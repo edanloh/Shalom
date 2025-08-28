@@ -1,0 +1,84 @@
+import React, { createContext, useContext, useState } from 'react';
+
+interface UserProgress {
+  courseId: string;
+  progress: number;
+  completed: boolean;
+  lastAccessed: Date;
+}
+
+interface UserContextType {
+  enrolledCourses: string[];
+  progress: UserProgress[];
+  completedCourses: string[];
+  enrollInCourse: (courseId: string) => void;
+  updateProgress: (courseId: string, progress: number) => void;
+  markCourseComplete: (courseId: string) => void;
+  getUserProgress: (courseId: string) => UserProgress | undefined;
+}
+
+const UserContext = createContext<UserContextType | undefined>(undefined);
+
+export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [enrolledCourses, setEnrolledCourses] = useState<string[]>([]);
+  const [progress, setProgress] = useState<UserProgress[]>([]);
+  const [completedCourses, setCompletedCourses] = useState<string[]>([]);
+
+  const enrollInCourse = (courseId: string) => {
+    if (!enrolledCourses.includes(courseId)) {
+      setEnrolledCourses([...enrolledCourses, courseId]);
+      setProgress([...progress, {
+        courseId,
+        progress: 0,
+        completed: false,
+        lastAccessed: new Date()
+      }]);
+    }
+  };
+
+  const updateProgress = (courseId: string, newProgress: number) => {
+    setProgress(prev => prev.map(p => 
+      p.courseId === courseId 
+        ? { ...p, progress: newProgress, lastAccessed: new Date() }
+        : p
+    ));
+  };
+
+  const markCourseComplete = (courseId: string) => {
+    if (!completedCourses.includes(courseId)) {
+      setCompletedCourses([...completedCourses, courseId]);
+      updateProgress(courseId, 100);
+      setProgress(prev => prev.map(p => 
+        p.courseId === courseId 
+          ? { ...p, completed: true }
+          : p
+      ));
+    }
+  };
+
+  const getUserProgress = (courseId: string) => {
+    return progress.find(p => p.courseId === courseId);
+  };
+
+  return (
+    <UserContext.Provider value={{
+      enrolledCourses,
+      progress,
+      completedCourses,
+      enrollInCourse,
+      updateProgress,
+      markCourseComplete,
+      getUserProgress
+    }}>
+      {children}
+    </UserContext.Provider>
+  );
+};
+
+export const useUser = () => {
+  const context = useContext(UserContext);
+  if (!context) {
+    throw new Error('useUser must be used within a UserProvider');
+  }
+  return context;
+};
