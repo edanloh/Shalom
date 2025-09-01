@@ -33,7 +33,8 @@
     "react-native-svg": "15.11.2",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-vector-icons": "^10.3.0",
-    "react-native-web": "^0.20.0"
+    "react-native-web": "^0.20.0",
+    "expo-blur": "~14.1.5"
   },
   "devDependencies": {
     "@react-native-community/cli": "^20.0.1",
