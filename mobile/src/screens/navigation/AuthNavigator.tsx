@@ -1,13 +1,14 @@
-import React from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import LoginScreen from '../auth/Login';
-import RegisterScreen from '../auth/Register';
-import ForgotPasswordScreen from '../auth/ForgotPassword';
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import LoginScreen from "../auth/Login";
+import RegisterScreen from "../auth/Register";
+import ForgotPasswordScreen from "../auth/ForgotPassword";
+import ConfirmSignUpScreen from "../auth/ConfirmSignUp";
 
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
+  ConfirmSignUp: { email?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
@@ -18,12 +19,13 @@ export default function AuthNavigator() {
       initialRouteName="Login"
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#fff' }, // works on web & mobile
+        contentStyle: { backgroundColor: "#fff" }, // works on web & mobile
       }}
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="ConfirmSignUp" component={ConfirmSignUpScreen} />
     </Stack.Navigator>
   );
 }
