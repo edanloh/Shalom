@@ -19,7 +19,7 @@ const CourseDetail = () => {
     duration: '40h',
     price: 89,
     originalPrice: 199,
-    thumbnail: require('../assets/placeholder.png'),
+    thumbnail: require('@assets/placeholder.png'),
     category: 'Web Development',
     level: 'Beginner',
     description: 'Learn web development from scratch with this comprehensive bootcamp. Cover HTML, CSS, JavaScript, React, Node.js, and more.',

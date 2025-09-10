@@ -4,7 +4,7 @@
     "slug": "Shalom",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/icon.png",
+    "icon": "@assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "backgroundColor": "#564beb"

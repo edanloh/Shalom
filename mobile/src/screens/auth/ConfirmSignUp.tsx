@@ -53,7 +53,7 @@ const ConfirmSignUp = () => {
         <View style={styles.header}>
           <View style={styles.logo}>
             <Image
-              source={require("../../assets/shalom.png")}
+              source={require("@assets/shalom.png")}
               style={{ width: 100, height: 100, resizeMode: "contain" }}
             />
           </View>

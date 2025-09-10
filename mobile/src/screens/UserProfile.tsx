@@ -86,7 +86,7 @@ export default function ProfileScreen({ navigation }: any) {
       <View style={styles.header}>
         <View style={styles.profileInfo}>
           <Image
-            source={{ uri: user?.avatar || require("../assets/icon.png") }}
+            source={{ uri: user?.avatar || require("@assets/icon.png") }}
             style={styles.avatar}
           />
           <View style={styles.userInfo}>

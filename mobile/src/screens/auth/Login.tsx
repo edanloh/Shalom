@@ -58,7 +58,7 @@ export default function LoginScreen({ navigation }: any) {
         <View style={styles.header}>
           <View style={styles.logo}>
             <Image
-              source={require("../../assets/shalom.png")}
+              source={require("@assets/shalom.png")}
               style={{ width: 100, height: 100, resizeMode: "contain" }}
             />
           </View>
@@ -121,7 +121,7 @@ export default function LoginScreen({ navigation }: any) {
               disabled={loading}
               loading={loading}
               variant="secondary"
-              imageSource={require("../../assets/facebook.png")}
+              imageSource={require("@assets/facebook.png")}
               style={styles.buttonSecondary}
               imageStyle={styles.image}
             />
@@ -130,7 +130,7 @@ export default function LoginScreen({ navigation }: any) {
               disabled={loading}
               loading={loading}
               variant="secondary"
-              imageSource={require("../../assets/google.png")}
+              imageSource={require("@assets/google.png")}
               style={styles.buttonSecondary}
               imageStyle={styles.image}
             />
