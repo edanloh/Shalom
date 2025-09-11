@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-// @ts-ignore
 import { COGNITO_POOL_ID, COGNITO_CLIENT_ID } from "react-native-dotenv";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -9,6 +8,9 @@ import {
   AuthenticationDetails,
   CognitoUserAttribute,
 } from "amazon-cognito-identity-js";
+import { makeRedirectUri } from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
+WebBrowser.maybeCompleteAuthSession();
 
 interface User {
   id: string;
@@ -19,6 +21,8 @@ interface User {
   bio?: string;
   location?: string;
   phone?: string;
+  authProvider: string; // e.g., 'google', 'email'
+  accessToken?: string; // Store access token if needed
 }
 
 interface AuthProviderProps {
@@ -42,9 +46,20 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<boolean>;
   updateProfile: (data: Partial<User>) => void;
   confirmSignUp: (email: string, code: string) => Promise<boolean>;
+  loginWithGoogle: (tokens: any) => Promise<void>;
+  confirmPasswordReset: (
+    email: string,
+    code: string,
+    newPassword: string
+  ) => Promise<boolean>;
 }
 
+const REDIRECT_URI = makeRedirectUri();
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// @ts-ignore
+import { API_BASE_URL, COGNITO_DOMAIN } from "react-native-dotenv";
 
 const poolData = {
   UserPoolId: COGNITO_POOL_ID,
@@ -60,8 +75,72 @@ if (!poolData.UserPoolId || !poolData.ClientId) {
 const userPool = new CognitoUserPool(poolData);
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
+  // Confirm password reset with code and new password
+  const confirmPasswordReset = async (
+    email: string,
+    code: string,
+    newPassword: string
+  ): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const cognitoUser = new CognitoUser({ Username: email, Pool: userPool });
+      cognitoUser.confirmPassword(code, newPassword, {
+        onSuccess: () => {
+          resolve(true);
+        },
+        onFailure: (err) => {
+          console.log("Confirm password reset error:", err);
+          resolve(false);
+        },
+      });
+    });
+  };
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Google login handler: expects tokens from Cognito
+  const loginWithGoogle = async (tokens: any) => {
+    try {
+      // Call your API Gateway endpoint to get full user info
+      const username = tokens.id_token
+        ? JSON.parse(atob(tokens.id_token.split(".")[1])).sub
+        : undefined;
+      if (!username) throw new Error("No username (sub) found in id_token");
+      const response = await fetch(
+        `${API_BASE_URL}/dev/getUserInfo?username=${encodeURIComponent(
+          username
+        )}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch user info from API Gateway");
+      }
+      const result = await response.json();
+      const userInfo = result.attributes || result.body?.attributes || {};
+      const userData: User = {
+        id: userInfo.sub || userInfo.email || username,
+        email: userInfo.email,
+        name:
+          userInfo.name ||
+          (userInfo.email ? userInfo.email.split("@")[0] : "GoogleUser"),
+        role: userInfo["custom:role"] || "learner",
+        avatar: userInfo.picture,
+        phone: userInfo.phone_number,
+        bio: userInfo.bio,
+        location: userInfo.locale || userInfo.location,
+        authProvider: "google",
+        accessToken: tokens.access_token, // Store access token if needed
+      };
+      setUser(userData);
+      setIsAuthenticated(true);
+      await AsyncStorage.setItem("user", JSON.stringify(userData));
+      console.log("Google login successful (API Gateway userInfo):", userData);
+    } catch (err) {
+      console.error("Google login error:", err);
+    }
+  };
 
   useEffect(() => {
     loadStoredAuth();
@@ -97,6 +176,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             email,
             name: email.split("@")[0],
             role: "learner",
+            authProvider: "email",
           });
           setIsAuthenticated(true);
           resolve({ success: true });
@@ -144,6 +224,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       await AsyncStorage.removeItem("user");
       setUser(null);
       setIsAuthenticated(false);
+
+      // Sign out from Cognito
+      const currentUser = userPool.getCurrentUser();
+      if (currentUser) {
+        currentUser.signOut();
+      }
+
+      // Redirect to Cognito logout URL
+      const logoutUrl = `${COGNITO_DOMAIN}/logout?client_id=${poolData.ClientId}&logout_uri=http://localhost:8081`;
+      if (typeof window !== "undefined" && window.location) {
+        window.location.href = logoutUrl;
+      } else {
+        // For React Native mobile
+        try {
+          const Linking = require("react-native").Linking;
+          Linking.openURL(logoutUrl);
+        } catch (err) {
+          console.log("Error opening logout URL:", err);
+        }
+      }
     } catch (error) {
       console.log("Logout error:", error);
     }
@@ -198,6 +298,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         resetPassword,
         updateProfile,
         confirmSignUp,
+        loginWithGoogle,
+        confirmPasswordReset,
       }}
     >
       {children}

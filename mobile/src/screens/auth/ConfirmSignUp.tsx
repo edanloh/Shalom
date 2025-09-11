@@ -1,14 +1,11 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Image,
   ScrollView,
-  TouchableOpacity,
 } from "react-native";
 import CustomTextInput from "@components/CustomTextInput";
 import ActionButton from "@components/ActionButton";
@@ -16,6 +13,7 @@ import { useAuth } from "@contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../navigation/AuthNavigator";
+import styles from "@/styles/styles";
 
 import { useRoute } from "@react-navigation/native";
 
@@ -64,7 +62,7 @@ const ConfirmSignUp = () => {
             style={{
               fontFamily: "Lexend-Regular",
               fontSize: 22,
-              color: "#fff",
+              color: "white",
               marginBottom: 16,
             }}
           >
@@ -107,36 +105,5 @@ const ConfirmSignUp = () => {
     </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#2f2f37" },
-  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 20 },
-  header: { alignItems: "center", marginBottom: 20 },
-  logo: {
-    width: 100,
-    height: 100,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#ffffffff",
-    marginBottom: 8,
-    letterSpacing: 1,
-    fontFamily: "Lexend-Regular",
-  },
-  form: {
-    borderRadius: 16,
-    padding: 24,
-  },
-  infoText: {
-    color: "#aaaaab",
-    fontSize: 14,
-    marginBottom: 16,
-    fontFamily: "Lexend-Light",
-  },
-});
 
 export default ConfirmSignUp;
