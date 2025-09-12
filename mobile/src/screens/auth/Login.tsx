@@ -137,6 +137,7 @@ export default function LoginScreen({ navigation }: any) {
             placeholder="Email"
             keyboardType="email-address"
             autoCapitalize="none"
+            returnKeyType="next"
           />
 
           {/* Password */}
@@ -149,6 +150,8 @@ export default function LoginScreen({ navigation }: any) {
             onTogglePassword={() => setShowPassword(!showPassword)}
             eyeIconStyle={styles.eyeIcon}
             warningText={loginWarning}
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
           />
 
           <View style={{ justifyContent: "flex-start" }}>

@@ -17,7 +17,11 @@ import * as WebBrowser from "expo-web-browser";
 import styles from "@/styles/styles";
 WebBrowser.maybeCompleteAuthSession();
 
-import { COGNITO_DOMAIN, COGNITO_CLIENT_ID } from "react-native-dotenv";
+import {
+  COGNITO_DOMAIN,
+  COGNITO_CLIENT_ID,
+  API_BASE_URL,
+} from "react-native-dotenv";
 import colors from "@/styles/colors";
 
 const REDIRECT_URI = makeRedirectUri();
@@ -48,6 +52,38 @@ export default function RegisterScreen({ navigation }: any) {
       return "Password must contain at least 1 lowercase letter";
     }
     return "";
+  };
+
+  const checkEmail = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/dev/getUserInfo?email=${email}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch user info from API Gateway");
+      }
+      const result = await response.json();
+      if (result) {
+        if (result.found == true) {
+          setPasswordWarning("Email is already registered");
+          console.log("Email already registered:", result.user);
+        } else {
+          setPasswordWarning("");
+          console.log("Email not registered, proceeding to register");
+          handleRegister();
+        }
+      }
+    } catch (err: any) {
+      setPasswordWarning("Error checking email");
+      console.error("Error checking email:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRegister = async () => {
@@ -162,6 +198,7 @@ export default function RegisterScreen({ navigation }: any) {
             onChangeText={setName}
             placeholder="Name"
             autoCapitalize="words"
+            returnKeyType="next"
           />
 
           {/* Email */}
@@ -171,6 +208,7 @@ export default function RegisterScreen({ navigation }: any) {
             placeholder="Email"
             keyboardType="email-address"
             autoCapitalize="none"
+            returnKeyType="next"
           />
 
           {/* Password */}
@@ -186,13 +224,13 @@ export default function RegisterScreen({ navigation }: any) {
             onTogglePassword={() => setShowPassword(!showPassword)}
             eyeIconStyle={styles.eyeIcon}
             warningText={password ? passwordWarning : ""}
+            returnKeyType="go"
+            onSubmitEditing={handleRegister}
           />
-
-          {/* Confirm Password removed */}
 
           {/* Sign Up Button */}
           <ActionButton
-            onPress={handleRegister}
+            onPress={checkEmail}
             disabled={loading}
             loading={loading}
             text={loading ? "Signing Up..." : "Sign Up"}

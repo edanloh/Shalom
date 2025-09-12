@@ -131,6 +131,8 @@ const ForgotPasswordScreen = () => {
                     placeholder="Email"
                     autoCapitalize="none"
                     keyboardType="email-address"
+                    returnKeyType="go"
+                    onSubmitEditing={handleRequestReset}
                   />
                   <ActionButton
                     onPress={handleRequestReset}
@@ -155,6 +157,7 @@ const ForgotPasswordScreen = () => {
                     placeholder="Reset Code"
                     autoCapitalize="none"
                     keyboardType="number-pad"
+                    returnKeyType="next"
                   />
                   {/* Password */}
                   <CustomTextInput
@@ -169,6 +172,8 @@ const ForgotPasswordScreen = () => {
                     onTogglePassword={() => setShowPassword(!showPassword)}
                     eyeIconStyle={styles.eyeIcon}
                     warningText={newPassword ? passwordWarning : ""}
+                    returnKeyType="go"
+                    onSubmitEditing={handleConfirmReset}
                   />
                   <ActionButton
                     onPress={handleConfirmReset}

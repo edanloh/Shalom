@@ -100,7 +100,7 @@ export default function UserManagementScreen({ navigation }: any) {
             ) : (
               filteredInstructors.map((user) => (
                 <View
-                  key={user.email}
+                  key={user.username}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
@@ -120,7 +120,27 @@ export default function UserManagementScreen({ navigation }: any) {
                     }}
                   />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: "white" }}>Name: {user.name}</Text>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
+                      }}
+                    >
+                      <Text style={{ color: "white" }}>Name: {user.name}</Text>
+                      {user?.authProvider && user?.authProvider == "Google" && (
+                        <Image
+                          source={require("@assets/google.png")}
+                          style={{
+                            width: 14,
+                            height: 14,
+                            resizeMode: "contain",
+                            marginLeft: 8,
+                            marginTop: 2,
+                          }}
+                        />
+                      )}
+                    </View>
                     <Text style={styles.loginText}>Email: {user.email}</Text>
                   </View>
                   <TouchableOpacity>
@@ -129,7 +149,7 @@ export default function UserManagementScreen({ navigation }: any) {
                       size={28}
                       color={"white"}
                       onPress={() => {
-                        console.log("Edit user:", user);
+                        navigation.navigate("UserConfig", { user });
                       }}
                     />
                   </TouchableOpacity>
@@ -159,7 +179,7 @@ export default function UserManagementScreen({ navigation }: any) {
             ) : (
               filteredStudents.map((user) => (
                 <View
-                  key={user.email}
+                  key={user.username}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
@@ -176,8 +196,28 @@ export default function UserManagementScreen({ navigation }: any) {
                       marginRight: 12,
                     }}
                   />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: "white" }}>Name: {user.name}</Text>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
+                      }}
+                    >
+                      <Text style={{ color: "white" }}>Name: {user.name}</Text>
+                      {user?.authProvider && user?.authProvider == "Google" && (
+                        <Image
+                          source={require("@assets/google.png")}
+                          style={{
+                            width: 14,
+                            height: 14,
+                            resizeMode: "contain",
+                            marginLeft: 8,
+                            marginTop: 2,
+                          }}
+                        />
+                      )}
+                    </View>
                     <Text style={styles.loginText}>Email: {user.email}</Text>
                   </View>
                   <TouchableOpacity>
@@ -186,7 +226,7 @@ export default function UserManagementScreen({ navigation }: any) {
                       size={28}
                       color={"white"}
                       onPress={() => {
-                        console.log("Edit user:", user);
+                        navigation.navigate("UserConfig", { user });
                       }}
                     />
                   </TouchableOpacity>

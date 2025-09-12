@@ -5,6 +5,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollContent: { flexGrow: 1, justifyContent: "center", padding: 20 },
   slimScrollContent: { flexGrow: 1, justifyContent: "flex-start", padding: 0 },
+  screenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    backgroundColor: colors.background,
+  },
   header: { alignItems: "center" },
   logo: {
     width: 100,
@@ -67,6 +74,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Lexend-Light",
   },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  headerTitle: { fontSize: 20, fontWeight: "bold", color: "white" },
 });
 
 export default styles;

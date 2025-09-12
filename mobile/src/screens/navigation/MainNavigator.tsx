@@ -9,6 +9,7 @@ import CourseDetailScreen from "../CourseDetail";
 import NotificationsScreen from "../Notification";
 import SettingsScreen from "../Settings";
 import EditProfileScreen from "../EditProfile";
+import UserConfigScreen from "../UserConfig";
 import { useAuth } from "../../contexts/AuthContext";
 
 import UserManagementScreen from "../UserManagement";
@@ -87,6 +88,16 @@ export default function MainNavigator() {
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="UserManagement"
+        component={UserManagementScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="UserConfig"
+        component={UserConfigScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

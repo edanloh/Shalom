@@ -77,14 +77,16 @@ export default function ProfileScreen({ navigation }: any) {
       <View style={styles.header}>
         <View style={styles.profileInfo}>
           <Image
-            source={{ uri: user?.avatar || require("@assets/icon.png") }}
+            source={
+              user?.avatar
+                ? { uri: user.avatar }
+                : require("@assets/profile.png")
+            }
             style={styles.avatar}
           />
           <View style={styles.userInfo}>
             <Text style={styles.name}>{user?.name}</Text>
             <Text style={styles.email}>{user?.email}</Text>
-            {/* <Text style={styles.name}>{user?.name}</Text>
-            <Text style={styles.email}>{user?.email}</Text> */}
             <View style={styles.roleContainer}>
               <Text
                 style={[

@@ -24,6 +24,19 @@ interface CustomTextInputProps {
   keyboardType?: KeyboardTypeOptions;
   warningText?: string;
   warningTextColor?: string;
+  onSubmitEditing?: () => void;
+  returnKeyType?:
+    | "default"
+    | "go"
+    | "google"
+    | "join"
+    | "next"
+    | "route"
+    | "search"
+    | "send"
+    | "yahoo"
+    | "done"
+    | "emergency-call";
 }
 
 const CustomTextInput: React.FC<CustomTextInputProps> = ({
@@ -40,6 +53,8 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
   keyboardType,
   warningText,
   warningTextColor,
+  onSubmitEditing,
+  returnKeyType = "default",
 }) => {
   const inputMarginBottom = warningText ? 8 : 16;
   return (
@@ -64,6 +79,8 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
           autoCapitalize={autoCapitalize}
           keyboardType={keyboardType}
           placeholderTextColor={colors.infoText}
+          onSubmitEditing={onSubmitEditing}
+          returnKeyType={returnKeyType}
         />
         {onTogglePassword && (
           <TouchableOpacity

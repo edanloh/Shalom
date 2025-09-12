@@ -15,6 +15,7 @@ WebBrowser.maybeCompleteAuthSession();
 interface User {
   id: string;
   email: string;
+  username: string;
   name: string;
   role: "learner" | "instructor";
   avatar?: string;
@@ -125,6 +126,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         name:
           userInfo.name ||
           (userInfo.email ? userInfo.email.split("@")[0] : "GoogleUser"),
+        username: userInfo.username,
         role: userInfo["custom:role"] || "learner",
         avatar: userInfo.picture,
         phone: userInfo.phone_number,
@@ -136,7 +138,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setUser(userData);
       setIsAuthenticated(true);
       await AsyncStorage.setItem("user", JSON.stringify(userData));
-      console.log("Google login successful (API Gateway userInfo):", userData);
     } catch (err) {
       console.error("Google login error:", err);
     }
@@ -171,15 +172,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       user.authenticateUser(authDetails, {
         onSuccess: async (result) => {
-          setUser({
-            id: email,
-            email,
-            name: email.split("@")[0],
-            role: "learner",
-            authProvider: "email",
+          user.getUserAttributes((err, attributes) => {
+            let role = "learner"; // default role
+            if (!err && attributes) {
+              const roleAttr = attributes.find(
+                (attr) => attr.getName() === "custom:role"
+              );
+              if (roleAttr) {
+                role = roleAttr.getValue();
+              }
+            }
+
+            setUser({
+              id: email,
+              email,
+              name: email.split("@")[0],
+              role: role as "learner" | "instructor",
+              authProvider: "email",
+              username: user.getUsername(),
+            });
+            setIsAuthenticated(true);
+            resolve({ success: true });
           });
-          setIsAuthenticated(true);
-          resolve({ success: true });
         },
         onFailure: (err) => {
           console.log("Login error:", err);
