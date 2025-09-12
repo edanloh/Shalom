@@ -44,12 +44,13 @@ function TabNavigator() {
         },
         tabBarActiveTintColor: '#8B5CF6',
         tabBarInactiveTintColor: '#6b7280',
-        headerStyle: { backgroundColor: '#8B5CF6' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
+        headerShown: false,
+        // headerStyle: { backgroundColor: '#8B5CF6' },
+        // headerTintColor: '#fff',
+        // headerTitleStyle: { fontWeight: 'bold' },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Home" component={HomeScreen}/>
       <Tab.Screen name="Courses" component={CoursesScreen} />
       <Tab.Screen name="Notifications" component={NotificationsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
