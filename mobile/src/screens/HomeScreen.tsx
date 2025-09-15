@@ -90,6 +90,10 @@ const HomeScreen: React.FC = () => {
     if (user) {
       console.log('HomeScreen - User ID for enrollment fetch:', user.id);
     }
+    // REMOVE LATER - Temporary override for testing
+    if (user) {
+      user.id = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
+    }
   }, [user]);
 
   const {

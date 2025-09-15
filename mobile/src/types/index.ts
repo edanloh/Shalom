@@ -209,6 +209,7 @@ export type MainStackParamList = {
   UserManagement?: undefined;
   UserConfig?: undefined;
   MyCourses?: undefined;
+  Auth?: undefined;
 };
 
 export type AuthStackParamList = {

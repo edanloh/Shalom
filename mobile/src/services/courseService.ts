@@ -326,6 +326,8 @@ class CourseService {
    */
   async getUserEnrollments(userId: string): Promise<Course[]> {
     try {
+      // REMOVE LATER - Temporary override for testing
+      userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
       console.log('getUserEnrollments - Starting fetch for user ID:', userId);
       
       // For testing, skip cache and always fetch fresh data

@@ -42,7 +42,7 @@ export default function LoginScreen({ navigation }: any) {
     if (!result.success) {
       setLoginWarning(result.error || "Login failed. Please try again");
     } else {
-      navigation.navigate("MainScreens");
+      navigation.navigate("Main");
     }
   };
 
