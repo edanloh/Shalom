@@ -75,7 +75,7 @@ export default function SearchScreen({ navigation, route }: any) {
         <Text style={styles.courseTitle} numberOfLines={2}>
           {item.title}
         </Text>
-        <Text style={styles.courseInstructor}>{item.instructor}</Text>
+        <Text style={styles.courseInstructor}>{item.instructor.name}</Text>
         <View style={styles.courseStats}>
           <View style={styles.rating}>
             <Ionicons name="star" size={12} color="#fbbf24" />

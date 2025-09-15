@@ -55,11 +55,8 @@ const App = () => {
                 <StatusBar style="dark" />
                 <NavigationContainer>
                   <Stack.Navigator screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="Auth" component={AuthNavigator} />
-                    <Stack.Screen
-                      name="MainScreens"
-                      component={MainNavigator}
-                    />
+                    {/* <Stack.Screen name="Auth" component={AuthNavigator} /> */}
+                    <Stack.Screen name="MainScreens" component={MainNavigator} options={{ headerShown: false }} />
                     <Stack.Screen name="NotFound" component={NotFoundScreen} />
                   </Stack.Navigator>
                 </NavigationContainer>

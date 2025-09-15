@@ -290,7 +290,7 @@ const renderCourse = ({ item }: any) => {
         </View>
         
         <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.instructor}>by {item.instructor}</Text>
+        <Text style={styles.instructor}>by {item.instructor.name}</Text>
         
         <View style={styles.stats}>
           <View style={styles.stat}>
