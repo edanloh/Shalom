@@ -15,12 +15,7 @@ import { AuthProvider } from "./src/contexts/AuthContext";
 import { UserProvider } from "./src/contexts/UserContext";
 import { CourseProvider } from "./src/contexts/CourseContext";
 import SplashScreen from "./src/screens/SplashScreen";
-
-export type RootStackParamList = {
-  Auth: undefined;
-  MainScreens: undefined;
-  NotFound: undefined;
-};
+import type { RootStackParamList } from "@/types/navigation";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const queryClient = new QueryClient();

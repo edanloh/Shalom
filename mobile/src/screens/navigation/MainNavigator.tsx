@@ -9,6 +9,7 @@ import CourseDetailScreen from '../CourseDetailScreen';
 import NotificationsScreen from '../Notification';
 import SettingsScreen from '../Settings';
 import EditProfileScreen from '../EditProfile';
+import MyCourses from '../MyCourses';
 import { useAuth } from '../../contexts/AuthContext';
 import type { MainStackParamList, TabParamList } from '../../types/navigation';
 
@@ -80,6 +81,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="MyCourses"
+        component={MyCourses}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
