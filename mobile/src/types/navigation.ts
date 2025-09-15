@@ -5,6 +5,7 @@ export type MainStackParamList = {
   CourseDetail: { courseId: string };
   Settings: undefined;
   EditProfile: undefined;
+  MyCourses: undefined;
 };
 
 export type TabParamList = {
@@ -18,4 +19,11 @@ export type RootStackParamList = {
   Auth: undefined;
   MainScreens: NavigatorScreenParams<MainStackParamList>;
   NotFound: undefined;
+};
+
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
+  ConfirmSignUp: { email?: string } | undefined;
 };

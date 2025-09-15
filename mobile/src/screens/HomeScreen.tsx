@@ -12,17 +12,22 @@ import {
   Alert,
 } from 'react-native';
 import { Colors, ContainerStyles, Spacing, Typography, TextStyles } from '../constants';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 
-// Import components
+// components (values)
 import ProfileHeader from '../components/home/ProfileHeader';
 import ProgressSection from '../components/home/ProgressSection';
 import SwipeableCourseCards from '../components/home/SwipeableCourseCards';
 import SuggestedCourses from '../components/home/SuggestedCourses';
 
-// Import hooks and types
+// hooks (values)
 import { useMyCourses, useSuggestedCourses } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
-import { Course } from '../types';
+
+// types
+import type { Course } from '../types';
+import type { MainStackParamList } from '../types/navigation';
 
 // Types for API-ready data structures
 interface User {
@@ -67,6 +72,8 @@ const HomeScreen: React.FC = () => {
       register('test@example.com', 'password', 'Test User', 'learner');
     }
   }, [user, register]);
+
+  const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
 
   // Use API hooks for course data
   const {
@@ -182,8 +189,8 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleViewAllCourses = () => {
-    // Navigate to all courses screen
-    console.log('View all courses');
+    // Navigate to my courses screen
+    navigation.navigate('MyCourses');
   };
 
   // Handle course actions for swipeable cards

@@ -3,13 +3,7 @@ import LoginScreen from "../auth/Login";
 import RegisterScreen from "../auth/Register";
 import ForgotPasswordScreen from "../auth/ForgotPassword";
 import ConfirmSignUpScreen from "../auth/ConfirmSignUp";
-
-export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  ForgotPassword: undefined;
-  ConfirmSignUp: { email?: string } | undefined;
-};
+import type { AuthStackParamList } from "@/types/navigation";
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
