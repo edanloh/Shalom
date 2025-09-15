@@ -1,188 +1,239 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
-  FlatList,
-  TouchableOpacity,
   StyleSheet,
+  SectionList,
+  Image,
+  TouchableOpacity,
+  StatusBar,
 } from 'react-native';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, Spacing, TextStyles } from '../constants';
+
+type AppNotification = {
+  id: string;
+  courseTitle: string;
+  subtitle: string;
+  thumbnail: string;
+  createdAt: string; // ISO date
+};
+
+const MOCK_NOTIFICATIONS: AppNotification[] = [
+  // Today
+  {
+    id: 't1',
+    courseTitle: 'Data Science Fundamentals',
+    subtitle: 'New content added to your course',
+    thumbnail:
+      'https://images.unsplash.com/photo-1551281044-8b89c2e2baea?w=200&q=60',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 't2',
+    courseTitle: 'Machine Learning Basics',
+    subtitle: 'Deadline approaching for your assignment',
+    thumbnail:
+      'https://images.unsplash.com/photo-1526378722484-bd91ca387e72?w=200&q=60',
+    createdAt: new Date().toISOString(),
+  },
+
+  // Yesterday
+  {
+    id: 'y1',
+    courseTitle: 'Data Science Fundamentals',
+    subtitle: 'New content added to your course',
+    thumbnail:
+      'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=200&q=60',
+    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'y2',
+    courseTitle: 'Machine Learning Basics',
+    subtitle: 'Deadline approaching for your assignment',
+    thumbnail:
+      'https://images.unsplash.com/photo-1518779578993-ec3579fee39f?w=200&q=60',
+    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  },
+
+  // Older
+  {
+    id: 'o1',
+    courseTitle: 'Data Science Fundamentals',
+    subtitle: 'New content added to your course',
+    thumbnail:
+      'https://images.unsplash.com/photo-1551281044-8b89c2e2baea?w=200&q=60',
+    createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const isSameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
+
+const isToday = (d: Date) => isSameDay(d, new Date());
+const isYesterday = (d: Date) => {
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  return isSameDay(d, y);
+};
+
+const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function NotificationsScreen({ navigation }: any) {
-  const [notifications, setNotifications] = useState([
-    {
-      id: '1',
-      type: 'course',
-      title: 'New lesson available',
-      message: 'Chapter 5: Advanced React Patterns is now available in your Web Development course',
-      time: '2 hours ago',
-      read: false,
-      icon: <Ionicons name="play-circle" size={20} color="#8B5CF6" />,
-      color: '#8B5CF6'
-    },
-    {
-      id: '2',
-      type: 'achievement',
-      title: 'Congratulations!',
-      message: 'You have completed 5 courses this month. Keep up the great work!',
-      time: '1 day ago',
-      read: false,
-      icon: <FontAwesome5 name="trophy" size={20} color="#fbbf24" />,
-      color: '#fbbf24'
-    },
-    {
-      id: '3',
-      type: 'reminder',
-      title: 'Study reminder',
-      message: 'Don\'t forget to continue your Machine Learning course today',
-      time: '2 days ago',
-      read: true,
-      icon: <Ionicons name="time-outline" size={20} color="#10b981" />,
-      color: '#10b981'
-    },
-    {
-      id: '4',
-      type: 'social',
-      title: 'New comment',
-      message: 'Sarah Chen replied to your question in the UI/UX Design course forum',
-      time: '3 days ago',
-      read: true,
-      icon: <Ionicons name="chatbubble-outline" size={20} color="#06b6d4" />,
-      color: '#06b6d4'
-    },
-    {
-      id: '5',
-      type: 'system',
-      title: 'App update available',
-      message: 'Version 2.1 is now available with new features and improvements',
-      time: '1 week ago',
-      read: true,
-      icon: <Ionicons name="download-outline" size={20} color="#6b7280" />,
-      color: '#6b7280'
+  const sections = useMemo(() => {
+    const today: AppNotification[] = [];
+    const yesterday: AppNotification[] = [];
+    const byDate: Record<string, AppNotification[]> = {};
+
+    for (const n of MOCK_NOTIFICATIONS) {
+      const dt = new Date(n.createdAt);
+
+      if (isToday(dt)) {
+        today.push(n);
+      } else if (isYesterday(dt)) {
+        yesterday.push(n);
+      } else {
+        const key = fmt.format(dt); // e.g., "Sep 2, 2025"
+        if (!byDate[key]) byDate[key] = [];
+        byDate[key].push(n);
+      }
     }
-  ]);
 
-  const markAsRead = (id: string) => {
-    setNotifications(notifications.map(notif => 
-      notif.id === id ? { ...notif, read: true } : notif
-    ));
-  };
+    const result: Array<{ title: string; data: AppNotification[] }> = [];
+    if (today.length) result.push({ title: 'Today', data: today });
+    if (yesterday.length) result.push({ title: 'Yesterday', data: yesterday });
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, read: true })));
-  };
+    // Add older groups sorted by most-recent first
+    const olderDates = Object.keys(byDate)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
-  const deleteNotification = (id: string) => {
-    setNotifications(notifications.filter(notif => notif.id !== id));
-  };
+    for (const key of olderDates) {
+      result.push({ title: key, data: byDate[key] });
+    }
 
-  const renderNotification = ({ item }: any) => (
-    <TouchableOpacity
-      style={[styles.notificationItem, !item.read && styles.unreadNotification]}
-      onPress={() => markAsRead(item.id)}
-    >
-      <View style={[styles.notificationIcon, { backgroundColor: item.color + '20' }]}>
-        {item.icon}
-      </View>
-      <View style={styles.notificationContent}>
-        <Text style={[styles.notificationTitle, !item.read && styles.unreadTitle]}>
-          {item.title}
+    return result;
+  }, []);
+
+  const renderItem = ({ item }: { item: AppNotification }) => (
+    <TouchableOpacity activeOpacity={0.8} style={styles.row}>
+      <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
+      <View style={styles.rowText}>
+        <Text style={styles.title} numberOfLines={1}>
+          {item.courseTitle}
         </Text>
-        <Text style={styles.notificationMessage} numberOfLines={2}>
-          {item.message}
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {item.subtitle}
         </Text>
-        <Text style={styles.notificationTime}>{item.time}</Text>
       </View>
-      {!item.read && <View style={styles.unreadDot} />}
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => deleteNotification(item.id)}
-      >
-        <Ionicons name="close" size={16} color="#9ca3af" />
-      </TouchableOpacity>
     </TouchableOpacity>
   );
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const renderSectionHeader = ({ section: { title } }: any) => (
+    <View style={styles.stickyHeader}>
+      <Text style={styles.stickyHeaderText}>{title}</Text>
+    </View>
+  );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          {unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </View>
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={markAllAsRead} style={styles.markAllButton}>
-            <Text style={styles.markAllText}>Mark all read</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
+        >
+          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>Notifications</Text>
+
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Settings')}
+          hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
+        >
+          <Ionicons name="settings-outline" size={22} color={Colors.textPrimary} />
+        </TouchableOpacity>
       </View>
 
-      {/* Notifications List */}
-      <FlatList
-        data={notifications}
-        renderItem={renderNotification}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
-        style={styles.notificationsList}
+        renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
+        SectionSeparatorComponent={() => <View style={{ height: Spacing.lg }} />}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
+const THUMB = 56;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.primary, // dark bg
+  },
+
+  // Header
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1f2937' },
-  unreadBadge: {
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
+  headerTitle: {
+    ...TextStyles.h3,
+    color: Colors.textPrimary,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
-  unreadBadgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  markAllButton: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#8B5CF6', borderRadius: 6 },
-  markAllText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  notificationsList: { flex: 1 },
-  notificationItem: {
+
+  // List
+  listContent: {
+    paddingHorizontal: Spacing.lg,
+  },
+  stickyHeader: {
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.sm,
+  },
+  stickyHeaderText: {
+    ...TextStyles.h2,
+    color: Colors.textPrimary,
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  // Row
+  row: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 4,
-    borderRadius: 12,
-    alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
   },
-  unreadNotification: { backgroundColor: '#f8fafc', borderLeftWidth: 3, borderLeftColor: '#8B5CF6' },
-  notificationIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  notificationContent: { flex: 1 },
-  notificationTitle: { fontSize: 16, color: '#1f2937', marginBottom: 4 },
-  unreadTitle: { fontWeight: '600' },
-  notificationMessage: { fontSize: 14, color: '#6b7280', lineHeight: 20, marginBottom: 4 },
-  notificationTime: { fontSize: 12, color: '#9ca3af' },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#8B5CF6', marginTop: 8, marginLeft: 8 },
-  deleteButton: { padding: 4, marginLeft: 8 },
+  thumb: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: 12,
+    marginRight: Spacing.md,
+  },
+  rowText: {
+    flex: 1,
+  },
+  title: {
+    ...TextStyles.h4,
+    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  subtitle: {
+    ...TextStyles.body,
+    color: Colors.textSecondary,
+    fontSize: 13,
+  },
 });

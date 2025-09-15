@@ -12,7 +12,8 @@ import {
   Alert,
 } from 'react-native';
 import { Colors, ContainerStyles, Spacing, Typography, TextStyles } from '../constants';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 // components (values)
@@ -27,7 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 // types
 import type { Course } from '../types';
-import type { MainStackParamList } from '../types/navigation';
+import type { MainStackParamList, TabParamList } from '../types/navigation';
 
 // Types for API-ready data structures
 interface User {
@@ -75,7 +76,10 @@ const HomeScreen: React.FC = () => {
 
   // Use unified CourseContext for all course data
 
-  const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
+  const navigation = useNavigation<CompositeNavigationProp<
+    StackNavigationProp<MainStackParamList>,
+    BottomTabNavigationProp<TabParamList>
+  >>();
 
   // Use unified CourseContext for all course data
   const {
@@ -188,7 +192,7 @@ const HomeScreen: React.FC = () => {
 
   const handleNotificationPress = () => {
     // Handle notification press - integrate with notification system
-    console.log('Notification pressed');
+    navigation.navigate('Notifications');
   };
 
   const handleViewAllCourses = () => {

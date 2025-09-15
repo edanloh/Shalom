@@ -9,9 +9,18 @@
     "splash": {
       "backgroundColor": "#564beb"
     },
-    "platforms": ["ios", "android", "web"],
-    "assetBundlePatterns": ["**/*"],
-    "plugins": ["expo-font"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-font",
+      "expo-web-browser"
+    ],
     "sdkVersion": "54.0.0"
   }
 }
