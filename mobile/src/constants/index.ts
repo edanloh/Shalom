@@ -7,3 +7,6 @@ export {
   TextStyles, 
   ContainerStyles 
 } from './GlobalStyles';
+
+// App constants
+export const ADMIN_EMAIL = 'admin@shalom.com';

@@ -58,12 +58,12 @@ const AchievementCard: React.FC<AchievementCardProps> = ({ achievement }) => {
   // Map achievement title to asset logo
   const getLogo = () => {
     if (achievement.title.includes("Streak")) {
-      return require("../../assets/streak.png");
+      return require("../../../assets/streak.png");
     } else if (achievement.title.includes("Certificates")) {
-      return require("../../assets/certificates.png");
+      return require("../../../assets/certificates.png");
     }
     // Default icon (use placeholder or shalom.png)
-    return require("../../assets/placeholder.png");
+    return require("../../../assets/placeholder.png");
   };
 
   return (

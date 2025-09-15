@@ -9,8 +9,11 @@ import CourseDetailScreen from '../CourseDetailScreen';
 import NotificationsScreen from '../Notification';
 import SettingsScreen from '../Settings';
 import EditProfileScreen from '../EditProfile';
+import UserManagementScreen from '../admin/UserManagement';
+import UserConfigScreen from '../admin/UserConfig';
 import { useAuth } from '../../contexts/AuthContext';
-import type { MainStackParamList, TabParamList } from '../../types/navigation';
+import { TabParamList, MainStackParamList } from '../../types';
+import { ADMIN_EMAIL } from '../../constants';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
@@ -25,20 +28,23 @@ function TabNavigator() {
           let iconName: keyof typeof Ionicons.glyphMap;
 
           switch (route.name) {
-            case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
+            case "Home":
+              iconName = focused ? "home" : "home-outline";
               break;
-            case 'Courses':
-              iconName = focused ? 'library' : 'library-outline';
+            case "Courses":
+              iconName = focused ? "library" : "library-outline";
               break;
-            case 'Notifications':
-              iconName = focused ? 'notifications' : 'notifications-outline';
+            case "Notifications":
+              iconName = focused ? "notifications" : "notifications-outline";
               break;
-            case 'Profile':
-              iconName = focused ? 'person' : 'person-outline';
+            case "Profile":
+              iconName = focused ? "person" : "person-outline";
+              break;
+            case "Admin":
+              iconName = focused ? "people" : "people-outline";
               break;
             default:
-              iconName = 'ellipse';
+              iconName = "ellipse";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -55,6 +61,9 @@ function TabNavigator() {
       <Tab.Screen name="Courses" component={CoursesScreen} />
       <Tab.Screen name="Notifications" component={NotificationsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
+      {user?.email === ADMIN_EMAIL && (
+        <Tab.Screen name="Admin" component={UserManagementScreen} />
+      )}
     </Tab.Navigator>
   );
 }
@@ -80,6 +89,16 @@ export default function MainNavigator() {
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="UserManagement"
+        component={UserManagementScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="UserConfig"
+        component={UserConfigScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

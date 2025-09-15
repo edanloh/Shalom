@@ -13,7 +13,7 @@ const SplashScreen = ({ onFinish }: { onFinish?: () => void }) => {
     <View style={styles.container}>
       <View style={styles.logo}>
         <Image
-          source={require("../assets/shalom.png")}
+          source={require("@assets/shalom.png")}
           style={{ width: 120, height: 120, resizeMode: "contain" }}
         />
         <Text style={styles.title}>Shalom</Text>

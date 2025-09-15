@@ -4,11 +4,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   KeyboardTypeOptions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { warn } from "console";
+import styles from "@/styles/styles";
+import colors from "@/styles/colors";
 
 interface CustomTextInputProps {
   value: string;
@@ -24,6 +24,19 @@ interface CustomTextInputProps {
   keyboardType?: KeyboardTypeOptions;
   warningText?: string;
   warningTextColor?: string;
+  onSubmitEditing?: () => void;
+  returnKeyType?:
+    | "default"
+    | "go"
+    | "google"
+    | "join"
+    | "next"
+    | "route"
+    | "search"
+    | "send"
+    | "yahoo"
+    | "done"
+    | "emergency-call";
 }
 
 const CustomTextInput: React.FC<CustomTextInputProps> = ({
@@ -40,6 +53,8 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
   keyboardType,
   warningText,
   warningTextColor,
+  onSubmitEditing,
+  returnKeyType = "default",
 }) => {
   const inputMarginBottom = warningText ? 8 : 16;
   return (
@@ -63,7 +78,9 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
           }
           autoCapitalize={autoCapitalize}
           keyboardType={keyboardType}
-          placeholderTextColor="#aaaaab"
+          placeholderTextColor={colors.infoText}
+          onSubmitEditing={onSubmitEditing}
+          returnKeyType={returnKeyType}
         />
         {onTogglePassword && (
           <TouchableOpacity
@@ -73,7 +90,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
             <Ionicons
               name={showPassword ? "eye" : "eye-off"}
               size={20}
-              color="#ffffffff"
+              color="white"
             />
           </TouchableOpacity>
         )}
@@ -83,7 +100,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
           <Text
             style={[
               styles.warningText,
-              { color: warningTextColor || "#ff6b6b" },
+              { color: warningTextColor || colors.warningText },
             ]}
           >
             {warningText}
@@ -93,28 +110,5 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    backgroundColor: "#3e3e47",
-  },
-  inputIcon: { marginLeft: 16 },
-  input: {
-    flex: 1,
-    padding: 16,
-    fontSize: 16,
-    color: "#ffffff",
-    fontFamily: "Lexend-Light",
-    borderRadius: 12,
-  },
-  eyeIcon: { padding: 16 },
-  warningText: {
-    fontSize: 12,
-    fontFamily: "Lexend-Light",
-  },
-});
 
 export default CustomTextInput;

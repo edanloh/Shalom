@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants';
-import { Images } from '../../assets';
+import { Images } from '../../../assets';
 
 interface CourseCardProps {
   title: string;

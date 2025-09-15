@@ -25,7 +25,7 @@ import Animated, {
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Colors, Spacing, Typography, TextStyles } from "../../constants";
-import { Images } from "../../assets";
+import { Images } from "../../../assets";
 import { Course } from "../../types";
 import type { MainStackParamList } from "../../types/navigation";
 

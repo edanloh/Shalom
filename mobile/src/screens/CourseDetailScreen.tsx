@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackScreenProps } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, TextStyles } from '../constants';
-import { Images } from '../assets';
+import { Images } from '../../assets';
 import { courseDetailService, ProcessedCourseDetail, CourseModule } from '../services/courseDetailService';
 import type { MainStackParamList } from '../types/navigation';
 

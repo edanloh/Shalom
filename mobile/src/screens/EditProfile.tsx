@@ -88,7 +88,7 @@ export default function EditProfileScreen({ navigation }: any) {
       <View style={styles.avatarSection}>
         <View style={styles.avatarContainer}>
           <Image
-            source={{ uri: user?.avatar || require("../assets/icon.png") }}
+            source={{ uri: user?.avatar || require("@assets/icon.png") }}
             style={styles.avatar}
           />
           <TouchableOpacity style={styles.avatarEditButton} onPress={handleChangeAvatar}>

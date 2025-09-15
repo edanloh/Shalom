@@ -31,8 +31,8 @@ const App = () => {
 
   useEffect(() => {
     Font.loadAsync({
-      "Lexend-Regular": require("./assets/fonts/Lexend-Regular.ttf"),
-      "Lexend-Light": require("./assets/fonts/Lexend-Light.ttf"),
+      "Lexend-Regular": require("@assets/fonts/Lexend-Regular.ttf"),
+      "Lexend-Light": require("@assets/fonts/Lexend-Light.ttf"),
       // Add other Lexend font weights/styles here if needed
     }).then(() => setFontsLoaded(true));
   }, []);

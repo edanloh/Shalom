@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Colors, Typography, Spacing, BorderRadius } from "../../constants";
-import { Images } from "../../assets";
+import { Images } from "../../../assets";
 
 interface Course {
   id: string;

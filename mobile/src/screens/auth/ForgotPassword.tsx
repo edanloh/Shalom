@@ -1,367 +1,201 @@
-import React, { useState } from 'react';
+import { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
-  StatusBar,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../../contexts/AuthContext';
+  Image,
+  ScrollView,
+  TouchableOpacity,
+} from "react-native";
+import CustomTextInput from "@components/CustomTextInput";
+import ActionButton from "@components/ActionButton";
+import { useAuth } from "@contexts/AuthContext";
+import { useNavigation } from "@react-navigation/native";
+import styles from "@/styles/styles";
+import colors from "@/styles/colors";
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-// Custom Icon Components (replacing Ionicons)
-const ArrowBackIcon = ({ size = 24, color = '#1f2937' }) => (
-  <View style={[styles.customIcon, { width: size, height: size }]}>
-    <Text style={[styles.iconText, { fontSize: size * 0.8, color }]}>←</Text>
-  </View>
-);
-
-const LockIcon = ({ size = 60, color = '#8B5CF6' }) => (
-  <View style={[styles.customIcon, { width: size, height: size }]}>
-    <Text style={[styles.iconText, { fontSize: size * 0.7, color }]}>🔒</Text>
-  </View>
-);
-
-const MailIcon = ({ size = 20, color = '#666' }) => (
-  <View style={[styles.customIcon, { width: size, height: size }]}>
-    <Text style={[styles.iconText, { fontSize: size * 0.8, color }]}>✉</Text>
-  </View>
-);
-
-const CheckmarkIcon = ({ size = 80, color = '#10b981' }) => (
-  <View style={[styles.customIcon, { width: size, height: size }]}>
-    <Text style={[styles.iconText, { fontSize: size * 0.8, color }]}>✓</Text>
-  </View>
-);
-
-export default function ForgotPasswordScreen({ navigation }: any) {
-  const [email, setEmail] = useState('');
+const ForgotPasswordScreen = () => {
+  const navigation = useNavigation<any>();
+  const [step, setStep] = useState(1); // 1: request, 2: confirm
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
-  const { resetPassword } = useAuth();
+  const [warningText, setWarningText] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordWarning, setPasswordWarning] = useState("");
+  const { resetPassword, confirmPasswordReset } = useAuth();
 
-  const handleResetPassword = async () => {
+  const validatePassword = (pwd: string) => {
+    if (pwd.length < 8) {
+      return "Password must be at least 8 characters";
+    }
+    if (!/[0-9]/.test(pwd)) {
+      return "Password must contain at least 1 number";
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) {
+      return "Password must contain at least 1 special character";
+    }
+    if (!/[A-Z]/.test(pwd)) {
+      return "Password must contain at least 1 uppercase letter";
+    }
+    if (!/[a-z]/.test(pwd)) {
+      return "Password must contain at least 1 lowercase letter";
+    }
+    return "";
+  };
+
+  const handleRequestReset = async () => {
     if (!email) {
-      Alert.alert('Error', 'Please enter your email address');
+      setWarningText("Please enter your email address");
       return;
     }
-
     setLoading(true);
-    const success = await resetPassword(email);
+    const ok = await resetPassword(email);
     setLoading(false);
-
-    if (success) {
-      setEmailSent(true);
-      Alert.alert(
-        'Email Sent',
-        'Check your email for password reset instructions',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-      );
+    if (ok) {
+      setStep(2);
+      setWarningText("");
     } else {
-      Alert.alert('Error', 'Failed to send reset email');
+      setWarningText("Failed to send reset email");
     }
   };
 
-  if (emailSent) {
-    return (
-      <View style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
-        
-        {/* Background Gradient - matching Hero component */}
-        <LinearGradient
-          colors={['rgba(59, 130, 246, 0.05)', 'rgba(147, 51, 234, 0.05)', 'transparent']}
-          style={styles.backgroundGradient}
-        />
-
-        <View style={styles.successContainer}>
-          <View style={styles.successContent}>
-            <CheckmarkIcon size={80} color="#10b981" />
-            <Text style={styles.successTitle}>Email Sent!</Text>
-            <Text style={styles.successMessage}>
-              We've sent password reset instructions to {email}
-            </Text>
-            
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.navigate('Login')}
-            >
-              <LinearGradient
-                colors={['#3B82F6', '#8B5CF6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.buttonGradient}
-              >
-                <Text style={styles.backButtonText}>Back to Login</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  }
+  const handleConfirmReset = async () => {
+    if (!code || !newPassword) {
+      setWarningText("Please enter the code and new password");
+      return;
+    }
+    setLoading(true);
+    const ok = await confirmPasswordReset(email, code, newPassword);
+    setLoading(false);
+    if (ok) {
+      setSuccess(true);
+      setWarningText("");
+    } else {
+      setWarningText("Invalid code or password. Please try again");
+    }
+  };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
-      
-      {/* Background Gradient - matching Hero component */}
-      <LinearGradient
-        colors={['rgba(59, 130, 246, 0.05)', 'rgba(147, 51, 234, 0.05)', 'transparent']}
-        style={styles.backgroundGradient}
-      />
-
-      <View style={styles.content}>
-        <TouchableOpacity
-          style={styles.backIcon}
-          onPress={() => navigation.goBack()}
-        >
-          <View style={styles.backIconContainer}>
-            <ArrowBackIcon size={24} color="#1f2937" />
-          </View>
-        </TouchableOpacity>
-
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <LockIcon size={60} color="#8B5CF6" />
-          <Text style={styles.title}>Forgot Password?</Text>
-          <Text style={styles.subtitle}>
-            Enter your email address and we'll send you instructions to reset your password
-          </Text>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <View style={styles.inputIconContainer}>
-              <MailIcon size={20} color="#666" />
-            </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your email"
-              placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
+          <View style={styles.logo}>
+            <Image
+              source={require("@assets/shalom.png")}
+              style={{ width: 100, height: 100, resizeMode: "contain" }}
             />
           </View>
-
-          <TouchableOpacity
-            style={[styles.resetButton, loading && styles.buttonDisabled]}
-            onPress={handleResetPassword}
-            disabled={loading}
-          >
-            <LinearGradient
-              colors={loading ? ['#9CA3AF', '#9CA3AF'] : ['#3B82F6', '#8B5CF6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.resetButtonText}>
-                {loading ? 'Sending...' : 'Send Reset Instructions'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.loginContainer}
-            onPress={() => navigation.navigate('Login')}
-          >
-            <Text style={styles.loginText}>Remember your password? </Text>
-            <Text style={styles.loginLink}>Sign In</Text>
-          </TouchableOpacity>
+          <Text style={styles.title}>Shalom</Text>
         </View>
-      </View>
+        <View style={styles.form}>
+          <Text
+            style={{
+              fontFamily: "Lexend-Regular",
+              fontSize: 22,
+              color: "white",
+              marginBottom: 16,
+            }}
+          >
+            {success
+              ? "Password Reset Successful"
+              : step === 1
+              ? "Forgot Password"
+              : "Confirm Password Reset"}
+          </Text>
+          <Text style={styles.infoText}>
+            {success
+              ? "You can now sign in with your new password."
+              : step === 1
+              ? "Enter your email to receive a password reset code."
+              : "Enter the code sent to your email and your new password."}
+          </Text>
+          {warningText ? (
+            <Text style={{ color: colors.warningText, marginBottom: 8 }}>
+              {warningText}
+            </Text>
+          ) : null}
+          {!success ? (
+            <>
+              {step === 1 ? (
+                <>
+                  <CustomTextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Email"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    returnKeyType="go"
+                    onSubmitEditing={handleRequestReset}
+                  />
+                  <ActionButton
+                    onPress={handleRequestReset}
+                    disabled={loading}
+                    loading={loading}
+                    text={loading ? "Sending..." : "Send Reset Code"}
+                  />
+                  <View style={[styles.loginContainer, { marginTop: 16 }]}>
+                    <Text style={styles.loginText}>Back to </Text>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate("Login")}
+                    >
+                      <Text style={styles.loginLink}>Login</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <CustomTextInput
+                    value={code}
+                    onChangeText={setCode}
+                    placeholder="Reset Code"
+                    autoCapitalize="none"
+                    keyboardType="number-pad"
+                    returnKeyType="next"
+                  />
+                  {/* Password */}
+                  <CustomTextInput
+                    value={newPassword}
+                    onChangeText={(text) => {
+                      setNewPassword(text);
+                      setPasswordWarning(text ? validatePassword(text) : "");
+                    }}
+                    placeholder="New Password"
+                    secureTextEntry={true}
+                    showPassword={showPassword}
+                    onTogglePassword={() => setShowPassword(!showPassword)}
+                    eyeIconStyle={styles.eyeIcon}
+                    warningText={newPassword ? passwordWarning : ""}
+                    returnKeyType="go"
+                    onSubmitEditing={handleConfirmReset}
+                  />
+                  <ActionButton
+                    onPress={handleConfirmReset}
+                    disabled={loading}
+                    loading={loading}
+                    text={loading ? "Resetting..." : "Confirm Reset"}
+                  />
+                </>
+              )}
+            </>
+          ) : (
+            <View style={{ alignItems: "center", marginTop: 16 }}>
+              <ActionButton
+                onPress={() => navigation.navigate("Login")}
+                text="Go to Login"
+              />
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  backgroundGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    minHeight: screenHeight * 0.8,
-  },
-  backIcon: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    left: 20,
-    zIndex: 10,
-  },
-  backIconContainer: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-    paddingTop: 40,
-  },
-  title: {
-    fontSize: screenWidth > 480 ? 32 : 28,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginTop: 20,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
-    maxWidth: 400,
-  },
-  form: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 32,
-    marginHorizontal: screenWidth > 480 ? 40 : 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.1)',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    marginBottom: 24,
-    backgroundColor: '#f9fafb',
-    minHeight: 56,
-  },
-  inputIconContainer: {
-    marginLeft: 16,
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    padding: 16,
-    fontSize: 16,
-    color: '#1f2937',
-    fontWeight: '500',
-  },
-  resetButton: {
-    borderRadius: 12,
-    marginBottom: 24,
-    overflow: 'hidden',
-  },
-  buttonGradient: {
-    paddingVertical: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  resetButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginText: {
-    color: '#6b7280',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  loginLink: {
-    color: '#3B82F6',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  successContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  successContent: {
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.1)',
-    maxWidth: 400,
-    width: '100%',
-  },
-  successTitle: {
-    fontSize: screenWidth > 480 ? 32 : 28,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginTop: 20,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  successMessage: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 40,
-    fontWeight: '500',
-  },
-  backButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    minWidth: 160,
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  customIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconText: {
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-});
+export default ForgotPasswordScreen;

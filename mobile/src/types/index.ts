@@ -188,3 +188,23 @@ export interface SearchQuery {
   sortBy?: 'rating' | 'price' | 'duration' | 'popularity';
   sortOrder?: 'asc' | 'desc';
 }
+
+// Navigation types
+export type TabParamList = {
+  Home: undefined;
+  Courses: undefined;
+  Search: undefined;
+  Profile: undefined;
+  Notifications: undefined;
+  Admin?: undefined;
+};
+
+export type MainStackParamList = {
+  Main: undefined;
+  CourseDetail: { courseId: string };
+  EditProfile: undefined;
+  Settings: undefined;
+  Notifications: undefined;
+  UserManagement?: undefined;
+  UserConfig?: undefined;
+};

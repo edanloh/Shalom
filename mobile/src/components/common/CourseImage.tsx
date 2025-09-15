@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Image, ImageProps, ImageStyle, View, StyleSheet } from 'react-native';
-import { Images } from '../../assets';
+import { Images } from '../../../assets';
 
 interface CourseImageProps extends Omit<ImageProps, 'source'> {
   uri: string;

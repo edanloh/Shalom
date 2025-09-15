@@ -14,10 +14,11 @@
     "paths": {
       "@/*": ["./src/*"],
       "@components/*": ["./src/components/*"],
-      "@contexts/*": ["./src/contexts/*"]
+      "@contexts/*": ["./src/contexts/*"],
+      "@assets/*": ["./assets/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "env.d.ts"],
   "exclude": ["node_modules"],
   "extends": "expo/tsconfig.base"
 }

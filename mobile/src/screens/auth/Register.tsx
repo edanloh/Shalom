@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   Alert,
   ScrollView,
   KeyboardAvoidingView,
@@ -13,6 +12,19 @@ import {
 import CustomTextInput from "@components/CustomTextInput";
 import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
+import { makeRedirectUri } from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
+import styles from "@/styles/styles";
+WebBrowser.maybeCompleteAuthSession();
+
+import {
+  COGNITO_DOMAIN,
+  COGNITO_CLIENT_ID,
+  API_BASE_URL,
+} from "react-native-dotenv";
+import colors from "@/styles/colors";
+
+const REDIRECT_URI = makeRedirectUri();
 
 export default function RegisterScreen({ navigation }: any) {
   const [name, setName] = useState("");
@@ -21,7 +33,7 @@ export default function RegisterScreen({ navigation }: any) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [passwordWarning, setPasswordWarning] = useState("");
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
 
   const validatePassword = (pwd: string) => {
     if (pwd.length < 8) {
@@ -40,6 +52,38 @@ export default function RegisterScreen({ navigation }: any) {
       return "Password must contain at least 1 lowercase letter";
     }
     return "";
+  };
+
+  const checkEmail = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/dev/getUserInfo?email=${email}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch user info from API Gateway");
+      }
+      const result = await response.json();
+      if (result) {
+        if (result.found == true) {
+          setPasswordWarning("Email is already registered");
+          console.log("Email already registered:", result.user);
+        } else {
+          setPasswordWarning("");
+          console.log("Email not registered, proceeding to register");
+          handleRegister();
+        }
+      }
+    } catch (err: any) {
+      setPasswordWarning("Error checking email");
+      console.error("Error checking email:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRegister = async () => {
@@ -64,14 +108,58 @@ export default function RegisterScreen({ navigation }: any) {
     }
   };
 
-  const handleFacebookRegister = () => {
-    Alert.alert("Info", "Facebook registration is not implemented yet");
-    alert("Facebook registration is not implemented yet");
-  };
-
-  const handleGoogleRegister = () => {
-    Alert.alert("Info", "Google registration is not implemented yet");
-    alert("Google registration is not implemented yet");
+  const handleGoogleLogin = async () => {
+    const cognitoAuthUrl =
+      `${COGNITO_DOMAIN}/oauth2/authorize?` +
+      `identity_provider=Google` +
+      `&client_id=${COGNITO_CLIENT_ID}` +
+      `&response_type=code` +
+      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+      `&scope=email%20openid%20phone`;
+    const result = await WebBrowser.openAuthSessionAsync(
+      cognitoAuthUrl,
+      REDIRECT_URI
+    );
+    if (result.type === "success") {
+      if (result.url) {
+        const urlParams = new URLSearchParams(result.url.split("?")[1]);
+        const authCode = urlParams.get("code");
+        if (authCode) {
+          // Exchange code for tokens
+          try {
+            const tokenResponse = await fetch(
+              `${COGNITO_DOMAIN}/oauth2/token`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: `grant_type=authorization_code&client_id=${COGNITO_CLIENT_ID}&code=${authCode}&redirect_uri=${encodeURIComponent(
+                  REDIRECT_URI
+                )}`,
+              }
+            );
+            const tokens = await tokenResponse.json();
+            if (tokens.id_token) {
+              // Call AuthContext to set user as authenticated
+              if (typeof loginWithGoogle === "function") {
+                await loginWithGoogle(tokens);
+              }
+              navigation.navigate("MainScreens");
+            } else {
+              Alert.alert("Error", "Failed to retrieve tokens from Cognito");
+            }
+          } catch (err) {
+            console.error("Error exchanging code for tokens:", err);
+            Alert.alert("Error", "Google login failed");
+          }
+        }
+      }
+    } else if (result.type === "dismiss") {
+      console.log("Google sign-in was cancelled");
+    } else {
+      console.log("Cognito sign-in failed");
+    }
   };
 
   return (
@@ -84,7 +172,7 @@ export default function RegisterScreen({ navigation }: any) {
         <View style={styles.header}>
           <View style={styles.logo}>
             <Image
-              source={require("../../assets/shalom.png")}
+              source={require("@assets/shalom.png")}
               style={{ width: 100, height: 100, resizeMode: "contain" }}
             />
           </View>
@@ -97,7 +185,7 @@ export default function RegisterScreen({ navigation }: any) {
             style={{
               fontFamily: "Lexend-Regular",
               fontSize: 22,
-              color: "#fff",
+              color: "white",
               marginBottom: 16,
             }}
           >
@@ -110,15 +198,17 @@ export default function RegisterScreen({ navigation }: any) {
             onChangeText={setName}
             placeholder="Name"
             autoCapitalize="words"
+            returnKeyType="next"
           />
 
           {/* Email */}
           <CustomTextInput
             value={email}
             onChangeText={setEmail}
-            placeholder="Email (Please use a real email)"
+            placeholder="Email"
             keyboardType="email-address"
             autoCapitalize="none"
+            returnKeyType="next"
           />
 
           {/* Password */}
@@ -134,45 +224,63 @@ export default function RegisterScreen({ navigation }: any) {
             onTogglePassword={() => setShowPassword(!showPassword)}
             eyeIconStyle={styles.eyeIcon}
             warningText={password ? passwordWarning : ""}
+            returnKeyType="go"
+            onSubmitEditing={handleRegister}
           />
-
-          {/* Confirm Password removed */}
 
           {/* Sign Up Button */}
           <ActionButton
-            onPress={handleRegister}
+            onPress={checkEmail}
             disabled={loading}
             loading={loading}
             text={loading ? "Signing Up..." : "Sign Up"}
+            style={{ marginTop: 16 }}
           />
-        </View>
 
-        {/* Social Login */}
-        <View style={{ alignItems: "center", marginBottom: 16 }}>
-          <Text style={{ color: "#aaaaab", marginBottom: 8 }}>
-            - Or Sign Up With -
-          </Text>
           <View
-            style={{ flexDirection: "row", justifyContent: "center", gap: 8 }}
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              marginVertical: 4,
+            }}
           >
-            <ActionButton
-              onPress={handleFacebookRegister}
-              disabled={loading}
-              loading={loading}
-              variant="secondary"
-              imageSource={require("../../assets/facebook.png")}
-              style={styles.buttonSecondary}
-              imageStyle={styles.image}
+            <View
+              style={{ flex: 1, height: 0.5, backgroundColor: colors.infoText }}
             />
-            <ActionButton
-              onPress={handleGoogleRegister}
-              disabled={loading}
-              loading={loading}
-              variant="secondary"
-              imageSource={require("../../assets/google.png")}
-              style={styles.buttonSecondary}
-              imageStyle={styles.image}
+            <Text
+              style={{
+                color: colors.infoText,
+                fontSize: 14,
+                marginHorizontal: 8,
+              }}
+            >
+              Or Sign In With
+            </Text>
+            <View
+              style={{ flex: 1, height: 0.5, backgroundColor: colors.infoText }}
             />
+          </View>
+
+          {/* Social Login */}
+          <View
+            style={{ alignItems: "center", marginBottom: 16, marginTop: 16 }}
+          >
+            <TouchableOpacity
+              onPress={handleGoogleLogin}
+              disabled={loading}
+              style={[
+                {
+                  width: "70%",
+                  maxWidth: 200,
+                  borderRadius: 24,
+                },
+              ]}
+            >
+              <Image
+                source={require("@assets/google-pill.png")}
+                style={[{ width: "100%", height: 48, resizeMode: "contain" }]}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -187,47 +295,3 @@ export default function RegisterScreen({ navigation }: any) {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#2f2f37" },
-  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 20 },
-  header: { alignItems: "center" },
-  logo: {
-    width: 100,
-    height: 100,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#ffffffff",
-    marginBottom: 8,
-    letterSpacing: 1,
-    fontFamily: "Lexend-Regular",
-  },
-  subtitle: { fontSize: 16, color: "#6b7280" },
-  form: {
-    borderRadius: 16,
-    padding: 24,
-  },
-  buttonSecondary: {
-    backgroundColor: "#3e3e47",
-    borderRadius: 12,
-    padding: 12,
-    paddingHorizontal: 20,
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  image: {
-    width: 24,
-    height: 24,
-    resizeMode: "contain",
-  },
-  picker: { flex: 1, height: 50 },
-  eyeIcon: { padding: 16 },
-  loginContainer: { flexDirection: "row", justifyContent: "center" },
-  loginText: { color: "#aaaaab", fontSize: 14 },
-  loginLink: { color: "#564beb", fontSize: 14, fontWeight: "600" },
-});
