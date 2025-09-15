@@ -9,15 +9,7 @@ import {
 } from "react-native";
 import { Colors, Typography, Spacing, BorderRadius } from "../../constants";
 import { Images } from "../../assets";
-
-interface Course {
-  id: string;
-  title: string;
-  level: string;
-  rating: number;
-  modules: number;
-  image: string;
-}
+import { Course } from "../../types";
 
 interface SuggestedCourseCardProps {
   course: Course;

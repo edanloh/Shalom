@@ -20,7 +20,7 @@ import SwipeableCourseCards from '../components/home/SwipeableCourseCards';
 import SuggestedCourses from '../components/home/SuggestedCourses';
 
 // Import hooks and types
-import { useMyCourses, useSuggestedCourses } from '../hooks';
+import { useCourses } from '../contexts/CourseContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Course } from '../types';
 
@@ -68,14 +68,18 @@ const HomeScreen: React.FC = () => {
     }
   }, [user, register]);
 
-  // Use API hooks for course data
+  // Use unified CourseContext for all course data
   const {
-    courses: myCoursesData,
-    loading: myCoursesLoading,
-    error: myCoursesError,
-    refresh: refreshMyCourses,
-    retry: retryMyCourses,
-  } = useMyCourses();
+    myCourses: myCoursesData,
+    myCoursesLoading,
+    myCoursesError,
+    refreshMyCourses,
+    
+    suggestedCourses: suggestedCoursesData,
+    suggestedLoading,
+    suggestedError,
+    refreshSuggested,
+  } = useCourses();
 
   // Debug logging for user state
   useEffect(() => {
@@ -84,13 +88,6 @@ const HomeScreen: React.FC = () => {
       console.log('HomeScreen - User ID for enrollment fetch:', user.id);
     }
   }, [user]);
-
-  const {
-    courses: suggestedCoursesData,
-    loading: suggestedLoading,
-    error: suggestedError,
-    refresh: refreshSuggested,
-  } = useSuggestedCourses();
 
   // Mock static data that doesn't require API calls
   const userData: User = {
@@ -162,7 +159,7 @@ const HomeScreen: React.FC = () => {
   // Check for errors on mount and when errors change
   useEffect(() => {
     if (myCoursesError) {
-      handleError(myCoursesError, retryMyCourses, 'My Courses');
+      handleError(myCoursesError, refreshMyCourses, 'My Courses');
     }
   }, [myCoursesError]);
 
@@ -240,7 +237,7 @@ const HomeScreen: React.FC = () => {
           ) : myCoursesError ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{myCoursesError}</Text>
-              <TouchableOpacity onPress={retryMyCourses} style={styles.retryButton}>
+              <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </View>

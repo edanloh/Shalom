@@ -1,15 +1,19 @@
 /**
  * Hooks Index
  * Export all custom hooks for easy importing
+ * 
+ * Note: For general course management, use useCourses from '../contexts/CourseContext'
+ * These hooks are for specialized functionality not covered by the context
  */
 
 export {
+  useCourseDetail,
+  useSearchCourses,
+  type UseCourseDetailReturn,
+  // Legacy exports (deprecated - use CourseContext instead)
   useCourses,
   useMyCourses,
   useSuggestedCourses,
-  useCourseDetail,
-  useSearchCourses,
   type UseCoursesReturn,
   type UseMyCOursesReturn,
-  type UseCourseDetailReturn,
 } from './useCourses';

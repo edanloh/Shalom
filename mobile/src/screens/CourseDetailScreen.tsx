@@ -143,7 +143,6 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           source={{ uri: review.reviewerAvatar }}
           fallback={Images.defaultAvatar}
           style={styles.reviewerAvatar}
-          onError={() => console.log('[CourseDetailScreen] Failed to load reviewer avatar')}
         />
         <View style={styles.reviewerInfo}>
           <Text style={styles.reviewerName}>{review.reviewerName}</Text>
@@ -195,7 +194,6 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             source={{ uri: courseDetail.image }}
             fallback={Images.placeholder}
             style={styles.heroImage}
-            onError={() => console.log('[CourseDetailScreen] Failed to load hero image')}
           />
           <View style={styles.heroOverlay} />
         </View>
@@ -227,7 +225,6 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               source={{ uri: courseDetail.instructor.avatar }}
               fallback={Images.defaultAvatar}
               style={styles.instructorAvatar}
-              onError={() => console.log('[CourseDetailScreen] Failed to load instructor avatar')}
             />
             <View style={styles.instructorInfo}>
               <Text style={styles.instructorName}>{courseDetail.instructor.name}</Text>
