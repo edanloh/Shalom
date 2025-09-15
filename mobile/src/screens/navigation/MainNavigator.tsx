@@ -5,14 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../HomeScreen';
 import CoursesScreen from '../Courses';
 import ProfileScreen from '../UserProfile';
-import CourseDetailScreen from '../CourseDetail';
+import CourseDetailScreen from '../CourseDetailScreen';
 import NotificationsScreen from '../Notification';
 import SettingsScreen from '../Settings';
 import EditProfileScreen from '../EditProfile';
 import { useAuth } from '../../contexts/AuthContext';
+import type { MainStackParamList, TabParamList } from '../../types/navigation';
 
-const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator<TabParamList>();
+const Stack = createStackNavigator<MainStackParamList>();
 
 function TabNavigator() {
   const { user } = useAuth();

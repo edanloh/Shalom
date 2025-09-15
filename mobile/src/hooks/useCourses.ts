@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Course } from '../types';
 import courseService, { CourseListParams } from '../services/courseService';
 import { ApiError, NetworkError, TimeoutError } from '../services/apiService';
+import { useAuth } from '../contexts/AuthContext';
 
 // Hook return types
 export interface UseCoursesReturn {
@@ -139,6 +140,7 @@ export const useMyCourses = (): UseMyCOursesReturn => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   
   const isMountedRef = useRef(true);
 
@@ -149,22 +151,33 @@ export const useMyCourses = (): UseMyCOursesReturn => {
   }, []);
 
   const fetchMyCourses = useCallback(async () => {
+    console.log('useMyCourses - fetchMyCourses called, user:', user);
+    
+    if (!user?.id) {
+      console.log('useMyCourses - No user ID available, skipping enrollment fetch');
+      return;
+    }
+
+    console.log('useMyCourses - Fetching enrollments for user ID:', user.id);
+
     try {
-      console.log('Fetching my courses...');
-      const coursesData = await courseService.getMyCourses();
+      console.log('useMyCourses - Calling courseService.getUserEnrollments...');
+      // Use the new enrollment endpoint with user ID
+      const coursesData = await courseService.getUserEnrollments(user.id);
       
       if (!isMountedRef.current) return;
       
-      console.log('Fetched my courses:', coursesData.length);
+      console.log('useMyCourses - Received courses data:', coursesData.length);
+      console.log('useMyCourses - Course titles:', coursesData.map(c => c.title));
       setCourses(coursesData);
       setError(null);
     } catch (err) {
       if (!isMountedRef.current) return;
       const errorMessage = getErrorMessage(err);
+      console.error('useMyCourses - Error fetching courses:', err);
       setError(errorMessage);
-      console.error('Error fetching my courses:', err);
     }
-  }, []);
+  }, [user?.id]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);

@@ -11,6 +11,7 @@
     },
     "platforms": ["ios", "android", "web"],
     "assetBundlePatterns": ["**/*"],
-    "plugins": ["expo-font"]
+    "plugins": ["expo-font"],
+    "sdkVersion": "54.0.0"
   }
 }

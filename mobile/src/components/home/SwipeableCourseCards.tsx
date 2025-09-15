@@ -6,13 +6,14 @@ import {
   Text,
   ScrollView,
   Image,
+  Pressable,
 } from "react-native";
 import {
-  PanGestureHandler,
+  Gesture,
+  GestureDetector,
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import Animated, {
-  useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -21,9 +22,49 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from "react-native-reanimated";
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import { Colors, Spacing, Typography, TextStyles } from "../../constants";
 import { Images } from "../../assets";
 import { Course } from "../../types";
+import type { MainStackParamList } from "../../types/navigation";
+
+type NavigationProp = StackNavigationProp<MainStackParamList, 'Main'>;
+
+// Custom Image component with fallback handling
+const ImageWithFallback: React.FC<{
+  source: { uri: string } | any;
+  fallback: any;
+  style: any;
+  onError?: () => void;
+}> = ({ source, fallback, style, onError }) => {
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleError = () => {
+    setHasError(true);
+    setIsLoading(false);
+    onError?.();
+  };
+
+  const handleLoad = () => {
+    setIsLoading(false);
+  };
+
+  // If there's no URI or an error occurred, use fallback
+  if (!source?.uri || hasError) {
+    return <Image source={fallback} style={style} onLoad={handleLoad} />;
+  }
+
+  return (
+    <Image
+      source={source}
+      style={style}
+      onError={handleError}
+      onLoad={handleLoad}
+    />
+  );
+};
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const CARD_WIDTH = screenWidth * 0.82;
@@ -46,6 +87,11 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useSharedValue(0);
   const opacity = useSharedValue(1);
+  const navigation = useNavigation<NavigationProp>();
+
+  const handleCoursePress = (courseId: string) => {
+    navigation.navigate('CourseDetail', { courseId });
+  };
 
   const handleSwipeComplete = (direction: "left" | "right") => {
     const currentCourse = courses[currentIndex];
@@ -63,12 +109,14 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
     });
   };
 
-  const gestureHandler = useAnimatedGestureHandler({
-    onStart: (_, context: any) => {
-      context.startX = translateX.value;
-    },
-    onActive: (event, context: any) => {
-      translateX.value = context.startX + event.translationX;
+  const startX = useSharedValue(0);
+
+  const panGesture = Gesture.Pan()
+    .onStart((_event) => {
+      startX.value = translateX.value;
+    })
+    .onUpdate((event) => {
+      translateX.value = startX.value + event.translationX;
       const progress = Math.abs(event.translationX) / SWIPE_THRESHOLD;
       opacity.value = interpolate(
         progress,
@@ -76,8 +124,8 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
         [1, 0.7],
         Extrapolate.CLAMP
       );
-    },
-    onEnd: (event) => {
+    })
+    .onEnd((event) => {
       const shouldSwipeRight = event.translationX > SWIPE_THRESHOLD;
       const shouldSwipeLeft = event.translationX < -SWIPE_THRESHOLD;
       if (shouldSwipeRight || shouldSwipeLeft) {
@@ -94,8 +142,7 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
         translateX.value = withSpring(0);
         opacity.value = withSpring(1);
       }
-    },
-  });
+    });
 
   const leftPreviewStyle = useAnimatedStyle(() => {
     const scale = interpolate(
@@ -155,10 +202,11 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
           style={[styles.previewCard, styles.leftPreview, leftPreviewStyle]}
         >
           <View style={styles.previewImageContainer}>
-            <Image
-              source={{ uri: previousCourse.image }}
-              defaultSource={Images.placeholder}
+            <ImageWithFallback
+              source={{ uri: previousCourse?.image }}
+              fallback={Images.placeholder}
               style={styles.previewImage}
+              
             />
           </View>
           <View style={styles.previewCardContent}>
@@ -184,10 +232,11 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
             </View>
 
             <View style={styles.instructorSection}>
-              <Image
-                source={{ uri: previousCourse.instructor.avatar }}
-                defaultSource={Images.defaultAvatar}
+              <ImageWithFallback
+                source={{ uri: previousCourse?.instructor?.avatar }}
+                fallback={Images.defaultAvatar}
                 style={styles.instructorAvatar}
+               
               />
               <View style={styles.instructorDetails}>
                 <View style={styles.instructorRow}>
@@ -207,20 +256,23 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
         </Animated.View>
 
         {/* Main course card */}
-        <PanGestureHandler onGestureEvent={gestureHandler}>
+        <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.mainCard, animatedStyle]}>
-            {/* Hero Image Section */}
-            <View style={styles.imageContainer}>
-              <Image
-                source={{ uri: currentCourse.image }}
-                defaultSource={Images.placeholder}
-                style={styles.mainImage}
-              />
-              <View style={styles.imageOverlay} />
-            </View>
+            <Pressable onPress={() => handleCoursePress(currentCourse.id)} style={{ flex: 1 }}>
+              {/* Hero Image Section */}
+              <View style={styles.imageContainer}>
+                <ImageWithFallback
+                  source={{ uri: currentCourse?.image }}
+                  fallback={Images.placeholder}
+                  style={styles.mainImage}
+                 
+                />
 
-            {/* Content Section */}
-            <View style={styles.mainCardContent}>
+                <View style={styles.imageOverlay} />
+              </View>
+
+              {/* Content Section */}
+              <View style={styles.mainCardContent}>
               {/* Course Title */}
               <Text style={styles.courseTitle} numberOfLines={2}>
                 {currentCourse.title}
@@ -248,10 +300,11 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
 
               {/* Instructor Section */}
               <View style={styles.instructorSection}>
-                <Image
-                  source={{ uri: currentCourse.instructor.avatar }}
-                  defaultSource={Images.defaultAvatar}
+                <ImageWithFallback
+                  source={{ uri: currentCourse?.instructor?.avatar }}
+                  fallback={Images.defaultAvatar}
                   style={styles.instructorAvatar}
+                 
                 />
                 <View style={styles.instructorDetails}>
                   <View style={styles.instructorRow}>
@@ -288,19 +341,21 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
                   <Text style={styles.statLabel}>Rating</Text>
                 </View>
               </View>
-            </View>
+              </View>
+            </Pressable>
           </Animated.View>
-        </PanGestureHandler>
+        </GestureDetector>
 
         {/* Right preview */}
         <Animated.View
           style={[styles.previewCard, styles.rightPreview, rightPreviewStyle]}
         >
           <View style={styles.previewImageContainer}>
-            <Image
-              source={{ uri: nextCourse.image }}
-              defaultSource={Images.placeholder}
+            <ImageWithFallback
+              source={{ uri: nextCourse?.image }}
+              fallback={Images.placeholder}
               style={styles.previewImage}
+             
             />
           </View>
           <View style={styles.previewCardContent}>
@@ -326,10 +381,11 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
             </View>
 
             <View style={styles.instructorSection}>
-              <Image
-                source={{ uri: nextCourse.instructor.avatar }}
-                defaultSource={Images.defaultAvatar}
+              <ImageWithFallback
+                source={{ uri: nextCourse?.instructor?.avatar }}
+                fallback={Images.defaultAvatar}
                 style={styles.instructorAvatar}
+               
               />
               <View style={styles.instructorDetails}>
                 <View style={styles.instructorRow}>

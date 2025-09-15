@@ -79,46 +79,35 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const login = async (
-    email: string,
-    password: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    return new Promise((resolve) => {
-      const user = new CognitoUser({ Username: email, Pool: userPool });
-      const authDetails = new AuthenticationDetails({
-        Username: email,
-        Password: password,
-      });
-
-      user.authenticateUser(authDetails, {
-        onSuccess: async (result) => {
-          setUser({
-            id: email,
-            email,
-            name: email.split("@")[0],
-            role: "learner",
-          });
-          setIsAuthenticated(true);
-          resolve({ success: true });
-        },
-        onFailure: (err) => {
-          console.log("Login error:", err);
-          let errorMsg = "Login failed. Please try again.";
-          if (err && err.message) errorMsg = err.message;
-          resolve({ success: false, error: errorMsg });
-        },
-      });
-    });
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      // Mock authentication
+      const mockUser: User = {
+        id: '550e8400-e29b-41d4-a716-446655440102',
+        email,
+        name: email.split('@')[0],
+        role: 'learner',
+        avatar: 'https://via.placeholder.com/150',
+        bio: 'Passionate learner and technology enthusiast',
+        location: 'Singapore',
+        phone: '',
+      };
+      
+      await AsyncStorage.setItem('user', JSON.stringify(mockUser));
+      setUser(mockUser);
+      setIsAuthenticated(true);
+      return true;
+    } catch (error) {
+      console.log('Login error:', error);
+      return false;
+    }
   };
 
-  const register = async (
-    email: string,
-    password: string,
-    name: string,
-    role: string
-  ): Promise<boolean> => {
-    return new Promise((resolve) => {
-      userPool.signUp(
+  const register = async (email: string, password: string, name: string, role: string): Promise<boolean> => {
+    try {
+      const mockUser: User = {
+        // id: Date.now().toString(),
+        id: '550e8400-e29b-41d4-a716-446655440102',
         email,
         password,
         [
