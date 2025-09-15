@@ -205,6 +205,15 @@ export type MainStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
   Notifications: undefined;
+  NotFound: undefined;
   UserManagement?: undefined;
   UserConfig?: undefined;
+  MyCourses?: undefined;
+};
+
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
+  ConfirmSignUp: { email: string };
 };

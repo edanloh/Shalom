@@ -1,9 +1,9 @@
 import React from 'react';
 import { SafeAreaView, View, Text, StyleSheet, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../../App';
+import type { MainStackParamList } from '../types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'NotFound'>;
+type Props = NativeStackScreenProps<MainStackParamList, 'NotFound'>;
 
 const NotFoundScreen: React.FC<Props> = ({ navigation }) => {
   return (
@@ -11,7 +11,7 @@ const NotFoundScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.center}>
         <Text style={styles.code}>404</Text>
         <Text style={styles.subtitle}>Oops! Page not found</Text>
-        <Pressable onPress={() => navigation.replace('MainScreens')} style={styles.link}>
+        <Pressable onPress={() => navigation.replace('Main')} style={styles.link}>
           <Text style={styles.linkText}>Return to Home</Text>
         </Pressable>
       </View>

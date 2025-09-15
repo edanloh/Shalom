@@ -3,8 +3,7 @@ import "react-native-gesture-handler";
 import React, { useEffect, useState } from "react";
 import * as Font from "expo-font";
 import { NavigationContainer } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -15,10 +14,9 @@ import { AuthProvider } from "./src/contexts/AuthContext";
 import { UserProvider } from "./src/contexts/UserContext";
 import { CourseProvider } from "./src/contexts/CourseContext";
 import SplashScreen from "./src/screens/SplashScreen";
-import type { RootStackParamList } from "@/types/navigation";
+import type { MainStackParamList } from "./src/types";
 
-const Stack = createStackNavigator<RootStackParamList>();
-const queryClient = new QueryClient();
+const Stack = createNativeStackNavigator<MainStackParamList>();
 
 const App = () => {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -26,8 +24,8 @@ const App = () => {
 
   useEffect(() => {
     Font.loadAsync({
-      "Lexend-Regular": require("@assets/fonts/Lexend-Regular.ttf"),
-      "Lexend-Light": require("@assets/fonts/Lexend-Light.ttf"),
+      "Lexend-Regular": require("./assets/fonts/Lexend-Regular.ttf"),
+      "Lexend-Light": require("./assets/fonts/Lexend-Light.ttf"),
       // Add other Lexend font weights/styles here if needed
     }).then(() => setFontsLoaded(true));
   }, []);
@@ -41,26 +39,24 @@ const App = () => {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <UserProvider>
-          <CourseProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <SafeAreaProvider>
-                <StatusBar style="dark" />
-                <NavigationContainer>
-                  <Stack.Navigator screenOptions={{ headerShown: false }}>
-                    {/* <Stack.Screen name="Auth" component={AuthNavigator} /> */}
-                    <Stack.Screen name="MainScreens" component={MainNavigator} options={{ headerShown: false }} />
-                    <Stack.Screen name="NotFound" component={NotFoundScreen} />
-                  </Stack.Navigator>
-                </NavigationContainer>
-              </SafeAreaProvider>
-            </GestureHandlerRootView>
-          </CourseProvider>
-        </UserProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <UserProvider>
+        <CourseProvider>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+              <StatusBar style="dark" />
+              <NavigationContainer>
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                  {/* <Stack.Screen name="Auth" component={AuthNavigator} /> */}
+                  <Stack.Screen name="Main" component={MainNavigator} options={{ headerShown: false }} />
+                  <Stack.Screen name="NotFound" component={NotFoundScreen} />
+                </Stack.Navigator>
+              </NavigationContainer>
+            </SafeAreaProvider>
+          </GestureHandlerRootView>
+        </CourseProvider>
+      </UserProvider>
+    </AuthProvider>
   );
 };
 

@@ -205,27 +205,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
   };
 
-  const register = async (email: string, password: string, name: string, role: string): Promise<boolean> => {
+  const register = async (
+    email: string,
+    password: string,
+    name: string,
+    role: string
+  ): Promise<boolean> => {
     return new Promise((resolve) => {
-      try {
-        const attributeList = [
+      userPool.signUp(
+        email,
+        password,
+        [
           new CognitoUserAttribute({ Name: "name", Value: name }),
           new CognitoUserAttribute({ Name: "custom:role", Value: role }),
-        ];
-
-        userPool.signUp(email, password, attributeList, [], (err, result) => {
+        ],
+        [],
+        (err) => {
           if (err) {
             console.log("Register error:", err);
             resolve(false);
           } else {
-            console.log("Registration successful:", result);
+            // Optionally auto-login or prompt for email verification
             resolve(true);
           }
-        });
-      } catch (error) {
-        console.log("Register error:", error);
-        resolve(false);
-      }
+        }
+      );
     });
   };
 
