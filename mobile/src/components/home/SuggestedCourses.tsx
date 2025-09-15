@@ -10,6 +10,7 @@ import {
 import { Colors, Typography, Spacing, BorderRadius } from "../../constants";
 import { Images } from "../../assets";
 import { Course } from "../../types";
+import { ImageWithFallback } from "../common";
 
 interface SuggestedCourseCardProps {
   course: Course;
@@ -23,10 +24,9 @@ const SuggestedCourseCard: React.FC<SuggestedCourseCardProps> = ({
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
       <View style={styles.imageContainer}>
-        <Image
-          source={
-            course?.image ? { uri: course.image } : Images.placeholder
-          }
+        <ImageWithFallback
+          source={{ uri: course?.image }}
+          fallback={Images.placeholder}
           style={styles.courseImage}
         />
         <View style={styles.levelBadge}>

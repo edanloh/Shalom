@@ -16,45 +16,11 @@ import { Colors, Spacing, Typography, TextStyles } from '../constants';
 import { Images } from '../assets';
 import { courseDetailService, ProcessedCourseDetail, CourseModule } from '../services/courseDetailService';
 import type { MainStackParamList } from '../types/navigation';
+import { ImageWithFallback } from '../components/common';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 type Props = StackScreenProps<MainStackParamList, 'CourseDetail'>;
-
-// ImageWithFallback component for reliable image loading
-const ImageWithFallback: React.FC<{
-  source: { uri: string } | any;
-  fallback: any;
-  style: any;
-  onError?: () => void;
-}> = ({ source, fallback, style, onError }) => {
-  const [hasError, setHasError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const handleError = () => {
-    setHasError(true);
-    setIsLoading(false);
-    onError?.();
-  };
-
-  const handleLoad = () => {
-    setIsLoading(false);
-  };
-
-  // If there's no URI or an error occurred, use fallback
-  if (!source?.uri || hasError) {
-    return <Image source={fallback} style={style} onLoad={handleLoad} />;
-  }
-
-  return (
-    <Image
-      source={source}
-      style={style}
-      onError={handleError}
-      onLoad={handleLoad}
-    />
-  );
-};
 
 const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { courseId } = route.params;
