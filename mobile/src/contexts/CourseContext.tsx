@@ -1,204 +1,169 @@
-import React, { createContext, useContext, useState } from 'react';
-
-export interface Course {
-  id: string;
-  title: string;
-  description: string;
-  instructor: string;
-  instructorId: string;
-  category: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-  duration: string;
-  price: number;
-  originalPrice?: number;
-  rating: number;
-  students: number;
-  thumbnail: string;
-  videos: Video[];
-  quizzes: Quiz[];
-  published: boolean;
-  createdAt: Date;
-}
-
-export interface Video {
-  id: string;
-  title: string;
-  duration: number;
-  url: string;
-  order: number;
-}
-
-export interface Quiz {
-  id: string;
-  title: string;
-  questions: Question[];
-  order: number;
-}
-
-export interface Question {
-  id: string;
-  question: string;
-  type: 'multiple-choice' | 'true-false' | 'text';
-  options?: string[];
-  correctAnswer: string;
-  explanation?: string;
-}
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Course } from '../types';
+import courseService, { CourseListParams } from '../services/courseService';
+import { useAuth } from './AuthContext';
 
 interface CourseContextType {
+  // All courses
   courses: Course[];
-  createCourse: (course: Omit<Course, 'id' | 'createdAt'>) => string;
-  updateCourse: (courseId: string, updates: Partial<Course>) => void;
-  deleteCourse: (courseId: string) => void;
-  getCourse: (courseId: string) => Course | undefined;
+  loading: boolean;
+  error: string | null;
+  refreshCourses: () => Promise<void>;
+  
+  // My courses (enrolled)
+  myCourses: Course[];
+  myCoursesLoading: boolean;
+  myCoursesError: string | null;
+  refreshMyCourses: () => Promise<void>;
+  
+  // Suggested courses
+  suggestedCourses: Course[];
+  suggestedLoading: boolean;
+  suggestedError: string | null;
+  refreshSuggested: () => Promise<void>;
+  
+  // Search and filter functions
   searchCourses: (query: string) => Course[];
   getCoursesByCategory: (category: string) => Course[];
-  getCoursesByInstructor: (instructorId: string) => Course[];
-  addVideoToCourse: (courseId: string, video: Omit<Video, 'id'>) => void;
-  addQuizToCourse: (courseId: string, quiz: Omit<Quiz, 'id'>) => void;
+  getCourse: (courseId: string) => Course | undefined;
 }
 
 const CourseContext = createContext<CourseContextType | undefined>(undefined);
 
 export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [courses, setCourses] = useState<Course[]>([
-    {
-      id: '1',
-      title: 'Complete Web Development Bootcamp 2024',
-      description: 'Learn HTML, CSS, JavaScript, React, Node.js, and more in this comprehensive bootcamp.',
-      instructor: 'Sarah Chen',
-      instructorId: 'instructor-1',
-      category: 'Web Development',
-      level: 'Beginner',
-      duration: '40h',
-      price: 89,
-      originalPrice: 199,
-      rating: 4.9,
-      students: 45000,
-      thumbnail: 'https://via.placeholder.com/400x250',
-      videos: [
-        { id: 'v1', title: 'Introduction to Web Development', duration: 900, url: 'mock-video-url', order: 1 },
-        { id: 'v2', title: 'HTML Fundamentals', duration: 1200, url: 'mock-video-url', order: 2 },
-      ],
-      quizzes: [
-        {
-          id: 'q1',
-          title: 'HTML Basics Quiz',
-          order: 1,
-          questions: [
-            {
-              id: 'q1-1',
-              question: 'What does HTML stand for?',
-              type: 'multiple-choice',
-              options: ['HyperText Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language'],
-              correctAnswer: 'HyperText Markup Language',
-              explanation: 'HTML stands for HyperText Markup Language.'
-            }
-          ]
-        }
-      ],
-      published: true,
-      createdAt: new Date()
-    },
-    {
-      id: '2',
-      title: 'Machine Learning Fundamentals with Python',
-      description: 'Master the basics of machine learning with hands-on Python projects.',
-      instructor: 'Dr. James Wilson',
-      instructorId: 'instructor-2',
-      category: 'Data Science',
-      level: 'Intermediate',
-      duration: '35h',
-      price: 119,
-      originalPrice: 249,
-      rating: 4.8,
-      students: 32000,
-      thumbnail: 'https://via.placeholder.com/400x250',
-      videos: [],
-      quizzes: [],
-      published: true,
-      createdAt: new Date()
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [myCourses, setMyCourses] = useState<Course[]>([]);
+  const [myCoursesLoading, setMyCoursesLoading] = useState(false);
+  const [myCoursesError, setMyCoursesError] = useState<string | null>(null);
+
+  const [suggestedCourses, setSuggestedCourses] = useState<Course[]>([]);
+  const [suggestedLoading, setSuggestedLoading] = useState(false);
+  const [suggestedError, setSuggestedError] = useState<string | null>(null);
+
+  const { user } = useAuth();
+
+  useEffect(() => {
+    loadCourses();
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadMyCourses();
+      loadSuggestedCourses();
     }
-  ]);
+  }, [user?.id]);
 
-  const createCourse = (courseData: Omit<Course, 'id' | 'createdAt'>): string => {
-    const newCourse: Course = {
-      ...courseData,
-      id: Date.now().toString(),
-      createdAt: new Date()
-    };
-    setCourses([...courses, newCourse]);
-    return newCourse.id;
+  const loadCourses = async () => {
+    if (loading) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const coursesData = await courseService.getCourses();
+      console.log('CourseContext: Loaded', coursesData.length, 'courses');
+      setCourses(coursesData);
+    } catch (err) {
+      console.error('CourseContext: Error loading courses:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load courses');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateCourse = (courseId: string, updates: Partial<Course>) => {
-    setCourses(courses.map(course => 
-      course.id === courseId ? { ...course, ...updates } : course
-    ));
+  const loadMyCourses = async () => {
+    if (!user?.id || myCoursesLoading) return;
+    
+    setMyCoursesLoading(true);
+    setMyCoursesError(null);
+    
+    try {
+      const myCoursesData = await courseService.getUserEnrollments(user.id);
+      console.log('CourseContext: Loaded', myCoursesData.length, 'my courses');
+      setMyCourses(myCoursesData);
+    } catch (err) {
+      console.error('CourseContext: Error loading my courses:', err);
+      setMyCoursesError(err instanceof Error ? err.message : 'Failed to load my courses');
+    } finally {
+      setMyCoursesLoading(false);
+    }
   };
 
-  const deleteCourse = (courseId: string) => {
-    setCourses(courses.filter(course => course.id !== courseId));
+  const loadSuggestedCourses = async () => {
+    if (suggestedLoading) return;
+    
+    setSuggestedLoading(true);
+    setSuggestedError(null);
+    
+    try {
+      console.log('CourseContext: Loading suggested courses...');
+      const suggestedData = await courseService.getSuggestedCourses();
+      setSuggestedCourses(suggestedData);
+    } catch (err) {
+      console.error('CourseContext: Error loading suggested courses:', err);
+      setSuggestedError(err instanceof Error ? err.message : 'Failed to load suggested courses');
+    } finally {
+      setSuggestedLoading(false);
+    }
   };
 
-  const getCourse = (courseId: string) => {
-    return courses.find(course => course.id === courseId);
+  const refreshCourses = async () => {
+    await loadCourses();
   };
 
-  const searchCourses = (query: string) => {
+  const refreshMyCourses = async () => {
+    await loadMyCourses();
+  };
+
+  const refreshSuggested = async () => {
+    await loadSuggestedCourses();
+  };
+
+  const searchCourses = (query: string): Course[] => {
+    if (!query.trim()) return courses;
+    
+    const queryLower = query.toLowerCase();
     return courses.filter(course => 
-      course.title.toLowerCase().includes(query.toLowerCase()) ||
-      course.description.toLowerCase().includes(query.toLowerCase()) ||
-      course.category.toLowerCase().includes(query.toLowerCase()) ||
-      course.instructor.toLowerCase().includes(query.toLowerCase())
+      course.title.toLowerCase().includes(queryLower) ||
+      course.description.toLowerCase().includes(queryLower) ||
+      course.category.toLowerCase().includes(queryLower) ||
+      course.instructor.name.toLowerCase().includes(queryLower)
     );
   };
 
-  const getCoursesByCategory = (category: string) => {
-    return courses.filter(course => course.category === category);
+  const getCoursesByCategory = (category: string): Course[] => {
+    return courses.filter(course => 
+      course.category.toLowerCase() === category.toLowerCase()
+    );
   };
 
-  const getCoursesByInstructor = (instructorId: string) => {
-    return courses.filter(course => course.instructorId === instructorId);
-  };
-
-  const addVideoToCourse = (courseId: string, videoData: Omit<Video, 'id'>) => {
-    const video: Video = {
-      ...videoData,
-      id: Date.now().toString()
-    };
-    
-    setCourses(courses.map(course => 
-      course.id === courseId 
-        ? { ...course, videos: [...course.videos, video] }
-        : course
-    ));
-  };
-
-  const addQuizToCourse = (courseId: string, quizData: Omit<Quiz, 'id'>) => {
-    const quiz: Quiz = {
-      ...quizData,
-      id: Date.now().toString()
-    };
-    
-    setCourses(courses.map(course => 
-      course.id === courseId 
-        ? { ...course, quizzes: [...course.quizzes, quiz] }
-        : course
-    ));
+  const getCourse = (courseId: string): Course | undefined => {
+    return courses.find(course => course.id === courseId);
   };
 
   return (
     <CourseContext.Provider value={{
       courses,
-      createCourse,
-      updateCourse,
-      deleteCourse,
-      getCourse,
+      loading,
+      error,
+      refreshCourses,
+      
+      myCourses,
+      myCoursesLoading,
+      myCoursesError,
+      refreshMyCourses,
+      
+      suggestedCourses,
+      suggestedLoading,
+      suggestedError,
+      refreshSuggested,
+      
       searchCourses,
       getCoursesByCategory,
-      getCoursesByInstructor,
-      addVideoToCourse,
-      addQuizToCourse
+      getCourse,
     }}>
       {children}
     </CourseContext.Provider>

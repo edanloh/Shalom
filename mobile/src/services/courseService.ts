@@ -332,7 +332,6 @@ class CourseService {
       
       // For testing, skip cache and always fetch fresh data
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`;
-      console.log('getUserEnrollments - Clearing cache for fresh data');
       await CacheManager.clear(cacheKey);
       
       /*
@@ -343,20 +342,13 @@ class CourseService {
         return cachedEnrollments;
       }
       */
-
-      console.log('getUserEnrollments - Fetching from API endpoint:', `${ENDPOINTS.USER_ENROLLMENTS}/${userId}`);
       
       const response = await apiService.get<EnrollmentResponse>(
         `${ENDPOINTS.USER_ENROLLMENTS}/${userId}`
       );
 
-      console.log('getUserEnrollments - Raw API Response:', JSON.stringify(response, null, 2));
-
       // Extract enrollments from response
       const enrollmentsData = response.data?.enrollments || [];
-      
-      console.log('getUserEnrollments - Enrollments data:', enrollmentsData);
-      console.log('getUserEnrollments - Number of enrollments:', enrollmentsData.length);
       
       if (!Array.isArray(enrollmentsData)) {
         console.error('getUserEnrollments - Invalid enrollment response structure:', response);
@@ -365,8 +357,6 @@ class CourseService {
 
       // Convert enrollment format to our app Course format
       const courses = enrollmentsData.map(convertEnrollmentToAppCourse);
-      
-      console.log('getUserEnrollments - Converted courses:', courses.length);
       console.log('getUserEnrollments - Course titles:', courses.map(c => c.title));
 
       // Cache the response

@@ -21,8 +21,8 @@ import ProgressSection from '../components/home/ProgressSection';
 import SwipeableCourseCards from '../components/home/SwipeableCourseCards';
 import SuggestedCourses from '../components/home/SuggestedCourses';
 
-// hooks (values)
-import { useMyCourses, useSuggestedCourses } from '../hooks';
+// Import hooks and types
+import { useCourses } from '../contexts/CourseContext';
 import { useAuth } from '../contexts/AuthContext';
 
 // types
@@ -73,16 +73,22 @@ const HomeScreen: React.FC = () => {
     }
   }, [user, register]);
 
+  // Use unified CourseContext for all course data
+
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
 
-  // Use API hooks for course data
+  // Use unified CourseContext for all course data
   const {
-    courses: myCoursesData,
-    loading: myCoursesLoading,
-    error: myCoursesError,
-    refresh: refreshMyCourses,
-    retry: retryMyCourses,
-  } = useMyCourses();
+    myCourses: myCoursesData,
+    myCoursesLoading,
+    myCoursesError,
+    refreshMyCourses,
+    
+    suggestedCourses: suggestedCoursesData,
+    suggestedLoading,
+    suggestedError,
+    refreshSuggested,
+  } = useCourses();
 
   // Debug logging for user state
   useEffect(() => {
@@ -95,13 +101,6 @@ const HomeScreen: React.FC = () => {
       user.id = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
     }
   }, [user]);
-
-  const {
-    courses: suggestedCoursesData,
-    loading: suggestedLoading,
-    error: suggestedError,
-    refresh: refreshSuggested,
-  } = useSuggestedCourses();
 
   // Mock static data that doesn't require API calls
   const userData: User = {
@@ -173,7 +172,7 @@ const HomeScreen: React.FC = () => {
   // Check for errors on mount and when errors change
   useEffect(() => {
     if (myCoursesError) {
-      handleError(myCoursesError, retryMyCourses, 'My Courses');
+      handleError(myCoursesError, refreshMyCourses, 'My Courses');
     }
   }, [myCoursesError]);
 
@@ -251,7 +250,7 @@ const HomeScreen: React.FC = () => {
           ) : myCoursesError ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{myCoursesError}</Text>
-              <TouchableOpacity onPress={retryMyCourses} style={styles.retryButton}>
+              <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </View>

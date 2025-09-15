@@ -89,12 +89,10 @@ export const useCourses = (params?: CourseListParams): UseCoursesReturn => {
 
   const fetchCourses = useCallback(async () => {
     try {
-      console.log('Fetching courses with params:', paramsRef.current);
       const coursesData = await courseService.getCourses(paramsRef.current);
       
       if (!isMountedRef.current) return;
 
-      console.log('Fetched courses:', coursesData.length);
       setCourses(coursesData);
       setError(null);
     } catch (err) {
@@ -165,13 +163,10 @@ export const useMyCourses = (): UseMyCOursesReturn => {
     console.log('useMyCourses - Fetching enrollments for user ID:', user.id);
 
     try {
-      console.log('useMyCourses - Calling courseService.getUserEnrollments...');
       // Use the new enrollment endpoint with user ID
       const coursesData = await courseService.getUserEnrollments(user.id);
       
       if (!isMountedRef.current) return;
-      
-      console.log('useMyCourses - Received courses data:', coursesData.length);
       console.log('useMyCourses - Course titles:', coursesData.map(c => c.title));
       setCourses(coursesData);
       setError(null);
