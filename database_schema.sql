@@ -512,3 +512,80 @@ GROUP BY u.id, u.name, u.email;
 -- ORDER BY c.student_count DESC;
 
 -- End of Database Schema
+
+-- ADDITIONAL CHANGES 15/09/2025
+-- Add to course_sections table
+ALTER TABLE course_sections ADD COLUMN section_order INTEGER;
+
+-- Add review aggregation data
+ALTER TABLE courses ADD COLUMN rating_breakdown JSONB; -- Store {5: 40, 4: 30, 3: 15, 2: 10, 1: 5}
+
+-- Add user progress tracking
+CREATE TABLE user_module_progress (
+  user_id UUID REFERENCES users(id),
+  course_id UUID REFERENCES courses(id),
+  section_id UUID REFERENCES course_sections(id),
+  is_completed BOOLEAN DEFAULT false,
+  completed_at TIMESTAMP,
+  PRIMARY KEY (user_id, course_id, section_id)
+);
+
+-- Add default sections for courses missing them
+INSERT INTO course_sections (
+    id, course_id, title, description, order_index, lessons_count, duration_minutes
+)
+VALUES
+-- UI/UX Design Masterclass
+(uuid_generate_v4(), '550e8400-e29b-41d4-a716-446655440403',
+ 'Introduction to UI/UX Design',
+ 'Overview of the course and fundamentals of user interface and experience design.',
+ 1, 4, 120),
+
+-- Advanced React & TypeScript
+(uuid_generate_v4(), '550e8400-e29b-41d4-a716-446655440404',
+ 'Getting Started with Advanced React & TypeScript',
+ 'Introduction to TypeScript with React, project setup, and advanced concepts outline.',
+ 1, 5, 150),
+
+-- Digital Marketing Mastery
+(uuid_generate_v4(), '550e8400-e29b-41d4-a716-446655440405',
+ 'Digital Marketing Foundations',
+ 'Core concepts of digital marketing, audience targeting, and analytics basics.',
+ 1, 3, 90),
+
+-- React Native Mobile Development
+(uuid_generate_v4(), '550e8400-e29b-41d4-a716-446655440406',
+ 'Introduction to React Native',
+ 'Setup React Native environment and create your first mobile application.',
+ 1, 4, 100);
+
+
+-- Insert default course_videos for new sections
+-- Insert one intro video per new section
+INSERT INTO course_videos (
+    id, course_id, section_id, title, description, video_url,
+    duration_seconds, order_index, is_preview, thumbnail_url
+)
+SELECT 
+    uuid_generate_v4(),
+    cs.course_id,
+    cs.id,
+    'Welcome to ' || c.title,
+    'An introduction to the course and what you will learn.',
+    'https://example.com/videos/' || c.id || '/intro.mp4',
+    600,   -- 10 minutes
+    1,
+    true,
+    'https://via.placeholder.com/320x180'
+FROM course_sections cs
+JOIN courses c ON c.id = cs.course_id
+WHERE cs.course_id IN (
+    '550e8400-e29b-41d4-a716-446655440403',
+    '550e8400-e29b-41d4-a716-446655440404',
+    '550e8400-e29b-41d4-a716-446655440405',
+    '550e8400-e29b-41d4-a716-446655440406'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM course_videos v WHERE v.section_id = cs.id
+);
+

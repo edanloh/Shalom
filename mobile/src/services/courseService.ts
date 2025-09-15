@@ -16,6 +16,7 @@ const CACHE_CONFIG = {
 // Course service endpoints
 const ENDPOINTS = {
   COURSES: '/courses',
+  USER_ENROLLMENTS: '/courses/enrollment',
 };
 
 export interface CourseListParams {
@@ -24,6 +25,82 @@ export interface CourseListParams {
   level?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+}
+
+// Types for enrollment response
+export interface EnrollmentCourse {
+  enrollment_id: string;
+  enrollment_date: string;
+  completion_date: string | null;
+  progress_percentage: string;
+  is_completed: boolean;
+  is_in_wishlist: boolean;
+  last_accessed: string;
+  total_watch_time_minutes: number;
+  course_id: string;
+  title: string;
+  description: string;
+  level: string;
+  duration_hours: number;
+  thumbnail_url: string;
+  rating: string;
+  student_count: number;
+  tags: string[];
+  category_name: string;
+  category_icon: string;
+  category_color: string;
+  instructor_name: string;
+  instructor_avatar: string;
+  instructor_rating: string;
+  total_videos: string;
+  completed_videos: string;
+  video_watch_time_seconds: string;
+  total_quizzes: string;
+  passed_quizzes: string;
+  video_progress_percent: number;
+  quiz_progress_percent: number;
+  estimated_time_remaining_minutes: number;
+  last_accessed_formatted: string;
+  enrollment_date_formatted: string;
+  completion_date_formatted: string | null;
+}
+
+export interface EnrollmentResponse {
+  success: boolean;
+  message: string;
+  data: {
+    enrollments: EnrollmentCourse[];
+    statistics: {
+      total_enrollments: number;
+      completed_courses: number;
+      wishlist_count: number;
+      average_progress: number;
+      total_watch_time_minutes: number;
+      active_last_week: number;
+      total_watch_time_hours: number;
+      completion_rate: number;
+    };
+    pagination: {
+      currentPageSize: number;
+      totalCount: number;
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+      totalPages: number;
+      currentPage: number;
+    };
+    filters: {
+      status: string | null;
+      progress_min: number | null;
+      progress_max: number | null;
+      sortBy: string;
+      sortOrder: string;
+    };
+    meta: {
+      timestamp: string;
+      requestId: string;
+    };
+  };
 }
 
 // Cache utility functions
@@ -129,6 +206,60 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   };
 };
 
+// Helper function to convert enrollment data to Course format
+const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
+  // Generate avatar from instructor name
+  const generateAvatar = (name: string): string => {
+    if (!name) return 'https://via.placeholder.com/50x50';
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=50&background=3B82F6&color=fff`;
+  };
+
+  // Map level to lowercase format
+  const mapLevel = (level: string): 'beginner' | 'intermediate' | 'advanced' => {
+    const levelLower = level?.toLowerCase();
+    switch (levelLower) {
+      case 'intermediate': return 'intermediate';
+      case 'advanced': return 'advanced';
+      default: return 'beginner';
+    }
+  };
+
+  // Calculate modules from duration
+  const totalModules = Math.floor(enrollment.duration_hours / 2) || 10;
+  const completedModules = Math.floor((totalModules * parseFloat(enrollment.progress_percentage)) / 100);
+
+  return {
+    id: enrollment.course_id,
+    title: enrollment.title,
+    description: enrollment.description,
+    instructor: {
+      id: `instructor-${enrollment.instructor_name.replace(/\s+/g, '-').toLowerCase()}`,
+      name: enrollment.instructor_name,
+      avatar: enrollment.instructor_avatar || generateAvatar(enrollment.instructor_name),
+      category: enrollment.category_name,
+      rating: parseFloat(enrollment.instructor_rating),
+      bio: `Expert ${enrollment.category_name} instructor`,
+    },
+    progress: {
+      completed: completedModules,
+      total: totalModules,
+      percentage: Math.round(parseFloat(enrollment.progress_percentage)),
+      lastAccessed: enrollment.last_accessed,
+    },
+    duration: `${enrollment.duration_hours}h`,
+    rating: parseFloat(enrollment.rating),
+    image: enrollment.thumbnail_url,
+    category: enrollment.category_name,
+    level: mapLevel(enrollment.level),
+    modules: totalModules,
+    tags: enrollment.tags || [],
+    prerequisites: [],
+    outcomes: [],
+    createdAt: enrollment.enrollment_date,
+    updatedAt: enrollment.last_accessed,
+  };
+};
+
 class CourseService {
   /**
    * Get all courses from AWS API Gateway
@@ -186,6 +317,62 @@ class CourseService {
       return courses;
     } catch (error) {
       console.error('Error fetching courses:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's enrolled courses from the enrollment endpoint
+   */
+  async getUserEnrollments(userId: string): Promise<Course[]> {
+    try {
+      console.log('getUserEnrollments - Starting fetch for user ID:', userId);
+      
+      // For testing, skip cache and always fetch fresh data
+      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`;
+      console.log('getUserEnrollments - Clearing cache for fresh data');
+      await CacheManager.clear(cacheKey);
+      
+      /*
+      // Check cache first
+      const cachedEnrollments = await CacheManager.get<Course[]>(cacheKey);
+      if (cachedEnrollments) {
+        console.log('getUserEnrollments - Returning cached user enrollments:', cachedEnrollments.length);
+        return cachedEnrollments;
+      }
+      */
+
+      console.log('getUserEnrollments - Fetching from API endpoint:', `${ENDPOINTS.USER_ENROLLMENTS}/${userId}`);
+      
+      const response = await apiService.get<EnrollmentResponse>(
+        `${ENDPOINTS.USER_ENROLLMENTS}/${userId}`
+      );
+
+      console.log('getUserEnrollments - Raw API Response:', JSON.stringify(response, null, 2));
+
+      // Extract enrollments from response
+      const enrollmentsData = response.data?.enrollments || [];
+      
+      console.log('getUserEnrollments - Enrollments data:', enrollmentsData);
+      console.log('getUserEnrollments - Number of enrollments:', enrollmentsData.length);
+      
+      if (!Array.isArray(enrollmentsData)) {
+        console.error('getUserEnrollments - Invalid enrollment response structure:', response);
+        throw new Error('Invalid enrollment response: enrollments array not found');
+      }
+
+      // Convert enrollment format to our app Course format
+      const courses = enrollmentsData.map(convertEnrollmentToAppCourse);
+      
+      console.log('getUserEnrollments - Converted courses:', courses.length);
+      console.log('getUserEnrollments - Course titles:', courses.map(c => c.title));
+
+      // Cache the response
+      await CacheManager.set(cacheKey, courses);
+
+      return courses;
+    } catch (error) {
+      console.error('Error fetching user enrollments:', error);
       throw error;
     }
   }
@@ -263,6 +450,7 @@ class CourseService {
    * Get detailed information for a specific course
    */
   async getCourseById(courseId: string): Promise<Course | null> {
+    console.log('Fetching course by ID:', courseId);
     try {
       const allCourses = await this.getCourses();
       return allCourses.find(course => course.id === courseId) || null;

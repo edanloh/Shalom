@@ -48,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Mock authentication
       const mockUser: User = {
-        id: '1',
+        id: '550e8400-e29b-41d4-a716-446655440102',
         email,
         name: email.split('@')[0],
         role: 'learner',
@@ -71,7 +71,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (email: string, password: string, name: string, role: string): Promise<boolean> => {
     try {
       const mockUser: User = {
-        id: Date.now().toString(),
+        // id: Date.now().toString(),
+        id: '550e8400-e29b-41d4-a716-446655440102',
         email,
         name,
         role: role as 'learner' | 'instructor' | 'admin',

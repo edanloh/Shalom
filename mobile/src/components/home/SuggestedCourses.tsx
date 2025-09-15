@@ -1,7 +1,14 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, ScrollView } from 'react-native';
-import { Colors, Typography, Spacing, BorderRadius } from '../../constants';
-import { Images } from '../../assets';
+import React from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  ScrollView,
+} from "react-native";
+import { Colors, Typography, Spacing, BorderRadius } from "../../constants";
+import { Images } from "../../assets";
 
 interface Course {
   id: string;
@@ -17,14 +24,18 @@ interface SuggestedCourseCardProps {
   onPress?: () => void;
 }
 
-const SuggestedCourseCard: React.FC<SuggestedCourseCardProps> = ({ course, onPress }) => {
+const SuggestedCourseCard: React.FC<SuggestedCourseCardProps> = ({
+  course,
+  onPress,
+}) => {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
       <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: course.image }} 
-          defaultSource={Images.placeholder}
-          style={styles.courseImage} 
+        <Image
+          source={
+            course?.image ? { uri: course.image } : Images.placeholder
+          }
+          style={styles.courseImage}
         />
         <View style={styles.levelBadge}>
           <Text style={styles.levelText}>{course.level}</Text>
@@ -50,14 +61,17 @@ interface SuggestedCoursesProps {
   onViewAll?: () => void;
 }
 
-const SuggestedCourses: React.FC<SuggestedCoursesProps> = ({ courses, onViewAll }) => {
+const SuggestedCourses: React.FC<SuggestedCoursesProps> = ({
+  courses,
+  onViewAll,
+}) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.sectionTitle}>Suggested for You</Text>
       </View>
-      <ScrollView 
-        horizontal 
+      <ScrollView
+        horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -91,18 +105,18 @@ const styles = StyleSheet.create({
     marginRight: Spacing.base,
     backgroundColor: Colors.backgroundGray,
     borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   imageContainer: {
-    position: 'relative',
+    position: "relative",
   },
   courseImage: {
-    width: '100%',
+    width: "100%",
     height: 120,
-    resizeMode: 'cover',
+    resizeMode: "cover",
   },
   levelBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: Spacing.sm,
     right: Spacing.sm,
     backgroundColor: Colors.purple400,
@@ -126,12 +140,12 @@ const styles = StyleSheet.create({
     lineHeight: Typography.fontSize.sm * Typography.lineHeight.tight,
   },
   stats: {
-    marginTop: 'auto',
+    marginTop: "auto",
   },
   stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   statValue: {
     fontFamily: Typography.fontFamily.bold,

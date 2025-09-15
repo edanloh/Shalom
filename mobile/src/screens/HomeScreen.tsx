@@ -21,6 +21,7 @@ import SuggestedCourses from '../components/home/SuggestedCourses';
 
 // Import hooks and types
 import { useMyCourses, useSuggestedCourses } from '../hooks';
+import { useAuth } from '../contexts/AuthContext';
 import { Course } from '../types';
 
 // Types for API-ready data structures
@@ -56,6 +57,16 @@ type TabType = 'home' | 'courses' | 'search' | 'settings';
 const HomeScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { user, login, register } = useAuth();
+
+  // Auto-login for testing if no user is authenticated
+  useEffect(() => {
+    if (!user) {
+      console.log('No user found, auto-registering test user...');
+      // Use register to get the correct user ID (550e8400-e29b-41d4-a716-446655440101)
+      register('test@example.com', 'password', 'Test User', 'learner');
+    }
+  }, [user, register]);
 
   // Use API hooks for course data
   const {
@@ -65,6 +76,14 @@ const HomeScreen: React.FC = () => {
     refresh: refreshMyCourses,
     retry: retryMyCourses,
   } = useMyCourses();
+
+  // Debug logging for user state
+  useEffect(() => {
+    console.log('HomeScreen - Current user:', user);
+    if (user) {
+      console.log('HomeScreen - User ID for enrollment fetch:', user.id);
+    }
+  }, [user]);
 
   const {
     courses: suggestedCoursesData,
@@ -104,7 +123,7 @@ const HomeScreen: React.FC = () => {
 
   const weeklyGoal: WeeklyGoalData = {
     id: '1',
-    userId: '1',
+    userId: '550e8400-e29b-41d4-a716-446655440102',
     targetHours: 7,
     currentHours: 5.8,
     weekStartDate: '2024-12-02T00:00:00Z',

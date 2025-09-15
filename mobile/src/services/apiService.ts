@@ -97,8 +97,18 @@ class ApiService {
           'Authorization': `Bearer ${token}`,
         };
       }
+      // Always add Content-Type header
+      config.headers = {
+        ...config.headers,
+        'Content-Type': 'application/json',
+      };
     } catch (error) {
       console.warn('Failed to retrieve auth token:', error);
+      // Even if auth fails, add Content-Type header
+      config.headers = {
+        ...config.headers,
+        'Content-Type': 'application/json',
+      };
     }
     return config;
   };
