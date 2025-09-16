@@ -31,15 +31,6 @@ import type { Course } from '../types';
 import type { MainStackParamList, TabParamList } from '../types/navigation';
 
 // Types for API-ready data structures
-interface User {
-  id: string;
-  name: string;
-  avatar: string;
-  points: number;
-  email: string;
-  joinedAt: string;
-}
-
 interface Achievement {
   id: string;
   icon: string;
@@ -63,18 +54,7 @@ type TabType = 'home' | 'courses' | 'search' | 'settings';
 const HomeScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { user, login, register } = useAuth();
-
-  // Auto-login for testing if no user is authenticated
-  useEffect(() => {
-    if (!user) {
-      console.log('No user found, auto-registering test user...');
-      // Use register to get the correct user ID (550e8400-e29b-41d4-a716-446655440101)
-      register('test@example.com', 'password', 'Test User', 'learner');
-    }
-  }, [user, register]);
-
-  // Use unified CourseContext for all course data
+  const { user } = useAuth();
 
   const navigation = useNavigation<CompositeNavigationProp<
     StackNavigationProp<MainStackParamList>,
@@ -96,26 +76,13 @@ const HomeScreen: React.FC = () => {
 
   // Debug logging for user state
   useEffect(() => {
-    console.log('HomeScreen - Current user:', user);
+    console.log('HomeScreen - Current user from AuthContext:', user);
     if (user) {
       console.log('HomeScreen - User ID for enrollment fetch:', user.id);
-    }
-    // REMOVE LATER - Temporary override for testing
-    if (user) {
-      user.id = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
     }
   }, [user]);
 
   // Mock static data that doesn't require API calls
-  const userData: User = {
-    id: '1',
-    name: 'James Lee',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=60&h=60&fit=crop&crop=face',
-    points: 30,
-    email: 'james.lee@example.com',
-    joinedAt: '2024-01-15T00:00:00Z',
-  };
-
   const achievements: Achievement[] = [
     {
       id: '1',
@@ -211,6 +178,19 @@ const HomeScreen: React.FC = () => {
     // TODO: Update course like status or mark as in-progress via API
   };
 
+  // Handle user loading state
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.purple400} />
+          <Text style={styles.loadingText}>Loading user profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
@@ -229,7 +209,7 @@ const HomeScreen: React.FC = () => {
       >
         {/* Combined Header with Profile, Welcome, and Notifications */}
         <ProfileHeader 
-          user={userData}
+          user={user}
           hasNotifications={true}
           onNotificationPress={handleNotificationPress}
         />

@@ -2,11 +2,18 @@
 
 export interface User {
   id: string;
-  name: string;
-  avatar: string;
-  points: number;
   email: string;
-  joinedAt: string;
+  username?: string;
+  name: string;
+  role?: "learner" | "instructor";
+  avatar?: string;
+  bio?: string;
+  location?: string;
+  phone?: string;
+  authProvider?: string; // e.g., 'google', 'email'
+  accessToken?: string; // Store access token if needed
+  points?: number; // For gamification features
+  joinedAt?: string; // ISO date string
   profile?: {
     bio?: string;
     location?: string;

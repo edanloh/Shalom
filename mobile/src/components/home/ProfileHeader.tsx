@@ -7,16 +7,9 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Colors, Spacing, Typography } from '../../constants';
+import type { User } from '../../types';
 
 // User interface matching the API structure
-interface User {
-  id: string;
-  name: string;
-  avatar: string;
-  points: number;
-  email: string;
-  joinedAt: string;
-}
 
 interface CombinedHeaderProps {
   user: User;
@@ -35,7 +28,7 @@ const CombinedHeader: React.FC<CombinedHeaderProps> = ({
       <View style={styles.topHeader}>
         <View style={styles.pointsContainer}>
           <Text style={styles.pointsIcon}>⭐</Text>
-          <Text style={styles.pointsText}>{user.points} pts</Text>
+          <Text style={styles.pointsText}>{user.points || 0} pts</Text>
         </View>
         
         <TouchableOpacity 
@@ -50,7 +43,10 @@ const CombinedHeader: React.FC<CombinedHeaderProps> = ({
       {/* Welcome Section with Avatar */}
       <View style={styles.welcomeSection}>
         <View style={styles.avatarContainer}>
-          <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          <Image 
+            source={{ uri: user.avatar || 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' }} 
+            style={styles.avatar} 
+          />
         </View>
         
         <View style={styles.welcomeTextContainer}>
