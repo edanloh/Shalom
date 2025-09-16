@@ -83,7 +83,7 @@ export default function LoginScreen({ navigation }: any) {
               if (typeof loginWithGoogle === "function") {
                 await loginWithGoogle(tokens);
               }
-              navigation.navigate("MainScreens");
+              navigation.navigate("Main");
             } else {
               Alert.alert("Error", "Failed to retrieve tokens from Cognito");
             }

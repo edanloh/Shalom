@@ -2,6 +2,7 @@
   "expo": {
     "name": "Shalom",
     "slug": "Shalom",
+    "scheme": "Shalom",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "@assets/icon.png",
@@ -9,18 +10,9 @@
     "splash": {
       "backgroundColor": "#564beb"
     },
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "plugins": [
-      "expo-font",
-      "expo-web-browser"
-    ],
+    "platforms": ["ios", "android", "web"],
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-font", "expo-web-browser"],
     "sdkVersion": "54.0.0"
   }
 }
