@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@aws-amplify/react-native": "^1.1.10",
+    "@aws-sdk/client-cognito-identity-provider": "^3.888.0",
+    "@aws-sdk/credential-providers": "^3.888.0",
     "@craftzdog/react-native-buffer": "^6.1.0",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",

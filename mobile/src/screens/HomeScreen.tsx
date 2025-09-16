@@ -54,7 +54,7 @@ type TabType = 'home' | 'courses' | 'search' | 'settings';
 const HomeScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { user } = useAuth();
+  const { user, login, register } = useAuth();
 
   const navigation = useNavigation<CompositeNavigationProp<
     StackNavigationProp<MainStackParamList>,

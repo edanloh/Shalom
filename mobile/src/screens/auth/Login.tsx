@@ -41,9 +41,8 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(false);
     if (!result.success) {
       setLoginWarning(result.error || "Login failed. Please try again");
-    } else {
-      navigation.navigate("Main");
     }
+    // Navigation will happen automatically when isAuthenticated changes
   };
 
   const handleGoogleLogin = async () => {
@@ -83,7 +82,7 @@ export default function LoginScreen({ navigation }: any) {
               if (typeof loginWithGoogle === "function") {
                 await loginWithGoogle(tokens);
               }
-              navigation.navigate("MainScreens");
+              // Navigation will happen automatically when isAuthenticated changes
             } else {
               Alert.alert("Error", "Failed to retrieve tokens from Cognito");
             }

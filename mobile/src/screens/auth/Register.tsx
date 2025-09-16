@@ -145,7 +145,7 @@ export default function RegisterScreen({ navigation }: any) {
               if (typeof loginWithGoogle === "function") {
                 await loginWithGoogle(tokens);
               }
-              navigation.navigate("MainScreens");
+              // Navigation will happen automatically when isAuthenticated changes
             } else {
               Alert.alert("Error", "Failed to retrieve tokens from Cognito");
             }
