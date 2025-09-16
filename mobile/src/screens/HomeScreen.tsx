@@ -66,13 +66,13 @@ const HomeScreen: React.FC = () => {
   const { user, login, register } = useAuth();
 
   // Auto-login for testing if no user is authenticated
-  useEffect(() => {
-    if (!user) {
-      console.log('No user found, auto-registering test user...');
-      // Use register to get the correct user ID (550e8400-e29b-41d4-a716-446655440101)
-      register('test@example.com', 'password', 'Test User', 'learner');
-    }
-  }, [user, register]);
+  // useEffect(() => {
+  //   if (!user) {
+  //     console.log('No user found, auto-registering test user...');
+  //     // Use register to get the correct user ID (550e8400-e29b-41d4-a716-446655440101)
+  //     register('test@example.com', 'password', 'Test User', 'learner');
+  //   }
+  // }, [user, register]);
 
   // Use unified CourseContext for all course data
 

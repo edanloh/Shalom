@@ -85,7 +85,7 @@ const ForgotPasswordScreen = () => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
+        <View style={[styles.header, { marginBottom: 24 }]}>
           <View style={styles.logo}>
             <Image
               source={require("@assets/shalom.png")}
@@ -185,7 +185,7 @@ const ForgotPasswordScreen = () => {
               )}
             </>
           ) : (
-            <View style={{ alignItems: "center", marginTop: 16 }}>
+            <View style={{ marginTop: 16 }}>
               <ActionButton
                 onPress={() => navigation.navigate("Login")}
                 text="Go to Login"

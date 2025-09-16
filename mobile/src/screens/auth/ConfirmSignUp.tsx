@@ -15,6 +15,7 @@ import { useAuth } from "@contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../../types";
+import styles from "@/styles/styles";
 
 import { useRoute } from "@react-navigation/native";
 
@@ -49,7 +50,7 @@ const ConfirmSignUp = () => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
+        <View style={[styles.header, { marginBottom: 24 }]}>
           <View style={styles.logo}>
             <Image
               source={require("@assets/shalom.png")}
@@ -106,45 +107,5 @@ const ConfirmSignUp = () => {
     </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.lg,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: Spacing['2xl'],
-  },
-  logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.lg,
-  },
-  title: {
-    fontFamily: Typography.fontFamily.bold,
-    fontSize: Typography.fontSize['3xl'],
-    color: Colors.textPrimary,
-  },
-  form: {
-    gap: Spacing.lg,
-  },
-  infoText: {
-    fontFamily: Typography.fontFamily.regular,
-    fontSize: Typography.fontSize.base,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-});
 
 export default ConfirmSignUp;

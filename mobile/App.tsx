@@ -8,16 +8,54 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { View, ActivityIndicator } from "react-native";
 import AuthNavigator from "./src/screens/navigation/AuthNavigator";
 import MainNavigator from "./src/screens/navigation/MainNavigator";
 import NotFoundScreen from "./src/screens/NotFoundScreen";
-import { AuthProvider } from "./src/contexts/AuthContext";
+import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { UserProvider } from "./src/contexts/UserContext";
 import { CourseProvider } from "./src/contexts/CourseContext";
 import SplashScreen from "./src/screens/SplashScreen";
 import type { MainStackParamList } from "./src/types";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
+
+// Navigation component that checks auth state
+const AppNavigator = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#fff",
+        }}
+      >
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {isAuthenticated ? (
+          <Stack.Screen
+            name="Main"
+            component={MainNavigator}
+            options={{ headerShown: false }}
+          />
+        ) : (
+          <Stack.Screen name="Auth" component={AuthNavigator} />
+        )}
+        <Stack.Screen name="NotFound" component={NotFoundScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
 
 const App = () => {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -46,17 +84,7 @@ const App = () => {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
               <StatusBar style="dark" />
-              <NavigationContainer>
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="Auth" component={AuthNavigator} />
-                  <Stack.Screen
-                    name="Main"
-                    component={MainNavigator}
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen name="NotFound" component={NotFoundScreen} />
-                </Stack.Navigator>
-              </NavigationContainer>
+              <AppNavigator />
             </SafeAreaProvider>
           </GestureHandlerRootView>
         </CourseProvider>
