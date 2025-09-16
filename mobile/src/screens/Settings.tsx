@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Switch,
   ScrollView,
@@ -42,6 +43,55 @@ export default function SettingsScreen({ navigation }: any) {
     { key: 'autoPlay',           title: 'Auto-play Videos',     subtitle: 'Automatically play video lessons',        icon: 'play-outline' },
     { key: 'downloadOverWifi',   title: 'Download over WiFi only', subtitle: 'Only download content when connected to WiFi', icon: 'wifi-outline' },
   ];
+
+  const accountItems = [
+  {
+    key: 'editProfile',
+    icon: 'person-outline' as const,
+    title: 'Edit Profile',
+    subtitle: 'Update your personal information',
+    onPress: () => navigation.navigate('EditProfile'),
+  },
+  {
+    key: 'privacy',
+    icon: 'shield-checkmark-outline' as const,
+    title: 'Privacy & Security',
+    subtitle: 'Manage your privacy settings',
+    onPress: () => console.log('Privacy & Security'),
+  },
+  {
+    key: 'changePassword',
+    icon: 'lock-closed-outline' as const,
+    title: 'Change Password',
+    subtitle: 'Update your account password',
+    onPress: () => console.log('Change Password'),
+  },
+];
+
+const supportItems = [
+  {
+    key: 'help',
+    icon: 'help-circle-outline' as const,
+    title: 'Help & Support',
+    subtitle: 'Get help and contact support',
+    onPress: () => console.log('Help & Support'),
+  },
+  {
+    key: 'terms',
+    icon: 'document-text-outline' as const,
+    title: 'Terms & Conditions',
+    subtitle: 'Read our terms of service',
+    onPress: () => console.log('Terms & Conditions'),
+  },
+  {
+    key: 'about',
+    icon: 'information-circle-outline' as const,
+    title: 'About',
+    subtitle: 'App version and information',
+    onPress: () => console.log('About'),
+  },
+];
+
 
   const onToggle = (key: keyof typeof settings) =>
     setSettings((s) => ({ ...s, [key]: !s[key] }));
@@ -120,40 +170,29 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.row}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Edit Profile</Text>
-                  <Text style={styles.settingSubtitle}>Update your personal information</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <View style={styles.divider} />
+            {accountItems.map((item, idx) => (
+              <React.Fragment key={item.key}>
+                <Pressable
+                  onPress={item.onPress}
+                  android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.title}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
+                >
+                  <View style={styles.settingLeft}>
+                    <Ionicons name={item.icon} size={20} color={Colors.textSecondary} />
+                    <View style={styles.settingText}>
+                      <Text style={styles.settingTitle}>{item.title}</Text>
+                      <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
+                </Pressable>
 
-            <TouchableOpacity style={styles.row}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={Colors.textSecondary} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Privacy & Security</Text>
-                  <Text style={styles.settingSubtitle}>Manage your privacy settings</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <View style={styles.divider} />
-
-            <TouchableOpacity style={styles.row}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Change Password</Text>
-                  <Text style={styles.settingSubtitle}>Update your account password</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
+                {idx < accountItems.length - 1 && <View style={styles.divider} />}
+              </React.Fragment>
+            ))}
           </View>
         </View>
 
@@ -161,40 +200,29 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support & Legal</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.row}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="help-circle-outline" size={20} color={Colors.textSecondary} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Help & Support</Text>
-                  <Text style={styles.settingSubtitle}>Get help and contact support</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <View style={styles.divider} />
+            {supportItems.map((item, idx) => (
+              <React.Fragment key={item.key}>
+                <Pressable
+                  onPress={item.onPress}
+                  android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.title}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
+                >
+                  <View style={styles.settingLeft}>
+                    <Ionicons name={item.icon} size={20} color={Colors.textSecondary} />
+                    <View style={styles.settingText}>
+                      <Text style={styles.settingTitle}>{item.title}</Text>
+                      <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
+                </Pressable>
 
-            <TouchableOpacity style={styles.row}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="document-text-outline" size={20} color={Colors.textSecondary} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Terms & Conditions</Text>
-                  <Text style={styles.settingSubtitle}>Read our terms of service</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <View style={styles.divider} />
-
-            <TouchableOpacity style={styles.row}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="information-circle-outline" size={20} color={Colors.textSecondary} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>About</Text>
-                  <Text style={styles.settingSubtitle}>App version and information</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
+                {idx < supportItems.length - 1 && <View style={styles.divider} />}
+              </React.Fragment>
+            ))}
           </View>
         </View>
 
@@ -226,7 +254,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...TextStyles.h3,
     color: Colors.textPrimary,
-    fontSize: 20,
+    fontSize: TextStyles.h4.fontSize,
     fontWeight: 'bold',
   },
 

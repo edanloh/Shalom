@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...TextStyles.h3,
     color: Colors.textPrimary,
-    fontSize: 20,
+    fontSize: TextStyles.h4.fontSize,
     fontWeight: 'bold',
   },
 
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   stickyHeaderText: {
     ...TextStyles.h2,
     color: Colors.textPrimary,
-    fontSize: 20,
+    fontSize: TextStyles.h4.fontSize,
     fontWeight: 'bold',
   },
   // Row
