@@ -2,12 +2,21 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { COGNITO_POOL_ID, COGNITO_CLIENT_ID } from "react-native-dotenv";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Using AWS SDK v3 for React Native compatibility
 import {
-  CognitoUserPool,
-  CognitoUser,
-  AuthenticationDetails,
-  CognitoUserAttribute,
-} from "amazon-cognito-identity-js";
+  CognitoIdentityProviderClient,
+  InitiateAuthCommand,
+  SignUpCommand,
+  ConfirmSignUpCommand,
+  ForgotPasswordCommand,
+  ConfirmForgotPasswordCommand,
+  GetUserCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+console.log(
+  "🔐 AuthContext: AWS SDK v3 imported successfully (React Native compatible)"
+);
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 WebBrowser.maybeCompleteAuthSession();
@@ -73,7 +82,14 @@ if (!poolData.UserPoolId || !poolData.ClientId) {
   );
 }
 
-const userPool = new CognitoUserPool(poolData);
+// Create AWS SDK client (React Native compatible)
+const cognitoClient = new CognitoIdentityProviderClient({
+  region: "ap-southeast-1", // Singapore region to match your User Pool
+});
+
+console.log(
+  "🔐 AuthContext: AWS SDK CognitoIdentityProviderClient created successfully"
+);
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Confirm password reset with code and new password
@@ -82,18 +98,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     code: string,
     newPassword: string
   ): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const cognitoUser = new CognitoUser({ Username: email, Pool: userPool });
-      cognitoUser.confirmPassword(code, newPassword, {
-        onSuccess: () => {
-          resolve(true);
-        },
-        onFailure: (err) => {
-          console.log("Confirm password reset error:", err);
-          resolve(false);
-        },
+    try {
+      console.log("🔐 Starting AWS SDK confirm password reset for:", email);
+
+      const confirmPasswordCommand = new ConfirmForgotPasswordCommand({
+        ClientId: COGNITO_CLIENT_ID,
+        Username: email,
+        ConfirmationCode: code,
+        Password: newPassword,
       });
-    });
+
+      await cognitoClient.send(confirmPasswordCommand);
+      console.log("✅ AWS SDK confirm password reset successful");
+      return true;
+    } catch (error: any) {
+      console.error("❌ AWS SDK confirm password reset error:", error);
+      return false;
+    }
   };
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -151,11 +172,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const storedUser = await AsyncStorage.getItem("user");
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
         setIsAuthenticated(true);
+        console.log("Loaded stored user:", parsedUser.email);
       }
     } catch (error) {
       console.log("Error loading stored auth:", error);
+      // Clear invalid stored data
+      await AsyncStorage.removeItem("user");
     }
   };
 
@@ -163,46 +188,83 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     email: string,
     password: string
   ): Promise<{ success: boolean; error?: string }> => {
-    return new Promise((resolve) => {
-      const user = new CognitoUser({ Username: email, Pool: userPool });
-      const authDetails = new AuthenticationDetails({
-        Username: email,
-        Password: password,
-      });
+    console.log("🔐 Starting AWS SDK login process for:", email);
+    console.log("🔐 Using COGNITO_POOL_ID:", COGNITO_POOL_ID);
+    console.log("🔐 Using COGNITO_CLIENT_ID:", COGNITO_CLIENT_ID);
 
-      user.authenticateUser(authDetails, {
-        onSuccess: async (result) => {
-          user.getUserAttributes((err, attributes) => {
-            let role = "learner"; // default role
-            if (!err && attributes) {
-              const roleAttr = attributes.find(
-                (attr) => attr.getName() === "custom:role"
-              );
-              if (roleAttr) {
-                role = roleAttr.getValue();
-              }
-            }
-
-            setUser({
-              id: email,
-              email,
-              name: email.split("@")[0],
-              role: role as "learner" | "instructor",
-              authProvider: "email",
-              username: user.getUsername(),
-            });
-            setIsAuthenticated(true);
-            resolve({ success: true });
-          });
-        },
-        onFailure: (err) => {
-          console.log("Login error:", err);
-          let errorMsg = "Login failed. Please try again.";
-          if (err && err.message) errorMsg = err.message;
-          resolve({ success: false, error: errorMsg });
+    try {
+      // Step 1: Authenticate with AWS Cognito using SDK
+      const authCommand = new InitiateAuthCommand({
+        AuthFlow: "USER_PASSWORD_AUTH",
+        ClientId: COGNITO_CLIENT_ID,
+        AuthParameters: {
+          USERNAME: email,
+          PASSWORD: password,
         },
       });
-    });
+
+      console.log("🔐 Calling AWS SDK InitiateAuthCommand...");
+      const authResponse = await cognitoClient.send(authCommand);
+      console.log("✅ AWS SDK authentication successful");
+
+      if (authResponse.AuthenticationResult?.AccessToken) {
+        // Step 2: Get user attributes using the access token
+        const getUserCommand = new GetUserCommand({
+          AccessToken: authResponse.AuthenticationResult.AccessToken,
+        });
+
+        const userResponse = await cognitoClient.send(getUserCommand);
+        console.log("✅ Got user attributes from AWS SDK");
+
+        // Extract user information
+        const attributes = userResponse.UserAttributes || [];
+        const roleAttr = attributes.find((attr) => attr.Name === "custom:role");
+        const nameAttr = attributes.find((attr) => attr.Name === "name");
+
+        const userData = {
+          id: userResponse.Username || email,
+          email,
+          name: nameAttr?.Value || email.split("@")[0],
+          role: (roleAttr?.Value as "learner" | "instructor") || "learner",
+          authProvider: "email",
+          username: userResponse.Username || email,
+          accessToken: authResponse.AuthenticationResult.AccessToken,
+        };
+
+        console.log("✅ Setting user data:", userData);
+        setUser(userData);
+        setIsAuthenticated(true);
+
+        // Store user data in AsyncStorage for persistence
+        await AsyncStorage.setItem("user", JSON.stringify(userData));
+        console.log("✅ User data stored in AsyncStorage");
+
+        console.log("✅ AWS SDK login process completed successfully");
+        return { success: true };
+      } else {
+        console.error("❌ No access token in authentication response");
+        return {
+          success: false,
+          error: "Authentication failed - no access token",
+        };
+      }
+    } catch (error: any) {
+      console.error("❌ AWS SDK login error:", error);
+
+      let errorMsg = "Login failed. Please try again.";
+      if (error.name === "NotAuthorizedException") {
+        errorMsg = "Invalid email or password";
+      } else if (error.name === "UserNotConfirmedException") {
+        errorMsg = "Please verify your email address";
+      } else if (error.name === "UserNotFoundException") {
+        errorMsg = "User not found";
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+
+      console.error("❌ Login failed with error:", errorMsg);
+      return { success: false, error: errorMsg };
+    }
   };
 
   const register = async (
@@ -211,69 +273,57 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     name: string,
     role: string
   ): Promise<boolean> => {
-    return new Promise((resolve) => {
-      userPool.signUp(
-        email,
-        password,
-        [
-          new CognitoUserAttribute({ Name: "name", Value: name }),
-          new CognitoUserAttribute({ Name: "custom:role", Value: role }),
+    try {
+      console.log("🔐 Starting AWS SDK registration for:", email);
+
+      const signUpCommand = new SignUpCommand({
+        ClientId: COGNITO_CLIENT_ID,
+        Username: email,
+        Password: password,
+        UserAttributes: [
+          { Name: "name", Value: name },
+          { Name: "custom:role", Value: role },
         ],
-        [],
-        (err) => {
-          if (err) {
-            console.log("Register error:", err);
-            resolve(false);
-          } else {
-            // Optionally auto-login or prompt for email verification
-            resolve(true);
-          }
-        }
-      );
-    });
+      });
+
+      const result = await cognitoClient.send(signUpCommand);
+      console.log("✅ AWS SDK registration successful:", result);
+      return true;
+    } catch (error: any) {
+      console.error("❌ AWS SDK registration error:", error);
+      return false;
+    }
   };
 
   const logout = async () => {
     try {
+      console.log("🔐 Starting logout process");
       await AsyncStorage.removeItem("user");
       setUser(null);
       setIsAuthenticated(false);
 
-      // Sign out from Cognito
-      const currentUser = userPool.getCurrentUser();
-      if (currentUser) {
-        currentUser.signOut();
-      }
-
-      // Redirect to Cognito logout URL
-      const logoutUrl = `${COGNITO_DOMAIN}/logout?client_id=${poolData.ClientId}&logout_uri=http://localhost:8081`;
-      if (typeof window !== "undefined" && window.location) {
-        window.location.href = logoutUrl;
-      } else {
-        // For React Native mobile
-        try {
-          const Linking = require("react-native").Linking;
-          Linking.openURL(logoutUrl);
-        } catch (err) {
-          console.log("Error opening logout URL:", err);
-        }
-      }
+      console.log("✅ User logged out successfully");
     } catch (error) {
-      console.log("Logout error:", error);
+      console.log("❌ Logout error:", error);
     }
   };
 
   const resetPassword = async (email: string): Promise<boolean> => {
-    return new Promise((resolve, reject) => {
-      const user = new CognitoUser({ Username: email, Pool: userPool });
-      user.forgotPassword({
-        onSuccess: () => resolve(true),
-        onFailure: (err) => {
-          console.log("Reset error:", err);
-          resolve(false);
-        },
+    try {
+      console.log("🔐 Starting AWS SDK forgot password for:", email);
+
+      const forgotPasswordCommand = new ForgotPasswordCommand({
+        ClientId: COGNITO_CLIENT_ID,
+        Username: email,
       });
-    });
+
+      await cognitoClient.send(forgotPasswordCommand);
+      console.log("✅ AWS SDK forgot password successful");
+      return true;
+    } catch (error: any) {
+      console.error("❌ AWS SDK forgot password error:", error);
+      return false;
+    }
   };
 
   const updateProfile = async (data: Partial<User>) => {
@@ -288,17 +338,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     email: string,
     code: string
   ): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const user = new CognitoUser({ Username: email, Pool: userPool });
-      user.confirmRegistration(code, true, (err, result) => {
-        if (err) {
-          console.log("ConfirmSignUp error:", err);
-          resolve(false);
-        } else {
-          resolve(true);
-        }
+    try {
+      console.log("🔐 Starting AWS SDK confirm signup for:", email);
+
+      const confirmCommand = new ConfirmSignUpCommand({
+        ClientId: COGNITO_CLIENT_ID,
+        Username: email,
+        ConfirmationCode: code,
       });
-    });
+
+      await cognitoClient.send(confirmCommand);
+      console.log("✅ AWS SDK confirm signup successful");
+      return true;
+    } catch (error: any) {
+      console.error("❌ AWS SDK confirm signup error:", error);
+      return false;
+    }
   };
 
   return (

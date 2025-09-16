@@ -1,3 +1,4 @@
+import "./polyfills";
 import "react-native-url-polyfill/auto";
 import "react-native-gesture-handler";
 import React, { useEffect, useState } from "react";
@@ -48,7 +49,11 @@ const App = () => {
               <NavigationContainer>
                 <Stack.Navigator screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="Auth" component={AuthNavigator} />
-                  <Stack.Screen name="Main" component={MainNavigator} options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="Main"
+                    component={MainNavigator}
+                    options={{ headerShown: false }}
+                  />
                   <Stack.Screen name="NotFound" component={NotFoundScreen} />
                 </Stack.Navigator>
               </NavigationContainer>
