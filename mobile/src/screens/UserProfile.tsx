@@ -4,12 +4,12 @@ import {
   View,
   ScrollView,
   StyleSheet,
-  StatusBar,
   TouchableOpacity,
   Pressable,
   Text,
   Image,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, ContainerStyles, Spacing, TextStyles } from '../constants';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,7 +44,7 @@ const ProfileScreen: React.FC = () => {
   const quickActions = useMemo(
     () => [
       { label: 'Point History', icon: 'trending-up-outline' },
-      { label: 'Learning Goal', icon: 'target-outline' },
+      { label: 'Learning Goal', icon: 'podium-outline' },
       { label: 'Certificate', icon: 'ribbon-outline' },
     ],
     []
@@ -85,7 +85,7 @@ const ProfileScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      <StatusBar style="light" />
 
       {/* Top bar (no back button) */}
       <View style={styles.topBar}>
@@ -137,7 +137,7 @@ const ProfileScreen: React.FC = () => {
 
         <View style={styles.achievementsGrid}>
           {achievements.map((a) => (
-            <View style={styles.achievementItem}>
+            <View key={a.label} style={styles.achievementItem}>
               <Ionicons
                 name={a.icon as any}
                 size={26}
