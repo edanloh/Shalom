@@ -8,7 +8,7 @@ import { useMyCourses } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 import { ImageWithFallback } from '../components/common';
 import { Images } from '../../assets';
-import { Colors, Spacing, TextStyles } from '../constants';
+import { Colors, Spacing, TextStyles, BorderRadius, Shadows } from '../constants';
 import type { Course } from '../types';
 import type { MainStackParamList } from '../types';
 
@@ -50,12 +50,12 @@ const MyCourses: React.FC = () => {
     // Not Started: courses with 0% progress
     const ns = allCourses.filter(c => (c.progress?.percentage ?? 0) === 0);
     
-    console.log('MyCourses - Filtered courses:', { 
-      total: allCourses.length, 
-      continueWatching: cw.length, 
-      inProgress: ip.length, 
-      notStarted: ns.length 
-    });
+    // console.log('MyCourses - Filtered courses:', { 
+    //   total: allCourses.length, 
+    //   continueWatching: cw.length, 
+    //   inProgress: ip.length, 
+    //   notStarted: ns.length 
+    // });
     
     return { continueWatching: cw, inProgress: ip, notStarted: ns };
   }, [courses]);
@@ -221,7 +221,7 @@ const MyCourses: React.FC = () => {
   );
 };
 
-const CARD_RADIUS = 16;
+const CARD_RADIUS = BorderRadius.lg;
 
 const styles = StyleSheet.create({
   container: {
@@ -237,23 +237,17 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.md,
   },
   headerTitle: {
-    ...TextStyles.h3,
-    color: Colors.textPrimary,
+    ...TextStyles.h4,
     textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
     flex: 1,
   },
 
   // Section title
   sectionTitle: {
-    ...TextStyles.h2,
-    color: Colors.textPrimary,
+    ...TextStyles.h4,
     paddingHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
-    fontSize: 20,
-    fontWeight: 'bold',
   },
 
   message: {
@@ -261,7 +255,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
-    fontSize: 14,
   },
 
   // Continue Watching (horizontal)
@@ -271,13 +264,8 @@ const styles = StyleSheet.create({
   cwThumbWrapper: {
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
-    backgroundColor: '#1f2937', // subtle backdrop for loading
-    // optional soft shadow (iOS only; Android uses elevation)
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 6,
+    backgroundColor: Colors.loadingBackdrop,
+    ...Shadows.medium,
   },
   // Image fills wrapper; NO borderRadius here
   cwThumb: {
@@ -285,25 +273,20 @@ const styles = StyleSheet.create({
     height: 150,
   },
   cwTitle: {
-    ...TextStyles.h4,
-    color: Colors.textPrimary,
+    ...TextStyles.bodyMedium,
     paddingHorizontal: Spacing.md,
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 10,
+    marginTop: Spacing.sm,
   },
   cwSubtitle: {
-    ...TextStyles.body,
-    color: Colors.textSecondary,
+    ...TextStyles.caption,
     paddingHorizontal: Spacing.md,
-    fontSize: 13,
     marginTop: 2,
   },
 
   // In Progress (vertical cards)
   ipCard: {
     flexDirection: 'row',
-    backgroundColor: '#0E0F15',
+    backgroundColor: Colors.cardDark,
     borderRadius: CARD_RADIUS,
     marginBottom: Spacing.md,
     overflow: 'hidden',
@@ -314,39 +297,37 @@ const styles = StyleSheet.create({
   },
   ipRight: {
     width: 140,
-    backgroundColor: '#E7F0EC',
+    backgroundColor: Colors.transparent,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
   },
   ipRightImage: {
-    width: '100%',
-    height: '100%',
+    width: 120,
+    height: 80,
+    borderRadius: BorderRadius.base,
     resizeMode: 'cover',
   },
   ipTitle: {
-    ...TextStyles.h4,
-    color: Colors.textPrimary,
+    ...TextStyles.bodyMedium,
     marginBottom: 6,
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   ipSubtitle: {
-    ...TextStyles.body,
-    color: Colors.textSecondary,
+    ...TextStyles.caption,
     marginBottom: 4,
-    fontSize: 13,
   },
 
   // progress bar
   pbTrack: {
     height: 4,
-    backgroundColor: '#D1D5DB', // light grey remainder
-    borderRadius: 8,
+    backgroundColor: Colors.progressTrack,
+    borderRadius: BorderRadius.base,
     overflow: 'hidden',
   },
   pbFill: {
     height: '100%',
-    backgroundColor: '#4F46E5', // purple fill
+    backgroundColor: Colors.progressFill,
   },
 
   // New styles for better UX
@@ -374,16 +355,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.purple400,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
-    borderRadius: 8,
+    borderRadius: BorderRadius.base,
   },
   retryText: {
-    ...TextStyles.body,
+    ...TextStyles.bodyMedium,
     color: Colors.white,
-    fontWeight: '600',
   },
   emptyMessage: {
     ...TextStyles.h4,
-    color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
@@ -394,16 +373,16 @@ const styles = StyleSheet.create({
   },
   progressOverlay: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    bottom: Spacing.base,
+    right: Spacing.base,
+    backgroundColor: Colors.overlay,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: BorderRadius.sm,
   },
   progressText: {
+    ...TextStyles.small,
     color: Colors.white,
-    fontSize: 12,
     fontWeight: '600',
   },
 });

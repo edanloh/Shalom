@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { View, Text, StyleSheet, Image } from "react-native";
+import { Colors, TextStyles } from "../constants";
 
 const SplashScreen = ({ onFinish }: { onFinish?: () => void }) => {
   useEffect(() => {
@@ -25,17 +26,14 @@ const SplashScreen = ({ onFinish }: { onFinish?: () => void }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#564beb",
+    backgroundColor: Colors.secondary,
     alignItems: "center",
     justifyContent: "center",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#ffffffff",
+    ...TextStyles.h1,
     marginBottom: 8,
     letterSpacing: 1,
-    fontFamily: "Lexend-Regular",
   },
   logo: {
     width: 120,

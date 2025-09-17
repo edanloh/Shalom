@@ -15,7 +15,7 @@ import colors from "@/styles/colors";
 import { Ionicons } from "@expo/vector-icons";
 import CustomTextInput from "@/components/CustomTextInput";
 import { API_BASE_URL } from "react-native-dotenv";
-import { Colors } from "@/constants";
+import { Colors, TextStyles } from "@/constants";
 
 export default function UserManagementScreen({ navigation }: any) {
   const [search, setSearch] = useState("");
@@ -86,15 +86,7 @@ export default function UserManagementScreen({ navigation }: any) {
 
             {/* Instructors List */}
             <View>
-              <Text
-                style={{
-                  fontFamily: "Lexend-Regular",
-                  fontSize: 20,
-                  color: "white",
-                  marginBottom: 8,
-                  marginTop: 4,
-                }}
-              >
+              <Text style={TextStyles.h3}>
                 Instructors{" "}
                 {filteredInstructors.length > 0 &&
                   `(${filteredInstructors.length})`}
@@ -170,14 +162,7 @@ export default function UserManagementScreen({ navigation }: any) {
                 ))
               )}
               {/* Students List */}
-              <Text
-                style={{
-                  fontFamily: "Lexend-Regular",
-                  fontSize: 20,
-                  color: "white",
-                  marginVertical: 8,
-                }}
-              >
+              <Text style={TextStyles.h3}>
                 Students{" "}
                 {filteredStudents.length > 0 && `(${filteredStudents.length})`}
               </Text>

@@ -14,6 +14,7 @@ import { useAuth } from "@contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import styles from "@/styles/styles";
 import colors from "@/styles/colors";
+import { Colors, TextStyles } from "../../constants";
 
 const ForgotPasswordScreen = () => {
   const navigation = useNavigation<any>();
@@ -95,14 +96,7 @@ const ForgotPasswordScreen = () => {
           <Text style={styles.title}>Shalom</Text>
         </View>
         <View style={styles.form}>
-          <Text
-            style={{
-              fontFamily: "Lexend-Regular",
-              fontSize: 22,
-              color: "white",
-              marginBottom: 16,
-            }}
-          >
+          <Text style={TextStyles.h2}>
             {success
               ? "Password Reset Successful"
               : step === 1

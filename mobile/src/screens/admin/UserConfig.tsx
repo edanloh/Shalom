@@ -15,7 +15,7 @@ import colors from "@/styles/colors";
 import { API_BASE_URL } from "react-native-dotenv";
 import { Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "@/constants/Colors";
+import { Colors, TextStyles } from "@/constants";
 
 export default function UserConfigScreen({ navigation, route }: any) {
   const { user } = route.params || {};
@@ -104,15 +104,7 @@ export default function UserConfigScreen({ navigation, route }: any) {
               </Text>
             </View>
             <View>
-              <Text
-                style={{
-                  fontFamily: "Lexend-Regular",
-                  fontSize: 20,
-                  color: "white",
-                  marginBottom: 8,
-                  marginTop: 8,
-                }}
-              >
+              <Text style={TextStyles.h3}>
                 Account Settings
               </Text>
 
@@ -125,7 +117,7 @@ export default function UserConfigScreen({ navigation, route }: any) {
                 }}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: "white", fontSize: 16 }}>
+                  <Text style={TextStyles.body}>
                     Instructor
                   </Text>
                 </View>
@@ -149,7 +141,7 @@ export default function UserConfigScreen({ navigation, route }: any) {
                 }}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: "white", fontSize: 16 }}>
+                  <Text style={TextStyles.body}>
                     Account Activated
                   </Text>
                 </View>

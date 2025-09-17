@@ -47,6 +47,13 @@ export const Colors = {
   // Achievement card specific colors
   streakCardBg: '#564BEB',   // 12 Day Streak card
   certificateCardBg: '#EEC53D', // 3 Certificates card
+  
+  // Additional UI Colors
+  loadingBackdrop: '#1f2937',    // Loading state backdrop
+  cardDark: '#0E0F15',           // Dark card background
+  progressTrack: '#D1D5DB',      // Progress bar track
+  progressFill: '#4F46E5',       // Progress bar fill
+  overlay: 'rgba(0,0,0,0.7)',    // Dark overlay for text on images
 } as const;
 
 export type ColorKeys = keyof typeof Colors;

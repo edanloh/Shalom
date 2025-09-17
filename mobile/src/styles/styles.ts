@@ -1,42 +1,52 @@
 import { StyleSheet } from "react-native";
-import colors from "./colors";
+import { Colors, TextStyles, Spacing, BorderRadius } from "../constants";
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 20 },
-  slimScrollContent: { flexGrow: 1, justifyContent: "flex-start", padding: 0 },
+  container: { 
+    flex: 1, 
+    backgroundColor: Colors.primary 
+  },
+  scrollContent: { 
+    flexGrow: 1, 
+    justifyContent: "center", 
+    padding: Spacing.lg 
+  },
+  slimScrollContent: { 
+    flexGrow: 1, 
+    justifyContent: "flex-start", 
+    padding: 0 
+  },
   screenHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginTop: 10,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
     minHeight: 40,
-    backgroundColor: colors.background,
+    backgroundColor: Colors.primary,
   },
-  header: { alignItems: "center" },
+  header: { 
+    alignItems: "center" 
+  },
   logo: {
     width: 100,
     height: 100,
-    borderRadius: 20,
+    borderRadius: Spacing.lg,
     alignItems: "center",
     justifyContent: "center",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: colors.headerText,
-    marginBottom: 8,
+    ...TextStyles.h1,
+    marginBottom: Spacing.base,
     letterSpacing: 1,
-    fontFamily: "Lexend-Regular",
   },
   buttonSecondary: {
-    backgroundColor: colors.buttonSecondary,
-    borderRadius: 12,
-    padding: 12,
-    paddingHorizontal: 20,
+    backgroundColor: Colors.backgroundGray,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: Spacing.base,
   },
   image: {
     width: 24,
@@ -44,46 +54,57 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
   form: {
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
   },
-  eyeIcon: { padding: 16 },
+  eyeIcon: { 
+    padding: Spacing.base 
+  },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
-    backgroundColor: colors.buttonSecondary,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.backgroundGray,
   },
-  inputIcon: { marginLeft: 16 },
+  inputIcon: { 
+    marginLeft: Spacing.base 
+  },
   input: {
     flex: 1,
-    padding: 16,
-    fontSize: 16,
-    color: "white",
-    fontFamily: "Lexend-Light",
-    borderRadius: 12,
+    padding: Spacing.base,
+    ...TextStyles.body,
+    borderRadius: BorderRadius.md,
   },
-  loginContainer: { flexDirection: "row", justifyContent: "center" },
-  loginText: { color: colors.loginText, fontSize: 14 },
-  loginLink: { color: colors.loginLink, fontSize: 14, fontWeight: "600" },
+  loginContainer: { 
+    flexDirection: "row", 
+    justifyContent: "center" 
+  },
+  loginText: { 
+    ...TextStyles.body,
+    color: Colors.textSecondary,
+  },
+  loginLink: { 
+    ...TextStyles.bodyMedium,
+    color: Colors.secondary,
+  },
   infoText: {
-    color: colors.infoText,
-    fontSize: 14,
-    marginBottom: 16,
-    fontFamily: "Lexend-Light",
+    ...TextStyles.body,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.base,
   },
   warningText: {
-    fontSize: 12,
-    fontFamily: "Lexend-Light",
+    ...TextStyles.small,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: Spacing.lg,
     alignItems: "flex-start",
     justifyContent: "center",
   },
-  headerTitle: { fontSize: 20, fontWeight: "bold", color: "white" },
+  headerTitle: { 
+    ...TextStyles.h4,
+  },
 });
 
 export default styles;

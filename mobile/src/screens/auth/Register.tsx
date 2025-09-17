@@ -15,6 +15,7 @@ import { useAuth } from "@contexts/AuthContext";
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import styles from "@/styles/styles";
+import { Colors, TextStyles } from "../../constants";
 WebBrowser.maybeCompleteAuthSession();
 
 import {
@@ -181,14 +182,7 @@ export default function RegisterScreen({ navigation }: any) {
 
         {/* Form */}
         <View style={styles.form}>
-          <Text
-            style={{
-              fontFamily: "Lexend-Regular",
-              fontSize: 22,
-              color: "white",
-              marginBottom: 16,
-            }}
-          >
+          <Text style={TextStyles.h2}>
             Create Your Account
           </Text>
 
