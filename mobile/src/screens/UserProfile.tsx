@@ -156,31 +156,31 @@ const ProfileScreen: React.FC = () => {
           Account Settings
         </Text>
 
-<View style={styles.settingsCard}>
-  {accountItems.map((item, idx) => (
-    <React.Fragment key={item.title}>
-      <Pressable
-        onPress={item.onPress}
-        android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
-        accessibilityRole="button"
-        accessibilityLabel={item.title}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
-      >
-        <View style={styles.settingLeft}>
-          <Ionicons name={item.icon} size={20} color={Colors.textSecondary} />
-          <View style={styles.settingTextWrap}>
-            <Text style={styles.settingTitle}>{item.title}</Text>
-            <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
-          </View>
-        </View>
-        <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
-      </Pressable>
+        <View style={styles.settingsCard}>
+          {accountItems.map((item, idx) => (
+            <React.Fragment key={item.title}>
+              <Pressable
+                onPress={item.onPress}
+                android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
+              >
+                <View style={styles.settingLeft}>
+                  <Ionicons name={item.icon} size={20} color={Colors.textSecondary} />
+                  <View style={styles.settingTextWrap}>
+                    <Text style={styles.settingTitle}>{item.title}</Text>
+                    <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
+              </Pressable>
 
-      {idx < accountItems.length - 1 && <View style={styles.divider} />}
-    </React.Fragment>
-  ))}
-</View>
+              {idx < accountItems.length - 1 && <View style={styles.divider} />}
+            </React.Fragment>
+          ))}
+        </View>
 
         {/* Logout (active) */}
         <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.9}>

@@ -1,24 +1,30 @@
+// src/screens/EditProfileScreen.tsx
 import React, { useState } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   TextInput,
   ScrollView,
   Alert,
   Image,
+  TouchableOpacity,
+  Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors, Spacing, TextStyles } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function EditProfileScreen({ navigation }: any) {
   const { user, updateProfile } = useAuth();
+
   const [formData, setFormData] = useState({
-    name: user?.name || 'test name',
-    email: user?.email || 'test@email.com',
-    bio: user?.bio || 'Passionate learner and technology enthusiast',
-    location: user?.location || 'Singapore',
+    name: user?.name || '',
+    email: user?.email || '',
+    bio: user?.bio || '',
+    location: user?.location || '',
     phone: user?.phone || '',
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -28,13 +34,9 @@ export default function EditProfileScreen({ navigation }: any) {
       Alert.alert('Error', 'Name and email are required');
       return;
     }
-
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Update user data using the correct function name
+      await new Promise((r) => setTimeout(r, 800)); // simulate API
       await updateProfile({
         name: formData.name,
         email: formData.email,
@@ -42,11 +44,8 @@ export default function EditProfileScreen({ navigation }: any) {
         location: formData.location,
         phone: formData.phone,
       });
-      
-      Alert.alert('Success', 'Profile updated successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-    } catch (error) {
+      Alert.alert('Success', 'Profile updated', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+    } catch (e) {
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
       setIsLoading(false);
@@ -54,238 +53,195 @@ export default function EditProfileScreen({ navigation }: any) {
   };
 
   const handleChangeAvatar = () => {
-    Alert.alert(
-      'Change Avatar',
-      'Choose an option',
-      [
-        { text: 'Take Photo', onPress: () => console.log('Take photo') },
-        { text: 'Choose from Gallery', onPress: () => console.log('Choose from gallery') },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    Alert.alert('Change Avatar', 'Choose an option', [
+      { text: 'Take Photo', onPress: () => {} },
+      { text: 'Choose from Gallery', onPress: () => {} },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      <StatusBar style="light" />
+
+      {/* Header (centered title, back on left, Save on right) */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1f2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <TouchableOpacity 
-          onPress={handleSave} 
-          style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
-          disabled={isLoading}
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerIconHitbox}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={[styles.saveButtonText, isLoading && styles.saveButtonTextDisabled]}>
-            {isLoading ? 'Saving...' : 'Save'}
-          </Text>
+          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>Edit Profile</Text>
+
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={isLoading}
+          style={[styles.headerAction, isLoading && { opacity: 0.7 }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.headerActionText}>{isLoading ? 'Saving…' : 'Save'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Avatar Section */}
-      <View style={styles.avatarSection}>
-        <View style={styles.avatarContainer}>
-          <Image
-            source={{ uri: user?.avatar || require("@assets/icon.png") }}
-            style={styles.avatar}
-          />
-          <TouchableOpacity style={styles.avatarEditButton} onPress={handleChangeAvatar}>
-            <Ionicons name="camera" size={16} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.avatarText}>Tap to change photo</Text>
-      </View>
-
-      {/* Form Fields */}
-      <View style={styles.formContainer}>
-        {/* Name */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Full Name *</Text>
-          <View style={styles.inputContainer}>
-            <Ionicons name="person-outline" size={20} color="#6b7280" />
-            <TextInput
-              style={styles.textInput}
-              value={formData.name}
-              onChangeText={(text) => setFormData({ ...formData, name: text })}
-              placeholder="Enter your full name"
-              placeholderTextColor="#9ca3af"
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Avatar */}
+        <View style={styles.avatarSection}>
+          <View style={styles.avatarContainer}>
+            <Image
+              source={
+                user?.avatar
+                  ? { uri: user.avatar }
+                  : require('@assets/profile.png')
+              }
+              style={styles.avatar}
             />
+            <Pressable style={styles.avatarEditButton} onPress={handleChangeAvatar}>
+              <Ionicons name="camera" size={16} color="#fff" />
+            </Pressable>
           </View>
+          <Text style={styles.avatarText}>Tap to change photo</Text>
         </View>
 
-        {/* Email */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Email Address *</Text>
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#6b7280" />
-            <TextInput
-              style={styles.textInput}
-              value={formData.email}
-              onChangeText={(text) => setFormData({ ...formData, email: text })}
-              placeholder="Enter your email address"
-              placeholderTextColor="#9ca3af"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-        </View>
-
-        {/* Bio */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Bio</Text>
-          <View style={styles.inputContainer}>
-            <Ionicons name="document-text-outline" size={20} color="#6b7280" />
-            <TextInput
-              style={[styles.textInput, styles.textArea]}
-              value={formData.bio}
-              onChangeText={(text) => setFormData({ ...formData, bio: text })}
-              placeholder="Tell us about yourself"
-              placeholderTextColor="#9ca3af"
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-          </View>
-        </View>
-
-        {/* Location */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Location</Text>
-          <View style={styles.inputContainer}>
-            <Ionicons name="location-outline" size={20} color="#6b7280" />
-            <TextInput
-              style={styles.textInput}
-              value={formData.location}
-              onChangeText={(text) => setFormData({ ...formData, location: text })}
-              placeholder="Enter your location"
-              placeholderTextColor="#9ca3af"
-            />
-          </View>
-        </View>      
-
-        {/* Phone */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Phone Number</Text>
-          <View style={styles.inputContainer}>
-            <Ionicons name="call-outline" size={20} color="#6b7280" />
-            <TextInput
-              style={styles.textInput}
-              value={formData.phone}
-              onChangeText={(text) => setFormData({ ...formData, phone: text })}
-              placeholder="Enter your phone number"
-              placeholderTextColor="#9ca3af"
-              keyboardType="phone-pad"
-            />
-          </View>
-        </View>
-      </View>
-
-      {/* Account Settings */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account Settings</Text>
-        <View style={styles.settingsCard}>
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="lock-closed-outline" size={20} color="#6b7280" />
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Change Password</Text>
-                <Text style={styles.settingSubtitle}>Update your account password</Text>
-              </View>
+        {/* Form */}
+        <View style={styles.form}>
+          {/* Name */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Full Name *</Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
+              <TextInput
+                style={styles.input}
+                value={formData.name}
+                onChangeText={(t) => setFormData({ ...formData, name: t })}
+                placeholder="Enter your full name"
+                placeholderTextColor="#9ca3af"
+              />
             </View>
-            <Ionicons name="chevron-forward-outline" size={16} color="#9ca3af" />
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="shield-checkmark-outline" size={20} color="#6b7280" />
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Privacy Settings</Text>
-                <Text style={styles.settingSubtitle}>Manage your privacy preferences</Text>
-              </View>
+          {/* Email */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email Address *</Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="mail-outline" size={20} color={Colors.textSecondary} />
+              <TextInput
+                style={styles.input}
+                value={formData.email}
+                onChangeText={(t) => setFormData({ ...formData, email: t })}
+                placeholder="Enter your email address"
+                placeholderTextColor="#9ca3af"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
             </View>
-            <Ionicons name="chevron-forward-outline" size={16} color="#9ca3af" />
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="notifications-outline" size={20} color="#6b7280" />
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Notification Preferences</Text>
-                <Text style={styles.settingSubtitle}>Customize your notifications</Text>
-              </View>
+          {/* Bio */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Bio</Text>
+            <View style={[styles.inputRow, { alignItems: 'flex-start', paddingVertical: 12 }]}>
+              <Ionicons name="document-text-outline" size={20} color={Colors.textSecondary} style={{ marginTop: 2 }} />
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={formData.bio}
+                onChangeText={(t) => setFormData({ ...formData, bio: t })}
+                placeholder="Tell us about yourself"
+                placeholderTextColor="#9ca3af"
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
             </View>
-            <Ionicons name="chevron-forward-outline" size={16} color="#9ca3af" />
-          </TouchableOpacity>
+          </View>
+
+          {/* Location */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Location</Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="location-outline" size={20} color={Colors.textSecondary} />
+              <TextInput
+                style={styles.input}
+                value={formData.location}
+                onChangeText={(t) => setFormData({ ...formData, location: t })}
+                placeholder="Enter your location"
+                placeholderTextColor="#9ca3af"
+              />
+            </View>
+          </View>
+
+          {/* Phone */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Phone Number</Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="call-outline" size={20} color={Colors.textSecondary} />
+              <TextInput
+                style={styles.input}
+                value={formData.phone}
+                onChangeText={(t) => setFormData({ ...formData, phone: t })}
+                placeholder="Enter your phone number"
+                placeholderTextColor="#9ca3af"
+                keyboardType="phone-pad"
+              />
+            </View>
+          </View>
         </View>
-      </View>
 
-      {/* Danger Zone */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Danger Zone</Text>
-        <View style={styles.dangerCard}>
-          <TouchableOpacity style={styles.dangerItem}>
-            <View style={styles.dangerLeft}>
-              <Ionicons name="trash-outline" size={20} color="#ef4444" />
-              <View style={styles.dangerText}>
-                <Text style={styles.dangerTitle}>Delete Account</Text>
-                <Text style={styles.dangerSubtitle}>Permanently delete your account and all data</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward-outline" size={16} color="#ef4444" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
+        <Text style={styles.version}>Version 1.0.0</Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
+const CARD_BG = '#2B2E36';
+const BORDER = '#4B4B57';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  safe: { flex: 1, backgroundColor: Colors.primary },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
     justifyContent: 'space-between',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+  headerIconHitbox: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: {
+    ...TextStyles.h3,
+    color: Colors.textPrimary,
+    fontSize: TextStyles.h4.fontSize,
+    fontWeight: 'bold',
+  },
+  headerAction: {
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.purple400,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1f2937' },
-  saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#8B5CF6',
-    borderRadius: 8,
+  headerActionText: {
+    ...TextStyles.body,
+    color: Colors.white,
+    fontWeight: '700',
   },
-  saveButtonDisabled: {
-    backgroundColor: '#d1d5db',
-  },
-  saveButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  saveButtonTextDisabled: { color: '#9ca3af' },
+
+  container: { flex: 1, backgroundColor: Colors.primary },
+
+  // Avatar
   avatarSection: {
     alignItems: 'center',
-    paddingVertical: 24,
-    backgroundColor: '#fff',
+    paddingVertical: Spacing.lg,
   },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 12,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
+  avatarContainer: { position: 'relative', marginBottom: 12 },
+  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: '#E5E7EB' },
   avatarEditButton: {
     position: 'absolute',
     bottom: 0,
@@ -293,78 +249,53 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: Colors.purple400,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: '#fff',
+    borderColor: Colors.primary,
   },
-  avatarText: { fontSize: 14, color: '#6b7280' },
-  formContainer: { padding: 20 },
-  inputGroup: { marginBottom: 20 },
-  inputLabel: { fontSize: 16, fontWeight: '600', color: '#1f2937', marginBottom: 8 },
-  inputContainer: {
+  avatarText: {
+    ...TextStyles.body,
+    color: Colors.textSecondary,
+    fontSize: 13,
+  },
+
+  // Form
+  form: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+  inputGroup: { marginBottom: Spacing.lg },
+  inputLabel: {
+    ...TextStyles.body,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+  },
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: CARD_BG,
     borderRadius: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: BORDER,
   },
-  textInput: {
+  input: {
     flex: 1,
     marginLeft: 12,
-    fontSize: 16,
-    color: '#1f2937',
+    fontFamily: TextStyles.body.fontFamily,
+    fontSize: TextStyles.body.fontSize,
+    color: Colors.textPrimary,
   },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
+  textArea: { minHeight: 92 },
+
+  // Footer
+  version: {
+    ...TextStyles.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.xl,
+    fontSize: 12,
   },
-  section: { marginTop: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1f2937', marginHorizontal: 20, marginBottom: 8 },
-  settingsCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  settingLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  settingText: { marginLeft: 16, flex: 1 },
-  settingTitle: { fontSize: 16, color: '#1f2937', marginBottom: 2 },
-  settingSubtitle: { fontSize: 14, color: '#6b7280' },
-  dangerCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  dangerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  dangerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  dangerText: { marginLeft: 16, flex: 1 },
-  dangerTitle: { fontSize: 16, color: '#ef4444', marginBottom: 2 },
-  dangerSubtitle: { fontSize: 14, color: '#6b7280' },
 });
