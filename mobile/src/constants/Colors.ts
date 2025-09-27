@@ -13,6 +13,7 @@ export const Colors = {
   gray500: '#636363',       // Medium text
   gray600: '#363535ff',
   gray800: '#2E2E2E',       // Dark elements
+  textInputBg: '#3E3E47',
   
   // Status Colors
   yellow: '#EEC53D',    // Achievements, warnings
@@ -34,6 +35,7 @@ export const Colors = {
   textPrimary: '#FFFFFF',    // Main text on dark backgrounds
   textSecondary: '#D4D4D4',  // Secondary text
   textMuted: '#636363',      // Muted/disabled text
+  textWarning: '#ff6b6b',    // Warning text
   
   // Interactive Colors
   cardBackground: '#3A339F',

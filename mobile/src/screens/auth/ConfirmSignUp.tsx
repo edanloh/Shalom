@@ -50,17 +50,17 @@ const ConfirmSignUp = () => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.header, { marginBottom: 24 }]}>
+        <View style={styles.header}>
           <View style={styles.logo}>
             <Image
               source={require("@assets/shalom.png")}
-              style={{ width: 100, height: 100, resizeMode: "contain" }}
+              style={styles.logo}
             />
           </View>
-          <Text style={styles.title}>Shalom</Text>
+          <Text style={[TextStyles.h2]}>Shalom</Text>
         </View>
         <View style={styles.form}>
-          <Text style={TextStyles.h2}>
+          <Text style={TextStyles.h3}>
             {confirmed ? "Confirmation Successful" : "Confirm Your Account"}
           </Text>
           <Text style={styles.infoText}>
