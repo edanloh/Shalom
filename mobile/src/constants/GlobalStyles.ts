@@ -121,7 +121,15 @@ export const TextStyles = {
     color: Colors.textPrimary,
     marginBottom: Spacing.md,
   } as TextStyle,
-  
+
+  h5: {
+    fontFamily: Typography.fontFamily.semiBold,
+    fontSize: Typography.fontSize.lg,
+    lineHeight: Typography.fontSize.lg * Typography.lineHeight.normal,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+  } as TextStyle,
+
   body: {
     fontFamily: Typography.fontFamily.regular,
     fontSize: Typography.fontSize.base,
@@ -133,6 +141,20 @@ export const TextStyles = {
     fontFamily: Typography.fontFamily.medium,
     fontSize: Typography.fontSize.base,
     lineHeight: Typography.fontSize.base * Typography.lineHeight.normal,
+    color: Colors.textPrimary,
+  } as TextStyle,
+
+  bodySmall: {
+    fontFamily: Typography.fontFamily.regular,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: Typography.fontSize.sm * Typography.lineHeight.normal,
+    color: Colors.textPrimary,
+  } as TextStyle,
+
+  bodySmallBold: {
+    fontFamily: Typography.fontFamily.bold,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: Typography.fontSize.sm * Typography.lineHeight.normal,
     color: Colors.textPrimary,
   } as TextStyle,
   

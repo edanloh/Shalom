@@ -14,7 +14,7 @@ import styles from "@/styles/styles";
 import { API_BASE_URL } from "react-native-dotenv";
 import { Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, TextStyles } from "@/constants";
+import { Colors, Spacing, TextStyles } from "@/constants";
 
 export default function UserConfigScreen({ navigation, route }: any) {
   const { user } = route.params || {};
@@ -70,7 +70,7 @@ export default function UserConfigScreen({ navigation, route }: any) {
           </View>
           {/* Form */}
           <View style={styles.form}>
-            <View style={[styles.header, { marginBottom: 16 }]}>
+            <View style={[styles.header, { marginBottom: 32 }]}>
               <View style={[styles.logo, { marginBottom: 16 }]}>
                 <Image
                   source={require("@assets/profile.png")}
@@ -84,7 +84,9 @@ export default function UserConfigScreen({ navigation, route }: any) {
                   justifyContent: "center",
                 }}
               >
-                <Text style={styles.title}>{user?.name || "Unknown User"}</Text>
+                <Text style={[TextStyles.h3, { marginBottom: Spacing.sm }]}>
+                  {user?.name || "Unknown User"}
+                </Text>
                 {user?.authProvider && user?.authProvider == "Google" && (
                   <Image
                     source={require("@assets/google.png")}
@@ -98,33 +100,29 @@ export default function UserConfigScreen({ navigation, route }: any) {
                   />
                 )}
               </View>
-              <Text style={styles.infoText}>
+              <Text style={TextStyles.bodyMedium}>
                 {user?.email || "Unknown Email"}
               </Text>
             </View>
             <View>
-              <Text style={TextStyles.h3}>
-                Account Settings
-              </Text>
+              <Text style={TextStyles.h4}>Account Settings</Text>
 
               <View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  paddingVertical: 12,
+                  paddingVertical: 4,
                   backgroundColor: Colors.primary,
                 }}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={TextStyles.body}>
-                    Instructor
-                  </Text>
+                  <Text style={TextStyles.body}>Instructor</Text>
                 </View>
                 <Switch
                   onValueChange={toggleInstructor}
                   value={isInstructor}
                   trackColor={{
-                    false: Colors.backgroundGray,
+                    false: Colors.gray500,
                     true: Colors.secondary,
                   }}
                   thumbColor="#fff"
@@ -140,15 +138,13 @@ export default function UserConfigScreen({ navigation, route }: any) {
                 }}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={TextStyles.body}>
-                    Account Activated
-                  </Text>
+                  <Text style={TextStyles.body}>Account Activated</Text>
                 </View>
                 <Switch
                   onValueChange={toggleActivated}
                   value={isActivated}
                   trackColor={{
-                    false: Colors.backgroundGray,
+                    false: Colors.gray500,
                     true: Colors.secondary,
                   }}
                   thumbColor="#fff"

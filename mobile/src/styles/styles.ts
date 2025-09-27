@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { Colors, TextStyles, Spacing, BorderRadius } from "@/constants";
+import { Colors, TextStyles, Spacing, BorderRadius, Typography } from "@/constants";
 
 const styles = StyleSheet.create({
   container: { 
@@ -104,6 +104,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: { 
     ...TextStyles.h4,
+    fontFamily: Typography.fontFamily.semiBold,
+    marginBottom: 0,
   },
 });
 

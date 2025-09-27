@@ -14,7 +14,7 @@ import styles from "@/styles/styles";
 import { Ionicons } from "@expo/vector-icons";
 import CustomTextInput from "@/components/CustomTextInput";
 import { API_BASE_URL } from "react-native-dotenv";
-import { Colors, TextStyles } from "@/constants";
+import { Colors, TextStyles, Typography } from "@/constants";
 
 export default function UserManagementScreen({ navigation }: any) {
   const [search, setSearch] = useState("");
@@ -85,7 +85,7 @@ export default function UserManagementScreen({ navigation }: any) {
 
             {/* Instructors List */}
             <View>
-              <Text style={TextStyles.h3}>
+              <Text style={TextStyles.h5}>
                 Instructors{" "}
                 {filteredInstructors.length > 0 &&
                   `(${filteredInstructors.length})`}
@@ -112,9 +112,9 @@ export default function UserManagementScreen({ navigation }: any) {
                     <Image
                       source={require("@assets/profile.png")}
                       style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
+                        width: 54,
+                        height: 54,
+                        borderRadius: 30,
                         marginRight: 12,
                         borderColor: Colors.secondary,
                         borderWidth: 2,
@@ -128,7 +128,7 @@ export default function UserManagementScreen({ navigation }: any) {
                           justifyContent: "flex-start",
                         }}
                       >
-                        <Text style={{ color: "white" }}>
+                        <Text style={TextStyles.bodySmallBold}>
                           Name: {user.name}
                         </Text>
                         {user?.authProvider &&
@@ -145,7 +145,9 @@ export default function UserManagementScreen({ navigation }: any) {
                             />
                           )}
                       </View>
-                      <Text style={styles.loginText}>Email: {user.email}</Text>
+                      <Text style={TextStyles.caption}>
+                        Email: {user.email}
+                      </Text>
                     </View>
                     <TouchableOpacity>
                       <Ionicons
@@ -161,7 +163,8 @@ export default function UserManagementScreen({ navigation }: any) {
                 ))
               )}
               {/* Students List */}
-              <Text style={TextStyles.h3}>
+              <View style={{ marginTop: 8 }} />
+              <Text style={TextStyles.h5}>
                 Students{" "}
                 {filteredStudents.length > 0 && `(${filteredStudents.length})`}
               </Text>
@@ -180,16 +183,16 @@ export default function UserManagementScreen({ navigation }: any) {
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
-                      paddingVertical: 12,
+                      paddingVertical: 8,
                       backgroundColor: Colors.primary,
                     }}
                   >
                     <Image
                       source={require("@assets/profile.png")}
                       style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
+                        width: 50,
+                        height: 50,
+                        borderRadius: 30,
                         marginRight: 12,
                       }}
                     />
@@ -201,7 +204,7 @@ export default function UserManagementScreen({ navigation }: any) {
                           justifyContent: "flex-start",
                         }}
                       >
-                        <Text style={{ color: "white" }}>
+                        <Text style={TextStyles.bodySmallBold}>
                           Name: {user.name}
                         </Text>
                         {user?.authProvider &&
@@ -218,7 +221,9 @@ export default function UserManagementScreen({ navigation }: any) {
                             />
                           )}
                       </View>
-                      <Text style={styles.loginText}>Email: {user.email}</Text>
+                      <Text style={TextStyles.caption}>
+                        Email: {user.email}
+                      </Text>
                     </View>
                     <TouchableOpacity>
                       <Ionicons
