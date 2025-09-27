@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import styles from "@/styles/styles";
-import colors from "@/styles/colors";
+import { Colors } from "@/constants";
 
 interface CustomTextInputProps {
   value: string;
@@ -78,7 +78,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
           }
           autoCapitalize={autoCapitalize}
           keyboardType={keyboardType}
-          placeholderTextColor={colors.infoText}
+          placeholderTextColor={Colors.textSecondary}
           onSubmitEditing={onSubmitEditing}
           returnKeyType={returnKeyType}
         />
@@ -96,11 +96,11 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
         )}
       </View>
       {warningText ? (
-        <View style={{ marginBottom: 8, marginHorizontal: 8 }}>
+        <View style={{ marginBottom: 8 }}>
           <Text
             style={[
               styles.warningText,
-              { color: warningTextColor || colors.warningText },
+              { color: warningTextColor || Colors.textWarning },
             ]}
           >
             {warningText}

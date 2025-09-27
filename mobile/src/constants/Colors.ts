@@ -35,6 +35,7 @@ export const Colors = {
   textPrimary: '#FFFFFF',    // Main text on dark backgrounds
   textSecondary: '#D4D4D4',  // Secondary text
   textMuted: '#636363',      // Muted/disabled text
+  textWarning: '#ff6b6b',    // Warning text
   
   // Interactive Colors
   cardBackground: '#3A339F',

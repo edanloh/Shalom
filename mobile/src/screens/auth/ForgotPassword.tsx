@@ -13,12 +13,11 @@ import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import styles from "@/styles/styles";
-import colors from "@/styles/colors";
 import { Colors, TextStyles } from "@/constants";
 
 const ForgotPasswordScreen = () => {
   const navigation = useNavigation<any>();
-  const [step, setStep] = useState(2); // 1: request, 2: confirm
+  const [step, setStep] = useState(1); // 1: request, 2: confirm
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -111,7 +110,7 @@ const ForgotPasswordScreen = () => {
               : "Enter the code sent to your email and your new password."}
           </Text>
           {warningText ? (
-            <Text style={{ color: colors.warningText, marginBottom: 8 }}>
+            <Text style={{ color: Colors.textWarning, marginBottom: 8 }}>
               {warningText}
             </Text>
           ) : null}

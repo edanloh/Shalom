@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styles from "@/styles/styles";
-import colors from "@/styles/colors";
 import { Ionicons } from "@expo/vector-icons";
 import CustomTextInput from "@/components/CustomTextInput";
 import { API_BASE_URL } from "react-native-dotenv";
@@ -94,7 +93,7 @@ export default function UserManagementScreen({ navigation }: any) {
               {loading ? (
                 <Text style={styles.infoText}>Loading users...</Text>
               ) : error ? (
-                <Text style={[styles.infoText, { color: colors.warningText }]}>
+                <Text style={[styles.infoText, { color: Colors.textWarning }]}>
                   {error}
                 </Text>
               ) : filteredInstructors.length === 0 ? (
@@ -107,7 +106,7 @@ export default function UserManagementScreen({ navigation }: any) {
                       flexDirection: "row",
                       alignItems: "center",
                       paddingVertical: 12,
-                      backgroundColor: colors.background,
+                      backgroundColor: Colors.primary,
                     }}
                   >
                     <Image
@@ -117,7 +116,7 @@ export default function UserManagementScreen({ navigation }: any) {
                         height: 40,
                         borderRadius: 20,
                         marginRight: 12,
-                        borderColor: colors.loginLink,
+                        borderColor: Colors.secondary,
                         borderWidth: 2,
                       }}
                     />
@@ -169,7 +168,7 @@ export default function UserManagementScreen({ navigation }: any) {
               {loading ? (
                 <Text style={styles.infoText}>Loading users...</Text>
               ) : error ? (
-                <Text style={[styles.infoText, { color: colors.warningText }]}>
+                <Text style={[styles.infoText, { color: Colors.textWarning }]}>
                   {error}
                 </Text>
               ) : filteredStudents.length === 0 ? (
@@ -182,7 +181,7 @@ export default function UserManagementScreen({ navigation }: any) {
                       flexDirection: "row",
                       alignItems: "center",
                       paddingVertical: 12,
-                      backgroundColor: colors.background,
+                      backgroundColor: Colors.primary,
                     }}
                   >
                     <Image

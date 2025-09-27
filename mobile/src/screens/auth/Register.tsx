@@ -23,7 +23,6 @@ import {
   COGNITO_CLIENT_ID,
   API_BASE_URL,
 } from "react-native-dotenv";
-import colors from "@/styles/colors";
 
 const REDIRECT_URI = makeRedirectUri();
 
@@ -239,11 +238,11 @@ export default function RegisterScreen({ navigation }: any) {
             }}
           >
             <View
-              style={{ flex: 1, height: 0.5, backgroundColor: colors.infoText }}
+              style={{ flex: 1, height: 0.5, backgroundColor: Colors.textSecondary }}
             />
             <Text
               style={{
-                color: colors.infoText,
+                color: Colors.textSecondary,
                 fontSize: 14,
                 marginHorizontal: 8,
               }}
@@ -251,7 +250,7 @@ export default function RegisterScreen({ navigation }: any) {
               Or Sign In With
             </Text>
             <View
-              style={{ flex: 1, height: 0.5, backgroundColor: colors.infoText }}
+              style={{ flex: 1, height: 0.5, backgroundColor: Colors.textSecondary }}
             />
           </View>
 

@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styles from "@/styles/styles";
-import colors from "@/styles/colors";
 import { API_BASE_URL } from "react-native-dotenv";
 import { Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -113,7 +112,7 @@ export default function UserConfigScreen({ navigation, route }: any) {
                   flexDirection: "row",
                   alignItems: "center",
                   paddingVertical: 12,
-                  backgroundColor: colors.background,
+                  backgroundColor: Colors.primary,
                 }}
               >
                 <View style={{ flex: 1 }}>
@@ -125,11 +124,11 @@ export default function UserConfigScreen({ navigation, route }: any) {
                   onValueChange={toggleInstructor}
                   value={isInstructor}
                   trackColor={{
-                    false: colors.buttonSecondary,
-                    true: colors.loginLink,
+                    false: Colors.backgroundGray,
+                    true: Colors.secondary,
                   }}
                   thumbColor="#fff"
-                  ios_backgroundColor={colors.buttonSecondary}
+                  ios_backgroundColor={Colors.backgroundGray}
                 />
               </View>
               <View
@@ -137,7 +136,7 @@ export default function UserConfigScreen({ navigation, route }: any) {
                   flexDirection: "row",
                   alignItems: "center",
                   paddingVertical: 12,
-                  backgroundColor: colors.background,
+                  backgroundColor: Colors.primary,
                 }}
               >
                 <View style={{ flex: 1 }}>
@@ -149,11 +148,11 @@ export default function UserConfigScreen({ navigation, route }: any) {
                   onValueChange={toggleActivated}
                   value={isActivated}
                   trackColor={{
-                    false: colors.buttonSecondary,
-                    true: colors.loginLink,
+                    false: Colors.backgroundGray,
+                    true: Colors.secondary,
                   }}
                   thumbColor="#fff"
-                  ios_backgroundColor={colors.buttonSecondary}
+                  ios_backgroundColor={Colors.backgroundGray}
                 />
               </View>
             </View>
