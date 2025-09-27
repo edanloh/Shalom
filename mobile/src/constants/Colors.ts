@@ -13,6 +13,7 @@ export const Colors = {
   gray500: '#636363',       // Medium text
   gray600: '#363535ff',
   gray800: '#2E2E2E',       // Dark elements
+  textInputBg: '#3E3E47',
   
   // Status Colors
   yellow: '#EEC53D',    // Achievements, warnings

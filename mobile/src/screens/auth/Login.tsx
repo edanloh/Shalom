@@ -21,8 +21,8 @@ import styles from "@/styles/styles";
 import CustomTextInput from "@components/CustomTextInput";
 import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
-import colors from "@/styles/colors";
-import { Colors, TextStyles } from "../../constants";
+import { Colors, TextStyles } from "@/constants";
+import externalStyles from "@styles/styles";
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
@@ -111,17 +111,15 @@ export default function LoginScreen({ navigation }: any) {
           <View style={styles.logo}>
             <Image
               source={require("@assets/shalom.png")}
-              style={{ width: 100, height: 100, resizeMode: "contain" }}
+              style={externalStyles.logo}
             />
           </View>
-          <Text style={styles.title}>Shalom</Text>
+          <Text style={[TextStyles.h2]}>Shalom</Text>
         </View>
 
         {/* Form */}
         <View style={styles.form}>
-          <Text style={TextStyles.h2}>
-            Login to your Account
-          </Text>
+          <Text style={[TextStyles.h3]}>Login to your Account</Text>
 
           {/* Email */}
           <CustomTextInput
@@ -174,11 +172,15 @@ export default function LoginScreen({ navigation }: any) {
             }}
           >
             <View
-              style={{ flex: 1, height: 0.5, backgroundColor: colors.infoText }}
+              style={{
+                flex: 1,
+                height: 0.5,
+                backgroundColor: Colors.textSecondary,
+              }}
             />
             <Text
               style={{
-                color: colors.infoText,
+                color: Colors.textSecondary,
                 fontSize: 14,
                 marginHorizontal: 8,
               }}
@@ -186,7 +188,11 @@ export default function LoginScreen({ navigation }: any) {
               Or Sign In With
             </Text>
             <View
-              style={{ flex: 1, height: 0.5, backgroundColor: colors.infoText }}
+              style={{
+                flex: 1,
+                height: 0.5,
+                backgroundColor: Colors.textSecondary,
+              }}
             />
           </View>
 

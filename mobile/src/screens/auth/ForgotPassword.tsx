@@ -14,11 +14,11 @@ import { useAuth } from "@contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import styles from "@/styles/styles";
 import colors from "@/styles/colors";
-import { Colors, TextStyles } from "../../constants";
+import { Colors, TextStyles } from "@/constants";
 
 const ForgotPasswordScreen = () => {
   const navigation = useNavigation<any>();
-  const [step, setStep] = useState(1); // 1: request, 2: confirm
+  const [step, setStep] = useState(2); // 1: request, 2: confirm
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -86,17 +86,17 @@ const ForgotPasswordScreen = () => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.header, { marginBottom: 24 }]}>
+        <View style={styles.header}>
           <View style={styles.logo}>
             <Image
               source={require("@assets/shalom.png")}
-              style={{ width: 100, height: 100, resizeMode: "contain" }}
+              style={styles.logo}
             />
           </View>
-          <Text style={styles.title}>Shalom</Text>
+          <Text style={[TextStyles.h2]}>Shalom</Text>
         </View>
         <View style={styles.form}>
-          <Text style={TextStyles.h2}>
+          <Text style={TextStyles.h3}>
             {success
               ? "Password Reset Successful"
               : step === 1

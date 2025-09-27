@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { Colors, TextStyles, Spacing, BorderRadius } from "../constants";
+import { Colors, TextStyles, Spacing, BorderRadius } from "@/constants";
 
 const styles = StyleSheet.create({
   container: { 
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.backgroundGray,
+    backgroundColor: Colors.textInputBg,
   },
   inputIcon: { 
     marginLeft: Spacing.base 
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   loginLink: { 
-    ...TextStyles.bodyMedium,
+    ...TextStyles.body,
     color: Colors.secondary,
   },
   infoText: {

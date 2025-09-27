@@ -174,15 +174,15 @@ export default function RegisterScreen({ navigation }: any) {
           <View style={styles.logo}>
             <Image
               source={require("@assets/shalom.png")}
-              style={{ width: 100, height: 100, resizeMode: "contain" }}
+              style={styles.logo}
             />
           </View>
-          <Text style={styles.title}>Shalom</Text>
+          <Text style={[TextStyles.h2]}>Shalom</Text>
         </View>
 
         {/* Form */}
         <View style={styles.form}>
-          <Text style={TextStyles.h2}>
+          <Text style={TextStyles.h3}>
             Create Your Account
           </Text>
 
