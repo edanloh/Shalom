@@ -8,7 +8,7 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
-import { Colors, Typography, Spacing } from "../../constants";
+import { Colors, Typography, Spacing, TextStyles } from "../../constants";
 import CustomTextInput from "@components/CustomTextInput";
 import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
@@ -60,14 +60,7 @@ const ConfirmSignUp = () => {
           <Text style={styles.title}>Shalom</Text>
         </View>
         <View style={styles.form}>
-          <Text
-            style={{
-              fontFamily: "Lexend-Regular",
-              fontSize: 22,
-              color: "white",
-              marginBottom: 16,
-            }}
-          >
+          <Text style={TextStyles.h2}>
             {confirmed ? "Confirmation Successful" : "Confirm Your Account"}
           </Text>
           <Text style={styles.infoText}>

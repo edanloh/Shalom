@@ -1,11 +1,15 @@
+// DEPRECATED: Use Colors from ../constants/Colors.ts instead
+// This file is kept for backward compatibility during migration
+import { Colors } from "../constants";
+
 const colors = {
-  background: "#2f2f37",
-  headerText: "#ffffffff",
-  buttonSecondary: "#3e3e47",
-  loginText: "#aaaaab",
-  loginLink: "#564beb",
-  infoText: "#aaaaab",
-  warningText: "#ff6b6b",
+  background: Colors.primary,
+  headerText: Colors.textPrimary,
+  buttonSecondary: Colors.backgroundGray,
+  loginText: Colors.textSecondary,
+  loginLink: Colors.secondary,
+  infoText: Colors.textSecondary,
+  warningText: Colors.red,
 };
 
 export default colors;

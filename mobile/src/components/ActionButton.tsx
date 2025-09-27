@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
+import { Colors, TextStyles } from "../constants";
 
 interface ActionButtonProps {
   onPress: () => void;
@@ -72,16 +73,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   buttonTextPrimary: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    fontFamily: "Lexend-Light",
+    ...TextStyles.bodyMedium,
+    color: Colors.white,
   },
   buttonTextSecondary: {
-    color: "#564beb",
-    fontSize: 16,
-    fontWeight: "600",
-    fontFamily: "Lexend-Light",
+    ...TextStyles.bodyMedium,
+    color: Colors.secondary,
   },
   image: {
     width: 28,

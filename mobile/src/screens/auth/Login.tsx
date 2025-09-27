@@ -22,6 +22,7 @@ import CustomTextInput from "@components/CustomTextInput";
 import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
 import colors from "@/styles/colors";
+import { Colors, TextStyles } from "../../constants";
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
@@ -118,14 +119,7 @@ export default function LoginScreen({ navigation }: any) {
 
         {/* Form */}
         <View style={styles.form}>
-          <Text
-            style={{
-              fontFamily: "Lexend-Regular",
-              fontSize: 22,
-              color: "white",
-              marginBottom: 16,
-            }}
-          >
+          <Text style={TextStyles.h2}>
             Login to your Account
           </Text>
 

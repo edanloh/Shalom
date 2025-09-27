@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Image,
   TouchableOpacity,
   StatusBar,
+  RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -135,6 +136,18 @@ export default function NotificationsScreen({ navigation }: any) {
     </View>
   );
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      // TODO: call your real fetch here, e.g. await reloadNotifications();
+      await new Promise(r => setTimeout(r, 800)); // demo delay
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
@@ -167,6 +180,15 @@ export default function NotificationsScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
         SectionSeparatorComponent={() => <View style={{ height: Spacing.lg }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.white}             // iOS spinner color
+            colors={[Colors.purple400]}          // Android spinner colors
+            progressViewOffset={8}               // Android offset (optional)
+          />
+        }
       />
     </SafeAreaView>
   );
@@ -191,7 +213,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...TextStyles.h3,
     color: Colors.textPrimary,
-    fontSize: 20,
+    fontSize: TextStyles.h4.fontSize,
     fontWeight: 'bold',
   },
 
@@ -206,7 +228,7 @@ const styles = StyleSheet.create({
   stickyHeaderText: {
     ...TextStyles.h2,
     color: Colors.textPrimary,
-    fontSize: 20,
+    fontSize: TextStyles.h4.fontSize,
     fontWeight: 'bold',
   },
   // Row

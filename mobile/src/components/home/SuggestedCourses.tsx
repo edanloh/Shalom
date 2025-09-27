@@ -22,7 +22,7 @@ const SuggestedCourseCard: React.FC<SuggestedCourseCardProps> = ({
   onPress,
 }) => {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <TouchableOpacity style={styles.suggestedCard} onPress={onPress}>
       <View style={styles.imageContainer}>
         <ImageWithFallback
           source={{ uri: course?.image }}
@@ -39,8 +39,9 @@ const SuggestedCourseCard: React.FC<SuggestedCourseCardProps> = ({
         </Text>
         <View style={styles.stats}>
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{course.rating}</Text>
-            <Text style={styles.statLabel}>★ • {course.modules} modules</Text>
+            <Text style={styles.statValue}>{course.rating}★</Text>
+            <Text style={styles.statLabel}> • </Text>
+            <Text style={styles.statLabel}>{course.modules} modules</Text>
           </View>
         </View>
       </View>
@@ -92,12 +93,23 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.lg,
     paddingRight: Spacing.base,
   },
-  card: {
+  suggestedCard: {
     width: 180,
     marginRight: Spacing.base,
-    backgroundColor: Colors.backgroundGray,
+    backgroundColor: Colors.gray600,
     borderRadius: BorderRadius.lg,
     overflow: "hidden",
+    // iOS Shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    // Android Shadow
+    elevation: 24,
+    zIndex: 1,
+    paddingBottom: Spacing.lg,
+    marginVertical: 2,
+    marginHorizontal: 2,
   },
   imageContainer: {
     position: "relative",
@@ -136,18 +148,20 @@ const styles = StyleSheet.create({
   },
   stat: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    alignItems: "baseline",
+    // justifyContent: "space-between",
   },
   statValue: {
     fontFamily: Typography.fontFamily.bold,
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.base,
     color: Colors.purple400,
+    paddingHorizontal: 2,
   },
   statLabel: {
     fontFamily: Typography.fontFamily.regular,
     fontSize: Typography.fontSize.xs,
     color: Colors.textSecondary,
+    paddingHorizontal: 4,
   },
 });
 
