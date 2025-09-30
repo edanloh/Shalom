@@ -20,7 +20,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import ProfileHeader from '../components/home/ProfileHeader';
 import ProgressSection from '../components/home/ProgressSection';
 import SwipeableCourseCards from '../components/home/SwipeableCourseCards';
-import SuggestedCourses from '../components/home/SuggestedCourses';
+import CourseCard from '../components/home/CourseCard';
 
 // Import hooks and types
 import { useCourses } from '../contexts/CourseContext';
@@ -72,6 +72,13 @@ const HomeScreen: React.FC = () => {
     suggestedLoading,
     suggestedError,
     refreshSuggested,
+
+    wishlist,
+    wishlistLoading,
+    wishlistError,
+    refreshWishlist,
+    toggleWishlist,
+    isWishlisted,
   } = useCourses();
 
   // Debug logging for user state
@@ -167,6 +174,11 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('MyCourses');
   };
 
+  const handleViewWishlist = () => {
+    // Navigate to wishlist screen
+    navigation.navigate('Wishlist');
+  };
+
   // Handle course actions for swipeable cards
   const handleCourseComplete = (courseId: string) => {
     console.log('Course marked as completed:', courseId);
@@ -238,31 +250,107 @@ const HomeScreen: React.FC = () => {
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </View>
+          ) : (myCoursesData?.length ?? 0) === 0 ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>You haven't enrolled in any courses yet.</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Courses')}
+                style={styles.retryButton}
+              >
+                <Text style={styles.retryText}>Browse courses</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <SwipeableCourseCards 
               courses={myCoursesData}
               onCourseComplete={handleCourseComplete}
               onCourseLike={handleCourseLike}
+              onToggleWishlist={toggleWishlist}
+              isWishlisted={(id) => isWishlisted?.(id) ?? false}
             />
           )}
         </View>
 
-        {/* Suggested Courses Section */}
-        {suggestedLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.purple400} />
-            <Text style={styles.loadingText}>Loading suggestions...</Text>
-          </View>
-        ) : suggestedError ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{suggestedError}</Text>
-            <TouchableOpacity onPress={refreshSuggested} style={styles.retryButton}>
-              <Text style={styles.retryText}>Retry</Text>
+        {/* Wishlist Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Wishlist</Text>
+            <TouchableOpacity onPress={handleViewWishlist}>
+              <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <SuggestedCourses courses={suggestedCoursesData} />
-        )}
+
+          {wishlistLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.purple400} />
+              <Text style={styles.loadingText}>Loading wishlist...</Text>
+            </View>
+          ) : wishlistError ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{wishlistError}</Text>
+              <TouchableOpacity onPress={refreshWishlist} style={styles.retryButton}>
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : wishlist.length === 0 ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>No favourites yet. Tap the heart on a course to save it.</Text>
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
+            >
+              {wishlist.map((course) => (
+                <CourseCard
+                  key={course.id}
+                  course={course}
+                  variant="compact"
+                  showInstructor={false}
+                  onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
+                />
+              ))}
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Suggested Courses Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Suggested for You</Text>
+          </View>
+
+          {suggestedLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.purple400} />
+              <Text style={styles.loadingText}>Loading suggestions...</Text>
+            </View>
+          ) : suggestedError ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{suggestedError}</Text>
+              <TouchableOpacity onPress={refreshSuggested} style={styles.retryButton}>
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
+            >
+              {suggestedCoursesData.map((course) => (
+                <CourseCard
+                  key={course.id}
+                  course={course}
+                  variant="compact"
+                  showInstructor={false}
+                  onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
+                />
+              ))}
+            </ScrollView>
+          )}
+          </View>
       </ScrollView>
 
       {/* Bottom Navigation - Home, My Courses, Search, Settings */}

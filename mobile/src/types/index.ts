@@ -69,6 +69,7 @@ export interface Course {
   outcomes?: string[];
   createdAt: string;
   updatedAt: string;
+  isWishlisted?: boolean;
 }
 
 export interface WeeklyGoal {

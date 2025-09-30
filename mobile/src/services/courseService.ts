@@ -19,6 +19,13 @@ const ENDPOINTS = {
   USER_ENROLLMENTS: '/courses/enrollment',
 };
 
+// Wishlist endpoints
+const WISHLIST = {
+  BASE: (uid: string) => `/users/${encodeURIComponent(uid)}/wishlist`,
+  ITEM: (uid: string, courseId: string) =>
+    `/users/${encodeURIComponent(uid)}/wishlist/${encodeURIComponent(courseId)}`,
+};
+
 export interface CourseListParams {
   limit?: number;
   category?: string;
@@ -203,6 +210,7 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
     outcomes: [],
     createdAt: awsCourse.created_at || new Date().toISOString(),
     updatedAt: awsCourse.updated_at || new Date().toISOString(),
+    isWishlisted: false,
   };
 };
 
@@ -257,6 +265,7 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     outcomes: [],
     createdAt: enrollment.enrollment_date,
     updatedAt: enrollment.last_accessed,
+    isWishlisted: Boolean(enrollment.is_in_wishlist),
   };
 };
 
@@ -437,6 +446,31 @@ class CourseService {
       throw error;
     }
   }
+
+async getWishlist(userId: string): Promise<Course[]> {
+  if (!userId) throw new Error('Missing userId');
+  const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`;
+  const cached = await CacheManager.get<Course[]>(cacheKey);
+  if (cached) return cached;
+
+  const resp = await apiService.get<any>(WISHLIST.BASE(userId));
+  const array = resp?.courses ?? resp?.data?.courses ?? [];
+  const courses = array.map(convertAWSCourseToAppCourse);
+  await CacheManager.set(cacheKey, courses);
+  return courses;
+}
+
+async addToWishlist(userId: string, courseId: string): Promise<void> {
+  if (!userId || !courseId) throw new Error('Missing userId/courseId');
+  await apiService.post(WISHLIST.BASE(userId), { courseId });
+  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
+}
+
+async removeFromWishlist(userId: string, courseId: string): Promise<void> {
+  if (!userId || !courseId) throw new Error('Missing userId/courseId');
+  await apiService.delete(WISHLIST.ITEM(userId, courseId));
+  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
+}
 
   /**
    * Get detailed information for a specific course

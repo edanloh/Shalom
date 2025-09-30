@@ -29,6 +29,7 @@ import { Images } from "../../../assets";
 import { Course } from "../../types";
 import type { MainStackParamList } from "../../types/navigation";
 import { ImageWithFallback } from "../common";
+import { Ionicons } from '@expo/vector-icons';
 
 type NavigationProp = StackNavigationProp<MainStackParamList, 'Main'>;
 
@@ -43,12 +44,16 @@ interface SwipeableCourseCardsProps {
   courses: Course[];
   onCourseComplete?: (courseId: string) => void;
   onCourseLike?: (courseId: string) => void;
+  onToggleWishlist?: (course: Course) => void;
+  isWishlisted?: (courseId: string) => boolean;
 }
 
 const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
   courses,
   onCourseComplete,
   onCourseLike,
+  onToggleWishlist,
+  isWishlisted,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useSharedValue(0);
@@ -233,6 +238,25 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
                   style={styles.mainImage}
                  
                 />
+
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onToggleWishlist?.(currentCourse);
+                  }}
+                  hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+                  style={styles.heartBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    (isWishlisted?.(currentCourse.id) ? 'Remove from' : 'Add to') + ' wishlist'
+                  }
+                >
+                  <Ionicons
+                    name={isWishlisted?.(currentCourse.id) ? 'heart' : 'heart-outline'}
+                    size={20}
+                    color="#fff"
+                  />
+                </Pressable>
 
                 <View style={styles.imageOverlay} />
               </View>
@@ -629,6 +653,15 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     color: Colors.textSecondary,
     textAlign: "center",
+  },
+  heartBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 16,
+    padding: 6,
   },
 });
 

@@ -11,6 +11,7 @@ import { Images } from '../../assets';
 import { Colors, Spacing, TextStyles, BorderRadius, Shadows } from '../constants';
 import type { Course } from '../types';
 import type { MainStackParamList } from '../types';
+import { useCourses } from '../contexts/CourseContext';
 
 const ProgressBar = ({ percent }: { percent: number }) => {
   const p = Math.max(0, Math.min(100, percent));
@@ -25,6 +26,11 @@ const MyCourses: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   const { user } = useAuth();
   const { courses, loading, error, refreshing, refresh, retry } = useMyCourses();
+  const { wishlist = [], toggleWishlist } = useCourses();
+
+  const wishIds = useMemo(() => new Set(wishlist.map(c => c.id)), [wishlist]);
+  const isWishlisted = (c: Course) => wishIds.has(c.id);
+
 
   // Debug logging for user state
   useEffect(() => {
@@ -150,6 +156,7 @@ const MyCourses: React.FC = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: Spacing.lg }}
             ItemSeparatorComponent={() => <View style={{ width: Spacing.md }} />}
+            extraData={wishlist}
             renderItem={({ item }) => {
               const moduleLabel = getModuleLabel(item);
               return (
@@ -163,7 +170,29 @@ const MyCourses: React.FC = () => {
                       source={{ uri: item.image }} 
                       fallback={Images.coursePlaceholder}
                       style={styles.cwThumb} 
-                    />
+                    /> 
+                    {/* Level badge and heart button */}
+                    <View style={styles.cwBadgeRow}>
+                      <View style={styles.levelBadge}>
+                        <Text style={styles.levelText}>{item.level}</Text>
+                      </View>
+
+                      <TouchableOpacity
+                        onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
+                        accessibilityRole="button"
+                        accessibilityLabel={isWishlisted(item) ? 'Remove from wishlist' : 'Add to wishlist'}
+                        hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+                        style={styles.heartBtn}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={isWishlisted(item) ? 'heart' : 'heart-outline'}
+                          size={18}
+                          color="#fff"
+                        />
+                      </TouchableOpacity>
+                    </View>
+
                     {/* Progress indicator overlay */}
                     <View style={styles.progressOverlay}>
                       <Text style={styles.progressText}>{Math.round(item.progress?.percentage || 0)}%</Text>
@@ -195,19 +224,40 @@ const MyCourses: React.FC = () => {
                 const moduleLabel = getModuleLabel(item);
                 return (
                     <View key={item.id} style={styles.ipCard}>
-                    <View style={styles.ipLeft}>
-                        <Text style={styles.ipTitle} numberOfLines={2}>{item.title}</Text>
-                        <Text style={styles.ipSubtitle} numberOfLines={1}>{moduleLabel}</Text>
-                        <Text style={styles.ipSubtitle}>{pct}% completed</Text>
-                        <ProgressBar percent={pct} />
-                    </View>
-                    <View style={styles.ipRight}>
-                        <ImageWithFallback 
-                          source={{ uri: item.image }} 
-                          fallback={Images.coursePlaceholder}
-                          style={styles.ipRightImage} 
-                        />
-                    </View>
+                      <View style={styles.ipLeft}>
+                          <Text style={styles.ipTitle} numberOfLines={2}>{item.title}</Text>
+                          <Text style={styles.ipSubtitle} numberOfLines={1}>{moduleLabel}</Text>
+                          <Text style={styles.ipSubtitle}>{pct}% completed</Text>
+                          <ProgressBar percent={pct} />
+                      </View>
+                      <View style={styles.ipRight}>
+                        <View style={styles.ipImageWrap}>
+                          <ImageWithFallback
+                            source={{ uri: item.image }}
+                            fallback={Images.coursePlaceholder}
+                            style={styles.ipRightImage}
+                          />
+                          <View style={styles.cwBadgeRow}>
+                            <View style={styles.levelBadge}>
+                              <Text style={styles.levelText}>{item.level}</Text>
+                            </View>
+                            <TouchableOpacity
+                              onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
+                              accessibilityRole="button"
+                              accessibilityLabel={isWishlisted(item) ? 'Remove from wishlist' : 'Add to wishlist'}
+                              hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+                              style={styles.heartBtn}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons
+                                name={isWishlisted(item) ? 'heart' : 'heart-outline'}
+                                size={18}
+                                color="#fff"
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
                     </View>
                 );
                 })}
@@ -281,6 +331,37 @@ const styles = StyleSheet.create({
     ...TextStyles.caption,
     paddingHorizontal: Spacing.md,
     marginTop: 2,
+  },
+  cwBadgeRow: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    zIndex: 2,
+  },
+  levelBadge: {
+    backgroundColor: Colors.purple400,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  levelText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  heartBtn: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 14,
+    padding: 6,
+  },
+  ipImageWrap: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
   },
 
   // In Progress (vertical cards)

@@ -10,10 +10,11 @@ import NotificationsScreen from '../Notification';
 import SettingsScreen from '../Settings';
 import EditProfileScreen from '../EditProfile';
 import MyCourses from '../MyCourses';
+import WishlistScreen from '../WishlistScreen';
 import UserManagementScreen from '../admin/UserManagement';
 import UserConfigScreen from '../admin/UserConfig';
 import { useAuth } from '../../contexts/AuthContext';
-import { TabParamList, MainStackParamList } from '../../types';
+import type { TabParamList, MainStackParamList } from '@/types/navigation';
 import { ADMIN_EMAIL } from '../../constants';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -106,6 +107,11 @@ export default function MainNavigator() {
         name="MyCourses"
         component={MyCourses}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="Wishlist" 
+        component={WishlistScreen} 
+        options={{ headerShown: false }} 
       />
     </Stack.Navigator>
   );
