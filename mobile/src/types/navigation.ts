@@ -6,6 +6,9 @@ export type MainStackParamList = {
   Settings: undefined;
   EditProfile: undefined;
   MyCourses: undefined;
+  Wishlist: undefined;
+  UserManagement: undefined;
+  UserConfig: undefined;
 };
 
 export type TabParamList = {
@@ -13,6 +16,7 @@ export type TabParamList = {
   Courses: undefined;
   Notifications: undefined;
   Profile: undefined;
+  Admin?: undefined;
 };
 
 export type RootStackParamList = {

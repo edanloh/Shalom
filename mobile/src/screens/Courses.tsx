@@ -21,6 +21,7 @@ import { useUser } from '../contexts/UserContext';
 import { Colors, Spacing, TextStyles } from '../constants';
 import type { Course } from '../types';
 
+
 const { width } = Dimensions.get('window');
 
 const CARD_BG = '#3A3A45';
@@ -55,14 +56,14 @@ function progressFrom(course: Course): number {
 export default function CoursesScreen({ navigation }: any) {
   const {
     courses = [],
-    coursesLoading = false,
+    loading,
     refreshCourses,
-  } = useCourses() as {
-    courses: Course[];
-    coursesLoading?: boolean;
-    coursesError?: string | null;
-    refreshCourses?: () => Promise<void>;
-  };
+    wishlist = [],
+    toggleWishlist,
+  } = useCourses();
+
+  const wishIds = useMemo(() => new Set(wishlist.map(c => c.id)), [wishlist]);
+  const isWishlisted = (c: Course) => wishIds.has(c.id);
   const { enrolledCourses = [] } = useUser();
 
   // UI state
@@ -146,6 +147,28 @@ export default function CoursesScreen({ navigation }: any) {
     }
   }, [refreshCourses]);
 
+  const BadgeHeartRow = ({ item }: { item: Course }) => (
+    <View style={styles.badgeRow}>
+      <View style={styles.levelBadge}>
+        <Text style={styles.levelText}>{item.level}</Text>
+      </View>
+      <TouchableOpacity
+        onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
+        accessibilityRole="button"
+        accessibilityLabel={isWishlisted(item) ? 'Remove from wishlist' : 'Add to wishlist'}
+        hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+        style={styles.heartBtn}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name={isWishlisted(item) ? 'heart' : 'heart-outline'}
+          size={18}
+          color="#fff"
+        />
+      </TouchableOpacity>
+    </View>
+  );
+
   const HCard = ({
     item,
     withProgress,
@@ -158,7 +181,10 @@ export default function CoursesScreen({ navigation }: any) {
       onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
       style={styles.hCard}
     >
-      <Image source={{ uri: item.image }} style={styles.hImage} />
+      <View style={styles.imageWrap}>
+        <Image source={{ uri: item.image }} style={styles.hImage} />
+        <BadgeHeartRow item={item} />
+      </View>
       <Text style={styles.hTitle} numberOfLines={2}>
         {item.title}
       </Text>
@@ -180,7 +206,10 @@ export default function CoursesScreen({ navigation }: any) {
       onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
       style={styles.gCard}
     >
-      <Image source={{ uri: item.image }} style={styles.gImage} />
+      <View style={styles.imageWrap}>
+        <Image source={{ uri: item.image }} style={styles.gImage} />
+        <BadgeHeartRow item={item} />
+      </View>
       <Text style={styles.gTitle} numberOfLines={2}>
         {item.title}
       </Text>
@@ -285,8 +314,9 @@ export default function CoursesScreen({ navigation }: any) {
               keyExtractor={(i) => i.id}
               renderItem={({ item }) => <HCard item={item} withProgress />}
               horizontal
-              showsHorizontalScrollIndicator={false}
+              showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.hRow}
+              extraData={wishlist}
             />
           </>
         )}
@@ -298,7 +328,7 @@ export default function CoursesScreen({ navigation }: any) {
               Recommended
             </Text>
 
-            {(coursesLoading || refreshing) ? (
+            {(loading || refreshing) ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={Colors.purple400} />
                 <Text style={styles.loadingText}>Loading recommended…</Text>
@@ -309,8 +339,9 @@ export default function CoursesScreen({ navigation }: any) {
                 keyExtractor={(i) => i.id}
                 renderItem={({ item }) => <HCard item={item} />}
                 horizontal
-                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.hRow}
+                extraData={wishlist}
               />
             ) : (
               <EmptyState icon="sparkles-outline" message="No recommendations right now." subtext="Pull down to refresh."/>
@@ -322,7 +353,7 @@ export default function CoursesScreen({ navigation }: any) {
         <Text style={[styles.sectionTitle, { marginTop: Spacing.sm }]}>
           Popular Courses
         </Text>
-        {(coursesLoading || refreshing) ? (
+        {(loading || refreshing) ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.purple400} />
             <Text style={styles.loadingText}>Loading popular courses…</Text>
@@ -336,6 +367,7 @@ export default function CoursesScreen({ navigation }: any) {
             columnWrapperStyle={{ justifyContent: 'space-between' }}
             contentContainerStyle={styles.grid}
             scrollEnabled={false}
+            extraData={wishlist}
           />
         ) : (
           <EmptyState icon="search-outline" message="No courses match your filters" subtext="Pull down to refresh."/>
@@ -466,7 +498,6 @@ const styles = StyleSheet.create({
   hImage: {
     width: '100%',
     height: 150,
-    borderRadius: 16, // image has its own rounded container
     backgroundColor: CARD_BG,
   },
   hTitle: {
@@ -522,7 +553,6 @@ const styles = StyleSheet.create({
   gImage: {
     width: '100%',
     height: 110,
-    borderRadius: 16,
     backgroundColor: CARD_BG,
   },
   gTitle: {
@@ -540,4 +570,35 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     fontFamily: TextStyles.body.fontFamily,
   },
+  imageWrap: {
+    position: 'relative',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  badgeRow: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  levelBadge: {
+    backgroundColor: Colors.purple400,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  levelText: {
+    color: Colors.white,
+    fontFamily: TextStyles.body.fontFamily,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  heartBtn: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 14,
+    padding: 6,
+  },
+
 });

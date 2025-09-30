@@ -26,6 +26,14 @@ interface CourseContextType {
   searchCourses: (query: string) => Course[];
   getCoursesByCategory: (category: string) => Course[];
   getCourse: (courseId: string) => Course | undefined;
+
+  // Wishlist
+  wishlist: Course[];
+  wishlistLoading: boolean;
+  wishlistError: string | null;
+  refreshWishlist: () => Promise<void>;
+  toggleWishlist: (course: Course) => Promise<void>;
+  isWishlisted: (courseId: string) => boolean;
 }
 
 const CourseContext = createContext<CourseContextType | undefined>(undefined);
@@ -43,6 +51,10 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [suggestedLoading, setSuggestedLoading] = useState(false);
   const [suggestedError, setSuggestedError] = useState<string | null>(null);
 
+  const [wishlist, setWishlist] = useState<Course[]>([]);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistError, setWishlistError] = useState<string | null>(null);
+
   const { user } = useAuth();
 
   useEffect(() => {
@@ -54,6 +66,10 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       loadMyCourses();
       loadSuggestedCourses();
     }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) refreshWishlist();
   }, [user?.id]);
 
   const loadCourses = async () => {
@@ -143,6 +159,63 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const getCourse = (courseId: string): Course | undefined => {
     return courses.find(course => course.id === courseId);
   };
+  
+  const refreshWishlist = async () => {
+    if (!user?.id) return;
+    try {
+      setWishlistLoading(true);
+      setWishlistError(null);
+      const items = await courseService.getWishlist(user.id);
+      setWishlist(items);
+    } catch (e: any) {
+      setWishlistError(e?.message ?? 'Failed to load wishlist');
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
+  const isWishlisted = (courseId: string) =>
+    wishlist.some(c => c.id === courseId);
+
+  // keep UI consistent across lists
+  const setFlagInLists = (courseId: string, flag: boolean) => {
+    setCourses(prev => prev.map(c => c.id === courseId ? { ...c, isWishlisted: flag } : c));
+    setMyCourses(prev => prev.map(c => c.id === courseId ? { ...c, isWishlisted: flag } : c));
+    setSuggestedCourses(prev => prev.map(c => c.id === courseId ? { ...c, isWishlisted: flag } : c));
+  };
+
+  const toggleWishlist = async (course: Course) => {
+    if (!user?.id) return;
+    const id = course.id;
+    const currently = isWishlisted(id);
+
+    // optimistic UI
+    if (currently) {
+      setWishlist(prev => prev.filter(c => c.id !== id));
+      setFlagInLists(id, false);
+    } else {
+      setWishlist(prev => [{ ...course, isWishlisted: true }, ...prev]);
+      setFlagInLists(id, true);
+    }
+
+    try {
+      if (currently) {
+        await courseService.removeFromWishlist(user.id, id);
+      } else {
+        await courseService.addToWishlist(user.id, id);
+      }
+    } catch (e) {
+      // rollback on failure
+      if (currently) {
+        setWishlist(prev => [{ ...course, isWishlisted: true }, ...prev]);
+        setFlagInLists(id, true);
+      } else {
+        setWishlist(prev => prev.filter(c => c.id !== id));
+        setFlagInLists(id, false);
+      }
+      setWishlistError((e as Error)?.message ?? 'Failed to update wishlist');
+    }
+  };
 
   return (
     <CourseContext.Provider value={{
@@ -164,6 +237,14 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       searchCourses,
       getCoursesByCategory,
       getCourse,
+
+      wishlist,
+      wishlistLoading,
+      wishlistError,
+      refreshWishlist,
+      toggleWishlist,
+      isWishlisted,
+
     }}>
       {children}
     </CourseContext.Provider>
