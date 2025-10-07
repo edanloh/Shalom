@@ -256,7 +256,14 @@ export default function RegisterScreen({ navigation }: any) {
 
           {/* Social Login */}
           <View
-            style={{ alignItems: "center", marginBottom: 16, marginTop: 16 }}
+            style={{
+              alignItems: "center",
+              marginBottom: 16,
+              marginTop: 16,
+              flexDirection: "column",
+              justifyContent: "center",
+              gap: 12,
+            }}
           >
             <TouchableOpacity
               onPress={handleGoogleLogin}
@@ -274,6 +281,18 @@ export default function RegisterScreen({ navigation }: any) {
                 style={[{ width: "100%", height: 48, resizeMode: "contain" }]}
               />
             </TouchableOpacity>
+            <ActionButton
+              onPress={() => navigation.navigate("SMSRegister")}
+              disabled={loading}
+              loading={loading}
+              text={"Register with phone number"}
+              style={{
+                marginBottom: 0,
+                paddingVertical: 12,
+                paddingHorizontal: 15,
+                borderRadius: 30,
+              }}
+            />
           </View>
         </View>
 

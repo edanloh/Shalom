@@ -37,6 +37,7 @@ interface CustomTextInputProps {
     | "yahoo"
     | "done"
     | "emergency-call";
+  editable?: boolean;
 }
 
 const CustomTextInput: React.FC<CustomTextInputProps> = ({
@@ -55,6 +56,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
   warningTextColor,
   onSubmitEditing,
   returnKeyType = "default",
+  editable = true,
 }) => {
   const inputMarginBottom = warningText ? 8 : 16;
   return (
@@ -81,6 +83,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
           placeholderTextColor={Colors.textSecondary}
           onSubmitEditing={onSubmitEditing}
           returnKeyType={returnKeyType}
+          editable={editable}
         />
         {onTogglePassword && (
           <TouchableOpacity

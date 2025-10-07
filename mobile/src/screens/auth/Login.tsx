@@ -21,7 +21,7 @@ import styles from "@/styles/styles";
 import CustomTextInput from "@components/CustomTextInput";
 import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
-import { Colors, TextStyles } from "@/constants";
+import { BorderRadius, Colors, TextStyles, Typography } from "@/constants";
 import externalStyles from "@styles/styles";
 
 export default function LoginScreen({ navigation }: any) {
@@ -198,7 +198,14 @@ export default function LoginScreen({ navigation }: any) {
 
           {/* Social Login */}
           <View
-            style={{ alignItems: "center", marginBottom: 16, marginTop: 16 }}
+            style={{
+              alignItems: "center",
+              marginBottom: 16,
+              marginTop: 16,
+              flexDirection: "column",
+              justifyContent: "center",
+              gap: 12,
+            }}
           >
             <TouchableOpacity
               onPress={handleGoogleLogin}
@@ -216,6 +223,18 @@ export default function LoginScreen({ navigation }: any) {
                 style={[{ width: "100%", height: 48, resizeMode: "contain" }]}
               />
             </TouchableOpacity>
+            <ActionButton
+              onPress={() => navigation.navigate("SMSLogin")}
+              disabled={loading}
+              loading={loading}
+              text={"Sign in with phone number"}
+              style={{
+                marginBottom: 0,
+                paddingVertical: 12,
+                paddingHorizontal: 15,
+                borderRadius: 30,
+              }}
+            />
           </View>
         </View>
 
