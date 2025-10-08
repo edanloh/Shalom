@@ -61,7 +61,6 @@ interface AuthContextType {
   ) => Promise<boolean>;
   confirmSignUp: (email: string, code: string) => Promise<boolean>;
   loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
-  authenticateWithTokens?: (tokens: AuthTokens) => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
 }
 
@@ -295,41 +294,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const authenticateWithTokens = async (tokens: AuthTokens) => {
-    try {
-      if (!tokens.access_token) throw new Error("No access token provided");
-
-      const userResponse = await cognitoClient.send(
-        new GetUserCommand({ AccessToken: tokens.access_token })
-      );
-
-      const attributes = userResponse.UserAttributes || [];
-      const username =
-        userResponse.Username ||
-        attributes.find((a) => a.Name === "email")?.Value ||
-        "";
-      const email =
-        attributes.find((a) => a.Name === "email")?.Value || username;
-
-      const baseUser = extractUserFromAttributes(
-        attributes as any[],
-        username,
-        email
-      );
-
-      const userData: User = {
-        ...baseUser,
-        authProvider: "email",
-        accessToken: tokens.access_token,
-        phone: attributes.find((a) => a.Name === "phone_number")?.Value,
-      };
-
-      await persistUser(userData);
-    } catch (error) {
-      throw error;
-    }
-  };
-
   const updateProfile = async (data: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...data };
@@ -351,7 +315,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         confirmSignUp,
         loginWithGoogle,
         updateProfile,
-        authenticateWithTokens,
       }}
     >
       {children}
