@@ -111,7 +111,7 @@ const HomeScreen: React.FC = () => {
 
   const weeklyGoal: WeeklyGoalData = {
     id: '1',
-    userId: '550e8400-e29b-41d4-a716-446655440102',
+    userId: '550e8400-e29b-41d4-a716-446655440101',
     targetHours: 7,
     currentHours: 5.8,
     weekStartDate: '2024-12-02T00:00:00Z',

@@ -2,6 +2,25 @@
 -- PostgreSQL Database Creation Script
 
 -- Drop existing tables if they exist (for fresh setup)
+DROP VIEW IF EXISTS course_detailed_stats CASCADE;
+DROP VIEW IF EXISTS user_dashboard_summary CASCADE;
+DROP TABLE IF EXISTS certificates CASCADE;
+DROP TABLE IF EXISTS user_learning_path_progress CASCADE;
+DROP TABLE IF EXISTS learning_path_courses CASCADE;
+DROP TABLE IF EXISTS learning_paths CASCADE;
+DROP TABLE IF EXISTS discussion_replies CASCADE;
+DROP TABLE IF EXISTS course_discussions CASCADE;
+DROP TABLE IF EXISTS course_resources CASCADE;
+DROP TABLE IF EXISTS course_analytics CASCADE;
+DROP TABLE IF EXISTS user_analytics CASCADE;
+DROP TABLE IF EXISTS user_lesson_progress CASCADE;
+DROP TABLE IF EXISTS assignment_submissions CASCADE;
+DROP TABLE IF EXISTS assignments CASCADE;
+DROP TABLE IF EXISTS course_lessons CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS user_preferences CASCADE;
+DROP TABLE IF EXISTS course_wishlist CASCADE;
+DROP TABLE IF EXISTS user_module_progress CASCADE;
 DROP TABLE IF EXISTS quiz_attempts CASCADE;
 DROP TABLE IF EXISTS video_progress CASCADE;
 DROP TABLE IF EXISTS course_sections CASCADE;
@@ -16,7 +35,6 @@ DROP TABLE IF EXISTS course_enrollments CASCADE;
 DROP TABLE IF EXISTS course_ratings CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
-DROP TABLE IF EXISTS instructors CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 -- Enable UUID extension
@@ -38,21 +56,6 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Instructors Table (extends users)
-CREATE TABLE instructors (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    bio TEXT,
-    expertise TEXT[],
-    rating DECIMAL(3,2) DEFAULT 0.0,
-    total_students INTEGER DEFAULT 0,
-    total_courses INTEGER DEFAULT 0,
-    years_experience INTEGER,
-    education TEXT,
-    certifications TEXT[],
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Categories Table
 CREATE TABLE categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -69,7 +72,7 @@ CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(500) NOT NULL,
     description TEXT NOT NULL,
-    instructor_id UUID NOT NULL REFERENCES instructors(id) ON DELETE CASCADE,
+    instructor_name VARCHAR(255) DEFAULT 'Shalom Instructor', -- Single instructor
     category_id UUID NOT NULL REFERENCES categories(id),
     level VARCHAR(20) NOT NULL CHECK (level IN ('Beginner', 'Intermediate', 'Advanced')),
     duration_hours INTEGER NOT NULL, -- total duration in hours
@@ -167,8 +170,6 @@ CREATE TABLE course_enrollments (
     completion_date TIMESTAMP WITH TIME ZONE,
     progress_percentage DECIMAL(5,2) DEFAULT 0.00,
     is_completed BOOLEAN DEFAULT false,
-    is_in_wishlist BOOLEAN DEFAULT false,
-    last_accessed TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     current_video_id UUID REFERENCES course_videos(id),
     total_watch_time_minutes INTEGER DEFAULT 0,
     UNIQUE(user_id, course_id)
@@ -242,7 +243,6 @@ CREATE TABLE user_achievements (
 );
 
 -- Indexes for better performance
-CREATE INDEX idx_courses_instructor ON courses(instructor_id);
 CREATE INDEX idx_courses_category ON courses(category_id);
 CREATE INDEX idx_courses_published ON courses(is_published);
 CREATE INDEX idx_courses_featured ON courses(is_featured);
@@ -288,33 +288,21 @@ INSERT INTO categories (id, name, description, icon, color, course_count) VALUES
 INSERT INTO users (id, email, name, avatar_url, password_hash, role, points, joined_at) VALUES
 -- Students
 ('550e8400-e29b-41d4-a716-446655440101', 'john.doe@email.com', 'John Doe', 'https://via.placeholder.com/150', '$2a$10$hashedpassword1', 'student', 1250, '2024-01-15 10:30:00'),
-('550e8400-e29b-41d4-a716-446655440102', 'jane.smith@email.com', 'Jane Smith', 'https://via.placeholder.com/150', '$2a$10$hashedpassword2', 'student', 2100, '2024-02-20 14:15:00'),
+('550e8400-e29b-41d4-a716-446655440101', 'jane.smith@email.com', 'Jane Smith', 'https://via.placeholder.com/150', '$2a$10$hashedpassword2', 'student', 2100, '2024-02-20 14:15:00'),
 ('550e8400-e29b-41d4-a716-446655440103', 'mike.johnson@email.com', 'Mike Johnson', 'https://via.placeholder.com/150', '$2a$10$hashedpassword3', 'student', 750, '2024-03-10 09:45:00'),
 ('550e8400-e29b-41d4-a716-446655440104', 'emily.davis@email.com', 'Emily Davis', 'https://via.placeholder.com/150', '$2a$10$hashedpassword4', 'student', 1800, '2024-01-25 16:20:00'),
 ('550e8400-e29b-41d4-a716-446655440105', 'alex.wilson@email.com', 'Alex Wilson', 'https://via.placeholder.com/150', '$2a$10$hashedpassword5', 'student', 950, '2024-04-05 11:30:00'),
--- Instructors
-('550e8400-e29b-41d4-a716-446655440201', 'sarah.chen@email.com', 'Sarah Chen', 'https://via.placeholder.com/150', '$2a$10$hashedpassword6', 'instructor', 5000, '2023-08-15 08:00:00'),
-('550e8400-e29b-41d4-a716-446655440202', 'james.wilson@email.com', 'Dr. James Wilson', 'https://via.placeholder.com/150', '$2a$10$hashedpassword7', 'instructor', 7500, '2023-06-10 10:15:00'),
-('550e8400-e29b-41d4-a716-446655440203', 'emma.rodriguez@email.com', 'Emma Rodriguez', 'https://via.placeholder.com/150', '$2a$10$hashedpassword8', 'instructor', 4200, '2023-09-20 13:45:00'),
-('550e8400-e29b-41d4-a716-446655440204', 'michael.park@email.com', 'Michael Park', 'https://via.placeholder.com/150', '$2a$10$hashedpassword9', 'instructor', 6800, '2023-07-05 15:30:00'),
-('550e8400-e29b-41d4-a716-446655440205', 'lisa.anderson@email.com', 'Lisa Anderson', 'https://via.placeholder.com/150', '$2a$10$hashedpassword10', 'instructor', 3900, '2023-10-12 12:00:00');
+-- Admin/Instructor
+('550e8400-e29b-41d4-a716-446655440201', 'admin@shalom.edu', 'Shalom Instructor', 'https://via.placeholder.com/150', '$2a$10$hashedpassword6', 'admin', 5000, '2023-08-15 08:00:00');
 
--- Insert Instructors
-INSERT INTO instructors (id, user_id, bio, expertise, rating, total_students, total_courses, years_experience, education, certifications) VALUES
-('550e8400-e29b-41d4-a716-446655440301', '550e8400-e29b-41d4-a716-446655440201', 'Senior Full-Stack Developer with 8+ years of experience building scalable web applications. Passionate about teaching modern web technologies.', ARRAY['React', 'Node.js', 'JavaScript', 'TypeScript', 'MongoDB'], 4.9, 45000, 3, 8, 'BS Computer Science - Stanford University', ARRAY['AWS Certified Developer', 'Google Cloud Professional']),
-('550e8400-e29b-41d4-a716-446655440302', '550e8400-e29b-41d4-a716-446655440202', 'PhD in Machine Learning with extensive research background. Former Google AI researcher, now focusing on making AI accessible through education.', ARRAY['Python', 'Machine Learning', 'Deep Learning', 'TensorFlow', 'PyTorch'], 4.8, 32000, 2, 12, 'PhD Machine Learning - MIT', ARRAY['TensorFlow Certificate', 'Google AI Certification']),
-('550e8400-e29b-41d4-a716-446655440303', '550e8400-e29b-41d4-a716-446655440203', 'Award-winning UX Designer with a passion for creating beautiful and functional user experiences. Previously worked at Apple and Airbnb.', ARRAY['UI/UX Design', 'Figma', 'Adobe Creative Suite', 'User Research', 'Prototyping'], 4.9, 28000, 2, 10, 'MFA Design - Art Center College of Design', ARRAY['Google UX Design Certificate', 'Adobe Certified Expert']),
-('550e8400-e29b-41d4-a716-446655440304', '550e8400-e29b-41d4-a716-446655440204', 'Senior Software Engineer specializing in React and TypeScript. Open source contributor and tech conference speaker.', ARRAY['React', 'TypeScript', 'JavaScript', 'Next.js', 'GraphQL'], 4.7, 18000, 1, 7, 'MS Computer Science - Carnegie Mellon', ARRAY['React Expert Certification', 'TypeScript Advanced']),
-('550e8400-e29b-41d4-a716-446655440305', '550e8400-e29b-41d4-a716-446655440205', 'Digital Marketing expert with 6+ years helping businesses grow online. Specializes in SEO, content marketing, and social media strategy.', ARRAY['Digital Marketing', 'SEO', 'Content Marketing', 'Social Media', 'Google Analytics'], 4.6, 22000, 2, 6, 'MBA Marketing - Wharton School', ARRAY['Google Ads Certified', 'HubSpot Certified']);
-
--- Insert Courses
-INSERT INTO courses (id, title, description, instructor_id, category_id, level, duration_hours, thumbnail_url, rating, total_ratings, student_count, is_published, is_featured, tags) VALUES
-('550e8400-e29b-41d4-a716-446655440401', 'Complete Web Development Bootcamp 2024', 'Learn HTML, CSS, JavaScript, React, Node.js, and more in this comprehensive bootcamp. Build real-world projects and become a full-stack developer.', '550e8400-e29b-41d4-a716-446655440301', '550e8400-e29b-41d4-a716-446655440001', 'Beginner', 40, 'https://via.placeholder.com/400x250', 4.9, 2180, 45000, true, true, ARRAY['HTML', 'CSS', 'JavaScript', 'React', 'Node.js', 'Full-Stack']),
-('550e8400-e29b-41d4-a716-446655440402', 'Machine Learning Fundamentals with Python', 'Master the basics of machine learning with hands-on Python projects. Learn scikit-learn, pandas, and build your first ML models.', '550e8400-e29b-41d4-a716-446655440302', '550e8400-e29b-41d4-a716-446655440002', 'Intermediate', 35, 'https://via.placeholder.com/400x250', 4.8, 1536, 32000, true, true, ARRAY['Python', 'Machine Learning', 'Data Science', 'scikit-learn', 'pandas']),
-('550e8400-e29b-41d4-a716-446655440403', 'UI/UX Design Masterclass', 'Learn user experience design from scratch. Master Figma, design thinking, user research, and create beautiful, functional interfaces.', '550e8400-e29b-41d4-a716-446655440303', '550e8400-e29b-41d4-a716-446655440003', 'Beginner', 25, 'https://via.placeholder.com/400x250', 4.9, 1372, 28000, true, true, ARRAY['UI Design', 'UX Design', 'Figma', 'User Research', 'Prototyping']),
-('550e8400-e29b-41d4-a716-446655440404', 'Advanced React & TypeScript', 'Deep dive into advanced React patterns, hooks, performance optimization, and TypeScript integration for professional development.', '550e8400-e29b-41d4-a716-446655440304', '550e8400-e29b-41d4-a716-446655440001', 'Advanced', 30, 'https://via.placeholder.com/400x250', 4.7, 846, 18000, true, false, ARRAY['React', 'TypeScript', 'Advanced', 'Hooks', 'Performance']),
-('550e8400-e29b-41d4-a716-446655440405', 'Digital Marketing Mastery', 'Complete guide to digital marketing including SEO, social media marketing, content strategy, and paid advertising campaigns.', '550e8400-e29b-41d4-a716-446655440305', '550e8400-e29b-41d4-a716-446655440008', 'Beginner', 20,'https://via.placeholder.com/400x250', 4.6, 1012, 22000, true, false, ARRAY['Digital Marketing', 'SEO', 'Social Media', 'Content Marketing', 'PPC']),
-('550e8400-e29b-41d4-a716-446655440406', 'React Native Mobile Development', 'Build cross-platform mobile apps with React Native. Learn navigation, state management, and deploy to both iOS and Android.', '550e8400-e29b-41d4-a716-446655440301', '550e8400-e29b-41d4-a716-446655440007', 'Intermediate', 28, 'https://via.placeholder.com/400x250', 4.8, 980, 20000, true, false, ARRAY['React Native', 'Mobile Development', 'iOS', 'Android', 'Cross-Platform']);
+-- Insert Courses (instructor_name instead of instructor_id)
+INSERT INTO courses (id, title, description, instructor_name, category_id, level, duration_hours, thumbnail_url, rating, total_ratings, student_count, is_published, is_featured, tags) VALUES
+('550e8400-e29b-41d4-a716-446655440401', 'Complete Web Development Bootcamp 2024', 'Learn HTML, CSS, JavaScript, React, Node.js, and more in this comprehensive bootcamp. Build real-world projects and become a full-stack developer.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440001', 'Beginner', 40, 'https://via.placeholder.com/400x250', 4.9, 2180, 45000, true, true, ARRAY['HTML', 'CSS', 'JavaScript', 'React', 'Node.js', 'Full-Stack']),
+('550e8400-e29b-41d4-a716-446655440402', 'Machine Learning Fundamentals with Python', 'Master the basics of machine learning with hands-on Python projects. Learn scikit-learn, pandas, and build your first ML models.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440002', 'Intermediate', 35, 'https://via.placeholder.com/400x250', 4.8, 1536, 32000, true, true, ARRAY['Python', 'Machine Learning', 'Data Science', 'scikit-learn', 'pandas']),
+('550e8400-e29b-41d4-a716-446655440403', 'UI/UX Design Masterclass', 'Learn user experience design from scratch. Master Figma, design thinking, user research, and create beautiful, functional interfaces.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440003', 'Beginner', 25, 'https://via.placeholder.com/400x250', 4.9, 1372, 28000, true, true, ARRAY['UI Design', 'UX Design', 'Figma', 'User Research', 'Prototyping']),
+('550e8400-e29b-41d4-a716-446655440404', 'Advanced React & TypeScript', 'Deep dive into advanced React patterns, hooks, performance optimization, and TypeScript integration for professional development.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440001', 'Advanced', 30, 'https://via.placeholder.com/400x250', 4.7, 846, 18000, true, false, ARRAY['React', 'TypeScript', 'Advanced', 'Hooks', 'Performance']),
+('550e8400-e29b-41d4-a716-446655440405', 'Digital Marketing Mastery', 'Complete guide to digital marketing including SEO, social media marketing, content strategy, and paid advertising campaigns.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440008', 'Beginner', 20,'https://via.placeholder.com/400x250', 4.6, 1012, 22000, true, false, ARRAY['Digital Marketing', 'SEO', 'Social Media', 'Content Marketing', 'PPC']),
+('550e8400-e29b-41d4-a716-446655440406', 'React Native Mobile Development', 'Build cross-platform mobile apps with React Native. Learn navigation, state management, and deploy to both iOS and Android.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440007', 'Intermediate', 28, 'https://via.placeholder.com/400x250', 4.8, 980, 20000, true, false, ARRAY['React Native', 'Mobile Development', 'iOS', 'Android', 'Cross-Platform']);
 
 -- Insert Course Sections
 INSERT INTO course_sections (id, course_id, title, description, order_index, lessons_count, duration_minutes) VALUES
@@ -376,26 +364,26 @@ INSERT INTO course_outcomes (id, course_id, outcome, order_index) VALUES
 ('550e8400-e29b-41d4-a716-446655441008', '550e8400-e29b-41d4-a716-446655440403', 'Create prototypes and conduct user research', 2);
 
 -- Insert Course Enrollments
-INSERT INTO course_enrollments (id, user_id, course_id, enrollment_date, progress_percentage, is_completed, last_accessed, total_watch_time_minutes) VALUES
-('550e8400-e29b-41d4-a716-446655441101', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440401', '2024-02-01 10:00:00', 65.50, false, '2024-09-10 14:30:00', 1200),
-('550e8400-e29b-41d4-a716-446655441102', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440403', '2024-03-15 09:15:00', 45.25, false, '2024-09-08 16:45:00', 800),
-('550e8400-e29b-41d4-a716-446655441103', '550e8400-e29b-41d4-a716-446655440102', '550e8400-e29b-41d4-a716-446655440402', '2024-01-20 11:30:00', 100.00, true, '2024-08-15 12:00:00', 2100),
-('550e8400-e29b-41d4-a716-446655441104', '550e8400-e29b-41d4-a716-446655440102', '550e8400-e29b-41d4-a716-446655440405', '2024-04-10 13:45:00', 78.90, false, '2024-09-09 10:20:00', 980),
-('550e8400-e29b-41d4-a716-446655441105', '550e8400-e29b-41d4-a716-446655440103', '550e8400-e29b-41d4-a716-446655440401', '2024-05-05 15:20:00', 32.75, false, '2024-09-07 18:15:00', 650),
-('550e8400-e29b-41d4-a716-446655441106', '550e8400-e29b-41d4-a716-446655440104', '550e8400-e29b-41d4-a716-446655440403', '2024-02-28 08:45:00', 89.40, false, '2024-09-11 09:30:00', 1350),
-('550e8400-e29b-41d4-a716-446655441107', '550e8400-e29b-41d4-a716-446655440105', '550e8400-e29b-41d4-a716-446655440404', '2024-06-12 12:10:00', 25.60, false, '2024-09-05 20:45:00', 480);
+INSERT INTO course_enrollments (id, user_id, course_id, enrollment_date, progress_percentage, is_completed, total_watch_time_minutes) VALUES
+('550e8400-e29b-41d4-a716-446655441101', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440401', '2024-02-01 10:00:00', 65.50, false, 1200),
+('550e8400-e29b-41d4-a716-446655441102', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440403', '2024-03-15 09:15:00', 45.25, false, 800),
+('550e8400-e29b-41d4-a716-446655441103', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440402', '2024-01-20 11:30:00', 100.00, true, 2100),
+('550e8400-e29b-41d4-a716-446655441104', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440405', '2024-04-10 13:45:00', 78.90, false, 980),
+('550e8400-e29b-41d4-a716-446655441105', '550e8400-e29b-41d4-a716-446655440103', '550e8400-e29b-41d4-a716-446655440401', '2024-05-05 15:20:00', 32.75, false, 650),
+('550e8400-e29b-41d4-a716-446655441106', '550e8400-e29b-41d4-a716-446655440104', '550e8400-e29b-41d4-a716-446655440403', '2024-02-28 08:45:00', 89.40, false, 1350),
+('550e8400-e29b-41d4-a716-446655441107', '550e8400-e29b-41d4-a716-446655440105', '550e8400-e29b-41d4-a716-446655440404', '2024-06-12 12:10:00', 25.60, false, 480);
 
 -- Insert Video Progress
 INSERT INTO video_progress (id, user_id, video_id, watch_time_seconds, is_completed, last_position_seconds, completed_at) VALUES
 ('550e8400-e29b-41d4-a716-446655441201', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440601', 900, true, 900, '2024-02-01 11:15:00'),
 ('550e8400-e29b-41d4-a716-446655441202', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440602', 800, false, 800, NULL),
-('550e8400-e29b-41d4-a716-446655441203', '550e8400-e29b-41d4-a716-446655440102', '550e8400-e29b-41d4-a716-446655440605', 1200, true, 1200, '2024-01-21 14:30:00'),
-('550e8400-e29b-41d4-a716-446655441204', '550e8400-e29b-41d4-a716-446655440102', '550e8400-e29b-41d4-a716-446655440606', 1800, true, 1800, '2024-01-22 10:45:00');
+('550e8400-e29b-41d4-a716-446655441203', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440605', 1200, true, 1200, '2024-01-21 14:30:00'),
+('550e8400-e29b-41d4-a716-446655441204', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440606', 1800, true, 1800, '2024-01-22 10:45:00');
 
 -- Insert Course Ratings
 INSERT INTO course_ratings (id, user_id, course_id, rating, review, created_at) VALUES
 ('550e8400-e29b-41d4-a716-446655441301', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440401', 5, 'Excellent course! Very comprehensive and well-structured. The instructor explains everything clearly.', '2024-08-20 15:30:00'),
-('550e8400-e29b-41d4-a716-446655441302', '550e8400-e29b-41d4-a716-446655440102', '550e8400-e29b-41d4-a716-446655440402', 5, 'Great introduction to machine learning. The hands-on projects really helped me understand the concepts.', '2024-08-18 12:45:00'),
+('550e8400-e29b-41d4-a716-446655441302', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440402', 5, 'Great introduction to machine learning. The hands-on projects really helped me understand the concepts.', '2024-08-18 12:45:00'),
 ('550e8400-e29b-41d4-a716-446655441303', '550e8400-e29b-41d4-a716-446655440103', '550e8400-e29b-41d4-a716-446655440401', 4, 'Good course overall, but could use more advanced topics in the later sections.', '2024-09-01 09:20:00'),
 ('550e8400-e29b-41d4-a716-446655441304', '550e8400-e29b-41d4-a716-446655440104', '550e8400-e29b-41d4-a716-446655440403', 5, 'Amazing design course! Emma is an incredible instructor. Learned so much about UX principles.', '2024-09-05 16:15:00');
 
@@ -412,25 +400,20 @@ INSERT INTO achievements (id, name, description, icon, type, criteria, points, c
 INSERT INTO user_achievements (id, user_id, achievement_id, earned_at, value) VALUES
 ('550e8400-e29b-41d4-a716-446655441501', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655441401', '2024-02-01 10:30:00', NULL),
 ('550e8400-e29b-41d4-a716-446655441502', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655441402', '2024-02-08 19:45:00', 7),
-('550e8400-e29b-41d4-a716-446655441503', '550e8400-e29b-41d4-a716-446655440102', '550e8400-e29b-41d4-a716-446655441401', '2024-01-20 11:45:00', NULL),
-('550e8400-e29b-41d4-a716-446655441504', '550e8400-e29b-41d4-a716-446655440102', '550e8400-e29b-41d4-a716-446655441403', '2024-08-15 12:30:00', NULL),
+('550e8400-e29b-41d4-a716-446655441503', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655441401', '2024-01-20 11:45:00', NULL),
+('550e8400-e29b-41d4-a716-446655441504', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655441403', '2024-08-15 12:30:00', NULL),
 ('550e8400-e29b-41d4-a716-446655441505', '550e8400-e29b-41d4-a716-446655440104', '550e8400-e29b-41d4-a716-446655441406', '2024-03-05 14:20:00', NULL);
 
 -- Insert Quiz Attempts
 INSERT INTO quiz_attempts (id, user_id, quiz_id, score, total_questions, correct_answers, time_taken_minutes, is_passed, answers, attempt_number, started_at, completed_at) VALUES
 ('550e8400-e29b-41d4-a716-446655441601', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440701', 85, 3, 3, 12, true, '{"q1": "HyperText Markup Language", "q2": "<h1>", "q3": "False"}', 1, '2024-02-05 10:00:00', '2024-02-05 10:12:00'),
-('550e8400-e29b-41d4-a716-446655441602', '550e8400-e29b-41d4-a716-446655440102', '550e8400-e29b-41d4-a716-446655440703', 100, 1, 1, 8, true, '{"q1": ".py"}', 1, '2024-01-25 14:30:00', '2024-01-25 14:38:00'),
+('550e8400-e29b-41d4-a716-446655441602', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440703', 100, 1, 1, 8, true, '{"q1": ".py"}', 1, '2024-01-25 14:30:00', '2024-01-25 14:38:00'),
 ('550e8400-e29b-41d4-a716-446655441603', '550e8400-e29b-41d4-a716-446655440104', '550e8400-e29b-41d4-a716-446655440702', 100, 1, 1, 15, true, '{"q1": "Cascading Style Sheets"}', 1, '2024-03-05 14:00:00', '2024-03-05 14:15:00');
 
 -- Update category course counts
 UPDATE categories SET course_count = (
     SELECT COUNT(*) FROM courses WHERE category_id = categories.id AND is_published = true
 );
-
--- Update instructor statistics
-UPDATE instructors SET 
-    total_courses = (SELECT COUNT(*) FROM courses WHERE instructor_id = instructors.id AND is_published = true),
-    total_students = (SELECT COALESCE(SUM(student_count), 0) FROM courses WHERE instructor_id = instructors.id AND is_published = true);
 
 -- Create views for common queries
 CREATE VIEW course_overview AS
@@ -444,12 +427,9 @@ SELECT
     c.student_count,
     c.is_featured,
     cat.name as category_name,
-    u.name as instructor_name,
-    i.rating as instructor_rating
+    c.instructor_name
 FROM courses c
 JOIN categories cat ON c.category_id = cat.id
-JOIN instructors i ON c.instructor_id = i.id
-JOIN users u ON i.user_id = u.id
 WHERE c.is_published = true;
 
 CREATE VIEW user_progress_summary AS
@@ -521,7 +501,7 @@ ALTER TABLE course_sections ADD COLUMN section_order INTEGER;
 ALTER TABLE courses ADD COLUMN rating_breakdown JSONB; -- Store {5: 40, 4: 30, 3: 15, 2: 10, 1: 5}
 
 -- Add user progress tracking
-CREATE TABLE user_module_progress (
+CREATE TABLE IF NOT EXISTS user_module_progress (
   user_id UUID REFERENCES users(id),
   course_id UUID REFERENCES courses(id),
   section_id UUID REFERENCES course_sections(id),
@@ -589,3 +569,474 @@ AND NOT EXISTS (
     SELECT 1 FROM course_videos v WHERE v.section_id = cs.id
 );
 
+-- ============================================================================
+-- ADDITIONAL SCHEMA UPDATES BASED ON WEB/MOBILE SOURCE CODE ANALYSIS
+-- 08/10/2025 - Align database with actual application requirements
+-- ============================================================================
+
+-- Course Wishlist Table - Separate table for better performance and features
+CREATE TABLE IF NOT EXISTS course_wishlist (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, course_id)
+);
+
+-- User Preferences Table - Store notification settings and app preferences
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email_notifications BOOLEAN DEFAULT true,
+    push_notifications BOOLEAN DEFAULT true,
+    assignment_reminders BOOLEAN DEFAULT true,
+    course_updates BOOLEAN DEFAULT true,
+    marketing_emails BOOLEAN DEFAULT false,
+    weekly_progress_summary BOOLEAN DEFAULT true,
+    language_preference VARCHAR(10) DEFAULT 'en',
+    timezone VARCHAR(50) DEFAULT 'UTC',
+    theme_preference VARCHAR(20) DEFAULT 'light', -- light, dark, auto
+    auto_play_videos BOOLEAN DEFAULT true,
+    video_quality VARCHAR(20) DEFAULT 'auto', -- auto, 720p, 1080p
+    subtitle_language VARCHAR(10) DEFAULT 'en',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Notifications Table - Store in-app notifications and alerts
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(500) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL, -- assignment, course_update, achievement, message, system
+    related_entity_type VARCHAR(50), -- course, user, achievement, etc.
+    related_entity_id UUID, -- ID of the related entity
+    is_read BOOLEAN DEFAULT false,
+    action_url TEXT, -- Optional URL for notification action
+    priority VARCHAR(20) DEFAULT 'normal', -- low, normal, high, urgent
+    expires_at TIMESTAMP WITH TIME ZONE, -- Optional expiration time
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP WITH TIME ZONE
+);
+
+
+
+-- Course Content Enhancements - Support for lessons, assignments, and detailed content
+CREATE TABLE IF NOT EXISTS course_lessons (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    section_id UUID REFERENCES course_sections(id) ON DELETE SET NULL,
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    content_type VARCHAR(50) NOT NULL, -- video, text, quiz, assignment, resource
+    content_url TEXT, -- URL for video, document, etc.
+    content_data JSONB, -- Additional content metadata
+    duration_minutes INTEGER DEFAULT 0,
+    order_index INTEGER NOT NULL,
+    is_required BOOLEAN DEFAULT true,
+    is_preview BOOLEAN DEFAULT false,
+    points_value INTEGER DEFAULT 0, -- Points awarded for completion
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Assignments Table - Support for course assignments
+CREATE TABLE IF NOT EXISTS assignments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    lesson_id UUID REFERENCES course_lessons(id) ON DELETE SET NULL,
+    title VARCHAR(500) NOT NULL,
+    description TEXT NOT NULL,
+    instructions TEXT,
+    assignment_type VARCHAR(50) NOT NULL, -- essay, project, code, presentation
+    max_points INTEGER DEFAULT 100,
+    due_date TIMESTAMP WITH TIME ZONE,
+    submission_format VARCHAR(100), -- file, text, link, etc.
+    allowed_file_types TEXT[], -- Array of allowed file extensions
+    max_file_size_mb INTEGER DEFAULT 10,
+    rubric JSONB, -- Grading rubric
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Assignment Submissions Table
+CREATE TABLE IF NOT EXISTS assignment_submissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    assignment_id UUID NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    submission_text TEXT,
+    file_urls TEXT[], -- Array of submitted file URLs
+    submission_status VARCHAR(50) DEFAULT 'draft', -- draft, submitted, graded, returned
+    submitted_at TIMESTAMP WITH TIME ZONE,
+    graded_at TIMESTAMP WITH TIME ZONE,
+    score INTEGER, -- Points earned
+    feedback TEXT, -- Instructor feedback
+    graded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    attempt_number INTEGER DEFAULT 1,
+    is_late BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(assignment_id, user_id, attempt_number)
+);
+
+-- User Lesson Progress - Detailed tracking of lesson completion
+CREATE TABLE IF NOT EXISTS user_lesson_progress (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lesson_id UUID NOT NULL REFERENCES course_lessons(id) ON DELETE CASCADE,
+    progress_percentage DECIMAL(5,2) DEFAULT 0.00,
+    is_completed BOOLEAN DEFAULT false,
+    time_spent_minutes INTEGER DEFAULT 0,
+    last_position JSONB, -- Store last position for resumable content
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, lesson_id)
+);
+
+-- Analytics Tables - Support for course and user analytics
+CREATE TABLE IF NOT EXISTS user_analytics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    total_time_minutes INTEGER DEFAULT 0,
+    courses_accessed INTEGER DEFAULT 0,
+    lessons_completed INTEGER DEFAULT 0,
+    quizzes_attempted INTEGER DEFAULT 0,
+    assignments_submitted INTEGER DEFAULT 0,
+    login_count INTEGER DEFAULT 0,
+    streak_days INTEGER DEFAULT 0,
+    points_earned INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS course_analytics (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    total_enrollments INTEGER DEFAULT 0,
+    new_enrollments INTEGER DEFAULT 0,
+    completions INTEGER DEFAULT 0,
+    average_progress DECIMAL(5,2) DEFAULT 0.00,
+    total_watch_time_minutes INTEGER DEFAULT 0,
+    quiz_attempts INTEGER DEFAULT 0,
+    assignment_submissions INTEGER DEFAULT 0,
+    dropout_rate DECIMAL(5,2) DEFAULT 0.00,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(course_id, date)
+);
+
+-- Course Resources Table - Additional resources like PDFs, links, etc.
+CREATE TABLE IF NOT EXISTS course_resources (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    lesson_id UUID REFERENCES course_lessons(id) ON DELETE SET NULL,
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    resource_type VARCHAR(50) NOT NULL, -- pdf, link, file, tool
+    resource_url TEXT NOT NULL,
+    file_size_bytes BIGINT,
+    download_count INTEGER DEFAULT 0,
+    is_downloadable BOOLEAN DEFAULT true,
+    order_index INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Discussion Forums - Course discussions and Q&A
+CREATE TABLE IF NOT EXISTS course_discussions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    lesson_id UUID REFERENCES course_lessons(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(500) NOT NULL,
+    content TEXT NOT NULL,
+    discussion_type VARCHAR(50) DEFAULT 'question', -- question, announcement, discussion
+    is_pinned BOOLEAN DEFAULT false,
+    is_answered BOOLEAN DEFAULT false,
+    upvotes INTEGER DEFAULT 0,
+    views INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS discussion_replies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    discussion_id UUID NOT NULL REFERENCES course_discussions(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    is_solution BOOLEAN DEFAULT false,
+    upvotes INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Learning Paths - Structured course sequences
+CREATE TABLE IF NOT EXISTS learning_paths (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(500) NOT NULL,
+    description TEXT NOT NULL,
+    difficulty_level VARCHAR(20) NOT NULL CHECK (difficulty_level IN ('Beginner', 'Intermediate', 'Advanced')),
+    estimated_duration_hours INTEGER NOT NULL,
+    thumbnail_url TEXT,
+    is_published BOOLEAN DEFAULT false,
+    is_featured BOOLEAN DEFAULT false,
+    created_by UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS learning_path_courses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    learning_path_id UUID NOT NULL REFERENCES learning_paths(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    order_index INTEGER NOT NULL,
+    is_required BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(learning_path_id, course_id)
+);
+
+-- User Learning Path Progress
+CREATE TABLE IF NOT EXISTS user_learning_path_progress (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    learning_path_id UUID NOT NULL REFERENCES learning_paths(id) ON DELETE CASCADE,
+    current_course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
+    progress_percentage DECIMAL(5,2) DEFAULT 0.00,
+    is_completed BOOLEAN DEFAULT false,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, learning_path_id)
+);
+
+-- Certificates Table - Digital certificates for course completion
+CREATE TABLE IF NOT EXISTS certificates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
+    learning_path_id UUID REFERENCES learning_paths(id) ON DELETE SET NULL,
+    certificate_type VARCHAR(50) NOT NULL, -- course_completion, learning_path, achievement
+    certificate_number VARCHAR(100) UNIQUE NOT NULL,
+    issued_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    issuer_name VARCHAR(500) DEFAULT 'Shalom Learning Platform',
+    credential_url TEXT, -- URL to verify certificate
+    metadata JSONB, -- Additional certificate data
+    is_public BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Enhanced indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_wishlist_user ON course_wishlist(user_id);
+CREATE INDEX IF NOT EXISTS idx_wishlist_course ON course_wishlist(course_id);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_lessons_course ON course_lessons(course_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_section ON course_lessons(section_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_order ON course_lessons(course_id, order_index);
+
+CREATE INDEX IF NOT EXISTS idx_assignments_course ON assignments(course_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_due_date ON assignments(due_date);
+
+CREATE INDEX IF NOT EXISTS idx_submissions_assignment ON assignment_submissions(assignment_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_user ON assignment_submissions(user_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_status ON assignment_submissions(submission_status);
+
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_user ON user_lesson_progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson ON user_lesson_progress(lesson_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_analytics_user_date ON user_analytics(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_course_analytics_course_date ON course_analytics(course_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_discussions_course ON course_discussions(course_id);
+CREATE INDEX IF NOT EXISTS idx_discussions_lesson ON course_discussions(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_discussions_user ON course_discussions(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_certificates_user ON certificates(user_id);
+CREATE INDEX IF NOT EXISTS idx_certificates_course ON certificates(course_id);
+CREATE INDEX IF NOT EXISTS idx_certificates_number ON certificates(certificate_number);
+
+-- Add triggers for updated_at timestamps on new tables (drop existing first to avoid conflicts)
+DROP TRIGGER IF EXISTS update_user_preferences_updated_at ON user_preferences;
+DROP TRIGGER IF EXISTS update_lessons_updated_at ON course_lessons;
+DROP TRIGGER IF EXISTS update_assignments_updated_at ON assignments;
+DROP TRIGGER IF EXISTS update_submissions_updated_at ON assignment_submissions;
+DROP TRIGGER IF EXISTS update_lesson_progress_updated_at ON user_lesson_progress;
+DROP TRIGGER IF EXISTS update_discussions_updated_at ON course_discussions;
+DROP TRIGGER IF EXISTS update_discussion_replies_updated_at ON discussion_replies;
+DROP TRIGGER IF EXISTS update_learning_paths_updated_at ON learning_paths;
+DROP TRIGGER IF EXISTS update_learning_path_progress_updated_at ON user_learning_path_progress;
+
+CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_lessons_updated_at BEFORE UPDATE ON course_lessons FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_assignments_updated_at BEFORE UPDATE ON assignments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_submissions_updated_at BEFORE UPDATE ON assignment_submissions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_lesson_progress_updated_at BEFORE UPDATE ON user_lesson_progress FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_discussions_updated_at BEFORE UPDATE ON course_discussions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_discussion_replies_updated_at BEFORE UPDATE ON discussion_replies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_learning_paths_updated_at BEFORE UPDATE ON learning_paths FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_learning_path_progress_updated_at BEFORE UPDATE ON user_learning_path_progress FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Add some sample data for new tables to test functionality (using ON CONFLICT to handle duplicates)
+INSERT INTO user_preferences (user_id, email_notifications, push_notifications, theme_preference) VALUES
+('550e8400-e29b-41d4-a716-446655440101', true, true, 'light'),
+('550e8400-e29b-41d4-a716-446655440101', true, false, 'dark'),
+('550e8400-e29b-41d4-a716-446655440103', false, true, 'auto')
+ON CONFLICT (user_id) DO NOTHING;
+
+-- Sample wishlist data
+INSERT INTO course_wishlist (user_id, course_id) VALUES
+('550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440402'),
+('550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440404'),
+('550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440403')
+ON CONFLICT (user_id, course_id) DO NOTHING;
+
+-- Sample notifications
+INSERT INTO notifications (user_id, title, message, type, related_entity_type, related_entity_id) VALUES
+('550e8400-e29b-41d4-a716-446655440101', 'New Assignment Available', 'A new assignment has been posted in Complete Web Development Bootcamp 2024', 'assignment', 'course', '550e8400-e29b-41d4-a716-446655440401'),
+('550e8400-e29b-41d4-a716-446655440101', 'Course Completed!', 'Congratulations! You have completed Machine Learning Fundamentals with Python', 'achievement', 'course', '550e8400-e29b-41d4-a716-446655440402'),
+('550e8400-e29b-41d4-a716-446655440103', 'Welcome to Shalom!', 'Welcome to Shalom Learning Platform. Start your learning journey today!', 'system', NULL, NULL);
+
+-- Sample course lessons
+INSERT INTO course_lessons (id, course_id, section_id, title, description, content_type, content_url, duration_minutes, order_index, is_required, points_value) VALUES
+('550e8400-e29b-41d4-a716-446655450001', '550e8400-e29b-41d4-a716-446655440401', '550e8400-e29b-41d4-a716-446655440501', 'Course Introduction', 'Welcome to the complete web development bootcamp', 'video', 'https://example.com/lesson1.mp4', 15, 1, true, 10),
+('550e8400-e29b-41d4-a716-446655450002', '550e8400-e29b-41d4-a716-446655440401', '550e8400-e29b-41d4-a716-446655440501', 'Setting Up Your Environment', 'Install all necessary tools for web development', 'video', 'https://example.com/lesson2.mp4', 25, 2, true, 15),
+('550e8400-e29b-41d4-a716-446655450003', '550e8400-e29b-41d4-a716-446655440402', '550e8400-e29b-41d4-a716-446655440506', 'Introduction to Python', 'Learn Python basics for data science', 'video', 'https://example.com/lesson3.mp4', 30, 1, true, 20)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample assignments
+INSERT INTO assignments (id, course_id, lesson_id, title, description, instructions, assignment_type, max_points, due_date, submission_format, allowed_file_types) VALUES
+('550e8400-e29b-41d4-a716-446655460001', '550e8400-e29b-41d4-a716-446655440401', '550e8400-e29b-41d4-a716-446655450001', 'Build Your First Website', 'Create a simple HTML website with CSS styling', 'Create a personal portfolio website using HTML and CSS. Include at least 3 pages: Home, About, and Contact.', 'project', 100, '2024-12-15 23:59:00', 'file', ARRAY['html', 'css', 'zip']),
+('550e8400-e29b-41d4-a716-446655460002', '550e8400-e29b-41d4-a716-446655440402', '550e8400-e29b-41d4-a716-446655450003', 'Data Analysis Project', 'Analyze a dataset using Python and pandas', 'Download the provided dataset and perform exploratory data analysis. Submit a Jupyter notebook with your findings.', 'code', 100, '2024-12-20 23:59:00', 'file', ARRAY['ipynb', 'py'])
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample assignment submissions
+INSERT INTO assignment_submissions (id, assignment_id, user_id, submission_text, file_urls, submission_status, submitted_at, score, feedback, graded_by, attempt_number) VALUES
+('550e8400-e29b-41d4-a716-446655470001', '550e8400-e29b-41d4-a716-446655460001', '550e8400-e29b-41d4-a716-446655440101', 'Here is my portfolio website project', ARRAY['https://example.com/portfolio.zip'], 'graded', '2024-12-10 18:30:00', 85, 'Great work! The design is clean and responsive. Consider adding more interactive elements.', '550e8400-e29b-41d4-a716-446655440201', 1),
+('550e8400-e29b-41d4-a716-446655470002', '550e8400-e29b-41d4-a716-446655460002', '550e8400-e29b-41d4-a716-446655440101', 'My data analysis of the sales dataset', ARRAY['https://example.com/analysis.ipynb'], 'submitted', '2024-12-18 14:20:00', NULL, NULL, NULL, 1)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample user lesson progress
+INSERT INTO user_lesson_progress (id, user_id, lesson_id, progress_percentage, is_completed, time_spent_minutes, completed_at) VALUES
+('550e8400-e29b-41d4-a716-446655480001', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655450001', 100.00, true, 20, '2024-11-01 10:30:00'),
+('550e8400-e29b-41d4-a716-446655480002', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655450002', 65.00, false, 18, NULL),
+('550e8400-e29b-41d4-a716-446655480003', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655450003', 100.00, true, 35, '2024-11-05 16:45:00')
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample user module progress
+INSERT INTO user_module_progress (user_id, course_id, section_id, is_completed, completed_at) VALUES
+('550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440401', '550e8400-e29b-41d4-a716-446655440501', true, '2024-11-01 15:00:00'),
+('550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440401', '550e8400-e29b-41d4-a716-446655440502', false, NULL),
+('550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440402', '550e8400-e29b-41d4-a716-446655440506', true, '2024-11-05 18:30:00')
+ON CONFLICT (user_id, course_id, section_id) DO NOTHING;
+
+-- Sample user analytics
+INSERT INTO user_analytics (id, user_id, date, total_time_minutes, courses_accessed, lessons_completed, quizzes_attempted, assignments_submitted, login_count, streak_days, points_earned) VALUES
+('550e8400-e29b-41d4-a716-446655490001', '550e8400-e29b-41d4-a716-446655440101', '2024-12-01', 120, 2, 3, 1, 0, 2, 5, 45),
+('550e8400-e29b-41d4-a716-446655490002', '550e8400-e29b-41d4-a716-446655440101', '2024-12-02', 90, 1, 2, 2, 1, 1, 6, 70),
+('550e8400-e29b-41d4-a716-446655490003', '550e8400-e29b-41d4-a716-446655440101', '2024-12-01', 150, 1, 4, 1, 1, 3, 8, 95)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample course analytics
+INSERT INTO course_analytics (id, course_id, date, total_enrollments, new_enrollments, completions, average_progress, total_watch_time_minutes, quiz_attempts, assignment_submissions) VALUES
+('550e8400-e29b-41d4-a716-446655500001', '550e8400-e29b-41d4-a716-446655440401', '2024-12-01', 45000, 150, 5, 42.5, 25000, 120, 45),
+('550e8400-e29b-41d4-a716-446655500002', '550e8400-e29b-41d4-a716-446655440402', '2024-12-01', 32000, 98, 8, 56.8, 18000, 85, 32),
+('550e8400-e29b-41d4-a716-446655500003', '550e8400-e29b-41d4-a716-446655440403', '2024-12-01', 28000, 78, 3, 35.2, 15000, 65, 28)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample course resources
+INSERT INTO course_resources (id, course_id, lesson_id, title, description, resource_type, resource_url, is_downloadable, order_index) VALUES
+('550e8400-e29b-41d4-a716-446655510001', '550e8400-e29b-41d4-a716-446655440401', '550e8400-e29b-41d4-a716-446655450001', 'HTML Cheat Sheet', 'Quick reference for HTML tags', 'pdf', 'https://example.com/html-cheatsheet.pdf', true, 1),
+('550e8400-e29b-41d4-a716-446655510002', '550e8400-e29b-41d4-a716-446655440401', NULL, 'MDN Web Docs', 'Official web development documentation', 'link', 'https://developer.mozilla.org', false, 2),
+('550e8400-e29b-41d4-a716-446655510003', '550e8400-e29b-41d4-a716-446655440402', '550e8400-e29b-41d4-a716-446655450003', 'Python Data Science Handbook', 'Comprehensive guide to data science in Python', 'pdf', 'https://example.com/python-ds-handbook.pdf', true, 1)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample course discussions
+INSERT INTO course_discussions (id, course_id, lesson_id, user_id, title, content, discussion_type, is_pinned, views, upvotes) VALUES
+('550e8400-e29b-41d4-a716-446655520001', '550e8400-e29b-41d4-a716-446655440401', '550e8400-e29b-41d4-a716-446655450001', '550e8400-e29b-41d4-a716-446655440101', 'Question about HTML semantics', 'Can someone explain when to use <section> vs <div>?', 'question', false, 25, 3),
+('550e8400-e29b-41d4-a716-446655520002', '550e8400-e29b-41d4-a716-446655440402', NULL, '550e8400-e29b-41d4-a716-446655440201', 'Welcome to Machine Learning!', 'Introduction to the course and what you can expect to learn', 'announcement', true, 150, 18)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample discussion replies
+INSERT INTO discussion_replies (id, discussion_id, user_id, content, is_solution, upvotes) VALUES
+('550e8400-e29b-41d4-a716-446655530001', '550e8400-e29b-41d4-a716-446655520001', '550e8400-e29b-41d4-a716-446655440201', 'Great question! Use <section> for thematic groupings of content with a heading, and <div> for styling or layout purposes without semantic meaning.', true, 5),
+('550e8400-e29b-41d4-a716-446655530002', '550e8400-e29b-41d4-a716-446655520001', '550e8400-e29b-41d4-a716-446655440101', 'Thanks for the explanation! That makes much more sense now.', false, 2)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample learning paths
+INSERT INTO learning_paths (id, title, description, difficulty_level, estimated_duration_hours, is_published, is_featured, created_by) VALUES
+('550e8400-e29b-41d4-a716-446655540001', 'Full-Stack Web Developer', 'Complete path from beginner to full-stack developer', 'Beginner', 120, true, true, '550e8400-e29b-41d4-a716-446655440201'),
+('550e8400-e29b-41d4-a716-446655540002', 'Data Science Specialist', 'Master data science and machine learning', 'Intermediate', 80, true, false, '550e8400-e29b-41d4-a716-446655440201')
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample learning path courses
+INSERT INTO learning_path_courses (id, learning_path_id, course_id, order_index, is_required) VALUES
+('550e8400-e29b-41d4-a716-446655550001', '550e8400-e29b-41d4-a716-446655540001', '550e8400-e29b-41d4-a716-446655440401', 1, true),
+('550e8400-e29b-41d4-a716-446655550002', '550e8400-e29b-41d4-a716-446655540001', '550e8400-e29b-41d4-a716-446655440404', 2, true),
+('550e8400-e29b-41d4-a716-446655550003', '550e8400-e29b-41d4-a716-446655540002', '550e8400-e29b-41d4-a716-446655440402', 1, true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample user learning path progress
+INSERT INTO user_learning_path_progress (id, user_id, learning_path_id, current_course_id, progress_percentage, is_completed, started_at) VALUES
+('550e8400-e29b-41d4-a716-446655560001', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655540001', '550e8400-e29b-41d4-a716-446655440401', 65.5, false, '2024-02-01 10:00:00'),
+('550e8400-e29b-41d4-a716-446655560002', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655540002', NULL, 100.0, true, '2024-01-20 11:30:00')
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample certificates
+INSERT INTO certificates (id, user_id, course_id, certificate_type, certificate_number, issued_at, credential_url, is_public) VALUES
+('550e8400-e29b-41d4-a716-446655570001', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440402', 'course_completion', 'CERT-ML-2024-001', '2024-08-15 12:30:00', 'https://shalom.edu/verify/CERT-ML-2024-001', true),
+('550e8400-e29b-41d4-a716-446655570002', '550e8400-e29b-41d4-a716-446655440101', NULL, 'learning_path', 'CERT-DS-2024-001', '2024-09-01 14:00:00', 'https://shalom.edu/verify/CERT-DS-2024-001', true)
+ON CONFLICT (certificate_number) DO NOTHING;
+
+-- Create comprehensive views for the enhanced schema (moved after table creation)
+CREATE OR REPLACE VIEW user_dashboard_summary AS
+SELECT 
+    u.id as user_id,
+    u.name,
+    u.email,
+    u.points,
+    COUNT(DISTINCT ce.id) as enrolled_courses,
+    COUNT(DISTINCT CASE WHEN ce.is_completed = true THEN ce.id END) as completed_courses,
+    COUNT(DISTINCT cw.id) as wishlist_count,
+    COUNT(DISTINCT ua.id) as achievements_count,
+    COUNT(DISTINCT CASE WHEN n.is_read = false THEN n.id END) as unread_notifications,
+    COALESCE(AVG(ce.progress_percentage), 0) as avg_progress
+FROM users u
+LEFT JOIN course_enrollments ce ON u.id = ce.user_id
+LEFT JOIN course_wishlist cw ON u.id = cw.user_id
+LEFT JOIN user_achievements ua ON u.id = ua.user_id
+LEFT JOIN notifications n ON u.id = n.user_id
+WHERE u.role = 'student'
+GROUP BY u.id, u.name, u.email, u.points;
+
+CREATE OR REPLACE VIEW course_detailed_stats AS
+SELECT 
+    c.id,
+    c.title,
+    c.student_count,
+    c.rating,
+    COUNT(DISTINCT ce.id) as current_enrollments,
+    COUNT(DISTINCT CASE WHEN ce.is_completed = true THEN ce.id END) as completions,
+    COUNT(DISTINCT cw.id) as wishlist_count,
+    COUNT(DISTINCT cr.id) as review_count,
+    COUNT(DISTINCT cs.id) as sections_count,
+    COUNT(DISTINCT cl.id) as lessons_count,
+    COUNT(DISTINCT cq.id) as quizzes_count,
+    COUNT(DISTINCT a.id) as assignments_count,
+    COALESCE(AVG(ce.progress_percentage), 0) as avg_progress_percentage
+FROM courses c
+LEFT JOIN course_enrollments ce ON c.id = ce.course_id
+LEFT JOIN course_wishlist cw ON c.id = cw.course_id
+LEFT JOIN course_ratings cr ON c.id = cr.course_id
+LEFT JOIN course_sections cs ON c.id = cs.course_id
+LEFT JOIN course_lessons cl ON c.id = cl.course_id
+LEFT JOIN course_quizzes cq ON c.id = cq.course_id
+LEFT JOIN assignments a ON c.id = a.course_id
+WHERE c.is_published = true
+GROUP BY c.id, c.title, c.student_count, c.rating;

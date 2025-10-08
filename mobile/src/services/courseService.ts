@@ -343,14 +343,13 @@ class CourseService {
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`;
       await CacheManager.clear(cacheKey);
       
-      /*
       // Check cache first
       const cachedEnrollments = await CacheManager.get<Course[]>(cacheKey);
       if (cachedEnrollments) {
         console.log('getUserEnrollments - Returning cached user enrollments:', cachedEnrollments.length);
         return cachedEnrollments;
       }
-      */
+      
       
       const response = await apiService.get<EnrollmentResponse>(
         `${ENDPOINTS.USER_ENROLLMENTS}/${userId}`
@@ -472,6 +471,7 @@ async addToWishlist(userId: string, courseId: string): Promise<void> {
 
 async removeFromWishlist(userId: string, courseId: string): Promise<void> {
   if (!userId || !courseId) throw new Error('Missing userId/courseId');
+  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
   await apiService.delete(WISHLIST.ITEM(userId, courseId));
   await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
 }
