@@ -294,7 +294,7 @@ const HomeScreen: React.FC = () => {
             </View>
           ) : wishlist.length === 0 ? (
             <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>No favourites yet. Tap the heart on a course to save it.</Text>
+              <Text style={styles.errorText}>You haven't added any courses into your wishlist yet.</Text>
             </View>
           ) : (
             <ScrollView

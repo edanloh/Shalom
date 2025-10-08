@@ -171,27 +171,6 @@ const MyCourses: React.FC = () => {
                       fallback={Images.coursePlaceholder}
                       style={styles.cwThumb} 
                     /> 
-                    {/* Level badge and heart button */}
-                    <View style={styles.cwBadgeRow}>
-                      <View style={styles.levelBadge}>
-                        <Text style={styles.levelText}>{item.level}</Text>
-                      </View>
-
-                      <TouchableOpacity
-                        onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
-                        accessibilityRole="button"
-                        accessibilityLabel={isWishlisted(item) ? 'Remove from wishlist' : 'Add to wishlist'}
-                        hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
-                        style={styles.heartBtn}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name={isWishlisted(item) ? 'heart' : 'heart-outline'}
-                          size={18}
-                          color="#fff"
-                        />
-                      </TouchableOpacity>
-                    </View>
 
                     {/* Progress indicator overlay */}
                     <View style={styles.progressOverlay}>
@@ -223,42 +202,58 @@ const MyCourses: React.FC = () => {
                 const pct = item.progress?.percentage ?? 0;
                 const moduleLabel = getModuleLabel(item);
                 return (
-                    <View key={item.id} style={styles.ipCard}>
-                      <View style={styles.ipLeft}>
-                          <Text style={styles.ipTitle} numberOfLines={2}>{item.title}</Text>
-                          <Text style={styles.ipSubtitle} numberOfLines={1}>{moduleLabel}</Text>
-                          <Text style={styles.ipSubtitle}>{pct}% completed</Text>
-                          <ProgressBar percent={pct} />
+                  <TouchableOpacity
+                    key={item.id}
+                    activeOpacity={0.9}
+                    onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
+                    style={styles.ipCard}
+                  >
+                    {/* Left: text */}
+                    <View style={styles.ipLeft}>
+                      <Text style={styles.ipTitle} numberOfLines={2}>{item.title}</Text>
+
+                      {/* meta row like Wishlist */}
+                      <View style={styles.ipMetaRow}>
+                        <Ionicons name="star" size={12} color="#FACC15" />
+                        <Text style={styles.ipMetaText}>{(item.rating as any)?.toFixed?.(1) ?? item.rating}</Text>
+                        <Text style={styles.ipMetaDot}>•</Text>
+                        <Text style={styles.ipMetaText}>{item.modules ?? 12} modules</Text>
                       </View>
-                      <View style={styles.ipRight}>
-                        <View style={styles.ipImageWrap}>
-                          <ImageWithFallback
-                            source={{ uri: item.image }}
-                            fallback={Images.coursePlaceholder}
-                            style={styles.ipRightImage}
-                          />
-                          <View style={styles.cwBadgeRow}>
-                            <View style={styles.levelBadge}>
-                              <Text style={styles.levelText}>{item.level}</Text>
-                            </View>
-                            <TouchableOpacity
-                              onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
-                              accessibilityRole="button"
-                              accessibilityLabel={isWishlisted(item) ? 'Remove from wishlist' : 'Add to wishlist'}
-                              hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
-                              style={styles.heartBtn}
-                              activeOpacity={0.7}
-                            >
-                              <Ionicons
-                                name={isWishlisted(item) ? 'heart' : 'heart-outline'}
-                                size={18}
-                                color="#fff"
-                              />
-                            </TouchableOpacity>
-                          </View>
+
+                      <View style={styles.ipPercentRow}>
+                        <Text style={styles.ipMetaText}>{pct}% complete</Text>
+                      </View>
+
+                      <ProgressBar percent={pct} />
+                    </View>
+
+                    {/* Right: fixed image block + overlays */}
+                    <View style={styles.ipRight}>
+                      <ImageWithFallback
+                        source={{ uri: item.image }}
+                        fallback={Images.coursePlaceholder}
+                        style={styles.ipImage}
+                      />
+                      <View style={styles.badgeRow}>
+                        <View style={styles.levelBadge}>
+                          <Text style={styles.levelText}>{item.level}</Text>
                         </View>
+                        <TouchableOpacity
+                          onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
+                          hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+                          style={styles.heartBtn}
+                          accessibilityRole="button"
+                          accessibilityLabel={wishIds.has(item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                        >
+                          <Ionicons
+                            name={wishIds.has(item.id) ? 'heart' : 'heart-outline'}
+                            size={20}
+                            color="#fff"
+                          />
+                        </TouchableOpacity>
                       </View>
                     </View>
+                  </TouchableOpacity>
                 );
                 })}
             </View>
@@ -332,13 +327,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     marginTop: 2,
   },
-  cwBadgeRow: {
+  badgeRow: {
     position: 'absolute',
     top: Spacing.sm,
     right: Spacing.sm,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    zIndex: 2,
   },
   levelBadge: {
     backgroundColor: Colors.purple400,
@@ -357,12 +351,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 6,
   },
-  ipImageWrap: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-  },
 
   // In Progress (vertical cards)
   ipCard: {
@@ -371,32 +359,58 @@ const styles = StyleSheet.create({
     borderRadius: CARD_RADIUS,
     marginBottom: Spacing.md,
     overflow: 'hidden',
+    minHeight: 100,
   },
   ipLeft: {
     flex: 1,
     padding: Spacing.md,
+    justifyContent: 'center',
+    paddingRight: Spacing.md,
+    flexShrink: 1,
   },
   ipRight: {
-    width: 140,
-    backgroundColor: Colors.transparent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: CARD_RADIUS,
+    width: 150,
+    alignSelf: 'stretch',
+    backgroundColor: '#E7F0EC',
+    position: 'relative',
     overflow: 'hidden',
   },
-  ipRightImage: {
-    width: 120,
-    height: 80,
-    borderRadius: BorderRadius.base,
+  ipImage: {
+    flex: 1,
+    width: undefined,
+    height: undefined,
     resizeMode: 'cover',
   },
   ipTitle: {
     ...TextStyles.bodyMedium,
+    color: Colors.textPrimary,
+    fontWeight: '700',
+    fontSize: 15,
     marginBottom: 6,
+  },
+  ipMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 2,
+    marginBottom: 6,
+  },
+  ipMetaText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  ipMetaDot: { 
+    color: Colors.textSecondary, 
+    marginHorizontal: 4 
   },
   ipSubtitle: {
     ...TextStyles.caption,
     marginBottom: 4,
+  },
+  ipPercentRow: {
+    alignItems: 'flex-end',
+    marginVertical: 6,
   },
 
   // progress bar
