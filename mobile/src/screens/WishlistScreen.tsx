@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
 
   card: {
     flexDirection: 'row',
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.cardDark,
     borderRadius: 16,
     overflow: 'hidden',
   },

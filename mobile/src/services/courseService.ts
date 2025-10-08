@@ -21,9 +21,9 @@ const ENDPOINTS = {
 
 // Wishlist endpoints
 const WISHLIST = {
-  BASE: (uid: string) => `/users/${encodeURIComponent(uid)}/wishlist`,
+  BASE: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}/wishlist`,
   ITEM: (uid: string, courseId: string) =>
-    `/users/${encodeURIComponent(uid)}/wishlist/${encodeURIComponent(courseId)}`,
+    `/courses/enrollment/${encodeURIComponent(uid)}/wishlist/?courseId=${encodeURIComponent(courseId)}`,
 };
 
 export interface CourseListParams {
@@ -452,6 +452,8 @@ async getWishlist(userId: string): Promise<Course[]> {
   const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`;
   const cached = await CacheManager.get<Course[]>(cacheKey);
   if (cached) return cached;
+  // remove later - temporary override for testing
+  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
 
   const resp = await apiService.get<any>(WISHLIST.BASE(userId));
   const array = resp?.courses ?? resp?.data?.courses ?? [];
@@ -462,7 +464,9 @@ async getWishlist(userId: string): Promise<Course[]> {
 
 async addToWishlist(userId: string, courseId: string): Promise<void> {
   if (!userId || !courseId) throw new Error('Missing userId/courseId');
-  await apiService.post(WISHLIST.BASE(userId), { courseId });
+    // remove later - temporary override for testing
+  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
+  await apiService.post(WISHLIST.ITEM(userId , courseId));
   await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
 }
 
