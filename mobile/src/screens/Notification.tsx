@@ -211,9 +211,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
-    ...TextStyles.h3,
-    color: Colors.textPrimary,
+    fontFamily: TextStyles.h4.fontFamily,
     fontSize: TextStyles.h4.fontSize,
+    color: Colors.textPrimary,
     fontWeight: 'bold',
   },
 

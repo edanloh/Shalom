@@ -60,6 +60,29 @@ interface ResponseInterceptor {
   (response: any): Promise<any>;
 }
 
+function isJsonResponse(res: Response) {
+  const ct = res.headers?.get?.('content-type') || '';
+  return ct.toLowerCase().includes('application/json');
+}
+
+async function safeParseJson(res: Response) {
+  // 204/205 are no-content by spec
+  if (res.status === 204 || res.status === 205) return {};
+  const text = await res.text();            // don't call res.json() blindly
+  if (!text) return {};                     // empty body → harmless empty object
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiError(
+      `Bad JSON from ${res.url}`,
+      res.status,
+      'BAD_JSON',
+      { body: text.slice(0, 200) }
+    );
+  }
+}
+
+
 class ApiService {
   private baseURL: string;
   private defaultTimeout: number;
@@ -116,31 +139,31 @@ class ApiService {
   // Error handling interceptor
   private errorInterceptor: ResponseInterceptor = async (response) => {
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      
+      // Read from a clone so we don't consume the original stream
+      const clone = response.clone();
+      let errorData: any = {};
+      try {
+        errorData = isJsonResponse(clone)
+          ? await safeParseJson(clone)
+          : { body: await clone.text() };
+      } catch { /* leave errorData minimal */ }
+
       switch (response.status) {
-        case 400:
-          throw new ApiError('Bad Request', 400, 'BAD_REQUEST', errorData);
-        case 401:
-          throw new ApiError('Unauthorized', 401, 'UNAUTHORIZED', errorData);
-        case 403:
-          throw new ApiError('Forbidden', 403, 'FORBIDDEN', errorData);
-        case 404:
-          throw new ApiError('Not Found', 404, 'NOT_FOUND', errorData);
-        case 429:
-          throw new ApiError('Too Many Requests', 429, 'RATE_LIMIT', errorData);
-        case 500:
-          throw new ApiError('Internal Server Error', 500, 'SERVER_ERROR', errorData);
-        case 502:
-          throw new ApiError('Bad Gateway', 502, 'BAD_GATEWAY', errorData);
-        case 503:
-          throw new ApiError('Service Unavailable', 503, 'SERVICE_UNAVAILABLE', errorData);
-        default:
-          throw new ApiError(`HTTP Error ${response.status}`, response.status, 'HTTP_ERROR', errorData);
+        case 400: throw new ApiError('Bad Request', 400, 'BAD_REQUEST', errorData);
+        case 401: throw new ApiError('Unauthorized', 401, 'UNAUTHORIZED', errorData);
+        case 403: throw new ApiError('Forbidden', 403, 'FORBIDDEN', errorData);
+        case 404: throw new ApiError('Not Found', 404, 'NOT_FOUND', errorData);
+        case 429: throw new ApiError('Too Many Requests', 429, 'RATE_LIMIT', errorData);
+        case 500: throw new ApiError('Internal Server Error', 500, 'SERVER_ERROR', errorData);
+        case 502: throw new ApiError('Bad Gateway', 502, 'BAD_GATEWAY', errorData);
+        case 503: throw new ApiError('Service Unavailable', 503, 'SERVICE_UNAVAILABLE', errorData);
+        default:  throw new ApiError(`HTTP Error ${response.status}`, response.status, 'HTTP_ERROR', errorData);
       }
     }
+    // IMPORTANT: do not read body here for success
     return response;
   };
+
 
   // Build query string from parameters
   private buildQueryString(params: Record<string, string>): string {
@@ -211,24 +234,13 @@ class ApiService {
           processedResponse = await interceptor(processedResponse);
         }
 
-        const rawData = await processedResponse.json();
-        
-        // Handle AWS API Gateway response format where actual data is in body as JSON string
-        if (rawData.body && typeof rawData.body === 'string') {
-          try {
-            const parsedBody = JSON.parse(rawData.body);
-            // Return the parsed data directly if it has success/data structure
-            if (parsedBody.success && parsedBody.data) {
-              return parsedBody.data;
-            }
-            return parsedBody;
-          } catch (parseError) {
-            console.warn('Failed to parse response body JSON:', parseError);
-            return rawData;
-          }
-        }
-        
-        return rawData;
+        // If we got here, response.ok is true (otherwise the interceptor threw).
+        // Parse the body ONCE, safely.
+        const data = isJsonResponse(processedResponse)
+          ? await safeParseJson(processedResponse)
+          : {}; // or { raw: await processedResponse.text() } if you want text for non-JSON
+
+        return data;
 
       } catch (error) {
         // Handle different types of errors
