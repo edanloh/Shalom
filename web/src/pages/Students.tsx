@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Colors } from "../constants";
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -23,7 +24,23 @@ const Students = () => {
       progress: 78,
       lastActivity: "2 hours ago",
       engagement: 92,
-      coursesEnrolled: 3
+      coursesEnrolled: 3,
+      completedCourses: 2,
+      currentCourses: [
+        { id: 1, name: "Data Science Fundamentals", progress: 85, grade: 92 },
+        { id: 2, name: "Machine Learning A-Z", progress: 67, grade: 88 }
+      ],
+      completedCoursesData: [
+        { id: 3, name: "Python for Beginners", completedDate: "2024-03-15", grade: 95, certificate: true }
+      ],
+      quizResults: [
+        { quiz: "Data Science Quiz 1", score: 92, date: "2024-04-10" },
+        { quiz: "ML Algorithms Test", score: 88, date: "2024-04-08" }
+      ],
+      totalHours: 124,
+      streak: 15,
+      badges: 5,
+      averageScore: 91
     },
     {
       id: 2,
@@ -33,7 +50,20 @@ const Students = () => {
       progress: 45,
       lastActivity: "1 day ago",
       engagement: 67,
-      coursesEnrolled: 2
+      coursesEnrolled: 2,
+      completedCourses: 0,
+      currentCourses: [
+        { id: 1, name: "Python for Beginners", progress: 45, grade: 78 },
+        { id: 2, name: "Data Visualization", progress: 30, grade: 72 }
+      ],
+      completedCoursesData: [],
+      quizResults: [
+        { quiz: "Python Basics Quiz", score: 78, date: "2024-04-05" }
+      ],
+      totalHours: 56,
+      streak: 7,
+      badges: 2,
+      averageScore: 75
     },
     {
       id: 3,
@@ -43,7 +73,24 @@ const Students = () => {
       progress: 92,
       lastActivity: "30 mins ago",
       engagement: 95,
-      coursesEnrolled: 4
+      coursesEnrolled: 4,
+      completedCourses: 3,
+      currentCourses: [
+        { id: 1, name: "Advanced Analytics", progress: 92, grade: 96 }
+      ],
+      completedCoursesData: [
+        { id: 2, name: "Data Science Fundamentals", completedDate: "2024-03-20", grade: 98, certificate: true },
+        { id: 3, name: "Machine Learning A-Z", completedDate: "2024-03-25", grade: 94, certificate: true },
+        { id: 4, name: "Python for Beginners", completedDate: "2024-02-28", grade: 97, certificate: true }
+      ],
+      quizResults: [
+        { quiz: "Advanced Analytics Quiz", score: 96, date: "2024-04-12" },
+        { quiz: "ML Final Test", score: 94, date: "2024-04-09" }
+      ],
+      totalHours: 187,
+      streak: 22,
+      badges: 8,
+      averageScore: 96
     },
     {
       id: 4,
@@ -53,7 +100,19 @@ const Students = () => {
       progress: 23,
       lastActivity: "3 days ago",
       engagement: 45,
-      coursesEnrolled: 1
+      coursesEnrolled: 1,
+      completedCourses: 0,
+      currentCourses: [
+        { id: 1, name: "Data Science Fundamentals", progress: 23, grade: 65 }
+      ],
+      completedCoursesData: [],
+      quizResults: [
+        { quiz: "Intro Quiz", score: 65, date: "2024-04-01" }
+      ],
+      totalHours: 18,
+      streak: 2,
+      badges: 1,
+      averageScore: 65
     }
   ];
 
@@ -135,19 +194,7 @@ const Students = () => {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-foreground">{student.progress}%</span>
                       </div>
-                      <div 
-                        className="h-2 rounded-full overflow-hidden"
-                        style={{ backgroundColor: Colors.gray200 }}
-                      >
-                        <div
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{
-                            width: `${student.progress}%`,
-                            background: `linear-gradient(90deg, ${Colors.purple400} 0%, ${Colors.purple600} 100%)`,
-                            boxShadow: `0 2px 8px ${Colors.purple400}40`,
-                          }}
-                        />
-                      </div>
+                      <Progress value={student.progress} className="h-2" />
                     </div>
                   </TableCell>
                   <TableCell>
@@ -163,62 +210,209 @@ const Students = () => {
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </SheetTrigger>
-                      <SheetContent className="w-full sm:max-w-md">
+                      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
                         <SheetHeader>
                           <SheetTitle>Student Profile</SheetTitle>
                         </SheetHeader>
                         {selectedStudent && (
                           <div className="space-y-6 mt-6">
-                            <div className="flex items-center gap-4">
-                              <Avatar className="h-16 w-16">
-                                <AvatarFallback className="text-lg">
+                            {/* Header */}
+                            <div className="flex items-center gap-4 pb-6 border-b border-border">
+                              <Avatar className="h-20 w-20">
+                                <AvatarFallback className="text-2xl bg-primary">
                                   {selectedStudent.name.split(' ').map((n: string) => n[0]).join('')}
                                 </AvatarFallback>
                               </Avatar>
-                              <div>
-                                <h3 className="font-semibold text-lg text-foreground">{selectedStudent.name}</h3>
-                                <p className="text-sm text-muted-foreground">{selectedStudent.email}</p>
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-2xl text-foreground">{selectedStudent.name}</h3>
+                                <p className="text-sm text-muted-foreground mb-2">{selectedStudent.email}</p>
+                                <div className="flex gap-2">
+                                  <Badge className="status-badge-published">Active</Badge>
+                                  <Badge variant="outline">{selectedStudent.coursesEnrolled} Courses</Badge>
+                                </div>
                               </div>
                             </div>
 
-                            <div className="space-y-4">
-                              <div className="p-4 rounded-lg bg-background/50">
-                                <div className="flex items-center gap-2 text-primary mb-2">
-                                  <TrendingUp className="h-4 w-4" />
-                                  <span className="font-medium">Progress</span>
-                                </div>
-                                <div 
-                                  className="h-2 rounded-full overflow-hidden mb-2"
-                                  style={{ backgroundColor: Colors.gray200 }}
-                                >
-                                  <div
-                                    className="h-full rounded-full transition-all duration-300"
-                                    style={{
-                                      width: `${selectedStudent.progress}%`,
-                                      background: `linear-gradient(90deg, ${Colors.purple400} 0%, ${Colors.purple600} 100%)`,
-                                      boxShadow: `0 2px 8px ${Colors.purple400}40`,
-                                    }}
-                                  />
-                                </div>
-                                <p className="text-2xl font-bold text-foreground">{selectedStudent.progress}%</p>
+                            {/* Quick Stats Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                                <Target className="h-5 w-5 text-primary mb-2" />
+                                <p className="text-2xl font-bold">{selectedStudent.averageScore}%</p>
+                                <p className="text-xs text-muted-foreground">Avg Score</p>
                               </div>
-
-                              <div className="p-4 rounded-lg bg-background/50">
-                                <div className="flex items-center gap-2 text-accent mb-2">
-                                  <BookOpen className="h-4 w-4" />
-                                  <span className="font-medium">Courses Enrolled</span>
-                                </div>
-                                <p className="text-2xl font-bold text-foreground">{selectedStudent.coursesEnrolled}</p>
+                              <div className="p-4 rounded-lg bg-success/10 border border-success/20">
+                                <CheckCircle className="h-5 w-5 text-success mb-2" />
+                                <p className="text-2xl font-bold">{selectedStudent.completedCourses}</p>
+                                <p className="text-xs text-muted-foreground">Completed</p>
                               </div>
-
-                              <div className="p-4 rounded-lg bg-background/50">
-                                <div className="flex items-center gap-2 text-warning mb-2">
-                                  <Clock className="h-4 w-4" />
-                                  <span className="font-medium">Last Activity</span>
-                                </div>
-                                <p className="text-foreground">{selectedStudent.lastActivity}</p>
+                              <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
+                                <Clock className="h-5 w-5 text-warning mb-2" />
+                                <p className="text-2xl font-bold">{selectedStudent.totalHours}h</p>
+                                <p className="text-xs text-muted-foreground">Study Time</p>
+                              </div>
+                              <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
+                                <Award className="h-5 w-5 text-accent mb-2" />
+                                <p className="text-2xl font-bold">{selectedStudent.badges}</p>
+                                <p className="text-xs text-muted-foreground">Badges</p>
                               </div>
                             </div>
+
+                            {/* Tabs for detailed information */}
+                            <Tabs defaultValue="journey" className="w-full">
+                              <TabsList className="grid w-full grid-cols-3">
+                                <TabsTrigger value="journey">Learning Journey</TabsTrigger>
+                                <TabsTrigger value="performance">Performance</TabsTrigger>
+                                <TabsTrigger value="activity">Activity</TabsTrigger>
+                              </TabsList>
+
+                              <TabsContent value="journey" className="space-y-4 mt-4">
+                                <div>
+                                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                                    <BookOpen className="h-4 w-4 text-primary" />
+                                    Current Courses
+                                  </h4>
+                                  <div className="space-y-3">
+                                    {selectedStudent.currentCourses.map((course: any) => (
+                                      <div key={course.id} className="p-4 rounded-lg bg-background/50 border border-border">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <p className="font-medium">{course.name}</p>
+                                          <Badge variant="outline">{course.grade}%</Badge>
+                                        </div>
+                                        <Progress value={course.progress} className="h-2" />
+                                        <p className="text-xs text-muted-foreground mt-1">{course.progress}% Complete</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {selectedStudent.completedCoursesData.length > 0 && (
+                                  <div>
+                                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                                      <CheckCircle className="h-4 w-4 text-success" />
+                                      Completed Courses
+                                    </h4>
+                                    <div className="space-y-3">
+                                      {selectedStudent.completedCoursesData.map((course: any) => (
+                                        <div key={course.id} className="p-4 rounded-lg bg-success/10 border border-success/20">
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex-1">
+                                              <p className="font-medium">{course.name}</p>
+                                              <p className="text-xs text-muted-foreground">Completed {course.completedDate}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <Badge className="bg-success">{course.grade}%</Badge>
+                                              {course.certificate && (
+                                                <Award className="h-4 w-4 text-warning" />
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </TabsContent>
+
+                              <TabsContent value="performance" className="space-y-4 mt-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="p-4 rounded-lg bg-background/50 border border-border">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <TrendingUp className="h-4 w-4 text-primary" />
+                                      <span className="text-sm font-medium">Overall Progress</span>
+                                    </div>
+                                    <Progress value={selectedStudent.progress} className="h-2 mb-2" />
+                                    <p className="text-2xl font-bold">{selectedStudent.progress}%</p>
+                                  </div>
+                                  <div className="p-4 rounded-lg bg-background/50 border border-border">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Star className="h-4 w-4 text-warning" />
+                                      <span className="text-sm font-medium">Engagement</span>
+                                    </div>
+                                    <Progress value={selectedStudent.engagement} className="h-2 mb-2" />
+                                    <p className="text-2xl font-bold">{selectedStudent.engagement}%</p>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h4 className="font-semibold mb-3">Recent Quiz Results</h4>
+                                  <div className="space-y-2">
+                                    {selectedStudent.quizResults.map((quiz: any, index: number) => (
+                                      <div key={index} className="p-3 rounded-lg bg-background/50 border border-border flex items-center justify-between">
+                                        <div>
+                                          <p className="font-medium text-sm">{quiz.quiz}</p>
+                                          <p className="text-xs text-muted-foreground">{quiz.date}</p>
+                                        </div>
+                                        <Badge variant={quiz.score >= 80 ? "default" : "outline"}>
+                                          {quiz.score}%
+                                        </Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
+                                  <h4 className="font-semibold mb-2">Performance Summary</h4>
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-muted-foreground">Strengths</p>
+                                      <p className="font-medium">Quiz Performance, Consistency</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Areas to Improve</p>
+                                      <p className="font-medium">Assignment Submissions</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </TabsContent>
+
+                              <TabsContent value="activity" className="space-y-4 mt-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="p-4 rounded-lg bg-background/50 border border-border">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Clock className="h-4 w-4 text-warning" />
+                                      <span className="text-sm font-medium">Last Activity</span>
+                                    </div>
+                                    <p className="text-xl font-bold">{selectedStudent.lastActivity}</p>
+                                  </div>
+                                  <div className="p-4 rounded-lg bg-background/50 border border-border">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <TrendingUp className="h-4 w-4 text-success" />
+                                      <span className="text-sm font-medium">Current Streak</span>
+                                    </div>
+                                    <p className="text-xl font-bold">{selectedStudent.streak} days</p>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h4 className="font-semibold mb-3">Engagement Metrics</h4>
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm">Total Study Hours</span>
+                                      <span className="font-bold">{selectedStudent.totalHours}h</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm">Enrolled Since</span>
+                                      <span className="font-medium">{selectedStudent.enrolledDate}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm">Active Courses</span>
+                                      <span className="font-medium">{selectedStudent.currentCourses.length}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm">Badges Earned</span>
+                                      <span className="font-medium">{selectedStudent.badges}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                                  <h4 className="font-semibold mb-2 text-sm">Activity Status</h4>
+                                  <Badge className={selectedStudent.engagement >= 70 ? "status-badge-published" : "status-badge-draft"}>
+                                    {selectedStudent.engagement >= 70 ? "Highly Engaged" : "Needs Attention"}
+                                  </Badge>
+                                </div>
+                              </TabsContent>
+                            </Tabs>
 
                             <Button className="w-full gap-2">
                               <Mail className="h-4 w-4" />

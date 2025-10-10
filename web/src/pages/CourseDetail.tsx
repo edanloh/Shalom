@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import courseThumbnail1 from "@/assets/course-thumbnail-1.jpg";
 
 const CourseDetail = () => {
@@ -594,21 +595,9 @@ const CourseDetail = () => {
                         {student.progress}%
                       </span>
                     </div>
-                    <div className="space-y-1">                      
-                      <div
-                        className="h-2 rounded-full overflow-hidden"
-                        style={{ backgroundColor: Colors.gray200 }}
-                      >
-                        <div
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{
-                            width: `${student.progress}%`,
-                            background: `linear-gradient(90deg, ${Colors.purple400} 0%, ${Colors.purple600} 100%)`,
-                            boxShadow: `0 2px 8px ${Colors.purple400}40`,
-                          }}
-                        />
-                      </div>
-                    </div>{" "}
+                    <div className="space-y-1">
+                      <Progress value={student.progress} />
+                    </div>
                     <div className="text-xs text-muted-foreground mb-2">
                       Last active: {student.lastActive}
                     </div>

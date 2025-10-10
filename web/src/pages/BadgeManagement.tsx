@@ -29,6 +29,8 @@ const BadgeManagement = () => {
   const [newBadgeDescription, setNewBadgeDescription] = useState("");
   const [newBadgeCriteria, setNewBadgeCriteria] = useState("");
   const [newBadgePoints, setNewBadgePoints] = useState("100");
+  const [newBadgeIcon, setNewBadgeIcon] = useState<File | null>(null);
+  const [badgeIconPreview, setBadgeIconPreview] = useState<string>("");
 
   const [badges, setBadges] = useState<BadgeItem[]>([
     {
@@ -118,6 +120,20 @@ const BadgeManagement = () => {
     setNewBadgeDescription("");
     setNewBadgeCriteria("");
     setNewBadgePoints("100");
+    setNewBadgeIcon(null);
+    setBadgeIconPreview("");
+  };
+
+  const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewBadgeIcon(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBadgeIconPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const toggleBadgeStatus = (badgeId: string) => {
@@ -204,6 +220,22 @@ const BadgeManagement = () => {
                     onChange={(e) => setNewBadgePoints(e.target.value)}
                     placeholder="100"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="badge-icon">Badge Icon (Optional)</Label>
+                  <Input
+                    id="badge-icon"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleIconUpload}
+                    className="cursor-pointer"
+                  />
+                  {badgeIconPreview && (
+                    <div className="mt-2">
+                      <img src={badgeIconPreview} alt="Badge preview" className="w-16 h-16 rounded object-cover" />
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">Upload a custom icon or use default</p>
                 </div>
               </div>
               <DialogFooter>
