@@ -9,6 +9,7 @@ import { Plus, Award, Edit, Trash2, Search, Star, Trophy, Medal, Target } from "
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Pagination } from "@/components/Pagination";
 
 interface BadgeItem {
   id: string;
@@ -31,6 +32,8 @@ const BadgeManagement = () => {
   const [newBadgePoints, setNewBadgePoints] = useState("100");
   const [newBadgeIcon, setNewBadgeIcon] = useState<File | null>(null);
   const [badgeIconPreview, setBadgeIconPreview] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(6);
 
   const [badges, setBadges] = useState<BadgeItem[]>([
     {
@@ -159,6 +162,11 @@ const BadgeManagement = () => {
     badge.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const paginatedBadges = filteredBadges.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -260,62 +268,77 @@ const BadgeManagement = () => {
         </div>
 
         {/* Badge Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredBadges.map((badge) => {
-            const IconComponent = getIconComponent(badge.icon);
-            return (
-              <div key={badge.id} className="gradient-card border border-border rounded-xl p-6 hover-lift">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center">
-                    <IconComponent className="h-8 w-8 text-warning" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={badge.active}
-                      onCheckedChange={() => toggleBadgeStatus(badge.id)}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteBadge(badge.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
+        {paginatedBadges.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {paginatedBadges.map((badge) => {
+                const IconComponent = getIconComponent(badge.icon);
+                return (
+                  <div key={badge.id} className="gradient-card border border-border rounded-xl p-6 hover-lift">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center">
+                        <IconComponent className="h-8 w-8 text-warning" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={badge.active}
+                          onCheckedChange={() => toggleBadgeStatus(badge.id)}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteBadge(badge.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
 
-                <h3 className="text-xl font-semibold mb-2">{badge.name}</h3>
-                <p className="text-sm text-muted-foreground mb-4">{badge.description}</p>
+                    <h3 className="text-xl font-semibold mb-2">{badge.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{badge.description}</p>
 
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Criteria:</span>
-                    <span className="font-medium">{badge.criteria}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Points:</span>
-                    <Badge variant="outline">{badge.points} pts</Badge>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Earned by:</span>
-                    <span className="font-medium">{badge.earnedBy} students</span>
-                  </div>
-                </div>
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Criteria:</span>
+                        <span className="font-medium">{badge.criteria}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Points:</span>
+                        <Badge variant="outline">{badge.points} pts</Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Earned by:</span>
+                        <span className="font-medium">{badge.earnedBy} students</span>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  <Badge className={badge.active ? "status-badge-published" : "status-badge-unpublished"}>
-                    {badge.active ? "ACTIVE" : "INACTIVE"}
-                  </Badge>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={badge.active ? "status-badge-published" : "status-badge-unpublished"}>
+                        {badge.active ? "ACTIVE" : "INACTIVE"}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-        {filteredBadges.length === 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredBadges.length / itemsPerPage)}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              itemsPerPage={itemsPerPage}
+              totalItems={filteredBadges.length}
+            />
+          </>
+        ) : (
           <div className="text-center py-12">
             <Award className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">No badges found matching your criteria</p>
+            <p className="text-muted-foreground">
+              {searchQuery ? `No badges found matching "${searchQuery}"` : "No badges found matching your criteria"}
+            </p>
           </div>
         )}
       </main>

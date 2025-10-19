@@ -43,7 +43,7 @@ const Settings = () => {
         </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full md:w-[600px] grid-cols-4">
+          <TabsList className="grid w-full md:w-[600px] grid-cols-3">
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
               Profile
@@ -56,10 +56,7 @@ const Settings = () => {
               <Shield className="h-4 w-4" />
               Security
             </TabsTrigger>
-            <TabsTrigger value="preferences" className="gap-2">
-              <SettingsIcon className="h-4 w-4" />
-              Preferences
-            </TabsTrigger>
+            
           </TabsList>
 
           <TabsContent value="profile" className="space-y-6">
@@ -114,7 +111,7 @@ const Settings = () => {
           <TabsContent value="notifications" className="space-y-6">
             <Card className="p-6 gradient-card border-border space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">Email Notifications</h3>
+                <h2 className="text-lg font-semibold text-foreground mb-4">Email Notifications</h2>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -145,7 +142,7 @@ const Settings = () => {
               <Separator />
 
               <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">Push Notifications</h3>
+                <h2 className="text-lg font-semibold text-foreground mb-4">Push Notifications</h2>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -168,84 +165,19 @@ const Settings = () => {
                 <div className="space-y-4 max-w-md">
                   <div>
                     <Label htmlFor="current-password">Current Password</Label>
-                    <Input id="current-password" type="password" />
+                    <Input id="current-password" className="mt-1" type="password" />
                   </div>
                   <div>
                     <Label htmlFor="new-password">New Password</Label>
-                    <Input id="new-password" type="password" />
+                    <Input id="new-password" className="mt-1" type="password" />
                   </div>
                   <div>
                     <Label htmlFor="confirm-password">Confirm Password</Label>
-                    <Input id="confirm-password" type="password" />
+                    <Input id="confirm-password" className="mt-1" type="password" />
                   </div>
                   <Button>Update Password</Button>
                 </div>
               </div>
-
-              <Separator />
-
-              <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">Two-Factor Authentication</h3>
-                <div className="flex items-center justify-between max-w-md">
-                  <div>
-                    <p className="font-medium text-foreground">Enable 2FA</p>
-                    <p className="text-sm text-muted-foreground">Add an extra layer of security to your account</p>
-                  </div>
-                  <Switch checked={twoFactorAuth} onCheckedChange={setTwoFactorAuth} />
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">Active Sessions</h3>
-                <div className="space-y-3">
-                  <div className="p-4 rounded-lg bg-background/50">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-foreground">Current Session</p>
-                        <p className="text-sm text-muted-foreground">Chrome on MacOS • New York, USA</p>
-                      </div>
-                      <Button variant="outline" size="sm">Revoke</Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="preferences" className="space-y-6">
-            <Card className="p-6 gradient-card border-border space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">Display</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Dark Mode</p>
-                      <p className="text-sm text-muted-foreground">Use dark theme across the platform</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">Course Defaults</h3>
-                <div className="space-y-4 max-w-md">
-                  <div>
-                    <Label htmlFor="default-duration">Default Course Duration (weeks)</Label>
-                    <Input id="default-duration" type="number" defaultValue="12" />
-                  </div>
-                  <div>
-                    <Label htmlFor="default-language">Default Language</Label>
-                    <Input id="default-language" defaultValue="English" />
-                  </div>
-                </div>
-              </div>
-
-              <Button>Save Preferences</Button>
             </Card>
           </TabsContent>
         </Tabs>

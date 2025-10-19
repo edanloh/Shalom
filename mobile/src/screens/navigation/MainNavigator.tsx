@@ -6,7 +6,7 @@ import HomeScreen from '../HomeScreen';
 import CoursesScreen from '../Courses';
 import ProfileScreen from '../UserProfile';
 import CourseDetailScreen from '../CourseDetailScreen';
-import NotificationsScreen from '../../../../web/src/pages/Notification';
+import NotificationsScreen from '../Notification';
 import SettingsScreen from '../Settings';
 import EditProfileScreen from '../EditProfile';
 import MyCourses from '../MyCourses';

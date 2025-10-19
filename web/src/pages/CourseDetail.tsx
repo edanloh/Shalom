@@ -39,11 +39,8 @@ const CourseDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
-  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedModules, setExpandedModules] = useState<number[]>([1]);
-  const [newReviewRating, setNewReviewRating] = useState(5);
-  const [newReviewText, setNewReviewText] = useState("");
 
   const course = {
     id: courseId,
@@ -229,24 +226,6 @@ const CourseDetail = () => {
     }
   };
 
-  const handleSubmitReview = () => {
-    if (!newReviewText) {
-      toast({
-        title: "Error",
-        description: "Please write a review",
-        variant: "destructive",
-      });
-      return;
-    }
-    toast({
-      title: "Review Submitted",
-      description: "Thank you for your feedback!",
-    });
-    setIsReviewDialogOpen(false);
-    setNewReviewText("");
-    setNewReviewRating(5);
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -401,68 +380,6 @@ const CourseDetail = () => {
             <div className="gradient-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold">Student Reviews</h2>
-                <Dialog
-                  open={isReviewDialogOpen}
-                  onOpenChange={setIsReviewDialogOpen}
-                >
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Write Review
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Write a Review</DialogTitle>
-                      <DialogDescription>
-                        Share your experience with this course
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Rating</Label>
-                        <div className="flex gap-2 mt-2">
-                          {[1, 2, 3, 4, 5].map((rating) => (
-                            <button
-                              key={rating}
-                              onClick={() => setNewReviewRating(rating)}
-                              className="focus:outline-none"
-                            >
-                              <Star
-                                className={`h-8 w-8 ${
-                                  rating <= newReviewRating
-                                    ? "text-warning fill-warning"
-                                    : "text-muted-foreground"
-                                }`}
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <Label htmlFor="review-text">Your Review</Label>
-                        <Textarea
-                          id="review-text"
-                          value={newReviewText}
-                          onChange={(e) => setNewReviewText(e.target.value)}
-                          placeholder="Share your thoughts about this course..."
-                          rows={4}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsReviewDialogOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSubmitReview}>
-                        Submit Review
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
               </div>
 
               {reviews.length === 0 ? (
@@ -470,52 +387,123 @@ const CourseDetail = () => {
                   <MessageSquare className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
                   <p className="text-muted-foreground mb-4">No reviews yet</p>
                   <p className="text-sm text-muted-foreground">
-                    Be the first to review this course!
+                    Students will be able to leave reviews once they complete
+                    the course.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {reviews.map((review) => (
-                    <div
-                      key={review.id}
-                      className="p-4 rounded-lg bg-background/50"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                            <span className="text-sm font-semibold">
-                              {review.studentName
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
+                <>
+                  {/* Rating Summary */}
+                  <div className="grid md:grid-cols-2 gap-8 mb-4 pb-2 pr-10">
+                    {/* Average Rating */}
+                    <div className=" flex flex-col items-center justify-center text-center">
+                      <div className="text-5xl font-bold mb-3">
+                        {course.rating}
+                      </div>
+                      <div className="flex gap-1 mb-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-4 w-4 ${
+                              star <= Math.round(course.rating)
+                                ? "text-warning fill-warning"
+                                : "text-muted-foreground"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-muted-foreground">
+                        Based on {course.totalRatings}{" "}
+                        {course.totalRatings === 1 ? "review" : "reviews"}
+                      </p>
+                    </div>
+
+                    {/* Rating Breakdown */}
+                    <div className="space-y-3">
+                      {[5, 4, 3, 2, 1].map((rating) => {
+                        // Mock data for rating distribution
+                        const distribution: Record<number, number> = {
+                          5: 65,
+                          4: 20,
+                          3: 10,
+                          2: 3,
+                          1: 2,
+                        };
+                        const percentage = distribution[rating];
+                        const count = Math.round(
+                          (course.totalRatings * percentage) / 100
+                        );
+
+                        return (
+                          <div key={rating} className="flex items-center gap-3 max-h-4">
+                            <div className="flex items-center gap-1 w-10">
+                              <span className="text-sm font-medium mr-1 justify-center text-center min-w-[12px]">
+                                {rating}
+                              </span>
+                              <Star className="h-4 w-4 text-warning fill-warning" />
+                            </div>
+                            <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-warning rounded-full transition-all duration-500"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                            <span className="text-sm text-muted-foreground w-10 text-right">
+                              {percentage}%
                             </span>
                           </div>
-                          <div>
-                            <p className="font-semibold">
-                              {review.studentName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {review.date}
-                            </p>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Individual Reviews */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Recent Reviews</h3>
+                    {reviews.map((review) => (
+                      <div
+                        key={review.id}
+                        className="p-4 rounded-lg bg-background/50"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                              <span className="text-sm font-semibold">
+                                {review.studentName
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                {review.studentName}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {review.date}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`h-4 w-4 ${
+                                  star <= review.rating
+                                    ? "text-warning fill-warning"
+                                    : "text-muted-foreground"
+                                }`}
+                              />
+                            ))}
                           </div>
                         </div>
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`h-4 w-4 ${
-                                star <= review.rating
-                                  ? "text-warning fill-warning"
-                                  : "text-muted-foreground"
-                              }`}
-                            />
-                          ))}
-                        </div>
+                        <p className="text-muted-foreground">
+                          {review.comment}
+                        </p>
                       </div>
-                      <p className="text-muted-foreground">{review.comment}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
