@@ -17,14 +17,17 @@ import { Images } from '../../assets';
 import { courseDetailService, ProcessedCourseDetail, CourseModule } from '../services/courseDetailService';
 import type { MainStackParamList } from '../types/navigation';
 import { ImageWithFallback } from '../components/common';
+import { moduleService, ModuleDetailResponse, UserProgress, CourseSection } from '../services/moduleService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 type Props = StackScreenProps<MainStackParamList, 'CourseDetail'>;
+type CourseContent = ModuleDetailResponse['data'];
 
 const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { courseId } = route.params;
   const [courseDetail, setCourseDetail] = useState<ProcessedCourseDetail | null>(null);
+  const [courseContent, setCourseContent] = useState<CourseContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,13 +35,39 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     loadCourseDetail();
   }, [courseId]);
 
+  const calculateCourseProgress = (): number => {
+    if (!courseContent || !courseContent.userProgress) return 0;
+    
+    const totalItems = courseContent.sections.reduce((sum, section) => sum + section.items.length, 0);
+    if (totalItems === 0) return 0;
+    
+    const completedItems = courseContent.sections.reduce((sum, section) => {
+      return sum + section.items.filter(item => 
+        moduleService.isItemCompleted(item, courseContent.userProgress)
+      ).length;
+    }, 0);
+    
+    return Math.round((completedItems / totalItems) * 100);
+  };
+
+  const getCompletedModulesCount = (): number => {
+    if (!courseContent) return 0;
+    return courseContent.sections.filter(section => section.module_is_completed).length;
+  };
+
   const loadCourseDetail = async () => {
-    console.log('[CourseDetailScreen] Loading course detail for ID:', courseId);
     try {
       setLoading(true);
       setError(null);
-      const detail = await courseDetailService.getCourseDetail(courseId);
+      
+      // Fetch both course detail and module detail with user progress
+      const [detail, moduleData] = await Promise.all([
+        courseDetailService.getCourseDetail(courseId),
+        moduleService.getModuleDetail(courseId, '550e8400-e29b-41d4-a716-446655440101') // TODO: Replace with actual user ID from auth context
+      ]);
+      
       setCourseDetail(detail);
+      setCourseContent(moduleData);
     } catch (err) {
       console.error('Failed to load course detail:', err);
       setError('Failed to load course details');
@@ -85,22 +114,50 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   };
 
-  const renderModule = (module: CourseModule, index: number) => (
-    <View key={module.id} style={styles.moduleItem}>
-      <View style={styles.moduleIcon}>
-        <Ionicons name="book-outline" size={20} color={Colors.purple400} />
-      </View>
-      <View style={styles.moduleContent}>
-        <Text style={styles.moduleTitle}>{module.title}</Text>
-        {module.description && (
-          <Text style={styles.moduleDescription}>{module.description}</Text>
-        )}
-      </View>
-      {module.isCompleted && (
-        <Ionicons name="checkmark-circle" size={20} color={Colors.green} />
-      )}
-    </View>
-  );
+  const renderModule = (module: CourseModule, index: number) => {
+    // Find the corresponding section from courseContent to get completion status
+    const section = courseContent?.sections.find(s => s.id === module.id);
+    const isCompleted = section?.module_is_completed || false;
+    const completedAt = section?.module_completed_at;
+    
+    return (
+      <Pressable 
+        key={module.id} 
+        style={styles.moduleItem}
+        onPress={() => navigation.navigate('ModuleDetail', {
+          courseId: route.params.courseId,
+          sectionId: module.id,
+          userId: '550e8400-e29b-41d4-a716-446655440101' // TODO: Replace with actual user ID from auth context
+        })}
+      >
+        <View style={styles.moduleIcon}>
+          <Ionicons name="book-outline" size={20} color={Colors.purple400} />
+        </View>
+        <View style={styles.moduleContent}>
+          <View style={styles.moduleTitleRow}>
+            <Text style={styles.moduleTitle}>{module.title}</Text>
+            {isCompleted && (
+              <View style={styles.completedBadge}>
+                <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
+                <Text style={styles.completedBadgeText}>Completed</Text>
+              </View>
+            )}
+          </View>
+          {module.description && (
+            <Text style={styles.moduleDescription}>{module.description}</Text>
+          )}
+          {isCompleted && completedAt && (
+            <Text style={styles.completedDate}>
+              Completed on {new Date(completedAt).toLocaleDateString()}
+            </Text>
+          )}
+        </View>
+        <View style={styles.moduleRightSection}>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        </View>
+      </Pressable>
+    );
+  };
 
   const renderReview = (review: ProcessedCourseDetail['reviews'][0]) => (
     <View key={`${review.reviewerName}-${review.createdAt}`} style={styles.reviewItem}>
@@ -172,8 +229,50 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.courseOverview}>Overview</Text>
           <Text style={styles.courseDescription}>{courseDetail.description}</Text>
 
+          {/* Course Progress Section */}
+          {courseContent && courseContent.userProgress && (
+            <>
+              <Text style={styles.sectionTitle}>Your Progress</Text>
+              <View style={styles.progressCard}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressLabel}>Course Progress</Text>
+                  <Text style={styles.progressPercentage}>{calculateCourseProgress()}%</Text>
+                </View>
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBarBackground}>
+                    <View 
+                      style={[
+                        styles.progressBarFill, 
+                        { width: `${calculateCourseProgress()}%` }
+                      ]} 
+                    />
+                  </View>
+                </View>
+                <View style={styles.progressStats}>
+                  <Text style={styles.progressStatsText}>
+                    {getCompletedModulesCount()} of {courseDetail.modules.length} modules completed
+                  </Text>
+                  {/* {calculateCourseProgress() === 100 && (
+                    <View style={styles.completedBadge}>
+                      <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
+                      <Text style={styles.completedBadgeText}>Course Completed!</Text>
+                    </View>
+                  )} */}
+                </View>
+              </View>
+            </>
+          )}
+
           {/* Modules Section */}
-          <Text style={styles.sectionTitle}>Modules</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Modules</Text>
+            {courseContent && getCompletedModulesCount() === courseDetail.modules.length && courseDetail.modules.length > 0 && (
+              <View style={styles.completedBadge}>
+                <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
+                <Text style={styles.completedBadgeText}>All Completed</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.modulesList}>
             {courseDetail.modules.length > 0 ? (
               courseDetail.modules.map(renderModule)
@@ -335,12 +434,17 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: Spacing.xl,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.md,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: Spacing.md,
-    marginTop: Spacing.xl,
   },
   modulesList: {
     marginBottom: Spacing.xl,
@@ -366,15 +470,91 @@ const styles = StyleSheet.create({
   moduleContent: {
     flex: 1,
   },
+  moduleTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  moduleRightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   moduleTitle: {
     fontSize: TextStyles.body.fontSize,
     fontWeight: '600',
     color: Colors.textPrimary,
+    flex: 1,
   },
   moduleDescription: {
     fontSize: TextStyles.caption.fontSize,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  completedDate: {
+    fontSize: 11,
+    color: Colors.green,
+    marginTop: 4,
+  },
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.green + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  completedBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.green,
+    marginLeft: 4,
+  },
+  progressCard: {
+    backgroundColor: Colors.gray600,
+    padding: Spacing.lg,
+    borderRadius: 12,
+    marginBottom: Spacing.xl,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  progressLabel: {
+    fontSize: TextStyles.h3.fontSize,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  progressPercentage: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.purple400,
+  },
+  progressBarContainer: {
+    marginBottom: Spacing.md,
+  },
+  progressBarBackground: {
+    height: 8,
+    backgroundColor: Colors.gray500,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: Colors.purple400,
+    borderRadius: 4,
+  },
+  progressStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  progressStatsText: {
+    fontSize: TextStyles.body.fontSize,
+    color: Colors.textSecondary,
   },
   instructorSection: {
     flexDirection: 'row',
@@ -412,6 +592,7 @@ const styles = StyleSheet.create({
   },
   ratingOverview: {
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.xl,
   },
   ratingNumber: {
@@ -444,19 +625,19 @@ const styles = StyleSheet.create({
   ratingBar: {
     flex: 1,
     height: 6,
-    backgroundColor: Colors.gray200,
+    backgroundColor: Colors.gray500,
     borderRadius: 3,
     marginRight: Spacing.sm,
   },
   ratingBarFill: {
     height: '100%',
-    backgroundColor: Colors.purple400,
+    backgroundColor: Colors.yellow,
     borderRadius: 3,
   },
   ratingPercentage: {
     fontSize: TextStyles.caption.fontSize,
     color: Colors.textSecondary,
-    width: 30,
+    minWidth: 28,
     textAlign: 'right',
   },
   reviewsList: {

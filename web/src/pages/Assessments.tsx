@@ -13,7 +13,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/Pagination";
 
 const Assessments = () => {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [courseSearchQuery, setCourseSearchQuery] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<string>("");
@@ -78,14 +77,6 @@ const Assessments = () => {
     return matchesCourse && matchesModule;
   });
 
-  const handleCreateQuiz = () => {
-    toast({
-      title: "Quiz Created",
-      description: "Your new quiz has been created successfully"
-    });
-    setIsCreateDialogOpen(false);
-  };
-
   const handleGradeSubmission = (id: number, score: number) => {
     toast({
       title: "Graded",
@@ -104,42 +95,6 @@ const Assessments = () => {
             <p className="text-muted-foreground">Create quizzes and grade submissions by course and module</p>
           </div>
           
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create Quiz
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Quiz</DialogTitle>
-                <DialogDescription>Design a new assessment for your students</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="quiz-title">Quiz Title</Label>
-                  <Input id="quiz-title" placeholder="e.g., Mid-term Exam" />
-                </div>
-                <div>
-                  <Label htmlFor="quiz-course">Course</Label>
-                  <Input id="quiz-course" placeholder="Select course..." />
-                </div>
-                <div>
-                  <Label htmlFor="quiz-questions">Number of Questions</Label>
-                  <Input id="quiz-questions" type="number" placeholder="15" />
-                </div>
-                <div>
-                  <Label htmlFor="quiz-instructions">Instructions</Label>
-                  <Textarea id="quiz-instructions" placeholder="Enter quiz instructions..." />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateQuiz}>Create Quiz</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
 
         {/* Filter Section - Smart Course Selection */}

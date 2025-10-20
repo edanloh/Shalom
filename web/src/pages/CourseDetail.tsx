@@ -70,6 +70,8 @@ const CourseDetail = () => {
       lessons: 5,
       quizzes: 1,
       duration: "2 hours",
+      isCompleted: true,
+      completedAt: "2025-02-01",
       items: [
         {
           id: 1,
@@ -100,6 +102,8 @@ const CourseDetail = () => {
       lessons: 6,
       quizzes: 1,
       duration: "3 hours",
+      isCompleted: false,
+      completedAt: null,
       items: [
         { id: 1, type: "lesson", title: "Python Basics", duration: "25 min" },
         {
@@ -136,6 +140,8 @@ const CourseDetail = () => {
       lessons: 5,
       quizzes: 1,
       duration: "2.5 hours",
+      isCompleted: false,
+      completedAt: null,
       items: [
         {
           id: 1,
@@ -307,10 +313,10 @@ const CourseDetail = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
-          {/* Course Content */}
-          <div className="col-span-2 space-y-6">
-            <div className="gradient-card border border-border rounded-xl p-6">
+          <div className="grid grid-cols-3 gap-6">
+            {/* Course Content */}
+            <div className="col-span-2 space-y-6">
+              <div className="gradient-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold">Course Content</h2>
                 <div className="text-sm text-muted-foreground">
@@ -329,13 +335,23 @@ const CourseDetail = () => {
                       className="flex items-center justify-between p-4 bg-card hover:bg-muted/10 cursor-pointer"
                       onClick={() => toggleModule(module.id)}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1">
                         <BookOpen className="h-5 w-5 text-primary" />
-                        <div>
-                          <div className="font-semibold">{module.title}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {module.lessons} lessons • {module.quizzes} quiz •{" "}
-                            {module.duration}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{module.title}</span>
+                            {module.isCompleted && (
+                              <Badge className="bg-success/20 text-success hover:bg-success/30 border-success/30">
+                                <Award className="h-3 w-3 mr-1" />
+                                Completed
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {module.lessons} lessons • {module.quizzes} quiz • {module.duration}
+                            {module.isCompleted && module.completedAt && (
+                              <span className="ml-2">• Completed on {new Date(module.completedAt).toLocaleDateString()}</span>
+                            )}
                           </div>
                         </div>
                       </div>

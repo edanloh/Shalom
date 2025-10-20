@@ -455,14 +455,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   previewCourseTitle: {
+    fontFamily: Typography.fontFamily.bold,
     fontSize: TextStyles.h3.fontSize,
-    fontWeight: "700",
     color: Colors.textPrimary,
     marginBottom: 4,
   },
   previewDescription: {
+    fontFamily: Typography.fontFamily.regular,
     fontSize: TextStyles.caption.fontSize,
-    fontWeight: "400",
     color: Colors.textSecondary,
   },
   previewCardOverlay: {
@@ -471,8 +471,8 @@ const styles = StyleSheet.create({
     zIndex: 2, // Ensure it is above the image but below any text/icon overlays
   },
   previewTitle: {
+    fontFamily: Typography.fontFamily.semiBold,
     fontSize: TextStyles.caption.fontSize,
-    fontWeight: "600",
     color: Colors.white,
     textAlign: "center",
   },
@@ -526,22 +526,22 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   courseTitle: {
+    fontFamily: Typography.fontFamily.bold,
     fontSize: TextStyles.h3.fontSize,
-    fontWeight: "700",
     color: Colors.textPrimary,
     marginBottom: 6,
     lineHeight: 24,
   },
   courseDescription: {
+    fontFamily: Typography.fontFamily.regular,
     fontSize: TextStyles.body.fontSize,
-    fontWeight: "400",
     color: Colors.textSecondary,
     marginBottom: 16,
     lineHeight: 18,
   },
   progressLabel: {
+    fontFamily: Typography.fontFamily.regular,
     fontSize: TextStyles.caption.fontSize,
-    fontWeight: "400",
     color: Colors.textSecondary,
     marginBottom: 8,
   },
@@ -578,8 +578,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   instructorName: {
+    fontFamily: Typography.fontFamily.semiBold,
     fontSize: TextStyles.body.fontSize,
-    fontWeight: "600",
     color: Colors.textPrimary,
     marginBottom: 4,
   },
@@ -591,8 +591,8 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   catText: {
+    fontFamily: Typography.fontFamily.medium,
     fontSize: TextStyles.caption.fontSize,
-    fontWeight: "500",
     color: Colors.white,
   },
   statsSection: {
@@ -607,13 +607,13 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   statValue: {
+    fontFamily: Typography.fontFamily.extraBold,
     fontSize: Typography.fontSize.lg,
-    fontWeight: "800",
     color: Colors.purple400,
   },
   statLabel: {
+    fontFamily: Typography.fontFamily.regular,
     fontSize: Typography.fontSize.sm,
-    fontWeight: "400",
     color: Colors.textSecondary,
     marginTop: 2,
   },
@@ -643,14 +643,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   completedText: {
+    fontFamily: Typography.fontFamily.bold,
     fontSize: TextStyles.h3.fontSize,
-    fontWeight: "700",
     color: Colors.textPrimary,
     marginBottom: 12,
   },
   completedSubtext: {
+    fontFamily: Typography.fontFamily.regular,
     fontSize: TextStyles.body.fontSize,
-    fontWeight: "400",
     color: Colors.textSecondary,
     textAlign: "center",
   },

@@ -16,6 +16,13 @@ export const Images = {
   certificates: require('./certificates.png'),
   streak: require('./streak.png'),
 
+  // Quiz assets
+  quizSuccess: require('./quiz_success.png'),
+  quizFail: require('./quiz_fail.png'),
+  quizRetry: require('./quiz_retry.png'),
+  quizReview: require('./quiz_review.png'),
+  quizComplete: require('./quiz_complete.png'),
+
   // Default avatars/placeholders
   defaultAvatar: require('./placeholder.png'),
   coursePlaceholder: require('./placeholder.png'),
