@@ -7,6 +7,9 @@ import CoursesScreen from '../Courses';
 import ProfileScreen from '../UserProfile';
 import CourseDetailScreen from '../CourseDetailScreen';
 import CourseOutlineScreen from '../CourseOutlineScreen'; 
+import ModuleDetailScreen from '../ModuleDetailScreen';
+import LessonPlayer from '../LessonPlayer';
+import QuizScreen from '../QuizScreen';
 import NotificationsScreen from '../Notification';
 import SettingsScreen from '../Settings';
 import EditProfileScreen from '../EditProfile';
@@ -87,6 +90,21 @@ export default function MainNavigator() {
       <Stack.Screen 
         name="CourseOutline" 
         component={CourseOutlineScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ModuleDetail"
+        component={ModuleDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="LessonPlayer"
+        component={LessonPlayer}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="QuizScreen"
+        component={QuizScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

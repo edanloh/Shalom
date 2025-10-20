@@ -1,0 +1,639 @@
+{
+  "health": {
+    "status": "healthy",
+    "timestamp": "2025-01-11T10:00:00Z"
+  },
+  "courses": {
+    "success": true,
+    "message": "Courses retrieved successfully",
+    "data": {
+      "courses": [
+        {
+          "id": 1,
+          "title": "React Native Fundamentals",
+          "description": "Learn the basics of React Native development with hands-on projects and real-world applications.",
+          "instructor_id": "inst_001",
+          "instructor_name": "Sarah Johnson",
+          "instructor_avatar": "https://ui-avatars.com/api/?name=Sarah+Johnson&size=50&background=3B82F6&color=fff",
+          "instructor_rating": "4.8",
+          "category_id": "cat_mobile",
+          "category_name": "Mobile Development",
+          "category_icon": "📱",
+          "category_color": "#3B82F6",
+          "level": "beginner",
+          "duration_hours": 12,
+          "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+          "video_preview_url": "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
+          "rating": "4.5",
+          "total_ratings": 145,
+          "student_count": 1250,
+          "is_published": true,
+          "is_featured": true,
+          "language": "English",
+          "subtitles": "English, Spanish",
+          "tags": ["react-native", "mobile", "javascript", "ios", "android"],
+          "created_at": "2024-01-15T08:00:00Z",
+          "updated_at": "2024-10-01T14:30:00Z",
+          "requirements": [
+            "Basic JavaScript knowledge",
+            "Computer with Node.js installed"
+          ],
+          "outcomes": [
+            "Build mobile apps with React Native",
+            "Understand component lifecycle",
+            "Handle navigation and state management"
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Advanced TypeScript",
+          "description": "Master advanced TypeScript concepts including generics, decorators, and type manipulation techniques.",
+          "instructor_id": "inst_002",
+          "instructor_name": "Michael Chen",
+          "instructor_avatar": "https://ui-avatars.com/api/?name=Michael+Chen&size=50&background=10B981&color=fff",
+          "instructor_rating": "4.9",
+          "category_id": "cat_web",
+          "category_name": "Web Development",
+          "category_icon": "🌐",
+          "category_color": "#10B981",
+          "level": "advanced",
+          "duration_hours": 18,
+          "thumbnail_url": "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=400&h=250&fit=crop",
+          "video_preview_url": null,
+          "rating": "4.7",
+          "total_ratings": 89,
+          "student_count": 678,
+          "is_published": true,
+          "is_featured": true,
+          "language": "English",
+          "subtitles": "English",
+          "tags": [
+            "typescript",
+            "javascript",
+            "programming",
+            "web",
+            "advanced"
+          ],
+          "created_at": "2024-02-10T10:15:00Z",
+          "updated_at": "2024-09-15T16:20:00Z",
+          "requirements": [
+            "Strong JavaScript foundation",
+            "Basic TypeScript knowledge"
+          ],
+          "outcomes": [
+            "Master TypeScript generics",
+            "Create custom utility types",
+            "Implement advanced patterns"
+          ]
+        },
+        {
+          "id": 3,
+          "title": "UI/UX Design Principles",
+          "description": "Learn fundamental design principles and create stunning user interfaces with practical design tools.",
+          "instructor_id": "inst_003",
+          "instructor_name": "Emma Rodriguez",
+          "instructor_avatar": "https://ui-avatars.com/api/?name=Emma+Rodriguez&size=50&background=F59E0B&color=fff",
+          "instructor_rating": "4.6",
+          "category_id": "cat_design",
+          "category_name": "Design",
+          "category_icon": "🎨",
+          "category_color": "#F59E0B",
+          "level": "beginner",
+          "duration_hours": 14,
+          "thumbnail_url": "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop",
+          "video_preview_url": null,
+          "rating": "4.4",
+          "total_ratings": 234,
+          "student_count": 2100,
+          "is_published": true,
+          "is_featured": false,
+          "language": "English",
+          "subtitles": "English, French, Spanish",
+          "tags": ["design", "ui", "ux", "figma", "creative"],
+          "created_at": "2024-01-20T09:30:00Z",
+          "updated_at": "2024-08-22T11:45:00Z",
+          "requirements": [
+            "No prior design experience needed",
+            "Access to Figma or similar design tool"
+          ],
+          "outcomes": [
+            "Create professional UI designs",
+            "Understand UX principles",
+            "Build design systems"
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Python for Data Science",
+          "description": "Comprehensive course covering data analysis, visualization, and machine learning with Python libraries.",
+          "instructor_id": "inst_004",
+          "instructor_name": "Dr. James Wilson",
+          "instructor_avatar": "https://ui-avatars.com/api/?name=James+Wilson&size=50&background=EF4444&color=fff",
+          "instructor_rating": "4.8",
+          "category_id": "cat_data",
+          "category_name": "Data Science",
+          "category_icon": "📊",
+          "category_color": "#EF4444",
+          "level": "intermediate",
+          "duration_hours": 22,
+          "thumbnail_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=250&fit=crop",
+          "video_preview_url": null,
+          "rating": "4.6",
+          "total_ratings": 156,
+          "student_count": 890,
+          "is_published": true,
+          "is_featured": true,
+          "language": "English",
+          "subtitles": "English",
+          "tags": ["python", "data-science", "pandas", "numpy", "matplotlib"],
+          "created_at": "2024-03-05T14:20:00Z",
+          "updated_at": "2024-09-30T10:15:00Z",
+          "requirements": [
+            "Basic Python programming",
+            "Understanding of mathematics"
+          ],
+          "outcomes": [
+            "Analyze data with pandas",
+            "Create visualizations",
+            "Build ML models"
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Cloud Architecture with AWS",
+          "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
+          "instructor_id": "inst_005",
+          "instructor_name": "Alex Kumar",
+          "instructor_avatar": "https://ui-avatars.com/api/?name=Alex+Kumar&size=50&background=8B5CF6&color=fff",
+          "instructor_rating": "4.7",
+          "category_id": "cat_cloud",
+          "category_name": "Cloud Computing",
+          "category_icon": "☁️",
+          "category_color": "#8B5CF6",
+          "level": "intermediate",
+          "duration_hours": 20,
+          "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
+          "video_preview_url": null,
+          "rating": "4.5",
+          "total_ratings": 112,
+          "student_count": 567,
+          "is_published": true,
+          "is_featured": false,
+          "language": "English",
+          "subtitles": "English",
+          "tags": ["aws", "cloud", "architecture", "devops", "serverless"],
+          "created_at": "2024-04-12T16:00:00Z",
+          "updated_at": "2024-10-05T12:30:00Z",
+          "requirements": [
+            "Basic networking knowledge",
+            "Understanding of web applications"
+          ],
+          "outcomes": [
+            "Design cloud architectures",
+            "Deploy on AWS",
+            "Optimize cloud costs"
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Machine Learning Basics",
+          "description": "Introduction to machine learning concepts with practical implementations using popular frameworks.",
+          "instructor_id": "inst_006",
+          "instructor_name": "Dr. Lisa Park",
+          "instructor_avatar": "https://ui-avatars.com/api/?name=Lisa+Park&size=50&background=EC4899&color=fff",
+          "instructor_rating": "4.9",
+          "category_id": "cat_ai",
+          "category_name": "Artificial Intelligence",
+          "category_icon": "🤖",
+          "category_color": "#EC4899",
+          "level": "beginner",
+          "duration_hours": 16,
+          "thumbnail_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=250&fit=crop",
+          "video_preview_url": null,
+          "rating": "4.8",
+          "total_ratings": 203,
+          "student_count": 1456,
+          "is_published": true,
+          "is_featured": true,
+          "language": "English",
+          "subtitles": "English, Korean, Chinese",
+          "tags": [
+            "machine-learning",
+            "ai",
+            "python",
+            "tensorflow",
+            "scikit-learn"
+          ],
+          "created_at": "2024-02-28T13:45:00Z",
+          "updated_at": "2024-09-18T15:20:00Z",
+          "requirements": [
+            "Basic programming knowledge",
+            "High school mathematics"
+          ],
+          "outcomes": [
+            "Understand ML algorithms",
+            "Build prediction models",
+            "Evaluate model performance"
+          ]
+        }
+      ],
+      "pagination": {
+        "currentPageSize": 6,
+        "scannedCount": 6,
+        "hasMore": false,
+        "nextPageToken": null,
+        "limit": 20
+      },
+      "filters": {
+        "filterExpression": null,
+        "filterValue": null,
+        "sortBy": "created_at",
+        "sortOrder": "desc"
+      },
+      "meta": {
+        "timestamp": "2025-01-11T10:00:00Z",
+        "requestId": "req_123456789"
+      }
+    }
+  },
+  "enrollments": {
+    "550e8400-e29b-41d4-a716-446655440101": {
+      "success": true,
+      "message": "Enrollments retrieved successfully",
+      "data": {
+        "enrollments": [
+          {
+            "enrollment_id": "enr_001",
+            "enrollment_date": "2024-09-01T08:00:00Z",
+            "completion_date": null,
+            "progress_percentage": "75",
+            "is_completed": false,
+            "is_in_wishlist": false,
+            "last_accessed": "2025-01-10T14:30:00Z",
+            "total_watch_time_minutes": 540,
+            "course_id": "1",
+            "title": "React Native Fundamentals",
+            "description": "Learn the basics of React Native development with hands-on projects and real-world applications.",
+            "level": "beginner",
+            "duration_hours": 12,
+            "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+            "rating": "4.5",
+            "student_count": 1250,
+            "tags": ["react-native", "mobile", "javascript"],
+            "category_name": "Mobile Development",
+            "category_icon": "📱",
+            "category_color": "#3B82F6",
+            "instructor_name": "Sarah Johnson",
+            "instructor_avatar": "https://ui-avatars.com/api/?name=Sarah+Johnson&size=50&background=3B82F6&color=fff",
+            "instructor_rating": "4.8",
+            "total_videos": "24",
+            "completed_videos": "18",
+            "video_watch_time_seconds": "32400",
+            "total_quizzes": "6",
+            "passed_quizzes": "4",
+            "video_progress_percent": 75,
+            "quiz_progress_percent": 67,
+            "estimated_time_remaining_minutes": 180,
+            "last_accessed_formatted": "2 hours ago",
+            "enrollment_date_formatted": "4 months ago",
+            "completion_date_formatted": null
+          },
+          {
+            "enrollment_id": "enr_002",
+            "enrollment_date": "2024-08-15T10:15:00Z",
+            "completion_date": "2024-12-20T16:45:00Z",
+            "progress_percentage": "100",
+            "is_completed": true,
+            "is_in_wishlist": false,
+            "last_accessed": "2024-12-20T16:45:00Z",
+            "total_watch_time_minutes": 840,
+            "course_id": "3",
+            "title": "UI/UX Design Principles",
+            "description": "Learn fundamental design principles and create stunning user interfaces with practical design tools.",
+            "level": "beginner",
+            "duration_hours": 14,
+            "thumbnail_url": "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop",
+            "rating": "4.4",
+            "student_count": 2100,
+            "tags": ["design", "ui", "ux", "figma"],
+            "category_name": "Design",
+            "category_icon": "🎨",
+            "category_color": "#F59E0B",
+            "instructor_name": "Emma Rodriguez",
+            "instructor_avatar": "https://ui-avatars.com/api/?name=Emma+Rodriguez&size=50&background=F59E0B&color=fff",
+            "instructor_rating": "4.6",
+            "total_videos": "28",
+            "completed_videos": "28",
+            "video_watch_time_seconds": "50400",
+            "total_quizzes": "7",
+            "passed_quizzes": "7",
+            "video_progress_percent": 100,
+            "quiz_progress_percent": 100,
+            "estimated_time_remaining_minutes": 0,
+            "last_accessed_formatted": "3 weeks ago",
+            "enrollment_date_formatted": "5 months ago",
+            "completion_date_formatted": "3 weeks ago"
+          }
+        ],
+        "statistics": {
+          "total_enrollments": 2,
+          "completed_courses": 1,
+          "wishlist_count": 3,
+          "average_progress": 87.5,
+          "total_watch_time_minutes": 1380,
+          "active_last_week": 1,
+          "total_watch_time_hours": 23,
+          "completion_rate": 50
+        },
+        "pagination": {
+          "currentPageSize": 2,
+          "totalCount": 2,
+          "limit": 20,
+          "offset": 0,
+          "hasMore": false,
+          "totalPages": 1,
+          "currentPage": 1
+        },
+        "filters": {
+          "status": null,
+          "progress_min": null,
+          "progress_max": null,
+          "sortBy": "last_accessed",
+          "sortOrder": "desc"
+        },
+        "meta": {
+          "timestamp": "2025-01-11T10:00:00Z",
+          "requestId": "req_enrollment_123"
+        }
+      }
+    }
+  },
+  "wishlist": {
+    "550e8400-e29b-41d4-a716-446655440101": {
+      "success": true,
+      "message": "Wishlist retrieved successfully",
+      "data": {
+        "courses": [
+          {
+            "wishlist_id": "wish_001",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "2",
+            "title": "Advanced TypeScript",
+            "description": "Master advanced TypeScript concepts including generics, decorators, and type manipulation techniques.",
+            "instructor": {
+              "id": "inst_002",
+              "name": "Michael Chen",
+              "avatar": "https://ui-avatars.com/api/?name=Michael+Chen&size=50&background=10B981&color=fff",
+              "category": "Web Development",
+              "rating": 4.9
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-10-15T12:30:00Z"
+            },
+            "duration": "18h",
+            "rating": 4.7,
+            "image": "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=400&h=250&fit=crop",
+            "category": "Web Development",
+            "level": "advanced",
+            "modules": 9,
+            "tags": [
+              "typescript",
+              "javascript",
+              "programming",
+              "web",
+              "advanced"
+            ],
+            "createdAt": "2024-02-10T10:15:00Z",
+            "updatedAt": "2024-09-15T16:20:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_002",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "4",
+            "title": "Python for Data Science",
+            "description": "Comprehensive course covering data analysis, visualization, and machine learning with Python libraries.",
+            "instructor": {
+              "id": "inst_004",
+              "name": "Dr. James Wilson",
+              "avatar": "https://ui-avatars.com/api/?name=James+Wilson&size=50&background=EF4444&color=fff",
+              "category": "Data Science",
+              "rating": 4.8
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-11-02T09:15:00Z"
+            },
+            "duration": "22h",
+            "rating": 4.6,
+            "image": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=250&fit=crop",
+            "category": "Data Science",
+            "level": "intermediate",
+            "modules": 11,
+            "tags": ["python", "data-science", "pandas", "numpy", "matplotlib"],
+            "createdAt": "2024-03-05T14:20:00Z",
+            "updatedAt": "2024-09-30T10:15:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_003",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "6",
+            "title": "Machine Learning Basics",
+            "description": "Introduction to machine learning concepts with practical implementations using popular frameworks.",
+            "instructor": {
+              "id": "inst_006",
+              "name": "Dr. Lisa Park",
+              "avatar": "https://ui-avatars.com/api/?name=Lisa+Park&size=50&background=EC4899&color=fff",
+              "category": "Artificial Intelligence",
+              "rating": 4.9
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-12-01T16:20:00Z"
+            },
+            "duration": "16h",
+            "rating": 4.8,
+            "image": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=250&fit=crop",
+            "category": "Artificial Intelligence",
+            "level": "beginner",
+            "modules": 8,
+            "tags": [
+              "machine-learning",
+              "ai",
+              "python",
+              "tensorflow",
+              "scikit-learn"
+            ],
+            "createdAt": "2024-02-28T13:45:00Z",
+            "updatedAt": "2024-09-18T15:20:00Z",
+            "isWishlisted": true
+          }
+        ],
+        "count": 3,
+        "meta": {
+          "timestamp": "2025-01-11T10:00:00Z",
+          "requestId": "req_wishlist_456"
+        }
+      }
+    }
+  },
+  "course-details": {
+    "1": {
+      "success": true,
+      "message": "Course details retrieved successfully",
+      "data": {
+        "course": {
+          "id": "1",
+          "title": "React Native Fundamentals",
+          "description": "Learn the basics of React Native development with hands-on projects and real-world applications. This comprehensive course covers everything from setting up your development environment to deploying your first mobile app.",
+          "instructor_id": "inst_001",
+          "category_id": "cat_mobile",
+          "level": "beginner",
+          "duration_hours": 12,
+          "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+          "video_preview_url": "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
+          "rating": "4.5",
+          "total_ratings": 145,
+          "student_count": 1250,
+          "is_published": true,
+          "is_featured": true,
+          "language": "English",
+          "subtitles": "English, Spanish",
+          "tags": ["react-native", "mobile", "javascript", "ios", "android"],
+          "created_at": "2024-01-15T08:00:00Z",
+          "updated_at": "2024-10-01T14:30:00Z",
+          "category_name": "Mobile Development",
+          "category_description": "Build mobile applications for iOS and Android",
+          "category_icon": "📱",
+          "category_color": "#3B82F6",
+          "instructor_name": "Sarah Johnson",
+          "instructor_email": "sarah.johnson@example.com",
+          "instructor_avatar": "https://ui-avatars.com/api/?name=Sarah+Johnson&size=50&background=3B82F6&color=fff",
+          "instructor_bio": "Senior Mobile Developer with 8+ years of experience building React Native applications for Fortune 500 companies.",
+          "instructor_rating": "4.8",
+          "instructor_total_students": 15000,
+          "instructor_total_courses": 12,
+          "instructor_experience": 8,
+          "instructor_education": "M.S. Computer Science - Stanford University",
+          "instructor_certifications": [
+            "AWS Certified Developer",
+            "Google Mobile Web Specialist"
+          ],
+          "instructor_expertise": [
+            "React Native",
+            "iOS Development",
+            "Android Development",
+            "JavaScript",
+            "TypeScript"
+          ],
+          "total_duration_seconds": 43200,
+          "requirements": [
+            "Basic JavaScript knowledge",
+            "Computer with Node.js installed",
+            "Mobile device or emulator for testing",
+            "Text editor (VS Code recommended)"
+          ],
+          "outcomes": [
+            "Build mobile apps with React Native",
+            "Understand component lifecycle and state management",
+            "Handle navigation between screens",
+            "Integrate with device features like camera and GPS",
+            "Deploy apps to App Store and Google Play"
+          ]
+        },
+        "sections": [
+          {
+            "id": "sec_1",
+            "title": "Getting Started",
+            "description": "Introduction and environment setup",
+            "order": 1,
+            "total_videos": 4,
+            "total_duration_seconds": 3600
+          },
+          {
+            "id": "sec_2",
+            "title": "Core Concepts",
+            "description": "Components, props, and state",
+            "order": 2,
+            "total_videos": 6,
+            "total_duration_seconds": 7200
+          },
+          {
+            "id": "sec_3",
+            "title": "Navigation & Styling",
+            "description": "Screen navigation and UI styling",
+            "order": 3,
+            "total_videos": 5,
+            "total_duration_seconds": 5400
+          }
+        ],
+        "videos": [
+          {
+            "id": "vid_1",
+            "section_id": "sec_1",
+            "title": "Course Introduction",
+            "duration_seconds": 600,
+            "order": 1,
+            "is_preview": true
+          },
+          {
+            "id": "vid_2",
+            "section_id": "sec_1",
+            "title": "Setting up Development Environment",
+            "duration_seconds": 1200,
+            "order": 2,
+            "is_preview": false
+          }
+        ],
+        "quizzes": [
+          {
+            "id": "quiz_1",
+            "section_id": "sec_1",
+            "title": "Environment Setup Quiz",
+            "total_questions": 5,
+            "passing_score": 80,
+            "order": 1
+          }
+        ],
+        "reviews": [
+          {
+            "rating": 5,
+            "review": "Excellent course! Sarah explains concepts clearly and the projects are very practical.",
+            "created_at": "2024-12-15T10:30:00Z",
+            "reviewer_name": "John Doe",
+            "reviewer_avatar": "https://ui-avatars.com/api/?name=John+Doe&size=40",
+            "is_anonymous": false
+          },
+          {
+            "rating": 4,
+            "review": "Great content, but would like more advanced topics covered.",
+            "created_at": "2024-12-10T14:20:00Z",
+            "reviewer_name": "Anonymous User",
+            "reviewer_avatar": "https://ui-avatars.com/api/?name=Anonymous&size=40",
+            "is_anonymous": true
+          }
+        ],
+        "statistics": {
+          "total_sections": 3,
+          "total_videos": 15,
+          "total_quizzes": 3,
+          "total_duration_seconds": 43200,
+          "total_duration_formatted": "12 hours",
+          "preview_videos_count": 2
+        },
+        "meta": {
+          "timestamp": "2025-01-11T10:00:00Z",
+          "requestId": "req_course_detail_789"
+        }
+      }
+    }
+  }
+}

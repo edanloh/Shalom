@@ -1,0 +1,184 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design system with STRICT color palette - All colors MUST be HSL */
+
+@layer base {
+  :root {
+    /* Primary backgrounds - converted to HSL */
+    --background: 228 7% 20%;        /* #2F2F37 */
+    --foreground: 0 0% 100%;         /* #FFFFFF */
+
+    /* Card backgrounds */
+    --card: 240 21% 26%;             /* #3A339F */
+    --card-foreground: 0 0% 100%;    /* #FFFFFF */
+
+    --popover: 240 21% 26%;          /* #3A339F */
+    --popover-foreground: 0 0% 100%; /* #FFFFFF */
+
+    /* Primary purple palette */
+    --primary: 243 79% 61%;          /* #564BEB */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF */
+
+    --secondary: 275 74% 57%;        /* #943FE4 */
+    --secondary-foreground: 0 0% 100%; /* #FFFFFF */
+
+    /* Neutral grays */
+    --muted: 0 0% 39%;               /* #636363 */
+    --muted-foreground: 0 0% 83%;    /* #D4D4D4 */
+
+    /* Accent colors */
+    --accent: 275 74% 57%;           /* #943FE4 */
+    --accent-foreground: 0 0% 100%;  /* #FFFFFF */
+
+    /* Status colors */
+    --success: 109 53% 44%;          /* #49AC33 */
+    --success-foreground: 0 0% 100%; /* #FFFFFF */
+
+    --warning: 45 82% 59%;           /* #EEC53D */
+    --warning-foreground: 0 0% 0%;   /* #000000 */
+
+    --destructive: 0 85% 52%;        /* #ED1B1B */
+    --destructive-foreground: 0 0% 100%; /* #FFFFFF */
+
+    /* Borders and inputs */
+    --border: 243 79% 61%;           /* #564BEB */
+    --input: 240 7% 25%;             /* #3E3E47 */
+    --ring: 243 79% 61%;             /* #564BEB */
+
+    --radius: 0.75rem;
+
+    /* Surface colors */
+    --surface: 240 21% 26%;          /* #3A339F */
+    --surface-dark: 240 47% 5%;      /* #0E0F15 */
+    
+    /* Additional semantic colors */
+    --text-primary: 0 0% 100%;       /* #FFFFFF */
+    --text-secondary: 0 0% 83%;      /* #D4D4D4 */
+    --text-muted: 0 0% 39%;          /* #636363 */
+    
+    /* Sidebar colors */
+    --sidebar-background: 240 21% 26%; /* #3A339F */
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 243 79% 61%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 228 7% 20%;
+    --sidebar-accent-foreground: 0 0% 83%;
+    --sidebar-border: 243 79% 61%;
+    --sidebar-ring: 243 79% 61%;
+  }
+
+  .dark {
+    --background: 228 7% 20%;
+    --foreground: 0 0% 100%;
+
+    --card: 240 21% 26%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 240 21% 26%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 243 79% 61%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 275 74% 57%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 39%;
+    --muted-foreground: 0 0% 83%;
+
+    --accent: 275 74% 57%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 109 53% 44%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 45 82% 59%;
+    --warning-foreground: 0 0% 0%;
+
+    --destructive: 0 85% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 243 79% 61%;
+    --input: 240 7% 25%;
+    --ring: 243 79% 61%;
+    
+    --sidebar-background: 240 21% 26%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 243 79% 61%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 228 7% 20%;
+    --sidebar-accent-foreground: 0 0% 83%;
+    --sidebar-border: 243 79% 61%;
+    --sidebar-ring: 243 79% 61%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+  
+  h1 {
+    @apply text-[32px] leading-tight;
+  }
+  
+  h2 {
+    @apply text-2xl;
+  }
+  
+  h3 {
+    @apply text-lg;
+  }
+}
+
+@layer utilities {
+  .gradient-card {
+    background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--surface)) 100%);
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+  }
+  
+  .gradient-accent {
+    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--warning)) 100%);
+  }
+
+  .glass-card {
+    background: rgba(58, 51, 159, 0.3);
+    backdrop-filter: blur(10px);
+    border: 1px solid hsl(var(--border));
+  }
+
+  .hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
+  }
+  
+  .status-badge-published {
+    @apply bg-success text-success-foreground;
+  }
+  
+  .status-badge-draft {
+    @apply bg-warning text-warning-foreground;
+  }
+  
+  .status-badge-unpublished {
+    @apply bg-destructive text-destructive-foreground;
+  }
+}

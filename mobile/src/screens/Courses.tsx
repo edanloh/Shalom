@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,21 +11,21 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-} from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
-import { useCourses } from '../contexts/CourseContext';
-import { useUser } from '../contexts/UserContext';
-import { Colors, Spacing, TextStyles } from '../constants';
-import type { Course } from '../types';
+import { useCourses } from "../contexts/CourseContext";
+import { useUser } from "../contexts/UserContext";
+import { Colors, Spacing, TextStyles } from "../constants";
+import type { Course } from "../types";
+import { ImageWithFallback } from "@components/common";
+import { Images } from "../../assets";
+const { width } = Dimensions.get("window");
 
-
-const { width } = Dimensions.get('window');
-
-const CARD_BG = '#3A3A45';
-const CHIP_BORDER = '#4B4B57';
+const CARD_BG = "#3A3A45";
+const CHIP_BORDER = "#4B4B57";
 
 function clamp01(n: number) {
   if (Number.isNaN(n)) return 0;
@@ -37,16 +37,13 @@ function clamp01(n: number) {
 function progressFrom(course: Course): number {
   const p: any = course?.progress;
   if (p == null) return 0;
-  if (typeof p === 'number') {
+  if (typeof p === "number") {
     // if looks like 0..100, convert
     return p > 1 ? clamp01(p / 100) : clamp01(p);
   }
-  const candidates = [
-    p.percent,
-    p.percentage,
-    p.progress,
-    p.value,
-  ].filter((v) => typeof v === 'number') as number[];
+  const candidates = [p.percent, p.percentage, p.progress, p.value].filter(
+    (v) => typeof v === "number"
+  ) as number[];
 
   if (!candidates.length) return 0;
   const v = candidates[0];
@@ -62,13 +59,13 @@ export default function CoursesScreen({ navigation }: any) {
     toggleWishlist,
   } = useCourses();
 
-  const wishIds = useMemo(() => new Set(wishlist.map(c => c.id)), [wishlist]);
+  const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
   const isWishlisted = (c: Course) => wishIds.has(c.id);
   const { enrolledCourses = [] } = useUser();
 
   // UI state
-  const [query, setQuery] = useState('');
-  const [selectedTag, setSelectedTag] = useState<string>('All');
+  const [query, setQuery] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string>("All");
 
   // Build unique tag chips from all courses
   const tagChips: string[] = useMemo(() => {
@@ -76,7 +73,7 @@ export default function CoursesScreen({ navigation }: any) {
     for (const c of courses) {
       (c.tags ?? []).forEach((t) => t && set.add(t));
     }
-    return ['All', ...Array.from(set)];
+    return ["All", ...Array.from(set)];
   }, [courses]);
 
   // Search helper (title, instructor, category, tags)
@@ -87,7 +84,9 @@ export default function CoursesScreen({ navigation }: any) {
       const inTitle = c.title?.toLowerCase().includes(t);
       const inInstr = c.instructor?.name?.toLowerCase().includes(t);
       const inCat = c.category?.toLowerCase().includes(t);
-      const inTags = (c.tags ?? []).some((tag) => tag.toLowerCase().includes(t));
+      const inTags = (c.tags ?? []).some((tag) =>
+        tag.toLowerCase().includes(t)
+      );
       return inTitle || inInstr || inCat || inTags;
     });
   };
@@ -109,7 +108,7 @@ export default function CoursesScreen({ navigation }: any) {
   const popular = useMemo(() => {
     // Not enrolled, filtered by tag and query
     let base = courses.filter((c) => !enrolledIds.has(c.id));
-    if (selectedTag !== 'All') {
+    if (selectedTag !== "All") {
       base = base.filter((c) => (c.tags ?? []).includes(selectedTag));
     }
     base = searchLocal(query, base);
@@ -117,7 +116,13 @@ export default function CoursesScreen({ navigation }: any) {
   }, [courses, enrolledIds, selectedTag, query]);
 
   // ---- small UI bits ----
-  const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
+  const MetaRow = ({
+    rating,
+    modules,
+  }: {
+    rating: number;
+    modules?: number;
+  }) => (
     <View style={styles.metaRow}>
       <Ionicons name="star" size={12} color="#FACC15" />
       <Text style={styles.metaText}>{rating?.toFixed?.(1) ?? rating}</Text>
@@ -153,15 +158,20 @@ export default function CoursesScreen({ navigation }: any) {
         <Text style={styles.levelText}>{item.level}</Text>
       </View>
       <TouchableOpacity
-        onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
+        onPress={(e) => {
+          e.stopPropagation();
+          toggleWishlist?.(item);
+        }}
         accessibilityRole="button"
-        accessibilityLabel={isWishlisted(item) ? 'Remove from wishlist' : 'Add to wishlist'}
+        accessibilityLabel={
+          isWishlisted(item) ? "Remove from wishlist" : "Add to wishlist"
+        }
         hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
         style={styles.heartBtn}
         activeOpacity={0.7}
       >
         <Ionicons
-          name={isWishlisted(item) ? 'heart' : 'heart-outline'}
+          name={isWishlisted(item) ? "heart" : "heart-outline"}
           size={18}
           color="#fff"
         />
@@ -178,11 +188,15 @@ export default function CoursesScreen({ navigation }: any) {
   }) => (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
+      onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
       style={styles.hCard}
     >
       <View style={styles.imageWrap}>
-        <Image source={{ uri: item.image }} style={styles.hImage} />
+        <ImageWithFallback
+          source={{ uri: item.image }}
+          fallback={Images.placeholder}
+          style={styles.hImage}
+        />
         <BadgeHeartRow item={item} />
       </View>
       <Text style={styles.hTitle} numberOfLines={2}>
@@ -203,11 +217,15 @@ export default function CoursesScreen({ navigation }: any) {
   const GCard = ({ item }: { item: Course }) => (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
+      onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
       style={styles.gCard}
     >
       <View style={styles.imageWrap}>
-        <Image source={{ uri: item.image }} style={styles.gImage} />
+        <ImageWithFallback
+          source={{ uri: item.image }}
+          fallback={Images.placeholder}
+          style={styles.gImage}
+        />
         <BadgeHeartRow item={item} />
       </View>
       <Text style={styles.gTitle} numberOfLines={2}>
@@ -215,13 +233,13 @@ export default function CoursesScreen({ navigation }: any) {
       </Text>
       <MetaRow rating={item.rating} modules={item.modules} />
       <Text style={styles.gInstructor} numberOfLines={1}>
-        {item.instructor?.name ? `Mr. ${item.instructor.name}` : ''}
+        {item.instructor?.name ? `Mr. ${item.instructor.name}` : ""}
       </Text>
     </TouchableOpacity>
   );
 
   const EmptyState = ({
-    icon = 'sparkles-outline',
+    icon = "sparkles-outline",
     message,
     subtext,
   }: {
@@ -237,7 +255,7 @@ export default function CoursesScreen({ navigation }: any) {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <StatusBar style="light" />
 
       {/* Header */}
@@ -253,12 +271,12 @@ export default function CoursesScreen({ navigation }: any) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={Colors.white}            // iOS spinner color
-            colors={[Colors.purple400]}         // Android spinner colors
+            tintColor={Colors.white} // iOS spinner color
+            colors={[Colors.purple400]} // Android spinner colors
           />
         }
-          alwaysBounceVertical={true}           // iOS
-          overScrollMode="always"               // Android    
+        alwaysBounceVertical={true} // iOS
+        overScrollMode="always" // Android
       >
         {/* Search */}
         <View style={styles.searchWrap}>
@@ -273,7 +291,7 @@ export default function CoursesScreen({ navigation }: any) {
           />
           {query ? (
             <TouchableOpacity
-              onPress={() => setQuery('')}
+              onPress={() => setQuery("")}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Ionicons name="close" size={18} color={Colors.textSecondary} />
@@ -293,7 +311,9 @@ export default function CoursesScreen({ navigation }: any) {
                 activeOpacity={0.8}
                 style={[styles.chip, active && styles.chipActive]}
               >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                <Text
+                  style={[styles.chipText, active && styles.chipTextActive]}
+                >
                   {item}
                 </Text>
               </TouchableOpacity>
@@ -328,7 +348,7 @@ export default function CoursesScreen({ navigation }: any) {
               Recommended
             </Text>
 
-            {(loading || refreshing) ? (
+            {loading || refreshing ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={Colors.purple400} />
                 <Text style={styles.loadingText}>Loading recommended…</Text>
@@ -344,7 +364,11 @@ export default function CoursesScreen({ navigation }: any) {
                 extraData={wishlist}
               />
             ) : (
-              <EmptyState icon="sparkles-outline" message="No recommendations right now." subtext="Pull down to refresh."/>
+              <EmptyState
+                icon="sparkles-outline"
+                message="No recommendations right now."
+                subtext="Pull down to refresh."
+              />
             )}
           </>
         )}
@@ -353,7 +377,7 @@ export default function CoursesScreen({ navigation }: any) {
         <Text style={[styles.sectionTitle, { marginTop: Spacing.sm }]}>
           Popular Courses
         </Text>
-        {(loading || refreshing) ? (
+        {loading || refreshing ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.purple400} />
             <Text style={styles.loadingText}>Loading popular courses…</Text>
@@ -364,13 +388,17 @@ export default function CoursesScreen({ navigation }: any) {
             keyExtractor={(i) => i.id}
             renderItem={({ item }) => <GCard item={item} />}
             numColumns={2}
-            columnWrapperStyle={{ justifyContent: 'space-between' }}
+            columnWrapperStyle={{ justifyContent: "space-between" }}
             contentContainerStyle={styles.grid}
             scrollEnabled={false}
             extraData={wishlist}
           />
         ) : (
-          <EmptyState icon="search-outline" message="No courses match your filters" subtext="Pull down to refresh."/>
+          <EmptyState
+            icon="search-outline"
+            message="No courses match your filters"
+            subtext="Pull down to refresh."
+          />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -381,26 +409,26 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.primary },
 
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.sm,
   },
   headerTitle: {
     fontFamily: TextStyles.h4.fontFamily,
     fontSize: TextStyles.h4.fontSize,
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // Search
   searchWrap: {
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.sm,
-    backgroundColor: '#3A3C46',
+    backgroundColor: "#3A3C46",
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   searchInput: {
     flex: 1,
@@ -420,7 +448,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: CHIP_BORDER,
     marginRight: 10,
@@ -431,12 +459,12 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: Colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 13,
     fontFamily: TextStyles.body.fontFamily,
   },
   chipTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
 
   // Section title
@@ -444,7 +472,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontFamily: TextStyles.h3.fontFamily,
     fontSize: TextStyles.h4.fontSize,
-    fontWeight: '700',
+    fontWeight: "700",
     marginTop: 6,
     marginBottom: 12,
     paddingHorizontal: Spacing.lg,
@@ -452,8 +480,8 @@ const styles = StyleSheet.create({
 
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: Spacing.xl,
     minHeight: 200,
   },
@@ -465,8 +493,8 @@ const styles = StyleSheet.create({
   },
 
   emptyWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.lg,
     minHeight: 120,
@@ -476,7 +504,7 @@ const styles = StyleSheet.create({
     fontFamily: TextStyles.body.fontFamily,
     fontSize: TextStyles.body.fontSize,
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptySubtitle: {
     color: Colors.textSecondary,
@@ -484,7 +512,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.8,
     marginTop: 4,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   // Horizontal cards
@@ -492,25 +520,25 @@ const styles = StyleSheet.create({
   hCard: {
     width: Math.min(width * 0.72, 300),
     marginRight: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 16,
   },
   hImage: {
-    width: '100%',
+    width: "100%",
     height: 150,
     backgroundColor: CARD_BG,
   },
   hTitle: {
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: 15,
     marginTop: 10,
     paddingHorizontal: 2,
     fontFamily: TextStyles.body.fontFamily,
   },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 2,
     paddingTop: 6,
@@ -518,7 +546,7 @@ const styles = StyleSheet.create({
   metaText: {
     color: Colors.textSecondary,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: TextStyles.body.fontFamily,
   },
   metaDot: { color: Colors.textSecondary, marginHorizontal: 4 },
@@ -527,11 +555,11 @@ const styles = StyleSheet.create({
   progressWrap: {
     height: 8,
     borderRadius: 8,
-    backgroundColor: '#4B4B57',
-    overflow: 'hidden',
+    backgroundColor: "#4B4B57",
+    overflow: "hidden",
   },
   progressFill: {
-    height: '100%',
+    height: "100%",
     borderRadius: 8,
     backgroundColor: Colors.purple400,
   },
@@ -546,18 +574,18 @@ const styles = StyleSheet.create({
   grid: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
   gCard: {
     width: (width - Spacing.lg * 2 - 12) / 2,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 16,
     marginBottom: 12,
   },
   gImage: {
-    width: '100%',
+    width: "100%",
     height: 110,
     backgroundColor: CARD_BG,
   },
   gTitle: {
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: 14.5,
     paddingHorizontal: 2,
     paddingTop: 10,
@@ -571,16 +599,16 @@ const styles = StyleSheet.create({
     fontFamily: TextStyles.body.fontFamily,
   },
   imageWrap: {
-    position: 'relative',
+    position: "relative",
     borderRadius: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   badgeRow: {
-    position: 'absolute',
+    position: "absolute",
     top: Spacing.sm,
     right: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   levelBadge: {
     backgroundColor: Colors.purple400,
@@ -593,12 +621,11 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontFamily: TextStyles.body.fontFamily,
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   heartBtn: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 14,
     padding: 6,
   },
-
 });

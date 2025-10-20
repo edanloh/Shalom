@@ -298,12 +298,9 @@ class CourseService {
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_${JSON.stringify(params || {})}`;
       const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
       if (cachedCourses) {
-        console.log('Returning cached courses');
         return cachedCourses;
       }
 
-      console.log('Fetching courses from API...');
-      
       // Build query parameters
       const queryParams: Record<string, string> = {};
       if (params?.limit) queryParams.limit = params.limit.toString();
@@ -316,8 +313,6 @@ class CourseService {
         ENDPOINTS.COURSES,
         queryParams
       );
-
-      console.log('API Response:', response);
 
       // Safety check: ensure response exists
       if (!response) {
@@ -356,20 +351,17 @@ class CourseService {
     try {
       // REMOVE LATER - Temporary override for testing
       userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
-      console.log('getUserEnrollments - Starting fetch for user ID:', userId);
       
       // For testing, skip cache and always fetch fresh data
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`;
       await CacheManager.clear(cacheKey);
       
-      /*
       // Check cache first
       const cachedEnrollments = await CacheManager.get<Course[]>(cacheKey);
       if (cachedEnrollments) {
-        console.log('getUserEnrollments - Returning cached user enrollments:', cachedEnrollments.length);
         return cachedEnrollments;
       }
-      */
+      
       
       const response = await apiService.get<any>(ENDPOINTS.USER_ENROLLMENTS(userId));
       const payload = unwrap<EnrollmentResponse | { enrollments: EnrollmentCourse[] }>(response);
@@ -493,6 +485,7 @@ async addToWishlist(userId: string, courseId: string): Promise<void> {
 
 async removeFromWishlist(userId: string, courseId: string): Promise<void> {
   if (!userId || !courseId) throw new Error('Missing userId/courseId');
+  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
   await apiService.delete(WISHLIST.ITEM(userId, courseId));
   await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
 }
@@ -501,7 +494,6 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    * Get detailed information for a specific course
    */
   async getCourseById(courseId: string): Promise<Course | null> {
-    console.log('Fetching course by ID:', courseId);
     try {
       const allCourses = await this.getCourses();
       return allCourses.find(course => course.id === courseId) || null;
