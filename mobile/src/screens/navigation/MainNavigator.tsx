@@ -6,6 +6,7 @@ import HomeScreen from '../HomeScreen';
 import CoursesScreen from '../Courses';
 import ProfileScreen from '../UserProfile';
 import CourseDetailScreen from '../CourseDetailScreen';
+import CourseOutlineScreen from '../CourseOutlineScreen'; 
 import NotificationsScreen from '../Notification';
 import SettingsScreen from '../Settings';
 import EditProfileScreen from '../EditProfile';
@@ -81,6 +82,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="CourseDetail"
         component={CourseDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="CourseOutline" 
+        component={CourseOutlineScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

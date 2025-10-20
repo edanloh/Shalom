@@ -9,6 +9,7 @@ export type MainStackParamList = {
   Wishlist: undefined;
   UserManagement: undefined;
   UserConfig: undefined;
+  CourseOutline: { courseId: string; startAt?: string };
 };
 
 export type TabParamList = {
