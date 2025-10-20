@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Image,
+  Alert,
   ScrollView,
   StyleSheet,
-  Dimensions,
   Pressable,
   ActivityIndicator,
 } from 'react-native';
@@ -17,6 +16,9 @@ import { Images } from '../../assets';
 import { courseDetailService, ProcessedCourseDetail, CourseModule } from '../services/courseDetailService';
 import type { MainStackParamList } from '../types/navigation';
 import { ImageWithFallback } from '../components/common';
+import * as Haptics from 'expo-haptics';
+import { useAuth } from '../contexts/AuthContext';
+import { courseService } from '../services/courseService';
 import { moduleService, ModuleDetailResponse, UserProgress, CourseSection } from '../services/moduleService';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -30,11 +32,27 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [courseContent, setCourseContent] = useState<CourseContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const userId = user?.id;
+
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
 
   useEffect(() => {
     loadCourseDetail();
   }, [courseId]);
 
+  useEffect(() => {
+    (async () => {
+      if (!userId) return;          // user must be logged in
+      try {
+        const enrolled = await courseService.isUserEnrolledInCourse(userId, courseId);
+        setIsEnrolled(enrolled);
+      } catch (e) {
+        console.log('Enroll status check failed:', e);
+      }
+    })();
+  }, [courseId, userId]);
   const calculateCourseProgress = (): number => {
     if (!courseContent || !courseContent.userProgress) return 0;
     
@@ -181,6 +199,38 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     </View>
   );
 
+  const handleEnroll = async () => {
+    if (isEnrolling) return; // debounce
+    if (!userId) {
+      Alert.alert('Sign in required', 'Please sign in to enroll.');
+      return;
+    }
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      setIsEnrolling(true);
+
+      // If already enrolled, jump straight in
+      if (isEnrolled) {
+        navigation.replace('CourseOutline', { courseId });
+        return;
+      }
+
+      const { firstModuleId } = await courseService.enrollInCourse(userId, courseId);
+      navigation.replace(
+        'CourseOutline',
+        firstModuleId ? { courseId, startAt: firstModuleId } : { courseId }
+      );
+    } catch (e: any) {
+        const status = e?.statusCode ?? e?.response?.status;
+        console.log('[Enroll] error', { status, code: e?.code, msg: e?.message, details: e?.details });
+        Alert.alert(`Enrollment failed ${status ? `(${status})` : ''}`, e?.details?.message || e?.message || 'Try again.');
+    } finally {
+        setIsEnrolling(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -320,8 +370,18 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Enroll Button */}
           <View style={styles.enrollSection}>
-            <Pressable style={styles.enrollButton}>
-              <Text style={styles.enrollButtonText}>Enroll Now</Text>
+            <Pressable
+              style={[styles.enrollButton, isEnrolling && { opacity: 0.6 }]}
+              onPress={handleEnroll}
+              disabled={isEnrolling}
+            >
+              {isEnrolling ? (
+                <ActivityIndicator color={Colors.white} />
+              ) : (
+                <Text style={styles.enrollButtonText}>
+                  {isEnrolled ? 'Go to Course' : 'Enroll Now'}
+                </Text>
+              )}
             </Pressable>
           </View>
         </View>

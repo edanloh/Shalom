@@ -179,7 +179,7 @@ export default function NotificationsScreen({ navigation }: any) {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
-        SectionSeparatorComponent={() => <View style={{ height: Spacing.lg }} />}
+        SectionSeparatorComponent={() => <View style={{ height: Spacing.sm }}/>}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -199,6 +199,7 @@ const THUMB = 56;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingVertical: Spacing.base,
     backgroundColor: Colors.primary, // dark bg
   },
 
@@ -207,7 +208,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
     justifyContent: 'space-between',
   },
   headerTitle: {
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   },
   stickyHeader: {
     backgroundColor: Colors.primary,
-    paddingVertical: Spacing.sm,
+    paddingTop: Spacing.md,
   },
   stickyHeaderText: {
     ...TextStyles.h2,

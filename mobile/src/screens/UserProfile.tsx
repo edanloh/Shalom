@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Pressable,
   Text,
-  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +17,9 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../contexts/AuthContext';
 import type { MainStackParamList, TabParamList } from '../types/navigation';
+import { ImageWithFallback } from '../components/common';
+import { Images } from '../../assets';
+import { getAvatarUri } from '@/utils/avatar';
 
 
 type Nav = CompositeNavigationProp<
@@ -36,10 +38,8 @@ const ProfileScreen: React.FC = () => {
   // Safe fallbacks so the UI renders even if some fields are missing
   const displayName = user?.name ?? 'User';
   const points = (user as any)?.points ?? 0;
-  const avatarSrc = user?.avatar
-    ? { uri: user.avatar }
-    // adjust this path if your alias differs
-    : require('@assets/profile.png');
+  const avatarUri = getAvatarUri(user);
+  const avatarSrc = avatarUri ? { uri: avatarUri } : Images.profile;
 
   const quickActions = useMemo(
     () => [
@@ -107,7 +107,7 @@ const ProfileScreen: React.FC = () => {
       >
         {/* Avatar & name */}
         <View style={styles.centerHeader}>
-          <Image source={avatarSrc} style={styles.avatar} />
+          <ImageWithFallback source={avatarSrc} fallback={Images.profile} style={styles.avatar} />
           <Text style={styles.name}>{displayName}</Text>
           <Text style={styles.points}>{points} points</Text>
         </View>
