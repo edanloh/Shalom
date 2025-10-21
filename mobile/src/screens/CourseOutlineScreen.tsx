@@ -16,29 +16,14 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Colors, Spacing, TextStyles } from '../constants';
 import type { MainStackParamList } from '../types/navigation';
-import {
-  courseDetailService,
-  type ProcessedCourseDetail,
-  type CourseModule,
-} from '../services/courseDetailService';
-import {
-  moduleService,
-  type ModuleDetailResponse,
-} from '../services/moduleService';
-import { useAuth } from '../contexts/AuthContext';
+import { courseDetailService, type ProcessedCourseDetail, type CourseModule } from '../services/courseDetailService';
 
 type Props = StackScreenProps<MainStackParamList, 'CourseOutline'>;
-type CourseContent = ModuleDetailResponse['data'];
 
 const CourseOutlineScreen: React.FC<Props> = ({ navigation, route }) => {
   const { courseId, startAt } = route.params;
 
-  const { user } = useAuth();
-  const userId = user?.id || null;
-
   const [detail, setDetail] = useState<ProcessedCourseDetail | null>(null);
-  const [content, setContent] = useState<CourseContent | null>(null);
-
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,25 +32,15 @@ const CourseOutlineScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       setError(null);
       setLoading(true);
-
-      // Fetch course detail first
       const d = await courseDetailService.getCourseDetail(courseId);
-
-      // Then (optionally) fetch module detail with user progress
-      let moduleData: CourseContent | null = null;
-      if (userId) {
-        moduleData = await moduleService.getModuleDetail(courseId, userId);
-      }
-
       setDetail(d);
-      setContent(moduleData ?? null)
     } catch (e) {
       console.error('[CourseOutline] load error', e);
       setError('Failed to load course outline');
     } finally {
       setLoading(false);
     }
-  }, [courseId, userId]);
+  }, [courseId]);
 
   useEffect(() => {
     load();
@@ -74,79 +49,46 @@ const CourseOutlineScreen: React.FC<Props> = ({ navigation, route }) => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await load();
+      const d = await courseDetailService.getCourseDetail(courseId);
+      setDetail(d);
+    } catch (e) {
+      setError('Failed to refresh');
     } finally {
       setRefreshing(false);
     }
-  }, [load]);
+  }, [courseId]);
 
-  // Build a quick lookup for section completion by sectionId
-  const sectionById = useMemo(() => {
-    const map = new Map<string, CourseContent['sections'][number]>();
-    if (content?.sections?.length) {
-      for (const s of content.sections) map.set(String(s.id), s);
-    }
-    return map;
-  }, [content]);
+  // pick a start module: startAt (from enroll), else first incomplete, else first
+  const startModule = useMemo(() => {
+    if (!detail) return null;
+    const byId = startAt ? detail.modules.find(m => String(m.id) === String(startAt)) : null;
+    if (byId) return byId;
 
-  // Progress based on sections / modules, matching CourseDetailScreen’s approach
-  const progressPct = useMemo(() => {
-    if (!detail?.modules?.length || !content?.sections?.length) return 0;
-    const completed = content.sections.filter((s) => s.module_is_completed).length;
-    const total = detail.modules.length || 1;
-    return Math.round((completed / total) * 100);
-  }, [detail, content]);
-
-  // Choose a sensible start module:
-  // 1) startAt (from enroll)
-  // 2) first incomplete based on section completion
-  // 3) first module
-  const startModule: CourseModule | null = useMemo(() => {
-    if (!detail?.modules?.length) return null;
-
-    if (startAt) {
-      const byId = detail.modules.find((m) => String(m.id) === String(startAt));
-      if (byId) return byId;
-    }
-
-    const firstIncomplete = detail.modules.find((m) => {
-      const sec = sectionById.get(String(m.id));
-      return !sec?.module_is_completed;
-    });
-
+    const firstIncomplete = detail.modules.find(m => !m.isCompleted);
     return firstIncomplete ?? detail.modules[0] ?? null;
-  }, [detail, startAt, sectionById]);
+  }, [detail, startAt]);
+
+  const progressPct = useMemo(() => {
+    if (!detail?.modules?.length) return 0;
+    const done = detail.modules.filter(m => m.isCompleted).length;
+    return Math.round((done / detail.modules.length) * 100);
+  }, [detail]);
 
   const handleStartOrContinue = useCallback(() => {
     if (!startModule) {
       Alert.alert('No content', 'This course has no modules yet.');
       return;
     }
-    if (!userId) {
-      Alert.alert('Sign in required', 'Please sign in to continue the course.');
-      return;
-    }
-    navigation.navigate('ModuleDetail', {
-      courseId,
-      sectionId: String(startModule.id),
-      userId,
-    });
-  }, [startModule, navigation, courseId, userId]);
+    // TODO: replace with your actual lesson/player route
+    // navigation.navigate('CoursePlayer', { courseId, moduleId: startModule.id });
+    Alert.alert('Open module', `Module ID: ${startModule.id}\n(Replace this alert with navigation to your player screen)`);
+  }, [startModule /* , navigation, courseId */]);
 
-  const handleOpenModule = useCallback(
-    (module: CourseModule) => {
-      if (!userId) {
-        Alert.alert('Sign in required', 'Please sign in to open this module.');
-        return;
-      }
-      navigation.navigate('ModuleDetail', {
-        courseId,
-        sectionId: String(module.id),
-        userId,
-      });
-    },
-    [navigation, courseId, userId]
-  );
+  const handleOpenModule = useCallback((module: CourseModule) => {
+    // TODO: replace with your actual lesson/player route
+    // navigation.navigate('CoursePlayer', { courseId, moduleId: module.id });
+    Alert.alert('Open module', `Module ID: ${module.id}\n(Replace this alert with navigation to your player screen)`);
+  }, [/* navigation, courseId */]);
 
   if (loading) {
     return (
@@ -175,20 +117,14 @@ const CourseOutlineScreen: React.FC<Props> = ({ navigation, route }) => {
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
         </Pressable>
-        <Text numberOfLines={1} style={styles.headerTitle}>
-          {detail.title}
-        </Text>
+        <Text numberOfLines={1} style={styles.headerTitle}>{detail.title}</Text>
       </View>
 
       <FlatList
         data={detail.modules}
         keyExtractor={(m) => String(m.id)}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Colors.purple400}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.purple400} />
         }
         ListHeaderComponent={
           <View style={styles.topCard}>
@@ -213,41 +149,33 @@ const CourseOutlineScreen: React.FC<Props> = ({ navigation, route }) => {
                 style={{ marginRight: 8 }}
               />
               <Text style={styles.primaryCtaText}>
-                {progressPct > 0 ? 'Continue' : 'Start'}
-                {startModule ? ` • ${startModule.title}` : ''}
+                {progressPct > 0 ? 'Continue' : 'Start'} {startModule ? ` • ${startModule.title}` : ''}
               </Text>
             </Pressable>
           </View>
         }
-        renderItem={({ item, index }) => {
-          const sec = sectionById.get(String(item.id));
-          const done = !!sec?.module_is_completed;
-
-          return (
-            <Pressable style={styles.moduleItem} onPress={() => handleOpenModule(item)}>
-              <View style={styles.moduleLeft}>
-                <View style={styles.moduleIcon}>
-                  <Ionicons name="book-outline" size={18} color={Colors.purple400} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.moduleTitle} numberOfLines={1}>
-                    {index + 1}. {item.title}
-                  </Text>
-                  {!!item.description && (
-                    <Text style={styles.moduleDesc} numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                  )}
-                </View>
+        renderItem={({ item, index }) => (
+          <Pressable style={styles.moduleItem} onPress={() => handleOpenModule(item)}>
+            <View style={styles.moduleLeft}>
+              <View style={styles.moduleIcon}>
+                <Ionicons name="book-outline" size={18} color={Colors.purple400} />
               </View>
-              {done ? (
-                <Ionicons name="checkmark-circle" size={20} color={Colors.green} />
-              ) : (
-                <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
-              )}
-            </Pressable>
-          );
-        }}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.moduleTitle} numberOfLines={1}>
+                  {index + 1}. {item.title}
+                </Text>
+                {!!item.description && (
+                  <Text style={styles.moduleDesc} numberOfLines={2}>{item.description}</Text>
+                )}
+              </View>
+            </View>
+            {item.isCompleted ? (
+              <Ionicons name="checkmark-circle" size={20} color={Colors.green} />
+            ) : (
+              <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+            )}
+          </Pressable>
+        )}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
         contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 40 }}
         ListFooterComponent={<View style={{ height: 8 }} />}
@@ -299,9 +227,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -383,12 +309,9 @@ const styles = StyleSheet.create({
   },
   moduleLeft: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   moduleIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 36, height: 36, borderRadius: 8,
     backgroundColor: Colors.purple400 + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     marginRight: Spacing.md,
   },
   moduleTitle: {
