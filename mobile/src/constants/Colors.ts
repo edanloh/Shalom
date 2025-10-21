@@ -19,6 +19,7 @@ export const Colors = {
   yellow: '#EEC53D',    // Achievements, warnings
   green: '#49AC33',     // Success states
   red: '#ED1B1B',       // Errors, notifications
+  blue: '#3B82F6',      // Info states
   
   // Base Colors
   white: '#FFFFFF',

@@ -6,7 +6,10 @@ import HomeScreen from '../HomeScreen';
 import CoursesScreen from '../Courses';
 import ProfileScreen from '../UserProfile';
 import CourseDetailScreen from '../CourseDetailScreen';
-import NotificationsScreen from '../../../../web/src/pages/Notification';
+import ModuleDetailScreen from '../ModuleDetailScreen';
+import LessonPlayer from '../LessonPlayer';
+import QuizScreen from '../QuizScreen';
+import NotificationsScreen from '../Notification';
 import SettingsScreen from '../Settings';
 import EditProfileScreen from '../EditProfile';
 import MyCourses from '../MyCourses';
@@ -81,6 +84,21 @@ export default function MainNavigator() {
       <Stack.Screen
         name="CourseDetail"
         component={CourseDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ModuleDetail"
+        component={ModuleDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="LessonPlayer"
+        component={LessonPlayer}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="QuizScreen"
+        component={QuizScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

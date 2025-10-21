@@ -3,13 +3,28 @@ import { Header } from "@/components/Header";
 import { CourseCard } from "@/components/CourseCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Grid3x3, List, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { Pagination } from "@/components/Pagination";
 import courseThumbnail1 from "@/assets/course-thumbnail-1.jpg";
 import courseThumbnail2 from "@/assets/course-thumbnail-2.jpg";
 import courseThumbnail3 from "@/assets/course-thumbnail-3.jpg";
@@ -23,6 +38,8 @@ const Courses = () => {
   const [newCourseTitle, setNewCourseTitle] = useState("");
   const [newCourseCategory, setNewCourseCategory] = useState("");
   const [newCourseDescription, setNewCourseDescription] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(8);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -35,7 +52,7 @@ const Courses = () => {
       enrolledCount: 245,
       completionRate: 67,
       rating: 4.8,
-      status: "published" as const
+      status: "published" as const,
     },
     {
       id: "2",
@@ -45,7 +62,7 @@ const Courses = () => {
       enrolledCount: 189,
       completionRate: 54,
       rating: 4.9,
-      status: "published" as const
+      status: "published" as const,
     },
     {
       id: "3",
@@ -55,7 +72,7 @@ const Courses = () => {
       enrolledCount: 412,
       completionRate: 78,
       rating: 4.7,
-      status: "published" as const
+      status: "published" as const,
     },
     {
       id: "4",
@@ -65,8 +82,88 @@ const Courses = () => {
       enrolledCount: 156,
       completionRate: 45,
       rating: 4.6,
-      status: "draft" as const
-    }
+      status: "draft" as const,
+    },
+    {
+      id: "5",
+      title: "Data Science Fundamentals",
+      category: "Data Science",
+      thumbnail: courseThumbnail1,
+      enrolledCount: 245,
+      completionRate: 67,
+      rating: 4.8,
+      status: "published" as const,
+    },
+    {
+      id: "6",
+      title: "Machine Learning A-Z",
+      category: "AI & ML",
+      thumbnail: courseThumbnail2,
+      enrolledCount: 189,
+      completionRate: 54,
+      rating: 4.9,
+      status: "published" as const,
+    },
+    {
+      id: "7",
+      title: "Python for Beginners",
+      category: "Programming",
+      thumbnail: courseThumbnail3,
+      enrolledCount: 412,
+      completionRate: 78,
+      rating: 4.7,
+      status: "published" as const,
+    },
+    {
+      id: "8",
+      title: "Advanced Analytics",
+      category: "Analytics",
+      thumbnail: courseThumbnail4,
+      enrolledCount: 156,
+      completionRate: 45,
+      rating: 4.6,
+      status: "draft" as const,
+    },
+    {
+      id: "9",
+      title: "Data Science Fundamentals",
+      category: "Data Science",
+      thumbnail: courseThumbnail1,
+      enrolledCount: 245,
+      completionRate: 67,
+      rating: 4.8,
+      status: "published" as const,
+    },
+    {
+      id: "10",
+      title: "Machine Learning A-Z",
+      category: "AI & ML",
+      thumbnail: courseThumbnail2,
+      enrolledCount: 189,
+      completionRate: 54,
+      rating: 4.9,
+      status: "published" as const,
+    },
+    {
+      id: "11",
+      title: "Python for Beginners",
+      category: "Programming",
+      thumbnail: courseThumbnail3,
+      enrolledCount: 412,
+      completionRate: 78,
+      rating: 4.7,
+      status: "published" as const,
+    },
+    {
+      id: "12",
+      title: "Advanced Analytics",
+      category: "Analytics",
+      thumbnail: courseThumbnail4,
+      enrolledCount: 156,
+      completionRate: 45,
+      rating: 4.6,
+      status: "draft" as const,
+    },
   ]);
 
   const handleCreateCourse = () => {
@@ -74,25 +171,28 @@ const Courses = () => {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
-    setCourses([...courses, {
-      id: Date.now().toString(),
-      title: newCourseTitle,
-      category: newCourseCategory,
-      thumbnail: courseThumbnail1,
-      enrolledCount: 0,
-      completionRate: 0,
-      rating: 0,
-      status: "draft" as const
-    }]);
+    setCourses([
+      ...courses,
+      {
+        id: Date.now().toString(),
+        title: newCourseTitle,
+        category: newCourseCategory,
+        thumbnail: courseThumbnail1,
+        enrolledCount: 0,
+        completionRate: 0,
+        rating: 0,
+        status: "draft" as const,
+      },
+    ]);
 
     toast({
       title: "Course Created",
-      description: `${newCourseTitle} has been created successfully`
+      description: `${newCourseTitle} has been created successfully`,
     });
 
     setIsCreateDialogOpen(false);
@@ -101,25 +201,39 @@ const Courses = () => {
     setNewCourseDescription("");
   };
 
-  const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         course.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || course.status === statusFilter;
+  const filteredCourses = courses.filter((course) => {
+    const matchesSearch =
+      course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || course.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const paginatedCourses = filteredCourses.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="container mx-auto px-6 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Course Management</h1>
-            <p className="text-muted-foreground">Manage and organize your courses</p>
+            <h1 className="text-3xl font-bold text-foreground">
+              Course Management
+            </h1>
+            <p className="text-muted-foreground">
+              Manage and organize your courses
+            </p>
           </div>
-          
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+          >
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
@@ -129,7 +243,9 @@ const Courses = () => {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New Course</DialogTitle>
-                <DialogDescription>Add a new course to your curriculum</DialogDescription>
+                <DialogDescription>
+                  Add a new course to your curriculum
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -161,7 +277,12 @@ const Courses = () => {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
                 <Button onClick={handleCreateCourse}>Create Course</Button>
               </DialogFooter>
             </DialogContent>
@@ -179,7 +300,7 @@ const Courses = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full md:w-[200px]">
                 <Filter className="h-4 w-4 mr-2" />
@@ -211,18 +332,36 @@ const Courses = () => {
           </div>
         </div>
 
-        <div className={viewMode === "grid" 
-          ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-          : "space-y-4"
-        }>
-          {filteredCourses.map((course, index) => (
-            <CourseCard key={index} {...course} />
-          ))}
-        </div>
+        {paginatedCourses.length > 0 ? (
+          <>
+            <div
+              className={
+                viewMode === "grid"
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                  : "space-y-4"
+              }
+            >
+              {paginatedCourses.map((course, index) => (
+                <CourseCard key={index} {...course} />
+              ))}
+            </div>
 
-        {filteredCourses.length === 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredCourses.length / itemsPerPage)}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              itemsPerPage={itemsPerPage}
+              totalItems={filteredCourses.length}
+            />
+          </>
+        ) : (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No courses found matching your criteria</p>
+            <p className="text-muted-foreground">
+              No courses found matching your criteria
+            </p>
           </div>
         )}
       </main>

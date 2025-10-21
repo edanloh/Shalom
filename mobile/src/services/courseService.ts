@@ -7,6 +7,10 @@ import { Course, AWSApiResponse, AWSCoursesResponse, AWSCourse } from '../types'
 import apiService from './apiService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+function unwrap<T = any>(r: any): T {
+  return (r && typeof r === 'object' && 'data' in r ? r.data : r) as T;
+}
+
 // Cache configuration
 const CACHE_CONFIG = {
   COURSES_KEY: 'cached_courses',
@@ -16,8 +20,9 @@ const CACHE_CONFIG = {
 // Course service endpoints
 const ENDPOINTS = {
   COURSES: '/courses',
-  USER_ENROLLMENTS: '/courses/enrollment',
+  USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
 };
+
 
 // Wishlist endpoints
 const WISHLIST = {
@@ -107,6 +112,20 @@ export interface EnrollmentResponse {
       timestamp: string;
       requestId: string;
     };
+  };
+}
+
+export interface EnrollRequest {
+  userId: string;
+  courseId: string;
+}
+
+export interface EnrollApiResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    enrollment_id: string;
+    firstModuleId?: string;
   };
 }
 
@@ -279,12 +298,9 @@ class CourseService {
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_${JSON.stringify(params || {})}`;
       const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
       if (cachedCourses) {
-        console.log('Returning cached courses');
         return cachedCourses;
       }
 
-      console.log('Fetching courses from API...');
-      
       // Build query parameters
       const queryParams: Record<string, string> = {};
       if (params?.limit) queryParams.limit = params.limit.toString();
@@ -297,8 +313,6 @@ class CourseService {
         ENDPOINTS.COURSES,
         queryParams
       );
-
-      console.log('API Response:', response);
 
       // Safety check: ensure response exists
       if (!response) {
@@ -337,7 +351,6 @@ class CourseService {
     try {
       // REMOVE LATER - Temporary override for testing
       userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
-      console.log('getUserEnrollments - Starting fetch for user ID:', userId);
       
       // For testing, skip cache and always fetch fresh data
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`;
@@ -346,17 +359,18 @@ class CourseService {
       // Check cache first
       const cachedEnrollments = await CacheManager.get<Course[]>(cacheKey);
       if (cachedEnrollments) {
-        console.log('getUserEnrollments - Returning cached user enrollments:', cachedEnrollments.length);
         return cachedEnrollments;
       }
       
       
-      const response = await apiService.get<EnrollmentResponse>(
-        `${ENDPOINTS.USER_ENROLLMENTS}/${userId}`
-      );
+      const response = await apiService.get<any>(ENDPOINTS.USER_ENROLLMENTS(userId));
+      const payload = unwrap<EnrollmentResponse | { enrollments: EnrollmentCourse[] }>(response);
 
-      // Extract enrollments from response
-      const enrollmentsData = response.data?.enrollments || [];
+      // Support both shapes: { data: { enrollments: [...] } } OR { enrollments: [...] }
+      const enrollmentsData =
+        (payload as EnrollmentResponse)?.data?.enrollments ??
+        (payload as any)?.enrollments ??
+        [];
       
       if (!Array.isArray(enrollmentsData)) {
         console.error('getUserEnrollments - Invalid enrollment response structure:', response);
@@ -480,7 +494,6 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    * Get detailed information for a specific course
    */
   async getCourseById(courseId: string): Promise<Course | null> {
-    console.log('Fetching course by ID:', courseId);
     try {
       const allCourses = await this.getCourses();
       return allCourses.find(course => course.id === courseId) || null;
@@ -563,6 +576,62 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
       suggestedCourses: suggestedCourses !== null,
     };
   }
+
+  /**
+   * Check if a given user is enrolled in a given course.
+   * Uses your existing GET /courses/enrollment/:userId and searches client-side.
+   * Caches via getUserEnrollments() cache key.
+   */
+  async isUserEnrolledInCourse(userId: string, courseId: string): Promise<boolean> {
+    // if (!userId || !courseId) throw new Error('Missing userId/courseId');
+    userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
+
+    // Reuse the enrollments fetch (it already maps to Course[])
+    const enrolledCourses = await this.getUserEnrollments(userId);
+    return enrolledCourses.some(c => String(c.id) === String(courseId));
+  }
+
+  /**
+   * Enroll user in course (free courses).
+   * POST /courses/enrollment  with { userId, courseId }
+   * Expects idempotent server (409 if already enrolled).
+   */
+  async enrollInCourse(userId: string, courseId: string): Promise<{ firstModuleId?: string }> {
+    // if (!userId || !courseId) throw new Error('Missing userId/courseId');
+    userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
+
+    const url = ENDPOINTS.USER_ENROLLMENTS(userId);
+    const resp = await apiService.post<any>(url, {
+      courseId,
+      initialProgress: 0,
+      isCompleted: false,
+      totalWatchTimeMinutes: 0,
+    });
+
+    await Promise.all([
+      CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`),
+      CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
+    ]);
+
+    // Normalize API value to undefined (no nulls)
+    const apiFirst: string | undefined =
+      (resp?.data?.firstModuleId ?? resp?.firstModuleId) || undefined;
+
+    if (apiFirst) return { firstModuleId: apiFirst };
+
+    try {
+      const detail =
+        await (await import('./courseDetailService'))
+          .courseDetailService.getCourseDetail(courseId);
+
+      const derived: string | undefined = detail?.modules?.[0]?.id || undefined;
+      return derived ? { firstModuleId: derived } : {};
+    } catch {
+      return {}; // no nulls; caller handles absence
+    }
+  }
+
+
 }
 
 // Export singleton instance

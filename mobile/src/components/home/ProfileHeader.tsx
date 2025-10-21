@@ -8,6 +8,9 @@ import {
 } from 'react-native';
 import { Colors, Spacing, Typography } from '../../constants';
 import type { User } from '../../types';
+import { getAvatarUri } from '@/utils/avatar';
+import { Images } from '../../../assets';
+import { ImageWithFallback } from '../common';
 
 // User interface matching the API structure
 
@@ -22,6 +25,9 @@ const CombinedHeader: React.FC<CombinedHeaderProps> = ({
   hasNotifications = false,
   onNotificationPress,
 }) => {
+  const uri = getAvatarUri(user as any);
+  const avatarSrc = uri ? { uri } : Images.profile;
+
   return (
     <View style={styles.container}>
       {/* Top Header with Points and Notification */}
@@ -43,10 +49,7 @@ const CombinedHeader: React.FC<CombinedHeaderProps> = ({
       {/* Welcome Section with Avatar */}
       <View style={styles.welcomeSection}>
         <View style={styles.avatarContainer}>
-          <Image 
-            source={{ uri: user.avatar || 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' }} 
-            style={styles.avatar} 
-          />
+          <ImageWithFallback source={avatarSrc} fallback={Images.profile} style={styles.avatar} />
         </View>
         
         <View style={styles.welcomeTextContainer}>

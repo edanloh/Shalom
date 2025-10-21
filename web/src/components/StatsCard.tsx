@@ -93,7 +93,7 @@ export const StatsCard = ({ title, value, icon: Icon, trend, variant = "default"
           {trend && (
             <p 
               className="text-xs"
-              style={{ color: Colors.textMuted }}
+              style={{ color: Colors.gray200 }}
             >
               {trend}
             </p>

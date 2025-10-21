@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,22 +8,43 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, FileText, CheckCircle, Clock, Filter } from "lucide-react";
+import { Plus, Search, FileText, CheckCircle, Clock, Filter, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Pagination } from "@/components/Pagination";
 
 const Assessments = () => {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [courseSearchQuery, setCourseSearchQuery] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [selectedModule, setSelectedModule] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(9);
   const { toast } = useToast();
 
-  const courses = [
-    { id: "1", name: "Data Science Fundamentals" },
-    { id: "2", name: "Machine Learning A-Z" },
-    { id: "3", name: "Python for Beginners" },
-  ];
+  // Generate more courses for demonstration
+  const allCourses = useMemo(() => {
+    const baseCourses = [
+      { id: "1", name: "Data Science Fundamentals" },
+      { id: "2", name: "Machine Learning A-Z" },
+      { id: "3", name: "Python for Beginners" },
+      { id: "4", name: "Advanced Analytics" },
+      { id: "5", name: "Deep Learning Specialization" },
+      { id: "6", name: "Natural Language Processing" },
+      { id: "7", name: "Computer Vision Basics" },
+      { id: "8", name: "Web Development Bootcamp" },
+      { id: "9", name: "React & Redux Masterclass" },
+      { id: "10", name: "Node.js Backend Development" },
+    ];
+    return baseCourses;
+  }, []);
+
+  const filteredCoursesForSelection = useMemo(() => {
+    return allCourses.filter(course =>
+      course.name.toLowerCase().includes(courseSearchQuery.toLowerCase())
+    );
+  }, [allCourses, courseSearchQuery]);
+
+  const courses = allCourses;
 
   const modules = selectedCourse ? [
     { id: "1", name: "Module 1: Introduction", courseId: selectedCourse },
@@ -56,14 +77,6 @@ const Assessments = () => {
     return matchesCourse && matchesModule;
   });
 
-  const handleCreateQuiz = () => {
-    toast({
-      title: "Quiz Created",
-      description: "Your new quiz has been created successfully"
-    });
-    setIsCreateDialogOpen(false);
-  };
-
   const handleGradeSubmission = (id: number, score: number) => {
     toast({
       title: "Graded",
@@ -82,98 +95,103 @@ const Assessments = () => {
             <p className="text-muted-foreground">Create quizzes and grade submissions by course and module</p>
           </div>
           
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create Quiz
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Quiz</DialogTitle>
-                <DialogDescription>Design a new assessment for your students</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="quiz-title">Quiz Title</Label>
-                  <Input id="quiz-title" placeholder="e.g., Mid-term Exam" />
-                </div>
-                <div>
-                  <Label htmlFor="quiz-course">Course</Label>
-                  <Input id="quiz-course" placeholder="Select course..." />
-                </div>
-                <div>
-                  <Label htmlFor="quiz-questions">Number of Questions</Label>
-                  <Input id="quiz-questions" type="number" placeholder="15" />
-                </div>
-                <div>
-                  <Label htmlFor="quiz-instructions">Instructions</Label>
-                  <Textarea id="quiz-instructions" placeholder="Enter quiz instructions..." />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateQuiz}>Create Quiz</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
 
-        {/* Filter Section */}
-        <Card className="p-6 gradient-card border-border mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold">Filter by Course & Module</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Filter Section - Smart Course Selection */}
+        <Card className="p-6 gradient-card border-border">
+          <div className="space-y-4">
+            {/* Course Filter with Search */}
             <div>
-              <Label>Select Course *</Label>
-              <Select value={selectedCourse} onValueChange={(value) => {
-                setSelectedCourse(value);
-                setSelectedModule(""); // Reset module when course changes
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a course..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {courses.map(course => (
-                    <SelectItem key={course.id} value={course.id}>{course.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-5 w-5 text-primary" />
+                  <Label className="font-semibold">Select Course</Label>
+                </div>
+                {selectedCourse && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCourse("");
+                      setSelectedModule("");
+                      setCourseSearchQuery("");
+                    }}
+                    className="gap-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                    Clear Selection
+                  </Button>
+                )}
+              </div>
+
+              {!selectedCourse ? (
+                <>
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search courses by name..."
+                      className="pl-10"
+                      value={courseSearchQuery}
+                      onChange={(e) => setCourseSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[240px] overflow-y-auto pr-2">
+                    {filteredCoursesForSelection.map(course => (
+                      <Button
+                        key={course.id}
+                        variant="outline"
+                        className="justify-start h-auto py-3 px-4 hover:border-primary hover:bg-primary/5"
+                        onClick={() => {
+                          setSelectedCourse(course.id);
+                          setCourseSearchQuery("");
+                        }}
+                      >
+                        <div className="text-left">
+                          <p className="font-medium text-sm">{course.name}</p>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                  {filteredCoursesForSelection.length === 0 && (
+                    <div className="text-center py-6 text-muted-foreground">
+                      No courses found matching "{courseSearchQuery}"
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Selected Course</p>
+                      <p className="font-semibold text-lg">
+                        {courses.find(c => c.id === selectedCourse)?.name}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <Label>Select Module (Optional)</Label>
-              <Select 
-                value={selectedModule} 
-                onValueChange={setSelectedModule}
-                disabled={!selectedCourse}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={selectedCourse ? "Select a module..." : "Select course first"} />
-                </SelectTrigger>
-                <SelectContent>
+
+            {/* Module Filter - Only shown when course is selected */}
+            {selectedCourse && modules.length > 0 && (
+              <div className="pt-4 border-t border-border">
+                <Label className="font-semibold mb-3 block">Select Module (Optional)</Label>
+                <div className="flex flex-wrap gap-2">
                   {modules.map(module => (
-                    <SelectItem key={module.id} value={module.id}>{module.name}</SelectItem>
+                    <Button
+                      key={module.id}
+                      variant={selectedModule === module.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedModule(module.id === selectedModule ? "" : module.id)}
+                      className="rounded-full"
+                    >
+                      {module.name}
+                    </Button>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
+                </div>
+              </div>
+            )}
           </div>
-          {selectedCourse && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-4"
-              onClick={() => {
-                setSelectedCourse("");
-                setSelectedModule("");
-              }}
-            >
-              Clear Filters
-            </Button>
-          )}
         </Card>
 
         <Tabs defaultValue="quizzes" className="space-y-6">
@@ -203,39 +221,50 @@ const Assessments = () => {
                   </div>
                 </Card>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredQuizzes.length === 0 ? (
-                    <div className="col-span-full text-center py-12">
-                      <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-muted-foreground">No quizzes found for selected filters</p>
-                    </div>
-                  ) : (
-                    filteredQuizzes.map((quiz) => (
-                <Card key={quiz.id} className="p-6 gradient-card border-border hover-lift">
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between">
-                      <FileText className="h-8 w-8 text-primary" />
-                      <Badge variant={quiz.status === "published" ? "default" : "secondary"}>
-                        {quiz.status}
-                      </Badge>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg text-foreground mb-1">{quiz.title}</h3>
-                      <p className="text-sm text-muted-foreground">{quiz.course}</p>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{quiz.questions} questions</span>
-                      <span className="text-muted-foreground">{quiz.type}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="flex-1">Edit</Button>
-                      <Button size="sm" className="flex-1">View Results</Button>
-                    </div>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredQuizzes.length === 0 ? (
+                      <div className="col-span-full text-center py-12">
+                        <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-muted-foreground">No quizzes found for selected filters</p>
                       </div>
-                    </Card>
-                  ))
+                    ) : (
+                      filteredQuizzes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((quiz) => (
+                        <Card key={quiz.id} className="p-6 gradient-card border-border hover-lift">
+                          <div className="space-y-4">
+                            <div className="flex items-start justify-between">
+                              <FileText className="h-8 w-8 text-primary" />
+                              <Badge variant={quiz.status === "published" ? "default" : "secondary"}>
+                                {quiz.status}
+                              </Badge>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg text-foreground mb-1">{quiz.title}</h3>
+                              <p className="text-sm text-muted-foreground">{quiz.course}</p>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">{quiz.questions} questions</span>
+                              <span className="text-muted-foreground">{quiz.type}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" className="flex-1">Edit</Button>
+                              <Button size="sm" className="flex-1">View Results</Button>
+                            </div>
+                          </div>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                  {filteredQuizzes.length > 0 && (
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={Math.ceil(filteredQuizzes.length / itemsPerPage)}
+                      onPageChange={setCurrentPage}
+                      itemsPerPage={itemsPerPage}
+                      totalItems={filteredQuizzes.length}
+                    />
                   )}
-                </div>
+                </>
               </>
             )}
           </TabsContent>
