@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star } from "lucide-react";
+import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
+import { disableStudent } from "@/lib/disableStudent";
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -425,6 +426,10 @@ const Students = () => {
                             <Button className="w-full gap-2">
                               <Mail className="h-4 w-4" />
                               Send Message
+                            </Button>
+                            <Button className="w-full gap-2" variant="destructive" onClick={() => disableStudent({studentId: "phuazaiqin@gmail.com", status: false})}>
+                              <UserX className="h-4 w-4" />
+                              Disable User
                             </Button>
                           </div>
                         )}
