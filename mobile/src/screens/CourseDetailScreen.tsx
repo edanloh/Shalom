@@ -134,21 +134,31 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const renderModule = (module: CourseModule, index: number) => {
-    // Find the corresponding section from courseContent to get completion status
     const section = courseContent?.sections.find(s => s.id === module.id);
     const isCompleted = section?.module_is_completed || false;
     const completedAt = section?.module_completed_at;
-    
+
+    const onOpen = () => {
+      if (!isEnrolled) {
+        Alert.alert(
+          'Enrollment required',
+          'Please enroll to access lessons and quizzes.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Enroll now', onPress: handleEnroll },
+          ],
+        );
+        return;
+      }
+      navigation.navigate('ModuleDetail', {
+        courseId: route.params.courseId,
+        sectionId: module.id,
+        userId: userId ?? '',
+      });
+    };
+
     return (
-      <Pressable 
-        key={module.id} 
-        style={styles.moduleItem}
-        onPress={() => navigation.navigate('ModuleDetail', {
-          courseId: route.params.courseId,
-          sectionId: module.id,
-          userId: '550e8400-e29b-41d4-a716-446655440101' // TODO: Replace with actual user ID from auth context
-        })}
-      >
+      <Pressable key={module.id} style={styles.moduleItem} onPress={onOpen}>
         <View style={styles.moduleIcon}>
           <Ionicons name="book-outline" size={20} color={Colors.purple400} />
         </View>
@@ -162,7 +172,7 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             )}
           </View>
-          {module.description && (
+          {!!module.description && (
             <Text style={styles.moduleDescription}>{module.description}</Text>
           )}
           {isCompleted && completedAt && (

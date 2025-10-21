@@ -8,13 +8,15 @@ import {
   StyleSheet,
   Dimensions,
 } from "react-native";
+import { Alert } from "react-native";
+import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { MainStackParamList } from "@/types/navigation";
-import { moduleService } from "@/services";
+import { moduleService, courseService } from "@/services";
 import type {
   ModuleItem,
   CourseSection,
@@ -33,6 +35,7 @@ const ModuleDetailScreen = () => {
   const route = useRoute();
   const navigation = useNavigation<ModuleDetailNavigationProp>();
   const { courseId, sectionId, userId } = route.params as any;
+  const [isEnrolled, setIsEnrolled] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [courseContent, setCourseContent] = useState<CourseContent | null>(
@@ -41,6 +44,23 @@ const ModuleDetailScreen = () => {
   const [currentSection, setCurrentSection] = useState<CourseSection | null>(
     null
   );
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!userId) { 
+        if (mounted) setIsEnrolled(false);
+        return; 
+      }
+      try {
+        const enrolled = await courseService.isUserEnrolledInCourse(userId, courseId);
+        if (mounted) setIsEnrolled(enrolled);
+      } catch {
+        if (mounted) setIsEnrolled(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [courseId, userId]);
 
   useEffect(() => {
     fetchCourseContent();
@@ -77,7 +97,24 @@ const ModuleDetailScreen = () => {
     );
   };
 
-  const handleItemPress = (item: ModuleItem) => {
+  const requireEnrollment = async (): Promise<boolean> => {
+    if (isEnrolled) return true;
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      "Enrollment required",
+      "Please enroll to access lessons and quizzes.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Go to course", onPress: () => navigation.navigate("CourseDetail", { courseId }) },
+      ]
+    );
+    return false;
+  };
+
+  const handleItemPress = async (item: ModuleItem) => {
+    if (!(await requireEnrollment())) return;
+
     if (item.type === "video") {
       navigation.navigate("LessonPlayer", {
         videoId: item.id,
