@@ -138,13 +138,20 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     const section = courseContent?.sections.find(s => s.id === module.id);
     const isCompleted = section?.module_is_completed || false;
     const completedAt = section?.module_completed_at;
-
+    
     return (
-      <View key={module.id} style={styles.moduleItem /* same style */}>
+      <Pressable 
+        key={module.id} 
+        style={styles.moduleItem}
+        onPress={() => navigation.navigate('ModuleDetail', {
+          courseId: route.params.courseId,
+          sectionId: module.id,
+          userId: '550e8400-e29b-41d4-a716-446655440101' // TODO: Replace with actual user ID from auth context
+        })}
+      >
         <View style={styles.moduleIcon}>
           <Ionicons name="book-outline" size={20} color={Colors.purple400} />
         </View>
-
         <View style={styles.moduleContent}>
           <View style={styles.moduleTitleRow}>
             <Text style={styles.moduleTitle}>{module.title}</Text>
@@ -155,23 +162,19 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             )}
           </View>
-
           {module.description && (
             <Text style={styles.moduleDescription}>{module.description}</Text>
           )}
-
           {isCompleted && completedAt && (
             <Text style={styles.completedDate}>
               Completed on {new Date(completedAt).toLocaleDateString()}
             </Text>
           )}
         </View>
-
-        {/* Right-side: show a lock to indicate preview-only */}
         <View style={styles.moduleRightSection}>
-          <Ionicons name="lock-closed" size={18} color={Colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -198,7 +201,7 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   const handleEnroll = async () => {
-    if (isEnrolling) return; // debounce
+    if (isEnrolling) return;
     if (!userId) {
       Alert.alert('Sign in required', 'Please sign in to enroll.');
       return;
@@ -208,24 +211,20 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
     try {
       setIsEnrolling(true);
-
-      // If already enrolled, jump straight in
-      if (isEnrolled) {
-        navigation.replace('CourseOutline', { courseId });
-        return;
-      }
-
       const { firstModuleId } = await courseService.enrollInCourse(userId, courseId);
-      navigation.replace(
-        'CourseOutline',
-        firstModuleId ? { courseId, startAt: firstModuleId } : { courseId }
-      );
+
+      // If you want to immediately take them somewhere after enroll, keep this:
+      // navigation.replace(
+      //   'CourseOutline',
+      //   firstModuleId ? { courseId, startAt: firstModuleId } : { courseId }
+      // );
+      // Otherwise, do nothing and let the screen re-render as enrolled.
     } catch (e: any) {
-        const status = e?.statusCode ?? e?.response?.status;
-        console.log('[Enroll] error', { status, code: e?.code, msg: e?.message, details: e?.details });
-        Alert.alert(`Enrollment failed ${status ? `(${status})` : ''}`, e?.details?.message || e?.message || 'Try again.');
+      const status = e?.statusCode ?? e?.response?.status;
+      console.log('[Enroll] error', { status, code: e?.code, msg: e?.message, details: e?.details });
+      Alert.alert(`Enrollment failed ${status ? `(${status})` : ''}`, e?.details?.message || e?.message || 'Try again.');
     } finally {
-        setIsEnrolling(false);
+      setIsEnrolling(false);
     }
   };
 
@@ -367,21 +366,21 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
 
           {/* Enroll Button */}
-          <View style={styles.enrollSection}>
-            <Pressable
-              style={[styles.enrollButton, isEnrolling && { opacity: 0.6 }]}
-              onPress={handleEnroll}
-              disabled={isEnrolling}
-            >
-              {isEnrolling ? (
-                <ActivityIndicator color={Colors.white} />
-              ) : (
-                <Text style={styles.enrollButtonText}>
-                  {isEnrolled ? 'Go to Course' : 'Enroll Now'}
-                </Text>
-              )}
-            </Pressable>
-          </View>
+          {!isEnrolled && (
+            <View style={styles.enrollSection}>
+              <Pressable
+                style={[styles.enrollButton, isEnrolling && { opacity: 0.6 }]}
+                onPress={handleEnroll}
+                disabled={isEnrolling}
+              >
+                {isEnrolling ? (
+                  <ActivityIndicator color={Colors.white} />
+                ) : (
+                  <Text style={styles.enrollButtonText}>Enroll Now</Text>
+                )}
+              </Pressable>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
