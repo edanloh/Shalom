@@ -3,6 +3,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Login from "./pages/Login";
 import Index from "./pages/Index";
 import Courses from "./pages/Courses";
 import Analytics from "./pages/Analytics";
@@ -22,32 +25,51 @@ import CoursePreview from "./pages/CoursePreview";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/courses" element={<Courses />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/students" element={<Students />} />
-          <Route path="/assessments" element={<Assessments />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/course-builder/:courseId" element={<CourseBuilder />} />
-          <Route path="/course/:courseId" element={<CourseDetail />} />
-          <Route path="/course/:courseId/preview" element={<CoursePreview />} />
-          <Route path="/course/:courseId/module/:moduleId/lesson/:lessonId" element={<LessonDetail />} />
-          <Route path="/course/:courseId/module/:moduleId/quiz/:quizId" element={<QuizTaking />} />
-          <Route path="/badges" element={<BadgeManagement />} />
-          <Route path="/notifications" element={<Notifications />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            {/* Public route */}
+            <Route path="/login" element={<Login />} />
+
+            {/* Protected routes - all nested under ProtectedRoute */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/courses" element={<Courses />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/students" element={<Students />} />
+              <Route path="/assessments" element={<Assessments />} />
+              <Route path="/messages" element={<Messages />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route
+                path="/course-builder/:courseId"
+                element={<CourseBuilder />}
+              />
+              <Route path="/course/:courseId" element={<CourseDetail />} />
+              <Route
+                path="/course/:courseId/preview"
+                element={<CoursePreview />}
+              />
+              <Route
+                path="/course/:courseId/module/:moduleId/lesson/:lessonId"
+                element={<LessonDetail />}
+              />
+              <Route
+                path="/course/:courseId/module/:moduleId/quiz/:quizId"
+                element={<QuizTaking />}
+              />
+              <Route path="/badges" element={<BadgeManagement />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </AuthProvider>
 );
 
 export default App;
