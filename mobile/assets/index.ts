@@ -1,7 +1,7 @@
 // Asset imports for local images
 export const Images = {
   // Profile images
-  placeholder: require('./placeholder.png'),
+  placeholder: require('./placeholder_icon.png'),
   heroImage: require('./hero-image.jpg'),
   icon: require('./icon.png'),
   splash: require('./splash.png'),
@@ -21,11 +21,11 @@ export const Images = {
   quizFail: require('./quiz_fail.png'),
   quizRetry: require('./quiz_retry.png'),
   quizReview: require('./quiz_review.png'),
-  quizComplete: require('./quiz_complete.png'),
+  quizComplete: require('./quiz_complete_icon.png'),
 
   // Default avatars/placeholders
-  defaultAvatar: require('./placeholder.png'),
-  coursePlaceholder: require('./placeholder.png'),
+  defaultAvatar: require('./placeholder_icon.png'),
+  coursePlaceholder: require('./placeholder_icon.png'),
 
   // Star icon (frequently used)
   star: require('./icon.png'), // Using icon as star placeholder

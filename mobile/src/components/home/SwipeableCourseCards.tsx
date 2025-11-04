@@ -179,6 +179,12 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
               style={styles.previewImage}
               
             />
+            {/* Category Badge - Top Left */}
+            <View style={styles.catBadgePreview}>
+              <Text style={styles.catText}>
+                {previousCourse.category}
+              </Text>
+            </View>
           </View>
           <View style={styles.previewCardContent}>
             <Text style={styles.courseTitle} numberOfLines={2}>
@@ -210,16 +216,9 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
                
               />
               <View style={styles.instructorDetails}>
-                <View style={styles.instructorRow}>
-                  <Text style={styles.instructorName}>
-                    {previousCourse.instructor.name}
-                  </Text>
-                  <View style={styles.catBadge}>
-                    <Text style={styles.catText}>
-                      {previousCourse.category}
-                    </Text>
-                  </View>
-                </View>
+                <Text style={styles.instructorName}>
+                  {previousCourse.instructor.name}
+                </Text>
               </View>
             </View>
           </View>
@@ -239,6 +238,14 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
                  
                 />
 
+                {/* Category Badge - Top Left */}
+                <View style={styles.catBadge}>
+                  <Text style={styles.catText}>
+                    {currentCourse.category}
+                  </Text>
+                </View>
+
+                {/* Wishlist Heart - Top Right */}
                 <Pressable
                   onPress={(e) => {
                     e.stopPropagation();
@@ -297,18 +304,9 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
                  
                 />
                 <View style={styles.instructorDetails}>
-                  <View style={styles.instructorRow}>
-                    <Text style={styles.instructorName}>
-                      {currentCourse.instructor.name}
-                    </Text>
-
-                    {/* Category Badge */}
-                    <View style={styles.catBadge}>
-                      <Text style={styles.catText}>
-                        {currentCourse.category}
-                      </Text>
-                    </View>
-                  </View>
+                  <Text style={styles.instructorName}>
+                    {currentCourse.instructor.name}
+                  </Text>
                 </View>
               </View>
 
@@ -347,6 +345,12 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
               style={styles.previewImage}
              
             />
+            {/* Category Badge - Top Left */}
+            <View style={styles.catBadgePreview}>
+              <Text style={styles.catText}>
+                {nextCourse.category}
+              </Text>
+            </View>
           </View>
           <View style={styles.previewCardContent}>
             <Text style={styles.courseTitle} numberOfLines={2}>
@@ -378,14 +382,9 @@ const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
                
               />
               <View style={styles.instructorDetails}>
-                <View style={styles.instructorRow}>
-                  <Text style={styles.instructorName}>
-                    {nextCourse.instructor.name}
-                  </Text>
-                  <View style={styles.catBadge}>
-                    <Text style={styles.catText}>{nextCourse.category}</Text>
-                  </View>
-                </View>
+                <Text style={styles.instructorName}>
+                  {nextCourse.instructor.name}
+                </Text>
               </View>
             </View>
           </View>
@@ -540,7 +539,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   progressLabel: {
-    fontFamily: Typography.fontFamily.regular,
+    fontFamily: Typography.fontFamily.medium,
     fontSize: TextStyles.caption.fontSize,
     color: Colors.textSecondary,
     marginBottom: 8,
@@ -584,15 +583,28 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   catBadge: {
-    backgroundColor: Colors.gray200,
+    position: 'absolute',
+    top: 12,
+    left: 14,
+    zIndex: 10,
+    backgroundColor: Colors.purple400,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: "flex-start",
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  catBadgePreview: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    zIndex: 10,
+    backgroundColor: Colors.purple400,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 5,
   },
   catText: {
     fontFamily: Typography.fontFamily.medium,
-    fontSize: TextStyles.caption.fontSize,
+    fontSize: Typography.fontSize.sm,
     color: Colors.white,
   },
   statsSection: {

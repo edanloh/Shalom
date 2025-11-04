@@ -505,13 +505,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: Spacing.xl,
+    // marginTop: Spacing.xl,
     marginBottom: Spacing.md,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
   },
   modulesList: {
     marginBottom: Spacing.xl,
@@ -521,7 +522,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.sm,
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     borderRadius: 12,
     marginBottom: Spacing.sm,
   },
@@ -579,7 +580,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   progressCard: {
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     padding: Spacing.lg,
     borderRadius: 12,
     marginBottom: Spacing.xl,
@@ -591,7 +592,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   progressLabel: {
-    fontSize: TextStyles.h3.fontSize,
+    fontSize: TextStyles.h4.fontSize,
     fontWeight: '600',
     color: Colors.textPrimary,
   },
@@ -626,7 +627,7 @@ const styles = StyleSheet.create({
   instructorSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     padding: Spacing.lg,
     borderRadius: 12,
     marginBottom: Spacing.xl,
@@ -641,18 +642,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   instructorName: {
-    fontSize: TextStyles.h3.fontSize,
+    fontSize: TextStyles.h4.fontSize,
     fontWeight: '600',
     color: Colors.textPrimary,
   },
   instructorRole: {
     fontSize: TextStyles.body.fontSize,
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginTop: 3,
   },
   ratingSummary: {
     flexDirection: 'row',
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     padding: Spacing.lg,
     borderRadius: 12,
     marginBottom: Spacing.lg,
@@ -711,7 +712,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   reviewItem: {
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     padding: Spacing.lg,
     borderRadius: 12,
     marginBottom: Spacing.md,
@@ -749,7 +750,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   noModulesContainer: {
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     padding: Spacing.xl,
     borderRadius: 12,
     alignItems: 'center',

@@ -89,19 +89,30 @@ export const useDragAndDrop = () => {
   };
 
   // Update lesson and quiz numbering within modules
+  // Format: "Lesson X.Y: [User Title]" where X.Y is system-generated based on position
   const updateContentNumbering = (modulesList: Module[]) => {
     return modulesList.map((module, moduleIndex) => ({
       ...module,
-      lessons: module.lessons.map((lesson, lessonIndex) => ({
-        ...lesson,
-        baseTitle: lesson.baseTitle || lesson.title.replace(/^Lesson \d+\.\d+:\s*/, ''),
-        title: `Lesson ${moduleIndex + 1}.${lessonIndex + 1}: ${lesson.baseTitle || lesson.title.replace(/^Lesson \d+\.\d+:\s*/, '')}`,
-      })),
-      quizzes: module.quizzes.map((quiz, quizIndex) => ({
-        ...quiz,
-        baseTitle: quiz.baseTitle || quiz.title.replace(/^Quiz \d+\.\d+:\s*/, ''),
-        title: `Quiz ${moduleIndex + 1}.${quizIndex + 1}: ${quiz.baseTitle || quiz.title.replace(/^Quiz \d+\.\d+:\s*/, '')}`,
-      })),
+      lessons: module.lessons.map((lesson, lessonIndex) => {
+        // Extract base title if not already set
+        const baseTitle = lesson.baseTitle || lesson.title.replace(/^Lesson \d+\.\d+:\s*/, '');
+        
+        return {
+          ...lesson,
+          baseTitle: baseTitle, // Store user's custom title
+          title: `Lesson ${moduleIndex + 1}.${lessonIndex + 1}: ${baseTitle}`, // System-generated prefix + user title
+        };
+      }),
+      quizzes: module.quizzes.map((quiz, quizIndex) => {
+        // Extract base title if not already set
+        const baseTitle = quiz.baseTitle || quiz.title.replace(/^Quiz \d+\.\d+:\s*/, '');
+        
+        return {
+          ...quiz,
+          baseTitle: baseTitle, // Store user's custom title
+          title: `Quiz ${moduleIndex + 1}.${quizIndex + 1}: ${baseTitle}`, // System-generated prefix + user title
+        };
+      }),
     }));
   };
 

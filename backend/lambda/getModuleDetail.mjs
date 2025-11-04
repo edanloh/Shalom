@@ -112,9 +112,9 @@ export const handler = async (event) => {
     const course = courseResult.rows[0];
 
     // ========================================
-    // 2. Fetch sections, videos, quizzes, requirements, outcomes in parallel
+    // 2. Fetch sections, lessons, quizzes (WITHOUT questions for students), requirements, outcomes in parallel
     // ========================================
-    const [sections, videos, quizzes, requirements, outcomes] = await Promise.all([
+    const [sections, lessons, quizzes, requirements, outcomes] = await Promise.all([
       client.query(
         `SELECT id, title, description, order_index, lessons_count, duration_minutes
          FROM course_sections 
@@ -123,10 +123,12 @@ export const handler = async (event) => {
         [courseId]
       ),
       client.query(
-        `SELECT id, section_id, title, description, video_url, duration_seconds, 
-                order_index, is_preview, thumbnail_url
+        `SELECT id, section_id, title, description, video_url, 
+                order_index, duration_seconds, is_preview, thumbnail_url
          FROM course_videos 
-         WHERE course_id = $1 
+         WHERE section_id IN (
+           SELECT id FROM course_sections WHERE course_id = $1
+         )
          ORDER BY section_id, order_index ASC`,
         [courseId]
       ),
@@ -261,22 +263,23 @@ export const handler = async (event) => {
     }
 
     // ========================================
-    // 4. Combine sections with their items (videos + quizzes)
+    // 4. Combine sections with their items (lessons + quizzes)
     // ========================================
     const sectionsWithContent = sections.rows.map((section) => {
-      // Get videos for this section and add type field
-      const sectionVideos = videos.rows
-        .filter((v) => v.section_id === section.id)
-        .map((v) => ({ 
-          ...v, 
-          type: "video",
+      // Get lessons (videos) for this section and add type field
+      const sectionLessons = lessons.rows
+        .filter((l) => l.section_id === section.id)
+        .map((l) => ({ 
+          ...l, 
+          type: "video", // Keep as "video" type for frontend compatibility
+          // duration_seconds already in correct format from course_videos table
           // Add completion status if user progress exists
           is_completed: userProgress?.videoProgress?.some(
-            vp => vp.video_id === v.id && vp.is_completed
+            vp => vp.video_id === l.id && vp.is_completed
           ) || false
         }));
 
-      // Get quizzes for this section and add type field
+      // Get quizzes for this section (WITHOUT questions for student view)
       const sectionQuizzes = quizzes.rows
         .filter((q) => q.section_id === section.id)
         .map((q) => ({ 
@@ -289,7 +292,7 @@ export const handler = async (event) => {
         }));
 
       // Combine and sort by order_index
-      const items = [...sectionVideos, ...sectionQuizzes]
+      const items = [...sectionLessons, ...sectionQuizzes]
         .sort((a, b) => a.order_index - b.order_index);
 
       // Get module completion status
@@ -316,7 +319,7 @@ export const handler = async (event) => {
       },
       sections: sectionsWithContent,
       totalSections: sections.rows.length,
-      totalVideos: videos.rows.length,
+      totalVideos: lessons.rows.length,
       totalQuizzes: quizzes.rows.length,
       userProgress,
       meta: {

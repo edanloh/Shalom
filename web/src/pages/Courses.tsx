@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { CourseCard } from "@/components/CourseCard";
 import { Button } from "@/components/ui/button";
@@ -10,195 +10,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Grid3x3, List, Filter } from "lucide-react";
+import { Plus, Search, Grid3x3, List, Filter, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Pagination } from "@/components/Pagination";
-import courseThumbnail1 from "@/assets/course-thumbnail-1.jpg";
-import courseThumbnail2 from "@/assets/course-thumbnail-2.jpg";
-import courseThumbnail3 from "@/assets/course-thumbnail-3.jpg";
-import courseThumbnail4 from "@/assets/course-thumbnail-4.jpg";
+import { courseService, Course } from "@/services";
 
 const Courses = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newCourseTitle, setNewCourseTitle] = useState("");
-  const [newCourseCategory, setNewCourseCategory] = useState("");
-  const [newCourseDescription, setNewCourseDescription] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(8);
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const [courses, setCourses] = useState([
-    {
-      id: "1",
-      title: "Data Science Fundamentals",
-      category: "Data Science",
-      thumbnail: courseThumbnail1,
-      enrolledCount: 245,
-      completionRate: 67,
-      rating: 4.8,
-      status: "published" as const,
-    },
-    {
-      id: "2",
-      title: "Machine Learning A-Z",
-      category: "AI & ML",
-      thumbnail: courseThumbnail2,
-      enrolledCount: 189,
-      completionRate: 54,
-      rating: 4.9,
-      status: "published" as const,
-    },
-    {
-      id: "3",
-      title: "Python for Beginners",
-      category: "Programming",
-      thumbnail: courseThumbnail3,
-      enrolledCount: 412,
-      completionRate: 78,
-      rating: 4.7,
-      status: "published" as const,
-    },
-    {
-      id: "4",
-      title: "Advanced Analytics",
-      category: "Analytics",
-      thumbnail: courseThumbnail4,
-      enrolledCount: 156,
-      completionRate: 45,
-      rating: 4.6,
-      status: "draft" as const,
-    },
-    {
-      id: "5",
-      title: "Data Science Fundamentals",
-      category: "Data Science",
-      thumbnail: courseThumbnail1,
-      enrolledCount: 245,
-      completionRate: 67,
-      rating: 4.8,
-      status: "published" as const,
-    },
-    {
-      id: "6",
-      title: "Machine Learning A-Z",
-      category: "AI & ML",
-      thumbnail: courseThumbnail2,
-      enrolledCount: 189,
-      completionRate: 54,
-      rating: 4.9,
-      status: "published" as const,
-    },
-    {
-      id: "7",
-      title: "Python for Beginners",
-      category: "Programming",
-      thumbnail: courseThumbnail3,
-      enrolledCount: 412,
-      completionRate: 78,
-      rating: 4.7,
-      status: "published" as const,
-    },
-    {
-      id: "8",
-      title: "Advanced Analytics",
-      category: "Analytics",
-      thumbnail: courseThumbnail4,
-      enrolledCount: 156,
-      completionRate: 45,
-      rating: 4.6,
-      status: "draft" as const,
-    },
-    {
-      id: "9",
-      title: "Data Science Fundamentals",
-      category: "Data Science",
-      thumbnail: courseThumbnail1,
-      enrolledCount: 245,
-      completionRate: 67,
-      rating: 4.8,
-      status: "published" as const,
-    },
-    {
-      id: "10",
-      title: "Machine Learning A-Z",
-      category: "AI & ML",
-      thumbnail: courseThumbnail2,
-      enrolledCount: 189,
-      completionRate: 54,
-      rating: 4.9,
-      status: "published" as const,
-    },
-    {
-      id: "11",
-      title: "Python for Beginners",
-      category: "Programming",
-      thumbnail: courseThumbnail3,
-      enrolledCount: 412,
-      completionRate: 78,
-      rating: 4.7,
-      status: "published" as const,
-    },
-    {
-      id: "12",
-      title: "Advanced Analytics",
-      category: "Analytics",
-      thumbnail: courseThumbnail4,
-      enrolledCount: 156,
-      completionRate: 45,
-      rating: 4.6,
-      status: "draft" as const,
-    },
-  ]);
+  // API state
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleCreateCourse = () => {
-    if (!newCourseTitle || !newCourseCategory) {
+  // Fetch courses from API
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  const fetchCourses = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await courseService.getCourses();
+      setCourses(data);
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch courses');
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Failed to load courses. Please try again.",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    setCourses([
-      ...courses,
-      {
-        id: Date.now().toString(),
-        title: newCourseTitle,
-        category: newCourseCategory,
-        thumbnail: courseThumbnail1,
-        enrolledCount: 0,
-        completionRate: 0,
-        rating: 0,
-        status: "draft" as const,
-      },
-    ]);
-
-    toast({
-      title: "Course Created",
-      description: `${newCourseTitle} has been created successfully`,
-    });
-
-    setIsCreateDialogOpen(false);
-    setNewCourseTitle("");
-    setNewCourseCategory("");
-    setNewCourseDescription("");
   };
 
   const filteredCourses = courses.filter((course) => {
@@ -230,63 +83,10 @@ const Courses = () => {
             </p>
           </div>
 
-          <Dialog
-            open={isCreateDialogOpen}
-            onOpenChange={setIsCreateDialogOpen}
-          >
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create Course
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Course</DialogTitle>
-                <DialogDescription>
-                  Add a new course to your curriculum
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="title">Course Title *</Label>
-                  <Input
-                    id="title"
-                    value={newCourseTitle}
-                    onChange={(e) => setNewCourseTitle(e.target.value)}
-                    placeholder="e.g., Introduction to React"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="category">Category *</Label>
-                  <Input
-                    id="category"
-                    value={newCourseCategory}
-                    onChange={(e) => setNewCourseCategory(e.target.value)}
-                    placeholder="e.g., Programming"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={newCourseDescription}
-                    onChange={(e) => setNewCourseDescription(e.target.value)}
-                    placeholder="Course description..."
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateCourse}>Create Course</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button className="gap-2" onClick={() => navigate('/course-builder/new')}>
+            <Plus className="h-4 w-4" />
+            Create Course
+          </Button>
         </div>
 
         <div className="gradient-card border-border rounded-xl p-6 space-y-4">
@@ -332,7 +132,16 @@ const Courses = () => {
           </div>
         </div>
 
-        {paginatedCourses.length > 0 ? (
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-destructive mb-4">{error}</p>
+            <Button onClick={fetchCourses}>Retry</Button>
+          </div>
+        ) : paginatedCourses.length > 0 ? (
           <>
             <div
               className={
@@ -341,8 +150,8 @@ const Courses = () => {
                   : "space-y-4"
               }
             >
-              {paginatedCourses.map((course, index) => (
-                <CourseCard key={index} {...course} />
+              {paginatedCourses.map((course) => (
+                <CourseCard key={course.id} {...course} />
               ))}
             </div>
 
@@ -362,6 +171,10 @@ const Courses = () => {
             <p className="text-muted-foreground">
               No courses found matching your criteria
             </p>
+            <Button className="mt-4" onClick={() => navigate('/course-builder/new')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your First Course
+            </Button>
           </div>
         )}
       </main>

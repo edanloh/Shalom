@@ -10,6 +10,7 @@ import {
   Archive,
 } from "lucide-react";
 import { useCourseBuilder } from "./CourseBuilderContext";
+import { Colors } from "../../constants/Colors";
 
 export const RightSidebar = () => {
   const {
@@ -20,8 +21,11 @@ export const RightSidebar = () => {
     modules,
     courseName,
     setCourseName,
+    courseDescription,
+    setCourseDescription,
     courseStatus,
     setCourseStatus,
+    setHasUnsavedChanges,
   } = useCourseBuilder();
 
   const handleMouseDown = () => {
@@ -71,56 +75,106 @@ export const RightSidebar = () => {
 
   return (
     <div
-      className="bg-slate-800 border-l border-slate-700 flex flex-col relative"
-      style={{ width: `${rightSidebarWidth}%` }}
+      style={{ 
+        backgroundColor: Colors.backgroundGray,
+        borderLeft: `1px solid ${Colors.gray800}`,
+        width: `${rightSidebarWidth}%`
+      }}
+      className="flex flex-col relative"
     >
       {/* Resize Handle */}
       <div
-        className="absolute top-0 left-0 w-1 h-full bg-slate-600 hover:bg-blue-500 cursor-col-resize transition-colors"
+        style={{ 
+          backgroundColor: Colors.gray500
+        }}
+        className="absolute top-0 left-0 w-1 h-full cursor-col-resize transition-colors hover:opacity-80"
         onMouseDown={handleMouseDown}
       />
       {/* Content */}
       <div className="flex-1 p-4 space-y-5 overflow-y-auto">
         {/* Header */}
-        <div className="p-2 border-b border-slate-700">
-          <h3 className="text-lg font-semibold text-white mb-2">Course Info</h3>
+        <div 
+          style={{ borderBottom: `1px solid ${Colors.gray800}` }}
+          className="p-2"
+        >
+          <h3 
+            style={{ color: Colors.textPrimary }}
+            className="text-lg font-semibold mb-2"
+          >
+            Course Info
+          </h3>
         </div>
         {/* Course Name */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">
+          <label 
+            style={{ color: Colors.textSecondary }}
+            className="block text-sm font-medium mb-2"
+          >
             Course Title
           </label>
           <input
             type="text"
             value={courseName}
-            onChange={(e) => setCourseName(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            onChange={(e) => {
+              setCourseName(e.target.value);
+              setHasUnsavedChanges(true);
+            }}
+            style={{ 
+              backgroundColor: Colors.textInputBg,
+              borderColor: Colors.gray600,
+              color: Colors.textPrimary
+            }}
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
             placeholder="Enter course title"
           />
         </div>
 
         {/* Course Description */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">
+          <label 
+            style={{ color: Colors.textSecondary }}
+            className="block text-sm font-medium mb-2"
+          >
             Course Description
           </label>
           <textarea
             rows={4}
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 resize-none"
+            value={courseDescription}
+            onChange={(e) => {
+              setCourseDescription(e.target.value);
+              setHasUnsavedChanges(true);
+            }}
+            style={{ 
+              backgroundColor: Colors.textInputBg,
+              borderColor: Colors.gray600,
+              color: Colors.textPrimary
+            }}
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-none"
             placeholder="Enter course description..."
           />
         </div>
 
         {/* Course Status */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">
+          <label 
+            style={{ color: Colors.textSecondary }}
+            className="block text-sm font-medium mb-2"
+          >
             Publication Status
           </label>
           <div className="space-y-3">
             <select
               value={courseStatus}
-              onChange={(e) => setCourseStatus(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
+              onChange={(e) => {
+                setCourseStatus(e.target.value);
+                setHasUnsavedChanges(true);
+              }}
+              style={{ 
+                backgroundColor: Colors.textInputBg,
+                borderColor: Colors.gray600,
+                color: Colors.textPrimary
+              }}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
             >
               <option value="draft">Draft</option>
               <option value="published">Published</option>
@@ -130,25 +184,25 @@ export const RightSidebar = () => {
             <div className="flex items-center gap-2 text-sm">
               {courseStatus === "draft" && (
                 <>
-                  <Clock className="h-4 w-4 text-yellow-400" />
-                  <span className="text-yellow-400">In Development</span>
+                  <Clock className="h-4 w-4" style={{ color: Colors.yellow }} />
+                  <span style={{ color: Colors.yellow }}>In Development</span>
                 </>
               )}
               {courseStatus === "published" && (
                 <>
-                  <Globe className="h-4 w-4 text-green-400" />
-                  <span className="text-green-400">Live & Available</span>
+                  <Globe className="h-4 w-4" style={{ color: Colors.green }} />
+                  <span style={{ color: Colors.green }}>Live & Available</span>
                 </>
               )}
               {courseStatus === "archived" && (
                 <>
-                  <Archive className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-400">Archived</span>
+                  <Archive className="h-4 w-4" style={{ color: Colors.gray500 }} />
+                  <span style={{ color: Colors.gray500 }}>Archived</span>
                 </>
               )}
             </div>
 
-            <p className="text-xs text-slate-400">
+            <p style={{ color: Colors.textMuted }} className="text-xs">
               {courseStatus === "draft" &&
                 "Course is in development and not visible to students"}
               {courseStatus === "published" &&
@@ -161,46 +215,61 @@ export const RightSidebar = () => {
 
         {/* Course Statistics */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-3">
+          <label 
+            style={{ color: Colors.textSecondary }}
+            className="block text-sm font-medium mb-3"
+          >
             Course Statistics
           </label>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-slate-700 rounded">
+            <div 
+              style={{ backgroundColor: Colors.textInputBg }}
+              className="flex items-center justify-between p-3 rounded"
+            >
               <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-blue-400" />
-                <span className="text-sm text-slate-300">Modules</span>
+                <BookOpen className="h-4 w-4" style={{ color: Colors.secondary }} />
+                <span style={{ color: Colors.textSecondary }} className="text-sm">Modules</span>
               </div>
-              <span className="text-lg font-semibold text-white">
+              <span style={{ color: Colors.textPrimary }} className="text-lg font-semibold">
                 {modules.length}
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-slate-700 rounded">
+            <div 
+              style={{ backgroundColor: Colors.textInputBg }}
+              className="flex items-center justify-between p-3 rounded"
+            >
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-green-400" />
-                <span className="text-sm text-slate-300">Lessons</span>
+                <Users className="h-4 w-4" style={{ color: Colors.green }} />
+                <span style={{ color: Colors.textSecondary }} className="text-sm">Lessons</span>
               </div>
-              <span className="text-lg font-semibold text-white">
+              <span style={{ color: Colors.textPrimary }} className="text-lg font-semibold">
                 {totalLessons}
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-slate-700 rounded">
+            <div 
+              style={{ backgroundColor: Colors.textInputBg }}
+              className="flex items-center justify-between p-3 rounded"
+            >
               <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-purple-400" />
-                <span className="text-sm text-slate-300">Quizzes</span>
+                <BarChart3 className="h-4 w-4" style={{ color: Colors.accent }} />
+                <span style={{ color: Colors.textSecondary }} className="text-sm">Quizzes</span>
               </div>
-              <span className="text-lg font-semibold text-white">
+              <span style={{ color: Colors.textPrimary }} className="text-lg font-semibold">
                 {totalQuizzes}
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-slate-700 rounded">
+            <div 
+              style={{ backgroundColor: Colors.textInputBg }}
+              className="flex items-center justify-between p-3 rounded"
+            >
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-orange-400" />
-                <span className="text-sm text-slate-300">Total Points</span>
+                <Clock className="h-4 w-4" style={{ color: Colors.yellow }} />
+                <span style={{ color: Colors.textSecondary }} className="text-sm">Total Points</span>
               </div>
-              <span className="text-lg font-semibold text-white">
+              <span style={{ color: Colors.textPrimary }} className="text-lg font-semibold">
                 {totalPoints}
               </span>
             </div>

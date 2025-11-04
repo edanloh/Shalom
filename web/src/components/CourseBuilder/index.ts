@@ -7,3 +7,5 @@ export { CourseBuilderLayout } from './CourseBuilderLayout';
 export { CoursePreview } from './CoursePreview';
 export { CenterContent } from './CenterContent';
 export { RightSidebar } from './RightSidebar';
+export { LoadingScreen } from './LoadingScreen';
+export { ConfirmationModal } from './ConfirmationModal';

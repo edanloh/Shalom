@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_COURSE_THUMBNAIL } from "@/constants/images";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -81,12 +82,16 @@ export const CourseCard = ({
       className="overflow-hidden hover-lift border-border group cursor-pointer"
       onClick={handleCardClick}
     >
-      <div className="relative h-48 overflow-hidden">
-        <img
-          src={thumbnail}
+              <div className="relative h-48 bg-muted overflow-hidden">
+          <img
+          src={thumbnail || DEFAULT_COURSE_THUMBNAIL}
           alt={title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-        />
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = DEFAULT_COURSE_THUMBNAIL;
+          }}
+          />
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
         <Badge className={`absolute top-4 left-4 ${statusColors[status]}`}>
           {status.toUpperCase()}

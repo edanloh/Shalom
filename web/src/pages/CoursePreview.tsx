@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ChevronLeft, Star, Clock, BookOpen, Users, Award, Play } from "lucide-react";
-import courseThumbnail1 from "@/assets/course-thumbnail-1.jpg";
+import { DEFAULT_COURSE_THUMBNAIL } from "@/constants/images";
 
 const CoursePreview = () => {
   const { courseId } = useParams();
@@ -14,7 +14,7 @@ const CoursePreview = () => {
     id: courseId,
     title: "Data Science Fundamentals",
     description: "Master the core concepts of data science including statistics, machine learning, data visualization, and real-world applications.",
-    thumbnail: courseThumbnail1,
+    thumbnail: DEFAULT_COURSE_THUMBNAIL,
     category: "Data Science",
     instructor: "Dr. Sarah Johnson",
     rating: 4.8,
@@ -61,9 +61,13 @@ const CoursePreview = () => {
         <div className="gradient-card border border-border rounded-xl overflow-hidden mb-6">
           <div className="relative">
             <img 
-              src={course.thumbnail} 
+              src={course.thumbnail || DEFAULT_COURSE_THUMBNAIL} 
               alt={course.title}
               className="w-full h-80 object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = DEFAULT_COURSE_THUMBNAIL;
+              }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-8">

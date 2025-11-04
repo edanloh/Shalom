@@ -154,9 +154,9 @@ export default function CoursesScreen({ navigation }: any) {
 
   const BadgeHeartRow = ({ item }: { item: Course }) => (
     <View style={styles.badgeRow}>
-      <View style={styles.levelBadge}>
+      {/* <View style={styles.levelBadge}>
         <Text style={styles.levelText}>{item.level}</Text>
-      </View>
+      </View> */}
       <TouchableOpacity
         onPress={(e) => {
           e.stopPropagation();
@@ -232,9 +232,9 @@ export default function CoursesScreen({ navigation }: any) {
         {item.title}
       </Text>
       <MetaRow rating={item.rating} modules={item.modules} />
-      <Text style={styles.gInstructor} numberOfLines={1}>
+      {/* <Text style={styles.gInstructor} numberOfLines={1}>
         {item.instructor?.name ? `Mr. ${item.instructor.name}` : ""}
-      </Text>
+      </Text> */}
     </TouchableOpacity>
   );
 
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     width: (width - Spacing.lg * 2 - 12) / 2,
     backgroundColor: "transparent",
     borderRadius: 16,
-    marginBottom: 12,
+    marginBottom: Spacing.lg,
   },
   gImage: {
     width: "100%",

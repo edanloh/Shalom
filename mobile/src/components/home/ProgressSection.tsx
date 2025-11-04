@@ -63,7 +63,7 @@ const AchievementCard: React.FC<AchievementCardProps> = ({ achievement }) => {
       return require("../../../assets/certificates.png");
     }
     // Default icon (use placeholder or shalom.png)
-    return require("../../../assets/placeholder.png");
+    return require("../../../assets/placeholder_icon.png");
   };
 
   return (

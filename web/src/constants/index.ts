@@ -9,6 +9,7 @@ export {
   ButtonStyles,
   CardStyles,
 } from "./GlobalStyles";
+export { DEFAULT_COURSE_THUMBNAIL } from "./images";
 
 // App constants - for web, we'll use environment variables
 export const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || "admin@shalom.edu";

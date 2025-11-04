@@ -45,6 +45,14 @@ const Login = () => {
     setLoading(true);
     setError("");
     try {
+      console.log("🔐 Login attempt for:", email);
+      console.log("📍 Cognito Region:", COGNITO_REGION);
+      console.log("🆔 Client ID:", COGNITO_CLIENT_ID ? "Set" : "Missing");
+      
+      if (!COGNITO_REGION || !COGNITO_CLIENT_ID) {
+        throw new Error("Cognito configuration is missing. Please check environment variables.");
+      }
+
       const client = new CognitoIdentityProviderClient({
         region: COGNITO_REGION,
       });
@@ -56,7 +64,9 @@ const Login = () => {
           PASSWORD: password,
         },
       });
+      console.log("📤 Sending authentication request...");
       const response = await client.send(command);
+      console.log("📥 Response received:", response.ChallengeName || "Success");
       if (response.AuthenticationResult) {
         setTokens(response.AuthenticationResult);
         login({
@@ -71,10 +81,27 @@ const Login = () => {
         setError("Authentication failed. Please check your credentials.");
       }
     } catch (err: unknown) {
+      console.error("Login error:", err);
       if (err instanceof Error) {
-        setError(err.message || "An error occurred during login.");
+        // Check for specific Cognito error codes
+        const errorMessage = err.message || "An error occurred during login.";
+        if (errorMessage.includes("User does not exist")) {
+          setError("No account found with this email.");
+        } else if (errorMessage.includes("Incorrect username or password")) {
+          setError("Incorrect email or password.");
+        } else if (errorMessage.includes("NotAuthorizedException")) {
+          setError("Incorrect email or password.");
+        } else if (errorMessage.includes("UserNotFoundException")) {
+          setError("No account found with this email.");
+        } else if (errorMessage.includes("TooManyRequestsException")) {
+          setError("Too many login attempts. Please try again later.");
+        } else if (errorMessage.includes("NetworkError") || errorMessage.includes("network")) {
+          setError("Network error. Please check your internet connection.");
+        } else {
+          setError(`Login failed: ${errorMessage}`);
+        }
       } else {
-        setError("An error occurred during login.");
+        setError("An error occurred during login. Please try again.");
       }
     } finally {
       setLoading(false);

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Colors } from "@/constants";
+import { DEFAULT_COURSE_THUMBNAIL } from "@/constants/images";
 import {
   Dialog,
   DialogContent,
@@ -28,11 +29,13 @@ import {
   Video,
   FileText,
   MessageSquare,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import courseThumbnail1 from "@/assets/course-thumbnail-1.jpg";
+import { courseService, moduleService, Course, Module, Review, Student } from "@/services";
 
 const CourseDetail = () => {
   const { courseId } = useParams();
@@ -40,30 +43,146 @@ const CourseDetail = () => {
   const { toast } = useToast();
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedModules, setExpandedModules] = useState<number[]>([1]);
+  const [expandedModules, setExpandedModules] = useState<string[]>([]);
 
-  const course = {
-    id: courseId,
-    title: "Data Science Fundamentals",
-    description:
-      "Master the core concepts of data science including statistics, machine learning, data visualization, and real-world applications. This comprehensive course covers Python programming, data analysis libraries, and hands-on projects.",
-    thumbnail: courseThumbnail1,
-    category: "Data Science",
-    status: "published" as const,
-    instructor: "Dr. Sarah Johnson",
-    enrolledCount: 245,
-    completionRate: 67,
-    rating: 4.8,
-    totalRatings: 156,
-    duration: "12 weeks",
-    modules: 8,
-    lessons: 42,
-    quizzes: 8,
-    createdDate: "Jan 15, 2025",
-    lastUpdated: "Feb 1, 2025",
+  // API state
+  const [course, setCourse] = useState<Course | null>(null);
+  const [modules, setModules] = useState<any[]>([]); // Use any[] for now to handle different module structures
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
+  const [availableStudents, setAvailableStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch course data
+  useEffect(() => {
+    if (courseId) {
+      fetchCourseData();
+    }
+  }, [courseId]);
+
+  const fetchCourseData = async () => {
+    if (!courseId) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Use instructor endpoint to get full course details
+      // TODO: Get actual admin ID from auth context
+      const adminId = '550e8400-e29b-41d4-a716-446655440101';
+      const fullResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/admin/${adminId}/${courseId}`);
+      const fullData = await fullResponse.json();
+      
+      if (!fullData.success || !fullData.data) {
+        throw new Error(fullData.message || 'Course not found');
+      }
+
+      const courseData = fullData.data.course;
+      const response = {
+        id: courseData.id,
+        title: courseData.title,
+        description: courseData.description || '',
+        thumbnail: courseData.thumbnail_url || '',
+        category: courseData.category_name || 'Uncategorized',
+        status: courseData.is_published ? 'published' : 'draft',
+        instructor: courseData.instructor_name || 'Unknown',
+        instructorId: courseData.instructor_id,
+        enrolledCount: parseInt(courseData.student_count) || 0,
+        completionRate: 0,
+        rating: parseFloat(courseData.rating) || 0,
+        totalRatings: parseInt(courseData.total_ratings) || 0,
+        duration: `${courseData.duration_hours || 0}h`,
+        modules: fullData.data.totalSections || 0,
+        lessons: fullData.data.totalVideos || 0,
+        quizzes: fullData.data.totalQuizzes || 0,
+        createdDate: courseData.created_at,
+        lastUpdated: courseData.updated_at
+      };
+
+      setCourse(response);
+      
+      // Set sections (modules) from the instructor API response
+      if (fullData.data && fullData.data.sections) {
+        setModules(fullData.data.sections);
+      } else {
+        setModules([]);
+      }
+
+      // Set reviews from the API response (if available)
+      if (fullData.data && fullData.data.reviews) {
+        const reviewsData = fullData.data.reviews.map((review: any, index: number) => ({
+          id: review.id || index,
+          studentName: review.reviewer_name || review.student_name || 'Anonymous',
+          rating: parseFloat(review.rating || '5'),
+          date: review.created_at ? new Date(review.created_at).toLocaleDateString() : 'N/A',
+          comment: review.review || review.comment || '',
+        }));
+        setReviews(reviewsData);
+      } else {
+        setReviews([]);
+      }
+
+      // Fetch enrolled students separately
+      try {
+        const studentsData = await courseService.getCourseStudents(courseId);
+        setEnrolledStudents(studentsData);
+      } catch (err) {
+        console.error('Error fetching students:', err);
+        setEnrolledStudents([]);
+      }
+
+      // Fetch available students (not enrolled)
+      try {
+        const availableData = await courseService.getAvailableStudents(courseId);
+        setAvailableStudents(availableData);
+      } catch (err) {
+        console.error('Error fetching available students:', err);
+        setAvailableStudents([]);
+      }
+    } catch (err) {
+      console.error('Error fetching course data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch course data');
+      toast({
+        title: "Error",
+        description: "Failed to load course details. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const modulesList = [
+  // Transform API sections to UI-friendly format
+  const modulesList = modules.length > 0 ? modules.map((section: any) => ({
+    id: section.id,
+    title: section.title,
+    lessons: section.videos?.length || 0,
+    quizzes: section.quizzes?.length || 0,
+    duration: section.total_duration_seconds 
+      ? `${Math.floor(section.total_duration_seconds / 60)} min`
+      : section.duration_minutes
+      ? `${section.duration_minutes} min`
+      : 'N/A',
+    isCompleted: false,
+    completedAt: null,
+    items: [
+      ...(section.videos || []).map((video: any) => ({
+        id: video.id,
+        type: 'lesson' as const,
+        title: video.title,
+        duration: video.duration_seconds 
+          ? `${Math.floor(video.duration_seconds / 60)} min`
+          : 'N/A',
+      })),
+      ...(section.quizzes || []).map((quiz: any) => ({
+        id: quiz.id,
+        type: 'quiz' as const,
+        title: quiz.title,
+        questions: quiz.question_count || 0,
+      })),
+    ],
+  })) : [
     {
       id: 1,
       title: "Introduction to Data Science",
@@ -168,47 +287,7 @@ const CourseDetail = () => {
     },
   ];
 
-  const reviews = [
-    {
-      id: 1,
-      studentName: "John Smith",
-      rating: 5,
-      date: "2 weeks ago",
-      comment:
-        "Excellent course! The content is well-structured and easy to follow. Dr. Johnson's teaching style is engaging and clear.",
-    },
-    {
-      id: 2,
-      studentName: "Emily Davis",
-      rating: 4,
-      date: "1 month ago",
-      comment:
-        "Great course overall. Would love to see more hands-on projects.",
-    },
-    {
-      id: 3,
-      studentName: "Michael Chen",
-      rating: 5,
-      date: "1 month ago",
-      comment: "Best data science course I've taken. Highly recommend!",
-    },
-  ];
-
-  const enrolledStudents = [
-    { id: 1, name: "John Smith", progress: 85, lastActive: "2 hours ago" },
-    { id: 2, name: "Emily Davis", progress: 92, lastActive: "1 day ago" },
-    { id: 3, name: "Michael Chen", progress: 67, lastActive: "3 hours ago" },
-    { id: 4, name: "Sarah Wilson", progress: 78, lastActive: "5 hours ago" },
-    { id: 5, name: "David Brown", progress: 45, lastActive: "2 days ago" },
-  ];
-
-  const availableStudents = [
-    { id: 6, name: "Alex Turner", email: "alex@example.com" },
-    { id: 7, name: "Lisa Anderson", email: "lisa@example.com" },
-    { id: 8, name: "Mark Johnson", email: "mark@example.com" },
-  ];
-
-  const toggleModule = (moduleId: number) => {
+  const toggleModule = (moduleId: string) => {
     setExpandedModules((prev) =>
       prev.includes(moduleId)
         ? prev.filter((id) => id !== moduleId)
@@ -216,12 +295,35 @@ const CourseDetail = () => {
     );
   };
 
-  const handleEnrollStudents = (studentIds: number[]) => {
-    toast({
-      title: "Students Enrolled",
-      description: `${studentIds.length} student(s) enrolled successfully`,
-    });
-    setIsEnrollDialogOpen(false);
+  const handleEnrollStudents = async (studentIds: number[]) => {
+    if (!courseId) return;
+
+    try {
+      // Enroll students in parallel
+      await Promise.all(
+        studentIds.map(studentId => 
+          courseService.enrollStudent(courseId, studentId.toString())
+        )
+      );
+
+      toast({
+        title: "Students Enrolled",
+        description: `${studentIds.length} student(s) enrolled successfully`,
+      });
+
+      setIsEnrollDialogOpen(false);
+
+      // Refresh students list
+      const updatedStudents = await courseService.getCourseStudents(courseId);
+      setEnrolledStudents(updatedStudents);
+    } catch (error) {
+      console.error('Error enrolling students:', error);
+      toast({
+        title: "Error",
+        description: "Failed to enroll students. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleItemClick = (module: any, item: any) => {
@@ -232,6 +334,36 @@ const CourseDetail = () => {
     }
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-6 py-8">
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error || !course) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-6 py-8">
+          <div className="text-center py-12">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <p className="text-destructive mb-4">{error || "Course not found"}</p>
+            <Button onClick={() => navigate("/courses")}>Back to Courses</Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -241,16 +373,22 @@ const CourseDetail = () => {
         <div className="gradient-card border border-border rounded-xl p-8 mb-6">
           <div className="flex gap-8">
             <img
-              src={course.thumbnail}
+              src={course.thumbnail || DEFAULT_COURSE_THUMBNAIL}
               alt={course.title}
               className="w-64 h-48 object-cover rounded-lg"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = DEFAULT_COURSE_THUMBNAIL;
+              }}
             />
             <div className="flex-1">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-[32px] font-bold">{course.title}</h1>
-                    <Badge className="status-badge-published">PUBLISHED</Badge>
+                    <Badge className={course.status === 'published' ? "status-badge-published" : "status-badge-draft"}>
+                      {course.status.toUpperCase()}
+                    </Badge>
                   </div>
                   <p className="text-muted-foreground mb-2">
                     by {course.instructor}

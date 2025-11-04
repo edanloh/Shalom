@@ -1,4 +1,5 @@
-﻿import React from "react";
+﻿import React, { useEffect } from "react";
+import { useParams, useNavigate, useBeforeUnload } from "react-router-dom";
 import {
   CourseBuilderProvider,
   useCourseBuilder,
@@ -8,18 +9,53 @@ import {
   RightSidebar,
   CoursePreview,
   CenterContent,
+  LoadingScreen,
+  ConfirmationModal,
 } from "../components/CourseBuilder";
 
 const CourseBuilder = () => {
+  const { courseId } = useParams<{ courseId: string }>();
+  
   return (
-    <CourseBuilderProvider>
+    <CourseBuilderProvider courseId={courseId}>
       <CourseBuilderMain />
     </CourseBuilderProvider>
   );
 };
 
 const CourseBuilderMain = () => {
-  const { previewMode } = useCourseBuilder();
+  const { previewMode, isLoadingCourse, hasUnsavedChanges, modalState, closeModal } = useCourseBuilder();
+  const navigate = useNavigate();
+
+  // Warn user about unsaved changes before leaving page
+  useBeforeUnload(
+    React.useCallback(
+      (event) => {
+        if (hasUnsavedChanges) {
+          event.preventDefault();
+          return (event.returnValue = "You have unsaved changes. Are you sure you want to leave?");
+        }
+      },
+      [hasUnsavedChanges]
+    )
+  );
+
+  // Warn user about unsaved changes before navigation (React Router)
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  if (isLoadingCourse) {
+    return <LoadingScreen />;
+  }
 
   if (previewMode) {
     return <CoursePreview />;
@@ -35,6 +71,19 @@ const CourseBuilderMain = () => {
           <RightSidebar />
         </div>
       </div>
+      
+      {/* Global Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        onConfirm={modalState.onConfirm}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        confirmText={modalState.confirmText}
+        cancelText={modalState.cancelText}
+        showCancel={modalState.showCancel}
+      />
     </CourseBuilderLayout>
   );
 };

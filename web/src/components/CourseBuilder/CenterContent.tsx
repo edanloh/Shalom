@@ -3,6 +3,7 @@ import { X, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCourseBuilder } from "./CourseBuilderContext";
 import { useContentManagement } from "./useContentManagement";
 import { Button } from "../ui/button";
+import { Colors } from "../../constants/Colors";
 
 /* ------------------------- MODULE EDITOR ------------------------- */
 const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
@@ -65,21 +66,41 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Lesson Title
+        <label 
+          style={{ color: Colors.textSecondary }}
+          className="block text-sm font-medium mb-2"
+        >
+          Lesson Title (User Input)
         </label>
+        <div 
+          style={{ 
+            color: Colors.textMuted,
+            fontSize: '12px',
+            marginBottom: '8px'
+          }}
+        >
+          System prefix: {lesson?.title?.split(':')[0] || 'Lesson X.Y'}
+        </div>
         <input
           type="text"
-          value={lesson?.title || ""}
+          value={lesson?.baseTitle || ""}
           onChange={(e) =>
-            updateLesson(module.id, lesson.id, { title: e.target.value })
+            updateLesson(module.id, lesson.id, { baseTitle: e.target.value })
           }
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
+          style={{ 
+            backgroundColor: Colors.textInputBg,
+            borderColor: Colors.gray600,
+            color: Colors.textPrimary
+          }}
+          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Content
+        <label 
+          style={{ color: Colors.textSecondary }}
+          className="block text-sm font-medium mb-2"
+        >
+          Description / Content
         </label>
         <textarea
           value={lesson?.content || ""}
@@ -87,13 +108,21 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             updateLesson(module.id, lesson.id, { content: e.target.value })
           }
           rows={8}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
-          placeholder="Enter lesson content..."
+          style={{ 
+            backgroundColor: Colors.textInputBg,
+            borderColor: Colors.gray600,
+            color: Colors.textPrimary
+          }}
+          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-none"
+          placeholder="Enter lesson description..."
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Video URL (optional)
+        <label 
+          style={{ color: Colors.textSecondary }}
+          className="block text-sm font-medium mb-2"
+        >
+          Video URL (required)
         </label>
         <input
           type="url"
@@ -101,9 +130,85 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
           onChange={(e) =>
             updateLesson(module.id, lesson.id, { videoUrl: e.target.value })
           }
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
+          style={{ 
+            backgroundColor: Colors.textInputBg,
+            borderColor: Colors.gray600,
+            color: Colors.textPrimary
+          }}
+          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
           placeholder="https://..."
         />
+      </div>
+      <div>
+        <label 
+          style={{ color: Colors.textSecondary }}
+          className="block text-sm font-medium mb-2"
+        >
+          Thumbnail URL (optional)
+        </label>
+        <input
+          type="url"
+          value={lesson?.thumbnailUrl || ""}
+          onChange={(e) =>
+            updateLesson(module.id, lesson.id, { thumbnailUrl: e.target.value })
+          }
+          style={{ 
+            backgroundColor: Colors.textInputBg,
+            borderColor: Colors.gray600,
+            color: Colors.textPrimary
+          }}
+          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+          placeholder="https://..."
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label 
+            style={{ color: Colors.textSecondary }}
+            className="block text-sm font-medium mb-2"
+          >
+            Duration (seconds)
+          </label>
+          <input
+            type="number"
+            value={lesson?.durationSeconds || 0}
+            onChange={(e) =>
+              updateLesson(module.id, lesson.id, { durationSeconds: parseInt(e.target.value) || 0 })
+            }
+            style={{ 
+              backgroundColor: Colors.textInputBg,
+              borderColor: Colors.gray600,
+              color: Colors.textPrimary
+            }}
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+            placeholder="0"
+            min="0"
+          />
+        </div>
+        <div>
+          <label 
+            style={{ color: Colors.textSecondary }}
+            className="block text-sm font-medium mb-2"
+          >
+            Preview Lesson
+          </label>
+          <label className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              checked={lesson?.isPreview || false}
+              onChange={(e) =>
+                updateLesson(module.id, lesson.id, { isPreview: e.target.checked })
+              }
+              style={{ 
+                accentColor: Colors.secondary
+              }}
+              className="w-5 h-5 rounded"
+            />
+            <span style={{ color: Colors.textSecondary }} className="text-sm">
+              Allow preview without enrollment
+            </span>
+          </label>
+        </div>
       </div>
     </div>
   );
@@ -130,6 +235,12 @@ const QuizEditor = ({
   const questions = quiz?.questions || [];
   const currentQuestion = questions[currentIndex];
 
+  // Debug logging
+  console.log('QuizEditor - Quiz:', quiz?.title);
+  console.log('QuizEditor - Questions:', questions);
+  console.log('QuizEditor - Current Question:', currentQuestion);
+  console.log('QuizEditor - Current Question Text:', currentQuestion?.text);
+
   const handleNext = () => {
     if (currentIndex < questions.length - 1) setCurrentIndex(currentIndex + 1);
   };
@@ -147,10 +258,11 @@ const QuizEditor = ({
         </label>
         <input
           type="text"
-          value={quiz?.title || ""}
+          value={quiz?.baseTitle || ""}
           onChange={(e) =>
-            updateQuiz(module.id, quiz.id, { title: e.target.value })
+            updateQuiz(module.id, quiz.id, { baseTitle: e.target.value })
           }
+          placeholder="Enter quiz title (e.g., 'Module 1 Assessment')"
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
         />
       </div>
@@ -485,29 +597,11 @@ const QuizEditor = ({
             </div>
           )}
 
-          {/* Short Answer UI */}
+          {/* Short Answer Note */}
           {currentQuestion.type === "short-answer" && (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Sample Answer (for grading reference)
-              </label>
-              <textarea
-                value={currentQuestion.sampleAnswer || ""}
-                onChange={(e) =>
-                  updateQuestion(
-                    module.id,
-                    quiz.id,
-                    currentQuestion.id,
-                    "sampleAnswer",
-                    e.target.value
-                  )
-                }
-                placeholder="Enter a sample correct answer for reference"
-                rows={3}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
-              />
-              <p className="text-xs text-slate-400">
-                Short answer questions will require manual grading
+            <div className="bg-yellow-900/20 border border-yellow-700/50 rounded p-3">
+              <p className="text-xs text-yellow-300">
+                ⚠️ Short answer questions require manual grading. Use the explanation field above to provide grading guidelines.
               </p>
             </div>
           )}
@@ -612,6 +706,34 @@ const QuizEditor = ({
               </div>
             </div>
           )}
+
+          {/* Explanation/Feedback Section - For all question types */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Explanation / Feedback
+              <span className="text-slate-400 text-xs ml-2">
+                (Shown to students after answering)
+              </span>
+            </label>
+            <textarea
+              value={currentQuestion.sampleAnswer || ""}
+              onChange={(e) =>
+                updateQuestion(
+                  module.id,
+                  quiz.id,
+                  currentQuestion.id,
+                  "sampleAnswer",
+                  e.target.value
+                )
+              }
+              placeholder="Enter explanation for the correct answer (e.g., why this is the correct choice)"
+              rows={3}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              This explanation helps students understand why the answer is correct
+            </p>
+          </div>
 
           {/* Points input */}
           <div>

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { StatsCard } from "@/components/StatsCard";
 import { CourseCard } from "@/components/CourseCard";
@@ -14,58 +15,62 @@ import {
   Clock,
   ArrowRight,
   UserPlus,
+  Loader2,
 } from "lucide-react";
-
-import courseThumbnail1 from "@/assets/course-thumbnail-1.jpg";
-import courseThumbnail2 from "@/assets/course-thumbnail-2.jpg";
-import courseThumbnail3 from "@/assets/course-thumbnail-3.jpg";
-import courseThumbnail4 from "@/assets/course-thumbnail-4.jpg";
+import { courseService } from "@/services";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const courses = [
-    {
-      id: "1",
-      title: "Data Science Fundamentals",
-      category: "Data Science",
-      thumbnail: courseThumbnail1,
-      enrolledCount: 245,
-      completionRate: 67,
-      rating: 4.8,
-      status: "published" as const,
-    },
-    {
-      id: "2",
-      title: "Machine Learning A-Z",
-      category: "AI & ML",
-      thumbnail: courseThumbnail2,
-      enrolledCount: 189,
-      completionRate: 54,
-      rating: 4.9,
-      status: "published" as const,
-    },
-    {
-      id: "3",
-      title: "Python for Beginners",
-      category: "Programming",
-      thumbnail: courseThumbnail3,
-      enrolledCount: 412,
-      completionRate: 78,
-      rating: 4.7,
-      status: "published" as const,
-    },
-    {
-      id: "4",
-      title: "Advanced Analytics",
-      category: "Analytics",
-      thumbnail: courseThumbnail4,
-      enrolledCount: 156,
-      completionRate: 45,
-      rating: 4.6,
-      status: "draft" as const,
-    },
-  ];
+  // State for API data
+  const [courses, setCourses] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Get admin ID from user (fallback to mock for now)
+      const adminId = user?.id || '550e8400-e29b-41d4-a716-446655440201';
+
+      // Fetch courses and admin stats in parallel using courseService
+      const [coursesData, statsData] = await Promise.all([
+        courseService.getCourses({ sortBy: 'updated_at', sortOrder: 'desc' }),
+        courseService.getInstructorStats(adminId)
+      ]);
+
+      setCourses(coursesData);
+      setStats(statsData);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-6 py-8">
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,7 +82,7 @@ const Index = () => {
           <h1 className="text-4xl font-bold text-foreground">
             Welcome Back,{" "}
             <span className="bg-gradient-primary bg-clip-text text-transparent">
-              Dr. Rachel
+              {user?.name || "Instructor"}
             </span>
           </h1>
           <p className="text-muted-foreground text-lg">
@@ -86,36 +91,38 @@ const Index = () => {
         </section>
 
         {/* Stats Grid */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatsCard
-            title="Total Students"
-            value="1,002"
-            icon={Users}
-            trend="+12% from last month"
-            variant="default"
-          />
-          <StatsCard
-            title="Avg Completion"
-            value="64%"
-            icon={TrendingUp}
-            trend="+5% improvement"
-            variant="success"
-          />
-          <StatsCard
-            title="Course Rating"
-            value="4.8"
-            icon={Star}
-            trend="Across all courses"
-            variant="warning"
-          />
-          <StatsCard
-            title="New Enrollments"
-            value="243"
-            icon={UserPlus}
-            trend="+18% this month"
-            variant="accent"
-          />
-        </section>
+        {stats && (
+          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatsCard
+              title="Total Students"
+              value={stats.statistics.total_students.toLocaleString()}
+              icon={Users}
+              trend={`${stats.statistics.active_students} active`}
+              variant="default"
+            />
+            <StatsCard
+              title="Avg Completion"
+              value={`${stats.statistics.average_completion_rate}%`}
+              icon={TrendingUp}
+              trend={`${stats.statistics.completed_courses} completed`}
+              variant="success"
+            />
+            <StatsCard
+              title="Course Rating"
+              value={stats.statistics.average_rating}
+              icon={Star}
+              trend="Across all courses"
+              variant="warning"
+            />
+            <StatsCard
+              title="New Enrollments"
+              value={stats.statistics.new_enrollments_this_month.toString()}
+              icon={UserPlus}
+              trend="This month"
+              variant="accent"
+            />
+          </section>
+        )}
 
         {/* Quick Actions */}
         <QuickActions />
@@ -151,7 +158,29 @@ const Index = () => {
         {/* Bottom Grid - Activity & Insights */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <ActivityFeed />
+            {stats && stats.recent_activity && stats.recent_activity.length > 0 ? (
+              <div className="gradient-card border-border rounded-xl p-6">
+                <h3 className="text-lg font-semibold mb-4 text-foreground">
+                  Recent Activity
+                </h3>
+                <div className="space-y-3">
+                  {stats.recent_activity.slice(0, 8).map((activity: any, index: number) => (
+                    <div key={index} className="flex items-center gap-4 p-3 rounded-lg bg-background/50">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {activity.student_name} enrolled in {activity.course_title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {activity.formatted_date}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <ActivityFeed />
+            )}
           </div>
 
           <div className="space-y-6">
