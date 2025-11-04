@@ -78,6 +78,7 @@ export const handler = async (event) => {
         u.id,
         u.name,
         u.email,
+        u.is_active,
         u.created_at as enrolled_date,
         COUNT(DISTINCT ce.course_id) as courses_enrolled,
         COUNT(DISTINCT CASE WHEN ce.is_completed = true THEN ce.course_id END) as completed_courses,
@@ -95,7 +96,7 @@ export const handler = async (event) => {
       FROM users u
       LEFT JOIN course_enrollments ce ON u.id = ce.user_id
       WHERE u.role = 'student'
-      GROUP BY u.id, u.name, u.email, u.created_at
+      GROUP BY u.id, u.name, u.email, u.is_active, u.created_at
       ORDER BY last_activity DESC NULLS LAST
     `;
     
@@ -111,6 +112,7 @@ export const handler = async (event) => {
         id: student.id,
         name: student.name,
         email: student.email,
+        enabled: student.is_active !== false, // Map is_active to enabled, default to true if null
         enrolledDate: student.enrolled_date ? new Date(student.enrolled_date).toISOString().split('T')[0] : 'N/A',
         progress: Math.round(parseFloat(student.overall_progress || 0)),
         lastActivity: lastActivity,
