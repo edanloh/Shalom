@@ -25,7 +25,7 @@ export async function disableStudent({
     );
 
     // Call the Lambda function via API Gateway
-    const response = await fetch(`${API_BASE_URL}/admin/toggleUserEnabled`, {
+    const response = await fetch(`${API_BASE_URL}/dev/admin/toggleUserEnabled`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

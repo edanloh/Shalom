@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,113 +12,185 @@ import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
 import { disableStudent } from "@/lib/disableStudent";
+import { API_BASE_URL } from "@/env";
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  const students = [
-    {
-      id: 1,
-      name: "Sarah Johnson",
-      email: "sarah.j@email.com",
-      enrolledDate: "2024-01-15",
-      progress: 78,
-      lastActivity: "2 hours ago",
-      engagement: 92,
-      coursesEnrolled: 3,
-      completedCourses: 2,
-      currentCourses: [
-        { id: 1, name: "Data Science Fundamentals", progress: 85, grade: 92 },
-        { id: 2, name: "Machine Learning A-Z", progress: 67, grade: 88 }
-      ],
-      completedCoursesData: [
-        { id: 3, name: "Python for Beginners", completedDate: "2024-03-15", grade: 95, certificate: true }
-      ],
-      quizResults: [
-        { quiz: "Data Science Quiz 1", score: 92, date: "2024-04-10" },
-        { quiz: "ML Algorithms Test", score: 88, date: "2024-04-08" }
-      ],
-      totalHours: 124,
-      streak: 15,
-      badges: 5,
-      averageScore: 91
-    },
-    {
-      id: 2,
-      name: "Michael Chen",
-      email: "m.chen@email.com",
-      enrolledDate: "2024-02-03",
-      progress: 45,
-      lastActivity: "1 day ago",
-      engagement: 67,
-      coursesEnrolled: 2,
-      completedCourses: 0,
-      currentCourses: [
-        { id: 1, name: "Python for Beginners", progress: 45, grade: 78 },
-        { id: 2, name: "Data Visualization", progress: 30, grade: 72 }
-      ],
-      completedCoursesData: [],
-      quizResults: [
-        { quiz: "Python Basics Quiz", score: 78, date: "2024-04-05" }
-      ],
-      totalHours: 56,
-      streak: 7,
-      badges: 2,
-      averageScore: 75
-    },
-    {
-      id: 3,
-      name: "Emma Wilson",
-      email: "emma.w@email.com",
-      enrolledDate: "2024-01-28",
-      progress: 92,
-      lastActivity: "30 mins ago",
-      engagement: 95,
-      coursesEnrolled: 4,
-      completedCourses: 3,
-      currentCourses: [
-        { id: 1, name: "Advanced Analytics", progress: 92, grade: 96 }
-      ],
-      completedCoursesData: [
-        { id: 2, name: "Data Science Fundamentals", completedDate: "2024-03-20", grade: 98, certificate: true },
-        { id: 3, name: "Machine Learning A-Z", completedDate: "2024-03-25", grade: 94, certificate: true },
-        { id: 4, name: "Python for Beginners", completedDate: "2024-02-28", grade: 97, certificate: true }
-      ],
-      quizResults: [
-        { quiz: "Advanced Analytics Quiz", score: 96, date: "2024-04-12" },
-        { quiz: "ML Final Test", score: 94, date: "2024-04-09" }
-      ],
-      totalHours: 187,
-      streak: 22,
-      badges: 8,
-      averageScore: 96
-    },
-    {
-      id: 4,
-      name: "James Rodriguez",
-      email: "james.r@email.com",
-      enrolledDate: "2024-03-10",
-      progress: 23,
-      lastActivity: "3 days ago",
-      engagement: 45,
-      coursesEnrolled: 1,
-      completedCourses: 0,
-      currentCourses: [
-        { id: 1, name: "Data Science Fundamentals", progress: 23, grade: 65 }
-      ],
-      completedCoursesData: [],
-      quizResults: [
-        { quiz: "Intro Quiz", score: 65, date: "2024-04-01" }
-      ],
-      totalHours: 18,
-      streak: 2,
-      badges: 1,
-      averageScore: 65
-    }
-  ];
+  const [search, setSearch] = useState("");
+  const [students, setStudents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+	const fetchStudents = async () => {
+		setLoading(true);
+		setError("");
+		try {
+			const response = await fetch(`${API_BASE_URL}/dev/getAllUserInfo`, {
+				method: "GET",
+				headers: { "Content-Type": "application/json" },
+			});
+			if (!response.ok) {
+				throw new Error("Failed to fetch user info from API Gateway");
+			}
+			const result = await response.json();
+			// Transform API data to match the expected user structure
+      const formatDateTime = (val: any) => {
+        if (!val && val !== 0) return "Unknown";
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) return d.toLocaleString();
+        return String(val);
+      };
+
+      const transformedStudents = (result.users || []).map(
+        (user: any, index: number) => ({
+          id: index + 1,
+          name: user.name || "Unknown User",
+          email: user.email || "",
+          enrolledDate: user.enrolledDate
+            ? formatDateTime(user.enrolledDate)
+            : formatDateTime(new Date()),
+          progress: user.progress ?? 50,
+          lastActivity: user.lastActivity
+            ? formatDateTime(user.lastActivity)
+            : "Unknown",
+          engagement: user.engagement ?? 0,
+          coursesEnrolled: user.coursesEnrolled ?? 0,
+          completedCourses: user.completedCourses ?? 0,
+          currentCourses: user.currentCourses || [
+            { id: 1, name: "Data Science Fundamentals", progress: 85, grade: 92 },
+            { id: 2, name: "Machine Learning A-Z", progress: 67, grade: 88 }
+          ],
+          completedCoursesData: user.completedCoursesData || [
+            { id: 3, name: "Python for Beginners", completedDate: "2024-03-15", grade: 95, certificate: true }
+          ],
+          quizResults: user.quizResults || [
+            { quiz: "Data Science Quiz 1", score: 92, date: "2024-04-10" },
+            { quiz: "ML Algorithms Test", score: 88, date: "2024-04-08" }
+          ],
+          totalHours: user.totalHours ?? 99,
+          streak: user.streak ?? 9,
+          badges: user.badges ?? 9,
+          averageScore: user.averageScore ?? 80,
+          enabled: user.enabled !== undefined ? user.enabled : true,
+        })
+      );
+			setStudents(transformedStudents);
+		} catch (err: any) {
+			setError(err.message || "Error fetching students");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  // const students = [
+  //   {
+  //     id: 1,
+  //     name: "Sarah Johnson",
+  //     email: "sarah.j@email.com",
+  //     enrolledDate: "2024-01-15",
+  //     progress: 78,
+  //     lastActivity: "2 hours ago",
+  //     engagement: 92,
+  //     coursesEnrolled: 3,
+  //     completedCourses: 2,
+  //     currentCourses: [
+  //       { id: 1, name: "Data Science Fundamentals", progress: 85, grade: 92 },
+  //       { id: 2, name: "Machine Learning A-Z", progress: 67, grade: 88 }
+  //     ],
+  //     completedCoursesData: [
+  //       { id: 3, name: "Python for Beginners", completedDate: "2024-03-15", grade: 95, certificate: true }
+  //     ],
+  //     quizResults: [
+  //       { quiz: "Data Science Quiz 1", score: 92, date: "2024-04-10" },
+  //       { quiz: "ML Algorithms Test", score: 88, date: "2024-04-08" }
+  //     ],
+  //     totalHours: 124,
+  //     streak: 15,
+  //     badges: 5,
+  //     averageScore: 91
+  //   },
+  //   {
+  //     id: 2,
+  //     name: "Michael Chen",
+  //     email: "m.chen@email.com",
+  //     enrolledDate: "2024-02-03",
+  //     progress: 45,
+  //     lastActivity: "1 day ago",
+  //     engagement: 67,
+  //     coursesEnrolled: 2,
+  //     completedCourses: 0,
+  //     currentCourses: [
+  //       { id: 1, name: "Python for Beginners", progress: 45, grade: 78 },
+  //       { id: 2, name: "Data Visualization", progress: 30, grade: 72 }
+  //     ],
+  //     completedCoursesData: [],
+  //     quizResults: [
+  //       { quiz: "Python Basics Quiz", score: 78, date: "2024-04-05" }
+  //     ],
+  //     totalHours: 56,
+  //     streak: 7,
+  //     badges: 2,
+  //     averageScore: 75
+  //   },
+  //   {
+  //     id: 3,
+  //     name: "Emma Wilson",
+  //     email: "emma.w@email.com",
+  //     enrolledDate: "2024-01-28",
+  //     progress: 92,
+  //     lastActivity: "30 mins ago",
+  //     engagement: 95,
+  //     coursesEnrolled: 4,
+  //     completedCourses: 3,
+  //     currentCourses: [
+  //       { id: 1, name: "Advanced Analytics", progress: 92, grade: 96 }
+  //     ],
+  //     completedCoursesData: [
+  //       { id: 2, name: "Data Science Fundamentals", completedDate: "2024-03-20", grade: 98, certificate: true },
+  //       { id: 3, name: "Machine Learning A-Z", completedDate: "2024-03-25", grade: 94, certificate: true },
+  //       { id: 4, name: "Python for Beginners", completedDate: "2024-02-28", grade: 97, certificate: true }
+  //     ],
+  //     quizResults: [
+  //       { quiz: "Advanced Analytics Quiz", score: 96, date: "2024-04-12" },
+  //       { quiz: "ML Final Test", score: 94, date: "2024-04-09" }
+  //     ],
+  //     totalHours: 187,
+  //     streak: 22,
+  //     badges: 8,
+  //     averageScore: 96
+  //   },
+  //   {
+  //     id: 4,
+  //     name: "James Rodriguez",
+  //     email: "james.r@email.com",
+  //     enrolledDate: "2024-03-10",
+  //     progress: 23,
+  //     lastActivity: "3 days ago",
+  //     engagement: 45,
+  //     coursesEnrolled: 1,
+  //     completedCourses: 0,
+  //     currentCourses: [
+  //       { id: 1, name: "Data Science Fundamentals", progress: 23, grade: 65 }
+  //     ],
+  //     completedCoursesData: [],
+  //     quizResults: [
+  //       { quiz: "Intro Quiz", score: 65, date: "2024-04-01" }
+  //     ],
+  //     totalHours: 18,
+  //     streak: 2,
+  //     badges: 1,
+  //     averageScore: 65
+  //   }
+  // ];
 
   const filteredStudents = students.filter(student =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -213,7 +285,7 @@ const Students = () => {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{student.lastActivity}</TableCell>
                   <TableCell className="text-right">
-                    <Sheet>
+                    <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                       <SheetTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={() => setSelectedStudent(student)}>
                           <MoreVertical className="h-4 w-4" />
@@ -283,7 +355,7 @@ const Students = () => {
                                   <div className="space-y-3">
                                     {selectedStudent.currentCourses.map((course: any) => (
                                       <div key={course.id} className="p-4 rounded-lg bg-background/50 border border-border">
-                                        <div className="flex items-center justify-between mb-2">
+                                          <div className="flex items-center justify-between mb-2">
                                           <p className="font-medium">{course.name}</p>
                                           <Badge variant="outline">{course.grade}%</Badge>
                                         </div>
@@ -303,19 +375,19 @@ const Students = () => {
                                     <div className="space-y-3">
                                       {selectedStudent.completedCoursesData.map((course: any) => (
                                         <div key={course.id} className="p-4 rounded-lg bg-success/10 border border-success/20">
-                                          <div className="flex items-center justify-between">
-                                            <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex-1">
                                               <p className="font-medium">{course.name}</p>
                                               <p className="text-xs text-muted-foreground">Completed {course.completedDate}</p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
+                                              </div>
+                                              <div className="flex items-center gap-2">
                                               <Badge className="bg-success">{course.grade}%</Badge>
-                                              {course.certificate && (
-                                                <Award className="h-4 w-4 text-warning" />
-                                              )}
+                                                {course.certificate && (
+                                                  <Award className="h-4 w-4 text-warning" />
+                                                )}
+                                              </div>
                                             </div>
                                           </div>
-                                        </div>
                                       ))}
                                     </div>
                                   </div>
@@ -347,14 +419,14 @@ const Students = () => {
                                   <div className="space-y-2">
                                     {selectedStudent.quizResults.map((quiz: any, index: number) => (
                                       <div key={index} className="p-3 rounded-lg bg-background/50 border border-border flex items-center justify-between">
-                                        <div>
+                                          <div>
                                           <p className="font-medium text-sm">{quiz.quiz}</p>
                                           <p className="text-xs text-muted-foreground">{quiz.date}</p>
-                                        </div>
+                                          </div>
                                         <Badge variant={quiz.score >= 80 ? "default" : "outline"}>
-                                          {quiz.score}%
-                                        </Badge>
-                                      </div>
+                                            {quiz.score}%
+                                          </Badge>
+                                        </div>
                                     ))}
                                   </div>
                                 </div>
@@ -427,10 +499,67 @@ const Students = () => {
                               <Mail className="h-4 w-4" />
                               Send Message
                             </Button>
-                            <Button className="w-full gap-2" variant="destructive" onClick={() => disableStudent({studentId: "phuazaiqin@gmail.com", status: false})}>
-                              <UserX className="h-4 w-4" />
-                              Disable User
-                            </Button>
+                            {selectedStudent.enabled ? (
+                              <Button
+                                className="w-full gap-2"
+                                variant="destructive"
+                                onClick={async () => {
+                                  try {
+                                    const result = await disableStudent({
+                                      studentId: selectedStudent.email,
+                                      status: false,
+                                    });
+                                    if (result) {
+                                      setIsSheetOpen(false);
+																			fetchStudents();
+                                    } else {
+                                      console.error(
+                                        "disableStudent failed:",
+                                        result
+                                      );
+                                    }
+                                  } catch (err) {
+                                    console.error(
+                                      "Failed to disable student:",
+                                      err
+                                    );
+                                  }
+                                }}
+                              >
+                                <UserX className="h-4 w-4" />
+                                Disable User
+                              </Button>
+                            ) : (
+                              <Button
+                                className="w-full gap-2"
+                                variant="default"
+                                onClick={async () => {
+                                  try {
+                                    const result = await disableStudent({
+                                      studentId: selectedStudent.email,
+                                      status: true,
+                                    });
+                                    if (result) {
+                                      setIsSheetOpen(false);
+																			fetchStudents();
+                                    } else {
+                                      console.error(
+                                        "disableStudent failed:",
+                                        result
+                                      );
+                                    }
+                                  } catch (err) {
+                                    console.error(
+                                      "Failed to disable student:",
+                                      err
+                                    );
+                                  }
+                                }}
+                              >
+                                <UserX className="h-4 w-4" />
+                                Enable User
+                              </Button>
+                            )}
                           </div>
                         )}
                       </SheetContent>
@@ -440,7 +569,7 @@ const Students = () => {
               ))}
             </TableBody>
           </Table>
-          
+
           <Pagination
             currentPage={currentPage}
             totalPages={Math.ceil(filteredStudents.length / itemsPerPage)}
