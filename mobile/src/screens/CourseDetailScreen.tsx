@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { courseService } from '../services/courseService';
 import { moduleService, ModuleDetailResponse, UserProgress, CourseSection } from '../services/moduleService';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -39,9 +40,11 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
 
-  useEffect(() => {
-    loadCourseDetail();
-  }, [courseId]);
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCourseDetail();
+    }, [courseId])
+  );
 
   useEffect(() => {
     (async () => {
@@ -210,6 +213,14 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     </View>
   );
 
+  const handleLeaveReview = () => {
+    if (!userId) {
+      Alert.alert('Sign in required', 'Please sign in to leave a review.');
+      return;
+    }
+    navigation.navigate('LeaveReview', { courseId });
+  };
+
   const handleEnroll = async () => {
     if (isEnrolling) return;
     if (!userId) {
@@ -358,21 +369,35 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.sectionTitle}>Course Reviews</Text>
           
           {/* Rating Summary */}
-          <View style={styles.ratingSummary}>
-            <View style={styles.ratingOverview}>
-              <Text style={styles.ratingNumber}>{courseDetail.rating.toFixed(1)}</Text>
-              <View style={styles.starsContainer}>
-                {renderStarRating(courseDetail.rating)}
-              </View>
-              <Text style={styles.reviewCount}>{courseDetail.totalRatings} reviews</Text>
-            </View>
-            
-            {renderRatingBreakdown(courseDetail.ratingBreakdown)}
-          </View>
+          <View style={styles.reviewsSectionCard}>
+            {/* Top row: Left summary (with button) + Right breakdown */}
+            <View style={styles.reviewsTopRow}>
+              {/* Left: summary + button */}
+              <View style={styles.reviewsSummaryCol}>
+                <Text style={styles.ratingNumber}>{courseDetail.rating.toFixed(1)}</Text>
+                <View style={styles.starsContainer}>
+                  {renderStarRating(courseDetail.rating)}
+                </View>
+                <Text style={styles.reviewCount}>
+                  {courseDetail.totalRatings} ratings · {courseDetail.reviews.length} reviews
+                </Text>
 
-          {/* Individual Reviews */}
-          <View style={styles.reviewsList}>
-            {courseDetail.reviews.map(renderReview)}
+                <Pressable style={styles.leaveReviewButton} onPress={handleLeaveReview}>
+                  <Text style={styles.leaveReviewButtonText}>Leave a Review</Text>
+                </Pressable>
+              </View>
+
+              {/* Right: rating breakdown (kept as-is) */}
+              {renderRatingBreakdown(courseDetail.ratingBreakdown)}
+            </View>
+
+            {/* Divider */}
+            <View style={styles.reviewsDivider} />
+
+            {/* Reviews list (rows feel part of same section) */}
+            <View style={styles.reviewsListTight}>
+              {courseDetail.reviews.map(renderReview)}
+            </View>
           </View>
 
           {/* Enroll Button */}
@@ -651,17 +676,29 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 3,
   },
-  ratingSummary: {
-    flexDirection: 'row',
+  reviewsSectionCard: {
     backgroundColor: Colors.textInputBg,
-    padding: Spacing.lg,
     borderRadius: 12,
-    marginBottom: Spacing.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
-  ratingOverview: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.xl,
+  reviewsTopRow: {
+    flexDirection: 'row',
+  },
+  reviewsSummaryCol: {
+    width: screenWidth * 0.48,  // left column like the screenshot
+    maxWidth: 340,
+    paddingRight: Spacing.lg,
+    alignItems: 'flex-start',
+  },
+  reviewsDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.gray500,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  reviewsListTight: {
+    // keep empty — makes the list feel part of the same section
   },
   ratingNumber: {
     fontSize: 32,
@@ -708,19 +745,33 @@ const styles = StyleSheet.create({
     minWidth: 28,
     textAlign: 'right',
   },
-  reviewsList: {
-    marginBottom: Spacing.xl,
+  leaveReviewButton: {
+    backgroundColor: Colors.purple400,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.sm,
+    alignSelf: 'flex-start',
+    flexShrink: 0,
+  },
+  leaveReviewButtonText: {
+    color: Colors.white,
+    fontWeight: '600',
+    fontSize: TextStyles.body.fontSize,
   },
   reviewItem: {
-    backgroundColor: Colors.textInputBg,
-    padding: Spacing.lg,
-    borderRadius: 12,
-    marginBottom: Spacing.md,
+    backgroundColor: 'transparent',       // was Colors.textInputBg
+    paddingVertical: Spacing.md,          // a bit tighter
+    paddingHorizontal: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.gray500,
   },
   reviewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,             // was Spacing.sm
   },
   reviewerAvatar: {
     width: 32,

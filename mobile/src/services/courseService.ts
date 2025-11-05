@@ -21,6 +21,7 @@ const CACHE_CONFIG = {
 const ENDPOINTS = {
   COURSES: '/courses',
   USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
+  COURSE_REVIEWS: (courseId: string) => `/courses/${encodeURIComponent(courseId)}/reviews`,
 };
 
 
@@ -127,6 +128,36 @@ export interface EnrollApiResponse {
     enrollment_id: string;
     firstModuleId?: string;
   };
+}
+
+export interface CourseReview {
+  id: string;
+  rating: number;            // 1–5
+  review: string;            // text
+  createdAt: string;         // ISO
+  reviewerName: string;      // "Anonymous" or real name
+  reviewerAvatar: string|null;
+}
+
+export interface AddReviewPayload {
+  userId: string;
+  rating: number;
+  review: string;
+  isAnonymous?: boolean;
+}
+
+export interface AddReviewApiResponse {
+  success: boolean;
+  message: string;
+  data?: CourseReview;
+}
+
+// services/courseService.ts
+export interface UpdateReviewPayload {
+  userId: string;
+  rating: number;
+  review: string;
+  isAnonymous?: boolean;
 }
 
 // Cache utility functions
@@ -598,7 +629,7 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    */
   async enrollInCourse(userId: string, courseId: string): Promise<{ firstModuleId?: string }> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
-    userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
+    userId = '550e8400-e29b-41d4-a716-446655440102'; // Temporary override for testing
 
     const url = ENDPOINTS.USER_ENROLLMENTS(userId);
     const resp = await apiService.post<any>(url, {
@@ -631,6 +662,63 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
     }
   }
 
+  async getUserReview(courseId: string, userId: string): Promise<CourseReview | null> {
+    try {
+      const resp = await apiService.get<any>(
+        `${ENDPOINTS.COURSE_REVIEWS(courseId)}`,
+        { userId }
+      );
+      const data = resp?.data ?? resp;
+      return data ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+
+    /**
+     * Post a new review for a course
+     * POST /courses/:courseId/reviews
+     */
+    async postCourseReview(
+      courseId: string,
+      payload: AddReviewPayload
+    ): Promise<CourseReview> {
+      if (!courseId) throw new Error('Missing courseId');
+      if (!Number.isInteger(payload.rating) || payload.rating < 1 || payload.rating > 5) {
+        throw new Error('rating must be an integer 1–5');
+      }
+      if (!payload.review?.trim()) throw new Error('review text is required');
+
+      // TEMP override — mirror your other methods
+      const userId = '550e8400-e29b-41d4-a716-446655440101';
+
+      const url = ENDPOINTS.COURSE_REVIEWS(courseId);
+      const resp = await apiService.post<AddReviewApiResponse>(url, {
+        userId,
+        rating: payload.rating,
+        review: payload.review.trim(),
+        isAnonymous: !!payload.isAnonymous,
+      });
+
+      const data = (resp as any)?.data ?? (resp as any);
+      const review: CourseReview | undefined = data?.data ?? data;
+      if (!review) throw new Error('Invalid API response when posting review');
+      return review;
+    }
+
+  async updateCourseReview(courseId: string, payload: UpdateReviewPayload) {
+    const userId = '550e8400-e29b-41d4-a716-446655440101'; // same as postCourseReview override
+    const url = ENDPOINTS.COURSE_REVIEWS(courseId);
+    const resp = await apiService.put<AddReviewApiResponse>(url, {
+      userId,
+      rating: payload.rating,
+      review: payload.review.trim(),
+      isAnonymous: !!payload.isAnonymous,
+    });
+    const data: any = (resp as any)?.data ?? (resp as any);
+    return data?.data ?? data;
+  }
 
 }
 

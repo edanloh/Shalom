@@ -16,14 +16,28 @@ const API_CONFIG = {
 
 // Error types for better error handling
 export class ApiError extends Error {
+  status?: number;
+  statusCode?: number;
+  code?: string;
+  details?: any;
+  data?: any;
+  headers?: Record<string, string | null>;
+
   constructor(
     message: string,
-    public statusCode?: number,
-    public code?: string,
-    public details?: any
+    status?: number,
+    code?: string,
+    details?: any,
+    headers?: Record<string, string | null>
   ) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+    this.statusCode = status;
+    this.code = code;
+    this.details = details;
+    this.data = details;
+    this.headers = headers;
   }
 }
 
@@ -137,32 +151,62 @@ class ApiService {
   };
 
   // Error handling interceptor
-  private errorInterceptor: ResponseInterceptor = async (response) => {
-    if (!response.ok) {
-      // Read from a clone so we don't consume the original stream
-      const clone = response.clone();
-      let errorData: any = {};
-      try {
-        errorData = isJsonResponse(clone)
-          ? await safeParseJson(clone)
-          : { body: await clone.text() };
-      } catch { /* leave errorData minimal */ }
+private errorInterceptor: ResponseInterceptor = async (response) => {
+  if (!response.ok) {
+    // Clone so we can safely read the body
+    const clone = response.clone();
 
-      switch (response.status) {
-        case 400: throw new ApiError('Bad Request', 400, 'BAD_REQUEST', errorData);
-        case 401: throw new ApiError('Unauthorized', 401, 'UNAUTHORIZED', errorData);
-        case 403: throw new ApiError('Forbidden', 403, 'FORBIDDEN', errorData);
-        case 404: throw new ApiError('Not Found', 404, 'NOT_FOUND', errorData);
-        case 429: throw new ApiError('Too Many Requests', 429, 'RATE_LIMIT', errorData);
-        case 500: throw new ApiError('Internal Server Error', 500, 'SERVER_ERROR', errorData);
-        case 502: throw new ApiError('Bad Gateway', 502, 'BAD_GATEWAY', errorData);
-        case 503: throw new ApiError('Service Unavailable', 503, 'SERVICE_UNAVAILABLE', errorData);
-        default:  throw new ApiError(`HTTP Error ${response.status}`, response.status, 'HTTP_ERROR', errorData);
-      }
+    let errorData: any = {};
+    try {
+      errorData = isJsonResponse(clone)
+        ? await safeParseJson(clone)
+        : { body: await clone.text() };
+    } catch {
+      // leave errorData minimal
     }
-    // IMPORTANT: do not read body here for success
-    return response;
-  };
+
+    // Prefer server's message if present
+    const serverMsg =
+      (errorData && (errorData.message || errorData.error || errorData.reason)) ||
+      (typeof errorData === 'string' ? errorData : undefined);
+
+    // Capture useful IDs for CloudWatch correlation
+    const hdrs = {
+      'apigw-requestid': response.headers.get('apigw-requestid'),
+      'x-amzn-requestid': response.headers.get('x-amzn-requestid'),
+      'x-lambda-fn': response.headers.get('x-lambda-fn'),
+      'x-lambda-ver': response.headers.get('x-lambda-ver'),
+      'x-lambda-req': response.headers.get('x-lambda-req'),
+    };
+
+    const status = response.status;
+    const codeMap: Record<number, string> = {
+      400: 'BAD_REQUEST',
+      401: 'UNAUTHORIZED',
+      403: 'FORBIDDEN',
+      404: 'NOT_FOUND',
+      409: 'CONFLICT',
+      429: 'RATE_LIMIT',
+      500: 'SERVER_ERROR',
+      502: 'BAD_GATEWAY',
+      503: 'SERVICE_UNAVAILABLE',
+    };
+
+    const err = new ApiError(
+      serverMsg || `HTTP ${status}`,
+      status,
+      codeMap[status] || 'HTTP_ERROR',
+      errorData,
+      hdrs
+    );
+
+    // helpful console for debugging
+    console.log('[HTTP ✖]', response.url, status, hdrs, errorData);
+    throw err;
+  }
+
+  return response; // ok → let makeRequest() parse the body
+};
 
 
   // Build query string from parameters
