@@ -14,6 +14,7 @@ import SettingsScreen from '../Settings';
 import EditProfileScreen from '../EditProfile';
 import MyCourses from '../MyCourses';
 import WishlistScreen from '../WishlistScreen';
+import LeaveReviewScreen from '../LeaveReviewScreen';
 import UserManagementScreen from '../admin/UserManagement';
 import UserConfigScreen from '../admin/UserConfig';
 import { useAuth } from '../../contexts/AuthContext';
@@ -130,6 +131,11 @@ export default function MainNavigator() {
         name="Wishlist" 
         component={WishlistScreen} 
         options={{ headerShown: false }} 
+      />
+      <Stack.Screen
+        name="LeaveReview"
+        component={LeaveReviewScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
