@@ -41,6 +41,7 @@
     "expo-linear-gradient": "~15.0.7",
     "expo-modules-autolinking": "~3.0.17",
     "expo-status-bar": "~3.0.8",
+    "expo-video": "^3.0.15",
     "expo-web-browser": "~15.0.9",
     "node-fetch": "^3.3.2",
     "node-libs-react-native": "^1.2.1",

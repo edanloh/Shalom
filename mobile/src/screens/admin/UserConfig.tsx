@@ -1,20 +1,8 @@
 import { useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  TouchableOpacity,
-  StatusBar,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, Image, Switch, Button } from "react-native";
 import styles from "@/styles/styles";
-import { API_BASE_URL } from "react-native-dotenv";
-import { Switch } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
+import { Screen } from "@/components";
 
 export default function UserConfigScreen({ navigation, route }: any) {
   const { user } = route.params || {};
@@ -35,126 +23,103 @@ export default function UserConfigScreen({ navigation, route }: any) {
   }
 
   const [isInstructor, setIsInstructor] = useState(user.role === "instructor");
-  const toggleInstructor = () =>
-    setIsInstructor((previousState) => !previousState);
   const [isActivated, setIsActivated] = useState(false);
-  const toggleActivated = () =>
-    setIsActivated((previousState) => !previousState);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <ScrollView contentContainerStyle={styles.slimScrollContent}>
-          {/* Header */}
-          <View style={styles.screenHeader}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-            >
-              <Ionicons name="chevron-back" size={24} color="white" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Configure User</Text>
-            <TouchableOpacity>
-              <Ionicons
-                name="cog"
-                size={28}
-                color={"white"}
-                onPress={() => {
-                  navigation.navigate("UserConfig", { user });
-                }}
-              />
-            </TouchableOpacity>
-          </View>
-          {/* Form */}
-          <View style={styles.form}>
-            <View style={[styles.header, { marginBottom: 32 }]}>
-              <View style={[styles.logo, { marginBottom: 16 }]}>
-                <Image
-                  source={require("@assets/profile.png")}
-                  style={{ width: 100, height: 100, resizeMode: "contain" }}
-                />
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={[TextStyles.h3, { marginBottom: Spacing.sm }]}>
-                  {user?.name || "Unknown User"}
-                </Text>
-                {user?.authProvider && user?.authProvider == "Google" && (
-                  <Image
-                    source={require("@assets/google.png")}
-                    style={{
-                      width: 24,
-                      height: 24,
-                      resizeMode: "contain",
-                      marginLeft: 12,
-                      marginBottom: 8,
-                    }}
-                  />
-                )}
-              </View>
-              <Text style={TextStyles.bodyMedium}>
-                {user?.email || "Unknown Email"}
-              </Text>
-            </View>
-            <View>
-              <Text style={TextStyles.h4}>Account Settings</Text>
+    <Screen
+      title="Configure User"
+      navigation={navigation}
+      showSettingsButton
+      onSettingsPress={() => {
+        navigation.navigate("UserConfig", { user });
+      }}
+    >
+      <View style={[styles.header, { marginBottom: 32 }]}>
+        <View style={[styles.logo, { marginBottom: 16 }]}>
+          <Image
+            source={require("@assets/profile.png")}
+            style={{ width: 100, height: 100, resizeMode: "contain" }}
+          />
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={[TextStyles.h3, { marginBottom: Spacing.sm }]}>
+            {user?.name || "Unknown User"}
+          </Text>
+          {user?.authProvider && user?.authProvider == "Google" && (
+            <Image
+              source={require("@assets/google.png")}
+              style={{
+                width: 24,
+                height: 24,
+                resizeMode: "contain",
+                marginLeft: 12,
+                marginBottom: 8,
+              }}
+            />
+          )}
+        </View>
+        <Text style={TextStyles.bodyMedium}>
+          {user?.email || "Unknown Email"}
+        </Text>
+      </View>
+      <View>
+        <Text style={TextStyles.h4}>Account Settings</Text>
 
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingVertical: 4,
-                  backgroundColor: Colors.primary,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={TextStyles.body}>Instructor</Text>
-                </View>
-                <Switch
-                  onValueChange={toggleInstructor}
-                  value={isInstructor}
-                  trackColor={{
-                    false: Colors.gray500,
-                    true: Colors.secondary,
-                  }}
-                  thumbColor="#fff"
-                  ios_backgroundColor={Colors.backgroundGray}
-                />
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingVertical: 12,
-                  backgroundColor: Colors.primary,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={TextStyles.body}>Account Activated</Text>
-                </View>
-                <Switch
-                  onValueChange={toggleActivated}
-                  value={isActivated}
-                  trackColor={{
-                    false: Colors.gray500,
-                    true: Colors.secondary,
-                  }}
-                  thumbColor="#fff"
-                  ios_backgroundColor={Colors.backgroundGray}
-                />
-              </View>
-            </View>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingVertical: 12,
+            backgroundColor: Colors.primary,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={TextStyles.body}>Instructor</Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <Switch
+            onValueChange={setIsInstructor}
+            value={isInstructor}
+            trackColor={{
+              false: Colors.gray500,
+              true: Colors.secondary,
+            }}
+            thumbColor="#fff"
+            ios_backgroundColor={Colors.backgroundGray}
+          />
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingVertical: 12,
+            backgroundColor: Colors.primary,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={TextStyles.body}>Account Activated</Text>
+          </View>
+          <Switch
+            onValueChange={setIsActivated}
+            value={isActivated}
+            trackColor={{
+              false: Colors.gray500,
+              true: Colors.secondary,
+            }}
+            thumbColor="#fff"
+            ios_backgroundColor={Colors.backgroundGray}
+          />
+        </View>
+      </View>
+      <Button
+        title="Test Screen"
+        onPress={() => navigation.navigate("TestScreen")}
+      />
+    </Screen>
   );
 }

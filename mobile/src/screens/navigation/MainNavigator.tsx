@@ -20,6 +20,7 @@ import UserConfigScreen from '../admin/UserConfig';
 import { useAuth } from '../../contexts/AuthContext';
 import type { TabParamList, MainStackParamList } from '@/types/navigation';
 import { ADMIN_EMAIL } from '../../constants';
+import TestScreen from '../TestScreen';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
@@ -135,6 +136,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="LeaveReview"
         component={LeaveReviewScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="TestScreen"
+        component={TestScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

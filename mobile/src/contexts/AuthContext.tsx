@@ -103,25 +103,25 @@ const extractUserFromAttributes = (
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // const [user, setUser] = useState<User | null>(null);
+  // const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
   // Set the below to skip auth during development
-  // const [user, setUser] = useState<User | null>({
-  //   id: "550e8400-e29b-41d4-a716-446655440101",
-  //   email: "testuser@example.com",
-  //   username: "testuser",
-  //   name: "Test User",
-  //   role: "learner",
-  //   avatar:
-  //     "https://ui-avatars.com/api/?name=Test+User&size=50&background=6366F1&color=fff",
-  //   bio: "Learning enthusiast exploring various courses",
-  //   location: "Singapore",
-  //   phone: "+65 9123 4567",
-  //   authProvider: "email",
-  // });
-  // const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [user, setUser] = useState<User | null>({
+    id: "550e8400-e29b-41d4-a716-446655440101",
+    email: "shalomfyp@gmail.com",
+    username: "shalomfyp",
+    name: "Shalom FYP",
+    role: "learner",
+    avatar:
+      "https://ui-avatars.com/api/?name=Shalom+FYP&size=50&background=6366F1&color=fff",
+    bio: "Learning enthusiast exploring various courses",
+    location: "Singapore",
+    phone: "+65 9123 4567",
+    authProvider: "email",
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   useEffect(() => {
     loadStoredAuth();

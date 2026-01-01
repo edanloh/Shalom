@@ -7,10 +7,11 @@ import {
   ActivityIndicator,
   Dimensions,
   ScrollView,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { YouTubePlayerWrapper } from "@/components/YouTubePlayerWrapper";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
@@ -64,9 +65,14 @@ const LessonPlayer = () => {
   const navigation = useNavigation<LessonPlayerNavigationProp>();
   const { videoId, courseId, sectionId, userId } = route.params as any;
 
-  const videoRef = useRef<Video>(null);
   const youtubePlayerRef = useRef<any>(null);
+  const videoViewRef = useRef<any>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [videoSource, setVideoSource] = useState<string>("");
+
+  const player = useVideoPlayer(videoSource, (player) => {
+    player.loop = false;
+  });
 
   const [loading, setLoading] = useState(true);
   const [videoDetail, setVideoDetail] = useState<VideoDetail | null>(null);
@@ -159,11 +165,10 @@ const LessonPlayer = () => {
         }
       } else {
         setIsYouTubeVideo(false);
+        setVideoSource(data.video_url);
         // For direct videos, set position after video loads
-        if (data.userProgress?.last_position_seconds && videoRef.current) {
-          await videoRef.current.setPositionAsync(
-            data.userProgress.last_position_seconds * 1000
-          );
+        if (data.userProgress?.last_position_seconds) {
+          player.currentTime = data.userProgress.last_position_seconds;
         }
       }
     } catch (err: any) {
@@ -207,73 +212,99 @@ const LessonPlayer = () => {
         isCompleted,
         lastPositionSeconds: Math.floor(currentPosition),
       });
-
     } catch (err) {
       console.error(" Error saving progress:", err);
     }
   };
 
-  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (status.isLoaded) {
-      const newPosition = status.positionMillis / 1000;
-      const newDuration = status.durationMillis
-        ? status.durationMillis / 1000
-        : 0;
+  // Monitor player status changes
+  useEffect(() => {
+    if (!player || isYouTubeVideo) return;
 
-      console.log("📹 Playback status update:", {
-        position: newPosition.toFixed(2),
-        duration: newDuration.toFixed(2),
-        isPlaying: status.isPlaying,
-      });
+    const interval = setInterval(() => {
+      setCurrentPosition(player.currentTime);
+      setDuration(player.duration);
+      setIsPlaying(player.playing);
+    }, 100);
 
-      setCurrentPosition(newPosition);
-      setDuration(newDuration);
-      setIsPlaying(status.isPlaying);
+    return () => clearInterval(interval);
+  }, [player, isYouTubeVideo]);
 
-      if (status.didJustFinish) {
-        console.log("🏁 Video finished!");
-        saveProgress();
-      }
-    }
-  };
+  // Listen for playback end
+  useEffect(() => {
+    if (!player || isYouTubeVideo) return;
 
-  const togglePlayPause = async () => {
-    // console.log("🎬 Toggle play/pause - current state:", {
-    //   isPlaying,
-    //   isYouTubeVideo,
-    // });
+    const subscription = player.addListener("playToEnd", () => {
+      console.log("🏁 Video finished!");
+      saveProgress();
+    });
 
+    return () => {
+      subscription.remove();
+    };
+  }, [player, isYouTubeVideo]);
+
+  const togglePlayPause = () => {
     if (isYouTubeVideo) {
       // YouTube player controls managed by component
       setIsPlaying(!isPlaying);
-    } else if (videoRef.current) {
-      if (isPlaying) {
-        await videoRef.current.pauseAsync();
+    } else if (player) {
+      if (player.playing) {
+        player.pause();
       } else {
-        await videoRef.current.playAsync();
+        player.play();
       }
     }
   };
 
-  const handleSeek = async (seconds: number) => {
-    if (videoRef.current) {
+  const handleSeek = (seconds: number) => {
+    if (player) {
       const newPosition = Math.max(
         0,
         Math.min(currentPosition + seconds, duration)
       );
-      await videoRef.current.setPositionAsync(newPosition * 1000);
+      player.currentTime = newPosition;
     }
   };
 
-  const handleSpeedChange = async () => {
+  const handleSpeedChange = () => {
     const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
     const currentIndex = speeds.indexOf(playbackSpeed);
     const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
 
-    if (videoRef.current) {
-      await videoRef.current.setRateAsync(nextSpeed, true);
+    if (player) {
+      player.playbackRate = nextSpeed;
       setPlaybackSpeed(nextSpeed);
     }
+  };
+
+  const handleProgressBarPress = (event: any) => {
+    if (!player || !duration || duration <= 0 || !isFinite(duration)) return;
+
+    // Get the touch position relative to the progress bar
+    const { pageX } = event.nativeEvent;
+
+    // Measure the progress bar to get its actual position and width
+    event.target.measure(
+      (
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        pageX: number,
+        pageY: number
+      ) => {
+        const touchX = event.nativeEvent.pageX - pageX;
+        const percentage = Math.max(0, Math.min(1, touchX / width));
+        const newTime = percentage * duration;
+
+        // Additional safety check
+        if (isFinite(newTime) && newTime >= 0) {
+          player.currentTime = newTime;
+          setCurrentPosition(newTime);
+        }
+      }
+    );
   };
 
   const handleNextVideo = () => {
@@ -297,6 +328,12 @@ const LessonPlayer = () => {
         sectionId,
         userId,
       });
+    }
+  };
+
+  const handleFullScreen = () => {
+    if (videoViewRef.current) {
+      videoViewRef.current.enterFullscreen();
     }
   };
 
@@ -424,7 +461,7 @@ const LessonPlayer = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -467,91 +504,121 @@ const LessonPlayer = () => {
               }}
             />
           ) : (
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={() => setShowControls(!showControls)}
-              style={styles.videoWrapper}
-            >
-              <Video
-                ref={videoRef}
-                source={{ uri: videoDetail.video_url }}
+            <View style={styles.videoWrapper}>
+              <VideoView
+                ref={videoViewRef}
+                player={player}
                 style={styles.video}
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay={false}
-                onPlaybackStatusUpdate={onPlaybackStatusUpdate}
-                useNativeControls={false}
+                nativeControls={false}
+                contentFit="contain"
+                fullscreenOptions={{ enable: true }}
+                allowsPictureInPicture
+                startsPictureInPictureAutomatically
               />
 
-              {/* Custom Controls Overlay */}
-              {showControls && (
-                <View style={styles.controlsOverlay}>
-                  {/* Top Controls */}
-                  <View style={styles.topControls}>
-                    <TouchableOpacity
-                      style={styles.speedButton}
-                      onPress={handleSpeedChange}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.speedText}>{playbackSpeed}x</Text>
-                    </TouchableOpacity>
-                  </View>
+              {/* Touchable overlay for showing/hiding controls */}
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => setShowControls(!showControls)}
+                style={styles.touchableOverlay}
+              >
+                {/* Custom Controls Overlay */}
+                {showControls && (
+                  <View style={styles.controlsOverlay} pointerEvents="box-none">
+                    {/* Top Controls */}
+                    <View style={styles.topControls}>
+                      <TouchableOpacity
+                        style={styles.speedButton}
+                        onPress={handleSpeedChange}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.speedText}>{playbackSpeed}x</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                  {/* Center Play/Pause */}
-                  <View style={styles.centerControls}>
-                    <TouchableOpacity
-                      onPress={() => handleSeek(-10)}
-                      activeOpacity={0.8}
-                      style={styles.seekButton}
-                    >
-                      <Ionicons
-                        name="play-back"
-                        size={32}
-                        color={Colors.white}
-                      />
-                    </TouchableOpacity>
+                    {/* Center Play/Pause */}
+                    <View style={styles.centerControls}>
+                      <TouchableOpacity
+                        onPress={() => handleSeek(-10)}
+                        activeOpacity={0.8}
+                        style={styles.seekButton}
+                      >
+                        <Ionicons
+                          name="play-back"
+                          size={32}
+                          color={Colors.white}
+                        />
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      onPress={togglePlayPause}
-                      style={styles.playButton}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={isPlaying ? "pause" : "play"}
-                        size={40}
-                        color={Colors.white}
-                      />
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={togglePlayPause}
+                        style={styles.playButton}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={isPlaying ? "pause" : "play"}
+                          size={40}
+                          color={Colors.white}
+                        />
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      onPress={() => handleSeek(10)}
-                      activeOpacity={0.8}
-                      style={styles.seekButton}
-                    >
-                      <Ionicons
-                        name="play-forward"
-                        size={32}
-                        color={Colors.white}
-                      />
-                    </TouchableOpacity>
-                  </View>
+                      <TouchableOpacity
+                        onPress={() => handleSeek(10)}
+                        activeOpacity={0.8}
+                        style={styles.seekButton}
+                      >
+                        <Ionicons
+                          name="play-forward"
+                          size={32}
+                          color={Colors.white}
+                        />
+                      </TouchableOpacity>
+                    </View>
 
-                  {/* Bottom Controls */}
-                  <View style={styles.bottomControls}>
-                    <Text style={styles.timeText}>
-                      {formatTime(currentPosition)} / {formatTime(duration)}
-                    </Text>
-                    <View style={styles.progressBar}>
+                    {/* Bottom Controls */}
+                    <View style={styles.bottomControls}>
                       <View
-                        style={[
-                          styles.progressFill,
-                          { width: `${(currentPosition / duration) * 100}%` },
-                        ]}
-                      />
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Text style={styles.timeText}>
+                          {formatTime(currentPosition)} / {formatTime(duration)}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => handleFullScreen()}
+                          activeOpacity={0.8}
+                          style={{ paddingHorizontal: 12, marginBottom: 8 }}
+                        >
+                          <Ionicons
+                            name="tablet-landscape-outline"
+                            size={24}
+                            color={Colors.white}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      <Pressable
+                        onPress={handleProgressBarPress}
+                        hitSlop={{ top: 10, bottom: 10, left: 0, right: 0 }}
+                      >
+                        <View style={styles.progressBar}>
+                          <View
+                            style={[
+                              styles.progressFill,
+                              {
+                                width: `${(currentPosition / duration) * 100}%`,
+                              },
+                            ]}
+                          />
+                        </View>
+                      </Pressable>
                     </View>
                   </View>
-                </View>
-              )}
-            </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -750,7 +817,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray600,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: Spacing.sm,
+    marginRight: Spacing.md,
   },
   headerContent: {
     flex: 1,
@@ -784,6 +851,9 @@ const styles = StyleSheet.create({
   video: {
     width: "100%",
     height: "100%",
+  },
+  touchableOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
   controlsOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -822,25 +892,27 @@ const styles = StyleSheet.create({
     height: 64,
     justifyContent: "center",
     alignItems: "center",
+    opacity: 0.8,
   },
   bottomControls: {
     padding: Spacing.md,
   },
   timeText: {
     color: Colors.white,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "500",
     marginBottom: 8,
   },
   progressBar: {
-    height: 4,
+    height: 8,
     backgroundColor: "rgba(255,255,255,0.3)",
-    borderRadius: 2,
+    borderRadius: 4,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
     backgroundColor: Colors.purple400,
+    opacity: 0.8,
   },
   infoCard: {
     backgroundColor: Colors.gray600,

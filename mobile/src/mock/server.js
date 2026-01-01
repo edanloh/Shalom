@@ -25,16 +25,115 @@ const endpointMap = {
   GET: {
     "/health": () => db.health,
     "/courses": () => db.courses,
-    "/courses/enrollment/:userId": (params) => db.enrollments[params.userId],
+    "/courses/enrollment/:userId": (params) =>
+      db.enrollments[params.userId] || db.enrollments.default,
     "/courses/enrollment/:userId/wishlist": (params) =>
-      db.wishlist[params.userId],
-    "/courses/:courseId": (params) => db["course-details"][params.courseId],
+      db.wishlist[params.userId] || db.wishlist.default,
+    "/courses/:courseId": (params) =>
+      db["course-details"][params.courseId] || db["course-details"]["1"],
+    "/courses/:courseId/module": (params, body, query) => {
+      const courseId = params.courseId;
+      const userId = query.userId;
+      return db["module-details"][courseId] || db["module-details"]["1"];
+    },
+    "/courses/:courseId/module/videos/:videoId": (params, body, query) => {
+      const videoId = params.videoId;
+      return db["video-details"][videoId] || db["video-details"]["vid_1"];
+    },
+    "/courses/:courseId/module/quizzes/:quizId": (params, body, query) => {
+      const quizId = params.quizId;
+      return db["quiz-details"][quizId] || db["quiz-details"]["quiz_1"];
+    },
+    "/courses/:courseId/reviews": (params, body, query) => {
+      const courseId = params.courseId;
+      const userId = query.userId;
+      // Return user's review if exists
+      return db["user-reviews"][`${userId}_${courseId}`] || null;
+    },
+    "/dev/getAllUserInfo": () => db["all-users-info"].data,
   },
   POST: {
-    "/courses/enrollment/:userId/wishlist": (params, body) => ({
+    "/courses/enrollment/:userId/wishlist": (params, body, query) => ({
       success: true,
-      message: `Course ${body.courseId || "unknown"} added to wishlist`,
-      data: { added: true, courseId: body.courseId },
+      message: `Course ${
+        query.courseId || body.courseId || "unknown"
+      } added to wishlist`,
+      data: { added: true, courseId: query.courseId || body.courseId },
+    }),
+    "/courses/enrollment/:userId": (params, body) => ({
+      success: true,
+      message: "Successfully enrolled in course",
+      data: {
+        enrollment_id: `enr_${Date.now()}`,
+        firstModuleId: "sec_1",
+      },
+    }),
+    "/courses/:courseId/module/videos/progress": (params, body) => ({
+      success: true,
+      message: "Video progress updated successfully",
+      data: {
+        videoProgress: {
+          user_id: body.userId,
+          video_id: body.videoId,
+          watch_time_seconds: body.watchTimeSeconds,
+          is_completed: body.isCompleted,
+          last_position_seconds: body.lastPositionSeconds,
+          updated_at: new Date().toISOString(),
+        },
+        courseProgress: {
+          progress_percentage: "75",
+          is_completed: false,
+          completed_videos: 18,
+          total_videos: 24,
+        },
+      },
+    }),
+    "/courses/:courseId/module/quizzes/:quizId": (params, body) => ({
+      success: true,
+      message: "Quiz submitted successfully",
+      data: {
+        score: 80,
+        totalQuestions: 5,
+        correctAnswers: 4,
+        isPassed: true,
+        attemptNumber: 1,
+        attemptsRemaining: 2,
+        answers: body.answers.map((ans, idx) => ({
+          questionId: ans.questionId,
+          isCorrect: idx < 4,
+          correctAnswer: "Option A",
+        })),
+      },
+    }),
+    "/courses/:courseId/reviews": (params, body) => ({
+      success: true,
+      message: "Review posted successfully",
+      data: {
+        id: `review_${Date.now()}`,
+        rating: body.rating,
+        review: body.review,
+        createdAt: new Date().toISOString(),
+        reviewerName: body.isAnonymous ? "Anonymous" : "User Name",
+        reviewerAvatar: body.isAnonymous
+          ? null
+          : "https://ui-avatars.com/api/?name=User+Name&size=40",
+      },
+    }),
+  },
+  PUT: {
+    "/courses/:courseId/reviews": (params, body) => ({
+      success: true,
+      message: "Review updated successfully",
+      data: {
+        id: `review_${Date.now()}`,
+        rating: body.rating,
+        review: body.review,
+        createdAt: new Date().toISOString(),
+        reviewerName: body.isAnonymous ? "Anonymous" : "User Name",
+        reviewerAvatar: body.isAnonymous
+          ? null
+          : "https://ui-avatars.com/api/?name=User+Name&size=40",
+      },
     }),
   },
   DELETE: {
@@ -103,10 +202,10 @@ app.patch("*", handleRequest("PATCH"));
 app.delete("*", handleRequest("DELETE"));
 
 app.listen(PORT, () => {
-  console.log(`🚀 Mock API server running at http://localhost:${PORT}`);
+  console.log(`🚀 Mock API server running at port ${PORT}`);
   console.log("📊 Available endpoints:");
   Object.entries(endpointMap).forEach(([method, endpoints]) => {
-    Object.keys(endpoints).forEach(endpoint => {
+    Object.keys(endpoints).forEach((endpoint) => {
       console.log(`   ${method} ${endpoint}`);
     });
   });

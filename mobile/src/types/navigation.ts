@@ -13,6 +13,7 @@ export type MainStackParamList = {
   Wishlist: undefined;
   UserManagement: undefined;
   UserConfig: undefined;
+  TestScreen: undefined;
 };
 
 export type TabParamList = {
