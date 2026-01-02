@@ -8,6 +8,7 @@ interface ScreenHeaderProps {
   subtitle?: string;
   headerLeftIcon?: string;
   headerRightIcon?: string;
+  headerRightComponent?: React.ReactNode;
   onHeaderLeftPress?: () => void;
   onHeaderRightPress?: () => void;
 }
@@ -17,6 +18,7 @@ export default function ScreenHeader({
   subtitle,
   headerLeftIcon,
   headerRightIcon,
+  headerRightComponent,
   onHeaderLeftPress,
   onHeaderRightPress,
 }: ScreenHeaderProps) {
@@ -39,12 +41,17 @@ export default function ScreenHeader({
 
       <View
         style={{
-          flex: 1,
+          position: "absolute",
+          left: 0,
+          right: 0,
           alignItems: "center",
           justifyContent: "center",
         }}
+        pointerEvents="box-none"
       >
-        <Text style={styles.headerTitle}>{title}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {title}
+        </Text>
         {subtitle && (
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {subtitle}
@@ -52,7 +59,9 @@ export default function ScreenHeader({
         )}
       </View>
 
-      {headerRightIcon && onHeaderRightPress ? (
+      {headerRightComponent ? (
+        headerRightComponent
+      ) : headerRightIcon && onHeaderRightPress ? (
         <TouchableOpacity onPress={onHeaderRightPress}>
           <Ionicons name={headerRightIcon as any} size={28} color="white" />
         </TouchableOpacity>

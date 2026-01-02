@@ -19,6 +19,7 @@ interface ScreenProps {
   navigation?: any;
   headerLeftIcon?: string;
   headerRightIcon?: string;
+  headerRightComponent?: React.ReactNode;
   onHeaderLeftPress?: () => void;
   onHeaderRightPress?: () => void;
   customScreenStyle?: object;
@@ -34,6 +35,7 @@ export default function Screen({
   navigation,
   headerLeftIcon,
   headerRightIcon,
+  headerRightComponent,
   onHeaderLeftPress,
   onHeaderRightPress,
   customScreenStyle,
@@ -47,6 +49,7 @@ export default function Screen({
       subtitle={subtitle}
       headerLeftIcon={headerLeftIcon}
       headerRightIcon={headerRightIcon}
+      headerRightComponent={headerRightComponent}
       onHeaderLeftPress={onHeaderLeftPress || (() => navigation?.goBack())}
       onHeaderRightPress={onHeaderRightPress}
     />
@@ -73,7 +76,6 @@ export default function Screen({
                 onRefresh={onRefresh}
                 tintColor={Colors.secondary}
                 colors={[Colors.secondary]}
-                
               />
             ) : undefined
           }

@@ -18,6 +18,9 @@ interface CustomTextInputProps {
   showPassword?: boolean;
   onTogglePassword?: () => void;
   style?: any;
+  multiline?: boolean;
+  numberOfLines?: number;
+  textAlignVertical?: "auto" | "top" | "bottom";
   inputContainerStyle?: any;
   leftIconName?: keyof typeof Ionicons.glyphMap;
   eyeIconStyle?: any;
@@ -48,6 +51,9 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
   showPassword,
   onTogglePassword,
   style,
+  multiline = false,
+  numberOfLines,
+  textAlignVertical,
   inputContainerStyle,
   leftIconName,
   eyeIconStyle,
@@ -73,7 +79,10 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
             name={leftIconName}
             size={20}
             color="white"
-            style={styles.inputIcon}
+            style={[
+              styles.inputIcon,
+              multiline && { alignSelf: "flex-start", paddingTop: Spacing.lg },
+            ]}
           />
         )}
         <TextInput
@@ -91,17 +100,22 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
           placeholderTextColor={Colors.textSecondary}
           onSubmitEditing={onSubmitEditing}
           returnKeyType={returnKeyType}
-          
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          textAlignVertical={textAlignVertical}
         />
-        <TouchableOpacity
-          onPress={() => onChangeText("")}
-          style={[
-            styles.eyeIcon,
-            { paddingRight: onTogglePassword ? 0 : Spacing.md },
-          ]}
-        >
-          <Ionicons name={"close-circle-outline"} size={20} color="white" />
-        </TouchableOpacity>
+        {value.length > 0 && (
+          <TouchableOpacity
+            onPress={() => onChangeText("")}
+            style={[
+              styles.eyeIcon,
+              { paddingRight: onTogglePassword ? 0 : Spacing.md },
+              multiline && { alignSelf: "flex-start", paddingTop: Spacing.lg },
+            ]}
+          >
+            <Ionicons name={"close-circle-outline"} size={20} color="white" />
+          </TouchableOpacity>
+        )}
         {onTogglePassword && (
           <TouchableOpacity
             onPress={onTogglePassword}

@@ -9,6 +9,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
   },
   fullScrollContent: { 
     flexGrow: 1, 
@@ -21,7 +22,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     marginVertical: Spacing.sm,
-    height: 50,
+    minHeight: 50,
     backgroundColor: Colors.primary,
   },
   header: { 
