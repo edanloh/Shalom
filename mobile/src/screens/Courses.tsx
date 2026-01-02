@@ -5,9 +5,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  TextInput,
   Dimensions,
-  ScrollView,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +17,7 @@ import type { Course } from "../types";
 import { ImageWithFallback } from "@components/common";
 import { Images } from "../../assets";
 import Screen from "../components/common/Screen";
+import { CustomTextInput } from "@/components";
 const { width } = Dimensions.get("window");
 
 const CARD_BG = "#3A3A45";
@@ -257,31 +256,15 @@ export default function CoursesScreen({ navigation }: any) {
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: Spacing.lg * 2 }}
-        showsVerticalScrollIndicator={false}
-      >
         {/* Search */}
-        <View style={styles.searchWrap}>
-          <Ionicons name="search" size={18} color={Colors.textSecondary} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search for courses"
-            placeholderTextColor={Colors.textSecondary}
-            style={styles.searchInput}
-            returnKeyType="search"
-          />
-          {query ? (
-            <TouchableOpacity
-              onPress={() => setQuery("")}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close" size={18} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
+        <CustomTextInput
+          placeholder="Search for courses"
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize={"none"}
+          leftIconName="search"
+          returnKeyType="search"
+        />
 
         {/* Tag chips (from course.tags, no duplicates) */}
         <FlatList
@@ -306,13 +289,12 @@ export default function CoursesScreen({ navigation }: any) {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsRow}
-          style={{ marginTop: 4 }}
         />
 
         {/* Jump Back In */}
         {jumpBackIn.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Jump Back In</Text>
+            <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>Jump Back In</Text>
             <FlatList<Course>
               data={jumpBackIn}
               keyExtractor={(i) => i.id}
@@ -328,7 +310,7 @@ export default function CoursesScreen({ navigation }: any) {
         {/* Recommended (not enrolled) */}
         {!query && (
           <>
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.sm }]}>
+            <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
               Recommended
             </Text>
 
@@ -358,7 +340,7 @@ export default function CoursesScreen({ navigation }: any) {
         )}
 
         {/* Popular Courses (clean grid, not enrolled, tag + query filtered) */}
-        <Text style={[styles.sectionTitle, { marginTop: Spacing.sm }]}>
+        <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
           Popular Courses
         </Text>
         {loading || refreshing ? (
@@ -373,7 +355,6 @@ export default function CoursesScreen({ navigation }: any) {
             renderItem={({ item }) => <GCard item={item} />}
             numColumns={2}
             columnWrapperStyle={{ justifyContent: "space-between" }}
-            contentContainerStyle={styles.grid}
             scrollEnabled={false}
             extraData={wishlist}
           />
@@ -384,48 +365,13 @@ export default function CoursesScreen({ navigation }: any) {
             subtext="Pull down to refresh."
           />
         )}
-      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.primary },
-
-  header: {
-    alignItems: "center",
-    paddingVertical: Spacing.sm,
-  },
-  headerTitle: {
-    fontFamily: TextStyles.h4.fontFamily,
-    fontSize: TextStyles.h4.fontSize,
-    color: Colors.textPrimary,
-    fontWeight: "700",
-  },
-
-  // Search
-  searchWrap: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
-    backgroundColor: "#3A3C46",
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  searchInput: {
-    flex: 1,
-    color: Colors.textPrimary,
-    marginLeft: 8,
-    fontSize: TextStyles.body.fontSize,
-    fontFamily: TextStyles.body.fontFamily,
-  },
-
   // Chips
   chipsRow: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
   },
   chip: {
@@ -436,10 +382,14 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: CHIP_BORDER,
     marginRight: 10,
+    height: 38,
+    justifyContent: "center",
   },
   chipActive: {
     backgroundColor: Colors.purple400,
     borderColor: Colors.purple400,
+    height: 38,
+    justifyContent: "center",
   },
   chipText: {
     color: Colors.textSecondary,
@@ -449,17 +399,6 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: "#fff",
-  },
-
-  // Section title
-  sectionTitle: {
-    color: Colors.textPrimary,
-    fontFamily: TextStyles.h3.fontFamily,
-    fontSize: TextStyles.h4.fontSize,
-    fontWeight: "700",
-    marginTop: 6,
-    marginBottom: 12,
-    paddingHorizontal: Spacing.lg,
   },
 
   loadingContainer: {
@@ -500,7 +439,7 @@ const styles = StyleSheet.create({
   },
 
   // Horizontal cards
-  hRow: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+  hRow: { paddingBottom: Spacing.sm },
   hCard: {
     width: Math.min(width * 0.72, 300),
     marginRight: 12,
@@ -555,12 +494,12 @@ const styles = StyleSheet.create({
   },
 
   // Grid cards (Popular)
-  grid: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
   gCard: {
-    width: (width - Spacing.lg * 2 - 12) / 2,
+    width: (width - Spacing.lg * 2 - 32) / 2,
     backgroundColor: "transparent",
     borderRadius: 16,
     marginBottom: Spacing.lg,
+    marginRight: Spacing.base, 
   },
   gImage: {
     width: "100%",
