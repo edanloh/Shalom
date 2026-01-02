@@ -22,6 +22,8 @@ import type {
   QuizDetailResponse,
   SubmitQuizResponse,
 } from "@/services";
+import Screen from "@/components/common/Screen";
+import ActionButton from "@/components/ActionButton";
 
 type QuizDetail = QuizDetailResponse["data"];
 type QuizResult = SubmitQuizResponse["data"];
@@ -412,42 +414,39 @@ const QuizScreen = () => {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Modern Header */}
-      <View style={styles.modernHeader}>
-        <TouchableOpacity
-          onPress={() => {
-            Alert.alert(
-              "Exit Quiz",
-              "Are you sure you want to exit? Your progress will be lost.",
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Exit",
-                  style: "destructive",
-                  onPress: () => navigation.goBack(),
-                },
-              ]
-            );
-          }}
-          style={styles.closeButton}
-        >
-          <Ionicons name="close" size={28} color={Colors.white} />
-        </TouchableOpacity>
-
-        <Text style={styles.modernHeaderTitle}>Quiz</Text>
-
-        {timeRemaining !== null && timerActive && !reviewMode && (
-          <View style={styles.modernTimer}>
-            <Ionicons name="time-outline" size={18} color={Colors.yellow} />
-            <Text style={styles.modernTimerText}>
-              {formatTime(timeRemaining)}
-            </Text>
-          </View>
-        )}
-        {!timerActive && !reviewMode && <View style={{ width: 80 }} />}
-      </View>
-
+    <Screen
+      title="Quiz"
+      navigation={navigation}
+      headerLeftIcon="close"
+      customEdges={["top", "bottom"]}
+      onHeaderLeftPress={() => {
+        Alert.alert(
+          "Exit Quiz",
+          "Are you sure you want to exit? Your progress will be lost.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Exit",
+              style: "destructive",
+              onPress: () => navigation.goBack(),
+            },
+          ]
+        );
+      }}
+      headerRightComponent={
+        <>
+          {timeRemaining !== null && timerActive && !reviewMode && (
+            <View style={styles.modernTimer}>
+              <Ionicons name="time-outline" size={18} color={Colors.yellow} />
+              <Text style={styles.modernTimerText}>
+                {formatTime(timeRemaining)}
+              </Text>
+            </View>
+          )}
+          {!timerActive && !reviewMode && <View style={{ width: 80 }} />}
+        </>
+      }
+    >
       {/* Segmented Progress Bar */}
       <View style={styles.segmentedProgressContainer}>
         <Text style={styles.progressLabel}>
@@ -477,165 +476,141 @@ const QuizScreen = () => {
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Question Card */}
-        <View style={styles.modernQuestionCard}>
-          {/* Question Image - Only show if image_url exists */}
-          {currentQuestion.image_url && (
-            <View style={styles.questionImageContainer}>
-              <View style={styles.questionImagePlaceholder}>
-                <Ionicons
-                  name="image"
-                  size={64}
-                  color={Colors.purple400 + "40"}
-                />
-                {/* TODO: Replace with actual image when available */}
-                {/* <Image source={{ uri: currentQuestion.image_url }} style={styles.questionImage} /> */}
-              </View>
+      {/* Question Card */}
+      <View style={styles.modernQuestionCard}>
+        {/* Question Image - Only show if image_url exists */}
+        {currentQuestion.image_url && (
+          <View style={styles.questionImageContainer}>
+            <View style={styles.questionImagePlaceholder}>
+              <Ionicons
+                name="image"
+                size={64}
+                color={Colors.purple400 + "40"}
+              />
+              {/* TODO: Replace with actual image when available */}
+              {/* <Image source={{ uri: currentQuestion.image_url }} style={styles.questionImage} /> */}
             </View>
-          )}
+          </View>
+        )}
 
-          <Text style={styles.modernQuestionText}>
-            {currentQuestion.question_text}
-          </Text>
-        </View>
+        <Text style={styles.modernQuestionText}>
+          {currentQuestion.question_text}
+        </Text>
+      </View>
 
-        {/* Options */}
-        <View style={styles.modernOptionsContainer}>
-          {currentQuestion.options.map((option, index) => {
-            const isSelected =
-              selectedAnswers.get(currentQuestion.id) === option.option_text;
+      {/* Options */}
+      <View style={styles.modernOptionsContainer}>
+        {currentQuestion.options.map((option, index) => {
+          const isSelected =
+            selectedAnswers.get(currentQuestion.id) === option.option_text;
 
-            // In review mode, determine if this option is correct/incorrect
-            let borderColor = "#3a3a4e";
-            let backgroundColor = "#2a2a3e";
-            let showCheckmark = false;
-            let showCross = false;
+          // In review mode, determine if this option is correct/incorrect
+          let borderColor = "#3a3a4e";
+          let backgroundColor = "#2a2a3e";
+          let showCheckmark = false;
+          let showCross = false;
 
-            if (reviewMode && correctAnswerForCurrentQuestion) {
-              const isCorrectAnswer =
-                option.option_text ===
-                correctAnswerForCurrentQuestion.correctAnswer;
-              const userAnswer = selectedAnswers.get(currentQuestion.id);
-              const wasUserAnswer = option.option_text === userAnswer;
+          if (reviewMode && correctAnswerForCurrentQuestion) {
+            const isCorrectAnswer =
+              option.option_text ===
+              correctAnswerForCurrentQuestion.correctAnswer;
+            const userAnswer = selectedAnswers.get(currentQuestion.id);
+            const wasUserAnswer = option.option_text === userAnswer;
 
-              if (isCorrectAnswer) {
-                // This is the correct answer - show green
-                borderColor = Colors.green;
-                backgroundColor = "#1a3a2a";
-                showCheckmark = true;
-              } else if (wasUserAnswer && !isCorrectAnswer) {
-                // User selected this wrong answer - show red
-                borderColor = Colors.red;
-                backgroundColor = "#3a1a1a";
-                showCross = true;
-              }
-            } else if (isSelected) {
-              // Normal mode - show purple for selected
-              borderColor = Colors.purple400;
-              backgroundColor = "#3a2a5e";
+            if (isCorrectAnswer) {
+              // This is the correct answer - show green
+              borderColor = Colors.green;
+              backgroundColor = "#1a3a2a";
+              showCheckmark = true;
+            } else if (wasUserAnswer && !isCorrectAnswer) {
+              // User selected this wrong answer - show red
+              borderColor = Colors.red;
+              backgroundColor = "#3a1a1a";
+              showCross = true;
             }
+          } else if (isSelected) {
+            // Normal mode - show purple for selected
+            borderColor = Colors.purple400;
+            backgroundColor = "#3a2a5e";
+          }
 
-            return (
-              <TouchableOpacity
-                key={option.id}
+          return (
+            <TouchableOpacity
+              key={option.id}
+              style={[
+                styles.modernOptionCard,
+                { borderColor, backgroundColor },
+              ]}
+              onPress={() =>
+                !reviewMode &&
+                handleAnswerSelect(currentQuestion.id, option.option_text)
+              }
+              activeOpacity={reviewMode ? 1 : 0.7}
+              disabled={reviewMode}
+            >
+              <View style={[styles.modernOptionRadio, { borderColor }]}>
+                {isSelected && !reviewMode && (
+                  <View style={styles.modernOptionRadioInner} />
+                )}
+                {reviewMode && showCheckmark && (
+                  <Ionicons name="checkmark" size={20} color={Colors.green} />
+                )}
+                {reviewMode && showCross && (
+                  <Ionicons name="close" size={20} color={Colors.red} />
+                )}
+              </View>
+              <Text
                 style={[
-                  styles.modernOptionCard,
-                  { borderColor, backgroundColor },
+                  styles.modernOptionText,
+                  isSelected &&
+                    !reviewMode &&
+                    styles.modernOptionTextSelected,
                 ]}
-                onPress={() =>
-                  !reviewMode &&
-                  handleAnswerSelect(currentQuestion.id, option.option_text)
-                }
-                activeOpacity={reviewMode ? 1 : 0.7}
-                disabled={reviewMode}
               >
-                <View style={[styles.modernOptionRadio, { borderColor }]}>
-                  {isSelected && !reviewMode && (
-                    <View style={styles.modernOptionRadioInner} />
-                  )}
-                  {reviewMode && showCheckmark && (
-                    <Ionicons name="checkmark" size={20} color={Colors.green} />
-                  )}
-                  {reviewMode && showCross && (
-                    <Ionicons name="close" size={20} color={Colors.red} />
-                  )}
-                </View>
-                <Text
-                  style={[
-                    styles.modernOptionText,
-                    isSelected &&
-                      !reviewMode &&
-                      styles.modernOptionTextSelected,
-                  ]}
-                >
-                  {option.option_text}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </ScrollView>
+                {option.option_text}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {/* Bottom Navigation */}
-      <View style={styles.modernFooter}>
+      <View style={{paddingVertical: Spacing.lg}}>
         {reviewMode ? (
-          <View style={styles.reviewFooter}>
-            {currentQuestionIndex > 0 && (
-              <TouchableOpacity
-                style={styles.reviewNavButton}
-                onPress={handlePreviousQuestion}
-              >
-                <Ionicons name="arrow-back" size={20} color={Colors.white} />
-                <Text style={styles.reviewNavButtonText}>Previous</Text>
-              </TouchableOpacity>
-            )}
+          <View style={{flexDirection: "column"}}>
             {currentQuestionIndex < quizDetail.questions.length - 1 ? (
-              <TouchableOpacity
-                style={styles.reviewNavButton}
+              <ActionButton
                 onPress={handleNextQuestion}
-              >
-                <Text style={styles.reviewNavButtonText}>Next</Text>
-                <Ionicons name="arrow-forward" size={20} color={Colors.white} />
-              </TouchableOpacity>
+                text={"Next"}
+              />
             ) : (
-              <TouchableOpacity
-                style={styles.reviewDoneButton}
+              <ActionButton
                 onPress={handleDoneReview}
-              >
-                <Text style={styles.reviewNavButtonText}>Done</Text>
-              </TouchableOpacity>
+                text={"Done"}
+              />
+            )}
+            {currentQuestionIndex > 0 && (
+              <ActionButton
+                onPress={handlePreviousQuestion}
+                text={"Previous"}
+              />
             )}
           </View>
         ) : currentQuestionIndex === quizDetail.questions.length - 1 ? (
-          <TouchableOpacity
-            style={[
-              styles.modernSubmitButton,
-              submitting && styles.modernSubmitButtonDisabled,
-            ]}
+          <ActionButton
             onPress={handleSubmitQuiz}
+            loading={submitting}
             disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color={Colors.white} />
-            ) : (
-              <Text style={styles.modernSubmitButtonText}>Submit</Text>
-            )}
-          </TouchableOpacity>
+            text={"Submit"}
+          />
         ) : (
-          <TouchableOpacity
-            style={styles.modernNextButton}
+          <ActionButton
             onPress={handleNextQuestion}
-          >
-            <Text style={styles.modernNextButtonText}>Next</Text>
-          </TouchableOpacity>
+            text={"Next"}
+          />
         )}
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
@@ -675,23 +650,6 @@ const styles = StyleSheet.create({
   },
 
   // Modern Header Styles
-  modernHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modernHeaderTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: Colors.white,
-    flex: 1,
-    textAlign: "center",
-  },
   modernTimer: {
     flexDirection: "row",
     alignItems: "center",
@@ -705,8 +663,7 @@ const styles = StyleSheet.create({
 
   // Segmented Progress Bar
   segmentedProgressContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
   },
   progressLabel: {
     fontSize: 15,
@@ -727,10 +684,6 @@ const styles = StyleSheet.create({
   // Scroll Content
   scrollView: {
     flex: 1,
-  },
-  scrollContent: {
-    padding: Spacing.lg,
-    paddingBottom: Spacing.xl * 2,
   },
   modernQuestionCard: {
     marginBottom: Spacing.lg,
@@ -804,41 +757,6 @@ const styles = StyleSheet.create({
   },
   modernOptionTextSelected: {
     fontWeight: "600",
-    color: Colors.white,
-  },
-
-  // Modern Footer
-  modernFooter: {
-    padding: Spacing.lg,
-    backgroundColor: "#2a2a3e",
-    borderTopWidth: 1,
-    borderTopColor: "#3a3a4e",
-  },
-  modernNextButton: {
-    backgroundColor: Colors.purple400,
-    borderRadius: 12,
-    paddingVertical: Spacing.lg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modernNextButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.white,
-  },
-  modernSubmitButton: {
-    backgroundColor: Colors.secondary,
-    borderRadius: 12,
-    paddingVertical: Spacing.lg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modernSubmitButtonDisabled: {
-    opacity: 0.6,
-  },
-  modernSubmitButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
     color: Colors.white,
   },
 
@@ -970,37 +888,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 13,
     color: Colors.textSecondary,
-  },
-
-  // Review Mode Footer Styles
-  reviewFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: Spacing.md,
-  },
-  reviewNavButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.purple400,
-    borderRadius: 12,
-    paddingVertical: Spacing.lg,
-    gap: 8,
-  },
-  reviewDoneButton: {
-    flex: 1,
-    backgroundColor: Colors.green,
-    borderRadius: 12,
-    paddingVertical: Spacing.lg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reviewNavButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.white,
-  },
+  }
 });
 
 export default QuizScreen;
