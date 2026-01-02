@@ -22,6 +22,7 @@ import type {
   CourseSection,
   ModuleDetailResponse,
 } from "@/services";
+import Screen from "@/components/common/Screen";
 
 const { width } = Dimensions.get("window");
 
@@ -298,238 +299,216 @@ const ModuleDetailScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {courseContent.course.title}
+    <Screen
+      title={courseContent.course.title}
+      subtitle={currentSection.title}
+      navigation={navigation}
+      headerLeftIcon="chevron-back"
+      customEdges={["top", "bottom"]}
+      onHeaderLeftPress={() => navigation.goBack()}
+    >
+      {/* Section Info */}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionIconContainer}>
+            <Ionicons
+              name="book-outline"
+              size={24}
+              color={Colors.purple400}
+            />
+          </View>
+          <Text style={styles.sectionTitle}>{currentSection.title}</Text>
+        </View>
+
+        {currentSection.description && (
+          <Text style={styles.sectionDescription}>
+            {currentSection.description}
           </Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {currentSection.title}
-          </Text>
+        )}
+
+        <View style={styles.sectionStats}>
+          <View style={styles.statItem}>
+            <Ionicons
+              name="videocam-outline"
+              size={18}
+              color={Colors.purple400}
+            />
+            <Text style={styles.statText}>
+              {
+                currentSection.items.filter(
+                  (i: ModuleItem) => i.type === "video"
+                ).length
+              }{" "}
+              videos
+            </Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Ionicons
+              name="document-text-outline"
+              size={18}
+              color={Colors.purple400}
+            />
+            <Text style={styles.statText}>
+              {
+                currentSection.items.filter(
+                  (i: ModuleItem) => i.type === "quiz"
+                ).length
+              }{" "}
+              quizzes
+            </Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Ionicons
+              name="time-outline"
+              size={18}
+              color={Colors.purple400}
+            />
+            <Text style={styles.statText}>
+              {currentSection.duration_minutes} min
+            </Text>
+          </View>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Section Info */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionIconContainer}>
-              <Ionicons
-                name="book-outline"
-                size={24}
-                color={Colors.purple400}
-              />
-            </View>
-            <Text style={styles.sectionTitle}>{currentSection.title}</Text>
-          </View>
-
-          {currentSection.description && (
-            <Text style={styles.sectionDescription}>
-              {currentSection.description}
+      {/* Progress Section - Module Progress */}
+      {courseContent.userProgress && currentSection && (
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>Module Progress</Text>
+            <Text style={styles.progressPercentage}>
+              {moduleService.getSectionCompletionPercentage(
+                currentSection,
+                courseContent.userProgress
+              )}%
             </Text>
-          )}
-
-          <View style={styles.sectionStats}>
-            <View style={styles.statItem}>
-              <Ionicons
-                name="videocam-outline"
-                size={18}
-                color={Colors.purple400}
-              />
-              <Text style={styles.statText}>
-                {
-                  currentSection.items.filter(
-                    (i: ModuleItem) => i.type === "video"
-                  ).length
-                }{" "}
-                videos
-              </Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons
-                name="document-text-outline"
-                size={18}
-                color={Colors.purple400}
-              />
-              <Text style={styles.statText}>
-                {
-                  currentSection.items.filter(
-                    (i: ModuleItem) => i.type === "quiz"
-                  ).length
-                }{" "}
-                quizzes
-              </Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons
-                name="time-outline"
-                size={18}
-                color={Colors.purple400}
-              />
-              <Text style={styles.statText}>
-                {currentSection.duration_minutes} min
-              </Text>
-            </View>
           </View>
-        </View>
-
-        {/* Progress Section - Module Progress */}
-        {courseContent.userProgress && currentSection && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Module Progress</Text>
-              <Text style={styles.progressPercentage}>
-                {moduleService.getSectionCompletionPercentage(
-                  currentSection,
-                  courseContent.userProgress
-                )}%
+          <View style={styles.progressBarContainer}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${moduleService.getSectionCompletionPercentage(
+                    currentSection,
+                    courseContent.userProgress
+                  )}%`,
+                },
+              ]}
+            />
+          </View>
+          {(currentSection as any).module_is_completed && (
+            <View style={styles.moduleCompletedBadge}>
+              <Ionicons
+                name="checkmark-circle"
+                size={16}
+                color={Colors.green}
+              />
+              <Text style={styles.moduleCompletedText}>
+                Module Completed on{" "}
+                {new Date((currentSection as any).module_completed_at).toLocaleDateString()}
               </Text>
             </View>
-            <View style={styles.progressBarContainer}>
-              <View
+          )}
+        </View>
+      )}
+
+      {/* Content Items */}
+      <View style={styles.contentSection}>
+        <Text style={styles.contentTitle}>Lessons</Text>
+        {currentSection.items.map((item: ModuleItem, index: number) =>
+          renderItem(item, index)
+        )}
+      </View>
+
+      {/* Module Navigation */}
+      {courseContent.sections.length > 1 && (
+        <View style={styles.navigationContainer}>
+          <TouchableOpacity
+            style={[
+              styles.navButton,
+              !getPreviousSection() && styles.navButtonDisabled,
+            ]}
+            onPress={handlePreviousSection}
+            disabled={!getPreviousSection()}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={getPreviousSection() ? Colors.purple400 : Colors.textSecondary}
+            />
+            <View style={styles.navButtonContent}>
+              <Text
                 style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${moduleService.getSectionCompletionPercentage(
-                      currentSection,
-                      courseContent.userProgress
-                    )}%`,
-                  },
+                  styles.navLabel,
+                  !getPreviousSection() && styles.navLabelDisabled,
                 ]}
-              />
+              >
+                PREVIOUS MODULE
+              </Text>
+              {getPreviousSection() ? (
+                <Text style={styles.navButtonText} numberOfLines={2}>
+                  {getPreviousSection()?.title}
+                </Text>
+              ) : (
+                <Text style={styles.navButtonTextDisabled}>
+                  No previous module
+                </Text>
+              )}
             </View>
-            {(currentSection as any).module_is_completed && (
-              <View style={styles.moduleCompletedBadge}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={Colors.green}
-                />
-                <Text style={styles.moduleCompletedText}>
-                  Module Completed on{" "}
-                  {new Date((currentSection as any).module_completed_at).toLocaleDateString()}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
+          </TouchableOpacity>
 
-        {/* Content Items */}
-        <View style={styles.contentSection}>
-          <Text style={styles.contentTitle}>Lessons</Text>
-          {currentSection.items.map((item: ModuleItem, index: number) =>
-            renderItem(item, index)
-          )}
+          <TouchableOpacity
+            style={[
+              styles.navButton,
+              !getNextSection() && styles.navButtonDisabled,
+            ]}
+            onPress={handleNextSection}
+            disabled={!getNextSection()}
+            activeOpacity={0.7}
+          >
+            <View style={styles.navButtonContent}>
+              <Text
+                style={[
+                  styles.navLabel,
+                  styles.navLabelRight,
+                  !getNextSection() && styles.navLabelDisabled,
+                ]}
+              >
+                NEXT MODULE
+              </Text>
+              {getNextSection() ? (
+                <Text
+                  style={[styles.navButtonText, styles.navButtonTextRight]}
+                  numberOfLines={2}
+                >
+                  {getNextSection()?.title}
+                </Text>
+              ) : (
+                <Text
+                  style={[
+                    styles.navButtonTextDisabled,
+                    styles.navButtonTextRight,
+                  ]}
+                >
+                  No next module
+                </Text>
+              )}
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={getNextSection() ? Colors.purple400 : Colors.textSecondary}
+            />
+          </TouchableOpacity>
         </View>
-
-        {/* Module Navigation */}
-        {courseContent.sections.length > 1 && (
-          <View style={styles.navigationContainer}>
-            <TouchableOpacity
-              style={[
-                styles.navButton,
-                !getPreviousSection() && styles.navButtonDisabled,
-              ]}
-              onPress={handlePreviousSection}
-              disabled={!getPreviousSection()}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="chevron-back"
-                size={20}
-                color={getPreviousSection() ? Colors.purple400 : Colors.textSecondary}
-              />
-              <View style={styles.navButtonContent}>
-                <Text
-                  style={[
-                    styles.navLabel,
-                    !getPreviousSection() && styles.navLabelDisabled,
-                  ]}
-                >
-                  PREVIOUS MODULE
-                </Text>
-                {getPreviousSection() ? (
-                  <Text style={styles.navButtonText} numberOfLines={2}>
-                    {getPreviousSection()?.title}
-                  </Text>
-                ) : (
-                  <Text style={styles.navButtonTextDisabled}>
-                    No previous module
-                  </Text>
-                )}
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.navButton,
-                !getNextSection() && styles.navButtonDisabled,
-              ]}
-              onPress={handleNextSection}
-              disabled={!getNextSection()}
-              activeOpacity={0.7}
-            >
-              <View style={styles.navButtonContent}>
-                <Text
-                  style={[
-                    styles.navLabel,
-                    styles.navLabelRight,
-                    !getNextSection() && styles.navLabelDisabled,
-                  ]}
-                >
-                  NEXT MODULE
-                </Text>
-                {getNextSection() ? (
-                  <Text
-                    style={[styles.navButtonText, styles.navButtonTextRight]}
-                    numberOfLines={2}
-                  >
-                    {getNextSection()?.title}
-                  </Text>
-                ) : (
-                  <Text
-                    style={[
-                      styles.navButtonTextDisabled,
-                      styles.navButtonTextRight,
-                    ]}
-                  >
-                    No next module
-                  </Text>
-                )}
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={getNextSection() ? Colors.purple400 : Colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+      )}
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -566,48 +545,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.white,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.textInputBg,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.textInputBg,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: Spacing.md,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: Spacing.xl * 2,
-  },
   progressSection: {
     backgroundColor: Colors.textInputBg,
-    marginHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
     padding: Spacing.lg,
+    paddingTop: Spacing.md,
     borderRadius: 12,
   },
   progressHeader: {
@@ -652,7 +594,6 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     backgroundColor: Colors.textInputBg,
-    marginHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
     padding: Spacing.lg,
     borderRadius: 12,
@@ -708,7 +649,6 @@ const styles = StyleSheet.create({
   },
   contentSection: {
     marginTop: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
   },
   contentTitle: {
     fontSize: 18,
@@ -800,7 +740,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   navigationContainer: {
-    marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
     gap: Spacing.sm,
   },

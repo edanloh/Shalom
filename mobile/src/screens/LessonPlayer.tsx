@@ -19,9 +19,11 @@ import type { StackNavigationProp } from "@react-navigation/stack";
 import type { MainStackParamList } from "@/types/navigation";
 import { videoService } from "@/services";
 import type { VideoDetailResponse } from "@/services";
+import Screen from "@/components/common/Screen";
 
-const { width } = Dimensions.get("window");
-const VIDEO_HEIGHT = width * (9 / 16); // 16:9 aspect ratio
+const width = Dimensions.get("window").width;
+const VIDEOWIDTH = width - Spacing.lg * 2;
+const VIDEO_HEIGHT = VIDEOWIDTH * (9 / 16); // 16:9 aspect ratio
 
 type VideoDetail = VideoDetailResponse["data"];
 type LessonPlayerNavigationProp = StackNavigationProp<
@@ -461,304 +463,286 @@ const LessonPlayer = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            saveProgress();
-            navigation.goBack();
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {videoDetail.course.title}
-          </Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {videoDetail.section.title}
-          </Text>
-        </View>
+    <Screen
+      title={videoDetail.course.title}
+      subtitle={videoDetail.section.title}
+      navigation={navigation}
+      headerLeftIcon="chevron-back"
+      customEdges={["top", "bottom"]}
+      onHeaderLeftPress={() => {
+        saveProgress();
+        navigation.goBack();
+      }}
+    >
+      {/* Video Player */}
+      <View style={styles.videoContainer}>
+        {isYouTubeVideo && youtubeVideoId ? (
+          <YouTubePlayerWrapper
+            ref={youtubePlayerRef}
+            height={VIDEO_HEIGHT}
+            videoId={youtubeVideoId}
+            play={isPlaying}
+            onChangeState={onYouTubeStateChange}
+            onProgress={onYouTubeProgress}
+            initialPlayerParams={{
+              start: Math.floor(currentPosition),
+            }}
+          />
+        ) : (
+          <View style={styles.videoWrapper}>
+            <VideoView
+              ref={videoViewRef}
+              player={player}
+              style={styles.video}
+              nativeControls={false}
+              contentFit="contain"
+              fullscreenOptions={{ enable: true }}
+              allowsPictureInPicture
+              startsPictureInPictureAutomatically
+            />
+
+            {/* Touchable overlay for showing/hiding controls */}
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setShowControls(!showControls)}
+              style={styles.touchableOverlay}
+            >
+              {/* Custom Controls Overlay */}
+              {showControls && (
+                <View style={styles.controlsOverlay} pointerEvents="box-none">
+                  {/* Top Controls */}
+                  <View style={styles.topControls}>
+                    <TouchableOpacity
+                      style={styles.speedButton}
+                      onPress={handleSpeedChange}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.speedText}>{playbackSpeed}x</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Center Play/Pause */}
+                  <View style={styles.centerControls}>
+                    <TouchableOpacity
+                      onPress={() => handleSeek(-10)}
+                      activeOpacity={0.8}
+                      style={styles.seekButton}
+                    >
+                      <Ionicons
+                        name="play-back"
+                        size={32}
+                        color={Colors.white}
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={togglePlayPause}
+                      style={styles.playButton}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={isPlaying ? "pause" : "play"}
+                        size={40}
+                        color={Colors.white}
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => handleSeek(10)}
+                      activeOpacity={0.8}
+                      style={styles.seekButton}
+                    >
+                      <Ionicons
+                        name="play-forward"
+                        size={32}
+                        color={Colors.white}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Bottom Controls */}
+                  <View style={styles.bottomControls}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={styles.timeText}>
+                        {formatTime(currentPosition)} / {formatTime(duration)}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => handleFullScreen()}
+                        activeOpacity={0.8}
+                        style={{ paddingHorizontal: 12, marginBottom: 8 }}
+                      >
+                        <Ionicons
+                          name="tablet-landscape-outline"
+                          size={24}
+                          color={Colors.white}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    <Pressable
+                      onPress={handleProgressBarPress}
+                      hitSlop={{ top: 10, bottom: 10, left: 0, right: 0 }}
+                    >
+                      <View style={styles.progressBar}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            {
+                              width: `${(currentPosition / duration) * 100}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Video Player */}
-        <View style={styles.videoContainer}>
-          {isYouTubeVideo && youtubeVideoId ? (
-            <YouTubePlayerWrapper
-              ref={youtubePlayerRef}
-              height={VIDEO_HEIGHT}
-              videoId={youtubeVideoId}
-              play={isPlaying}
-              onChangeState={onYouTubeStateChange}
-              onProgress={onYouTubeProgress}
-              initialPlayerParams={{
-                start: Math.floor(currentPosition),
-              }}
-            />
-          ) : (
-            <View style={styles.videoWrapper}>
-              <VideoView
-                ref={videoViewRef}
-                player={player}
-                style={styles.video}
-                nativeControls={false}
-                contentFit="contain"
-                fullscreenOptions={{ enable: true }}
-                allowsPictureInPicture
-                startsPictureInPictureAutomatically
-              />
+      {/* Video Info Card */}
+      <View style={styles.infoCard}>
+        <Text style={styles.videoTitle}>{videoDetail.title}</Text>
 
-              {/* Touchable overlay for showing/hiding controls */}
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={() => setShowControls(!showControls)}
-                style={styles.touchableOverlay}
-              >
-                {/* Custom Controls Overlay */}
-                {showControls && (
-                  <View style={styles.controlsOverlay} pointerEvents="box-none">
-                    {/* Top Controls */}
-                    <View style={styles.topControls}>
-                      <TouchableOpacity
-                        style={styles.speedButton}
-                        onPress={handleSpeedChange}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.speedText}>{playbackSpeed}x</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Center Play/Pause */}
-                    <View style={styles.centerControls}>
-                      <TouchableOpacity
-                        onPress={() => handleSeek(-10)}
-                        activeOpacity={0.8}
-                        style={styles.seekButton}
-                      >
-                        <Ionicons
-                          name="play-back"
-                          size={32}
-                          color={Colors.white}
-                        />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={togglePlayPause}
-                        style={styles.playButton}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons
-                          name={isPlaying ? "pause" : "play"}
-                          size={40}
-                          color={Colors.white}
-                        />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => handleSeek(10)}
-                        activeOpacity={0.8}
-                        style={styles.seekButton}
-                      >
-                        <Ionicons
-                          name="play-forward"
-                          size={32}
-                          color={Colors.white}
-                        />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Bottom Controls */}
-                    <View style={styles.bottomControls}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <Text style={styles.timeText}>
-                          {formatTime(currentPosition)} / {formatTime(duration)}
-                        </Text>
-                        <TouchableOpacity
-                          onPress={() => handleFullScreen()}
-                          activeOpacity={0.8}
-                          style={{ paddingHorizontal: 12, marginBottom: 8 }}
-                        >
-                          <Ionicons
-                            name="tablet-landscape-outline"
-                            size={24}
-                            color={Colors.white}
-                          />
-                        </TouchableOpacity>
-                      </View>
-                      <Pressable
-                        onPress={handleProgressBarPress}
-                        hitSlop={{ top: 10, bottom: 10, left: 0, right: 0 }}
-                      >
-                        <View style={styles.progressBar}>
-                          <View
-                            style={[
-                              styles.progressFill,
-                              {
-                                width: `${(currentPosition / duration) * 100}%`,
-                              },
-                            ]}
-                          />
-                        </View>
-                      </Pressable>
-                    </View>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Video Info Card */}
-        <View style={styles.infoCard}>
-          <Text style={styles.videoTitle}>{videoDetail.title}</Text>
-
-          {videoDetail.userProgress && (
-            <View style={styles.progressBadge}>
-              <Ionicons
-                name={
-                  videoDetail.userProgress.is_completed
-                    ? "checkmark-circle"
-                    : "time-outline"
-                }
-                size={16}
-                color={
-                  videoDetail.userProgress.is_completed
-                    ? Colors.green
-                    : Colors.purple400
-                }
-              />
-              <Text
-                style={[
-                  styles.progressText,
-                  videoDetail.userProgress.is_completed &&
-                    styles.progressTextCompleted,
-                ]}
-              >
-                {videoDetail.userProgress.is_completed
-                  ? "Completed"
-                  : `Watched ${formatTime(
-                      videoDetail.userProgress.watch_time_seconds
-                    )}`}
-              </Text>
-            </View>
-          )}
-
-          {videoDetail.description && (
-            <View style={styles.descriptionContainer}>
-              <Text style={styles.descriptionTitle}>About this lesson</Text>
-              <Text style={styles.descriptionText}>
-                {videoDetail.description}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Navigation Buttons */}
-        <View style={styles.navigationContainer}>
-          <TouchableOpacity
-            style={[
-              styles.navButton,
-              !videoDetail.navigation.previousVideo && styles.navButtonDisabled,
-            ]}
-            onPress={handlePreviousVideo}
-            disabled={!videoDetail.navigation.previousVideo}
-            activeOpacity={0.7}
-          >
+        {videoDetail.userProgress && (
+          <View style={styles.progressBadge}>
             <Ionicons
-              name="chevron-back"
-              size={20}
+              name={
+                videoDetail.userProgress.is_completed
+                  ? "checkmark-circle"
+                  : "time-outline"
+              }
+              size={16}
               color={
-                videoDetail.navigation.previousVideo
-                  ? Colors.purple400
-                  : Colors.textSecondary
+                videoDetail.userProgress.is_completed
+                  ? Colors.green
+                  : Colors.purple400
               }
             />
-            <View style={styles.navButtonContent}>
-              <Text
-                style={[
-                  styles.navLabel,
-                  !videoDetail.navigation.previousVideo &&
-                    styles.navLabelDisabled,
-                ]}
-              >
-                PREVIOUS
-              </Text>
-              {videoDetail.navigation.previousVideo ? (
-                <Text style={styles.navButtonText} numberOfLines={2}>
-                  {videoDetail.navigation.previousVideo.title}
-                </Text>
-              ) : (
-                <Text style={styles.navButtonTextDisabled}>
-                  No previous lesson
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
+            <Text
+              style={[
+                styles.progressText,
+                videoDetail.userProgress.is_completed &&
+                  styles.progressTextCompleted,
+              ]}
+            >
+              {videoDetail.userProgress.is_completed
+                ? "Completed"
+                : `Watched ${formatTime(
+                    videoDetail.userProgress.watch_time_seconds
+                  )}`}
+            </Text>
+          </View>
+        )}
 
-          <TouchableOpacity
-            style={[
-              styles.navButton,
-              !videoDetail.navigation.nextVideo && styles.navButtonDisabled,
-            ]}
-            onPress={handleNextVideo}
-            disabled={!videoDetail.navigation.nextVideo}
-            activeOpacity={0.7}
-          >
-            <View style={styles.navButtonContent}>
+        {videoDetail.description && (
+          <View style={styles.descriptionContainer}>
+            <Text style={styles.descriptionTitle}>About this lesson</Text>
+            <Text style={styles.descriptionText}>
+              {videoDetail.description}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Navigation Buttons */}
+      <View style={styles.navigationContainer}>
+        <TouchableOpacity
+          style={[
+            styles.navButton,
+            !videoDetail.navigation.previousVideo && styles.navButtonDisabled,
+          ]}
+          onPress={handlePreviousVideo}
+          disabled={!videoDetail.navigation.previousVideo}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="chevron-back"
+            size={20}
+            color={
+              videoDetail.navigation.previousVideo
+                ? Colors.purple400
+                : Colors.textSecondary
+            }
+          />
+          <View style={styles.navButtonContent}>
+            <Text
+              style={[
+                styles.navLabel,
+                !videoDetail.navigation.previousVideo &&
+                  styles.navLabelDisabled,
+              ]}
+            >
+              PREVIOUS
+            </Text>
+            {videoDetail.navigation.previousVideo ? (
+              <Text style={styles.navButtonText} numberOfLines={2}>
+                {videoDetail.navigation.previousVideo.title}
+              </Text>
+            ) : (
+              <Text style={styles.navButtonTextDisabled}>
+                No previous lesson
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.navButton,
+            !videoDetail.navigation.nextVideo && styles.navButtonDisabled,
+          ]}
+          onPress={handleNextVideo}
+          disabled={!videoDetail.navigation.nextVideo}
+          activeOpacity={0.7}
+        >
+          <View style={styles.navButtonContent}>
+            <Text
+              style={[
+                styles.navLabel,
+                styles.navLabelRight,
+                !videoDetail.navigation.nextVideo && styles.navLabelDisabled,
+              ]}
+            >
+              NEXT
+            </Text>
+            {videoDetail.navigation.nextVideo ? (
+              <Text
+                style={[styles.navButtonText, styles.navButtonTextRight]}
+                numberOfLines={2}
+              >
+                {videoDetail.navigation.nextVideo.title}
+              </Text>
+            ) : (
               <Text
                 style={[
-                  styles.navLabel,
-                  styles.navLabelRight,
-                  !videoDetail.navigation.nextVideo && styles.navLabelDisabled,
+                  styles.navButtonTextDisabled,
+                  styles.navButtonTextRight,
                 ]}
               >
-                NEXT
+                No next lesson
               </Text>
-              {videoDetail.navigation.nextVideo ? (
-                <Text
-                  style={[styles.navButtonText, styles.navButtonTextRight]}
-                  numberOfLines={2}
-                >
-                  {videoDetail.navigation.nextVideo.title}
-                </Text>
-              ) : (
-                <Text
-                  style={[
-                    styles.navButtonTextDisabled,
-                    styles.navButtonTextRight,
-                  ]}
-                >
-                  No next lesson
-                </Text>
-              )}
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={
-                videoDetail.navigation.nextVideo
-                  ? Colors.purple400
-                  : Colors.textSecondary
-              }
-            />
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+            )}
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={
+              videoDetail.navigation.nextVideo
+                ? Colors.purple400
+                : Colors.textSecondary
+            }
+          />
+        </TouchableOpacity>
+      </View>
+    </Screen>
   );
 };
 
@@ -801,48 +785,12 @@ const styles = StyleSheet.create({
     fontSize: TextStyles.body.fontSize,
     fontWeight: "600",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray600,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.gray600,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: Spacing.md,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: Spacing.xl,
-  },
   videoContainer: {
-    width,
+    width: VIDEOWIDTH,
     height: VIDEO_HEIGHT,
     backgroundColor: Colors.black,
     position: "relative",
+    alignSelf: "center",
   },
   videoWrapper: {
     width: "100%",
@@ -915,9 +863,8 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   infoCard: {
-    backgroundColor: Colors.gray600,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
+    backgroundColor: Colors.textInputBg,
+    marginTop: Spacing.lg,
     padding: Spacing.md,
     borderRadius: 12,
   },
@@ -965,8 +912,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   navigationContainer: {
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
+    marginTop: Spacing.lg,
     gap: Spacing.sm,
   },
   navButton: {
@@ -974,7 +920,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     borderRadius: 10,
   },
   navButtonDisabled: {
