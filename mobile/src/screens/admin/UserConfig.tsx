@@ -45,7 +45,7 @@ export default function UserConfigScreen({ navigation, route }: any) {
               <Text style={[TextStyles.h3, { marginBottom: Spacing.sm }]}>
                 {user?.name || "Unknown User"}
               </Text>
-              {user?.authProvider && user?.authProvider == "Google" && (
+              {user?.authProvider && user?.authProvider == "google" && (
                 <Image
                   source={require("@assets/google.png")}
                   style={{

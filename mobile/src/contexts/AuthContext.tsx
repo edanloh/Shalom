@@ -119,7 +119,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     bio: "Learning enthusiast exploring various courses",
     location: "Singapore",
     phone: "+65 9123 4567",
-    authProvider: "email",
+    authProvider: "google",
   });
   const [isAuthenticated, setIsAuthenticated] = useState(true);
 

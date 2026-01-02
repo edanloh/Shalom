@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   Pressable,
   StyleSheet,
   Switch,
@@ -10,10 +9,10 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, TextStyles } from '../constants';
+import Screen from '../components/common/Screen';
+import externalStyles from '../styles/styles';
 
 export default function SettingsScreen({ navigation }: any) {
   const [settings, setSettings] = useState({
@@ -124,21 +123,15 @@ const supportItems = [
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <StatusBar style="light" />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconHitbox}>
-          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <View style={styles.headerIconHitbox} />
-      </View>
-
+    <Screen
+      title="Settings"
+      navigation={navigation}
+      headerLeftIcon="chevron-back"
+      onHeaderLeftPress={() => navigation.goBack()}
+      customEdges={["top", "bottom"]}
+    >
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingBottom: Spacing.xl * 2 }}
+        contentContainerStyle={[externalStyles.fullScrollContent]}
         showsVerticalScrollIndicator={false}
       >
         {/* Notification Settings */}
@@ -253,61 +246,32 @@ const supportItems = [
           </View>
         </View>
 
-
         <Text style={styles.version}>Version 1.0.0</Text>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: Colors.primary, // dark app background
-  },
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    justifyContent: 'space-between',
-  },
-  headerIconHitbox: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: {
-    ...TextStyles.h3,
-    color: Colors.textPrimary,
-    fontSize: TextStyles.h4.fontSize,
-    fontWeight: 'bold',
-  },
-
   // Sections
-  section: { marginTop: Spacing.lg },
+  section: { marginTop: Spacing.base },
   sectionTitle: {
     ...TextStyles.body,
     color: Colors.textPrimary,
     opacity: 0.9,
     fontWeight: '600',
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
 
   // Cards
   card: {
-    marginHorizontal: Spacing.lg,
-    backgroundColor: '#2B2E36',
     borderRadius: 12,
     overflow: 'hidden',
   },
 
   // Rows
   settingItem: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -320,7 +284,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   row: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -329,11 +293,10 @@ const styles = StyleSheet.create({
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    marginLeft: Spacing.lg + 28, // indent under the icon
   },
 
   // Left chunk
-  settingLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  settingLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 },
   settingText: { marginLeft: 16, flex: 1 },
 
   // Typography
@@ -352,7 +315,7 @@ const styles = StyleSheet.create({
 
   // Danger
   dangerTitle: { ...TextStyles.body, color: '#ef4444', fontWeight: '700', marginBottom: 2 },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, marginRight: 12 },
   rowTextWrap: { marginLeft: 12, flexShrink: 1 },
   rowSub: {
     ...TextStyles.body,

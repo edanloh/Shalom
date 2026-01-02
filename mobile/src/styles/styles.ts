@@ -8,7 +8,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   fullScrollContent: { 
     flexGrow: 1, 
@@ -111,6 +111,13 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     ...TextStyles.bodySmall,
     color: Colors.textSecondary,
+  },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: '#E5E7EB',
   },
 });
 

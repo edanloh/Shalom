@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Pressable,
   Text,
+  Image
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,7 +21,8 @@ import type { MainStackParamList, TabParamList } from '../types/navigation';
 import { ImageWithFallback } from '../components/common';
 import { Images } from '../../assets';
 import { getAvatarUri } from '@/utils/avatar';
-
+import { ActionButton, Screen } from "@/components";
+import externalStyles from "@styles/styles";
 
 type Nav = CompositeNavigationProp<
   StackNavigationProp<MainStackParamList>,
@@ -84,32 +86,47 @@ const ProfileScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar style="light" />
-
-      {/* Top bar (no back button) */}
-      <View style={styles.topBar}>
-        <View style={styles.iconSpacer} />
-        <Text style={styles.topTitle}>Profile</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Settings')}
-          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-          style={styles.iconBtn}
-        >
-          <Ionicons name="settings-outline" size={22} color={Colors.textPrimary} />
-        </TouchableOpacity>
-      </View>
-
+    <Screen
+      title="Profile"
+      navigation={navigation}
+      headerRightIcon="settings-outline"
+      onHeaderRightPress={() => navigation.navigate('Settings')}
+    >
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: Spacing.xl * 2 }}
+        contentContainerStyle={[externalStyles.fullScrollContent]}
         showsVerticalScrollIndicator={false}
       >
         {/* Avatar & name */}
-        <View style={styles.centerHeader}>
-          <ImageWithFallback source={avatarSrc} fallback={Images.profile} style={styles.avatar} />
-          <Text style={styles.name}>{displayName}</Text>
-          <Text style={styles.points}>{points} points</Text>
+        <View style={[externalStyles.header, { marginBottom: 16 }]}>
+          <View style={[externalStyles.logo, { marginBottom: 16 }]}>
+            <ImageWithFallback source={avatarSrc} fallback={Images.profile} style={externalStyles.avatar} />
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={[TextStyles.h3, { marginBottom: Spacing.xs }]}>
+              {displayName}
+            </Text>
+            {user?.authProvider && user?.authProvider == "google" && (
+              <Image
+                source={require("@assets/google.png")}
+                style={{
+                  width: 24,
+                  height: 24,
+                  resizeMode: "contain",
+                  marginLeft: 12,
+                  marginBottom: 8,
+                }}
+              />
+            )}
+          </View>
+          <Text style={TextStyles.bodyMedium}>
+            {points} points
+          </Text>
         </View>
 
         {/* Quick actions (visual-only) */}
@@ -152,7 +169,7 @@ const ProfileScreen: React.FC = () => {
         </View>
 
         {/* Account Settings */}
-        <Text style={[styles.sectionTitle, { marginTop: Spacing.md, paddingHorizontal: Spacing.lg }]}>
+        <Text style={[styles.sectionTitle, { marginTop: Spacing.md }]}>
           Account Settings
         </Text>
 
@@ -183,76 +200,22 @@ const ProfileScreen: React.FC = () => {
         </View>
 
         {/* Logout (active) */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.9}>
-          <Text style={styles.logoutText}>Log Out</Text>
-        </TouchableOpacity>
+        <ActionButton
+          text="Log Out"
+          onPress={logout}
+        />
+
+        <View style={{ height: 8 }} />
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    ...ContainerStyles.screen,
-    backgroundColor: Colors.primary,
-  },
-  scrollView: { flex: 1 },
-
-  // Top bar
-  topBar: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xs,
-    paddingBottom: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  iconSpacer: { width: 36, height: 36 }, // keeps title centered
-  iconBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topTitle: {
-    fontFamily: TextStyles.h4.fontFamily,
-    fontSize: TextStyles.h4.fontSize,
-    color: Colors.textPrimary,
-    fontWeight: 'bold',
-  },
-
-  // Header
-  centerHeader: {
-    alignItems: 'center',
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.lg,
-  },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 3,
-    borderColor: '#E5E7EB',
-  },
-  name: {
-    marginTop: Spacing.sm,
-    fontFamily: TextStyles.h3.fontFamily,
-    fontSize: TextStyles.h3.fontSize,
-    color: Colors.textPrimary,
-    fontWeight: '700',
-  },
-  points: {
-    marginTop: 4,
-    fontFamily: TextStyles.body.fontFamily,
-    fontSize: TextStyles.body.fontSize,
-    color: Colors.textSecondary,
-  },
-
   // Quick actions
   quickRow: {
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: Spacing.lg,
     marginTop: Spacing.md,
     marginBottom: Spacing.lg,
   },
@@ -278,7 +241,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
     marginTop: Spacing.sm,
     marginBottom: Spacing.md,
   },
@@ -295,7 +257,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   achievementsGrid: {
-    paddingHorizontal: Spacing.lg,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
@@ -321,10 +282,9 @@ const styles = StyleSheet.create({
   // Settings card
   settingsCard: {
     backgroundColor: CARD_BG,
-    marginHorizontal: Spacing.lg,
     borderRadius: 16,
     paddingVertical: 6,
-    marginTop: Spacing.md,
+    marginVertical: Spacing.lg,
   },
   settingsRow: {
     paddingVertical: 16,
@@ -372,23 +332,6 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: '#4B4B57',
     marginLeft: Spacing.lg + 20, // indents divider under the icon
-  },
-
-  // Logout
-  logoutBtn: {
-    backgroundColor: Colors.purple400,
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.xl,
-    paddingVertical: 14,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutText: {
-    fontFamily: TextStyles.body.fontFamily,
-    fontSize: TextStyles.body.fontSize,
-    color: Colors.white,
-    fontWeight: '700',
   },
 });
 
