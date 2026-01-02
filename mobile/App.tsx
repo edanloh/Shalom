@@ -8,7 +8,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { View, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator, Platform } from "react-native";
 import AuthNavigator from "./src/screens/navigation/AuthNavigator";
 import MainNavigator from "./src/screens/navigation/MainNavigator";
 import NotFoundScreen from "./src/screens/NotFoundScreen";
@@ -17,6 +17,29 @@ import { UserProvider } from "./src/contexts/UserContext";
 import { CourseProvider } from "./src/contexts/CourseContext";
 import SplashScreen from "./src/screens/SplashScreen";
 import type { MainStackParamList } from "./src/types";
+
+// Fix for web scrolling - override root height
+if (Platform.OS === "web") {
+  const style = document.createElement("style");
+  style.textContent = `
+    body {
+      height: 100%;
+      overflow: auto;
+    }
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    body::-webkit-scrollbar,
+    *::-webkit-scrollbar {
+      display: none;
+    }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    body,
+    * {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 

@@ -130,10 +130,7 @@ const supportItems = [
       onHeaderLeftPress={() => navigation.goBack()}
       customEdges={["top", "bottom"]}
     >
-      <ScrollView
-        contentContainerStyle={[externalStyles.fullScrollContent]}
-        showsVerticalScrollIndicator={false}
-      >
+      <>
         {/* Notification Settings */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notification Preferences</Text>
@@ -247,7 +244,7 @@ const supportItems = [
         </View>
 
         <Text style={styles.version}>Version 1.0.0</Text>
-      </ScrollView>
+      </>
     </Screen>
   );
 }
