@@ -1,27 +1,21 @@
 // screens/LeaveReviewScreen.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
-  ScrollView,
   Text,
-  TextInput,
   Pressable,
   StyleSheet,
   Alert,
-  ActivityIndicator,
-  StatusBar,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Colors, Spacing, TextStyles } from '../constants';
+import { Spacing, TextStyles } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { courseService } from '../services/courseService';
 import type { MainStackParamList } from '../types/navigation';
+import Screen from '../components/common/Screen';
+import { ActionButton, CustomTextInput } from '@/components';
 
 type R = RouteProp<MainStackParamList, 'LeaveReview'>;
 
@@ -144,138 +138,57 @@ export default function LeaveReviewScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+    <Screen
+      title="Leave a Review"
+      navigation={navigation}
+      headerLeftIcon="chevron-back"
+      customEdges={["top", "bottom"]}
+      onHeaderLeftPress={() => navigation.goBack()}
+    >
+      <Text style={TextStyles.h5}>How was this course?</Text>
 
-      {/* Header (matches WishlistScreen style) */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
-        >
-          <Ionicons name="chevron-back" size={26} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Leave a Review</Text>
-        <View style={{ width: 26 }} />{/* spacer to balance the chevron */}
+      <View style={styles.starsRow}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Pressable key={n} onPress={() => onSelectStar(n)} style={styles.starBtn} hitSlop={8}>
+            <Ionicons name={n <= rating ? 'star' : 'star-outline'} size={28} color="#FFD700" />
+          </Pressable>
+        ))}
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.select({ ios: 'padding', android: undefined })}
-        keyboardVerticalOffset={Platform.select({ ios: 10, android: 0 })}
-      >
-        <ScrollView
-            contentContainerStyle={styles.body}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-        >
-          <Text style={styles.heading}>How was this course?</Text>
+      <Text style={TextStyles.h5}>Leave a Comment!</Text>
 
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <Pressable key={n} onPress={() => onSelectStar(n)} style={styles.starBtn} hitSlop={8}>
-                <Ionicons name={n <= rating ? 'star' : 'star-outline'} size={28} color="#FFD700" />
-              </Pressable>
-            ))}
-          </View>
+      <CustomTextInput
+        placeholder="Share your experience (min 10 chars)"
+        value={text}
+        onChangeText={setText}
+        autoCapitalize={"none"}
+        multiline
+        maxLength={1200}
+        textAlignVertical="top"
+        style={{minHeight: 100}}
+      />
 
-          <Text style={styles.heading}>Leave a Comment!</Text>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Share your experience (min 10 chars)"
-            placeholderTextColor={Colors.textSecondary}
-            value={text}
-            onChangeText={setText}
-            multiline
-            maxLength={1200}
-          />
-
-            <View style={styles.bottomSection}>
-
-              <Pressable
-                style={[styles.submitBtn, !canSubmit && { opacity: 0.6 }]}
-                onPress={onSubmit}
-                disabled={!canSubmit || submitting}
-              >
-                {submitting
-                  ? <ActivityIndicator color={Colors.white} />
-                  : <Text style={styles.submitText}>{isEditing ? 'Update Review' : 'Submit Review'}</Text>}
-              </Pressable>
-
-                <View style={styles.footerMessage}>
-                <Text style={styles.footerText}>
-                    Reviews help other learners decide if this course is right for them.
-                </Text>
-                </View>
-            </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      <View style={styles.bottomSection}>
+        <ActionButton
+          onPress={onSubmit}
+          disabled={!canSubmit || submitting}
+          loading={submitting}
+          text={isEditing ? 'Update Review' : 'Submit Review'}
+          style={!canSubmit && { opacity: 0.6 }}
+        />
+        <Text style={TextStyles.caption}>
+          Reviews help other learners decide if this course is right for them.
+        </Text>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.primary },
-
-  // Header styles reused to match WishlistScreen
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
-  headerTitle: {
-    ...TextStyles.h3,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-    flex: 1,
-  },
-
-  body: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xl * 2,
-  },
-
   bottomSection: {
     marginTop: 'auto',
     paddingTop: Spacing.lg,
   },
-  heading: { fontSize: 20, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
-
   starsRow: { flexDirection: 'row', marginBottom: Spacing.xl },
   starBtn: { marginRight: Spacing.sm },
-
-  input: {
-    minHeight: 140,
-    borderRadius: 12,
-    padding: Spacing.md,
-    backgroundColor: Colors.textInputBg,
-    color: Colors.textPrimary,
-    textAlignVertical: 'top',
-    marginBottom: Spacing.lg,
-  },
-
-  footerMessage: {
-    marginVertical: Spacing.md,
-  },
-    footerText: {
-    ...TextStyles.body,
-    fontSize: 11,
-    color: Colors.textSecondary, 
-    opacity: 0.7, 
-    textAlign: 'center',
-    lineHeight: 16,
-    },
-
-  submitBtn: {
-    backgroundColor: Colors.purple400,
-    paddingVertical: Spacing.md,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  submitText: { color: Colors.white, fontWeight: '700', fontSize: TextStyles.body.fontSize },
 });

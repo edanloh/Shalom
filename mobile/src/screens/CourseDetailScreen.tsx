@@ -22,6 +22,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { courseService } from '../services/courseService';
 import { moduleService, ModuleDetailResponse, UserProgress, CourseSection } from '../services/moduleService';
 import { useFocusEffect } from '@react-navigation/native';
+import Screen from '../components/common/Screen';
+import ActionButton from '@/components/ActionButton';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -270,7 +272,12 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen
+      title=""
+      noHeader
+      widescreen
+      customEdges={["bottom"]}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -278,155 +285,144 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         </Pressable>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Image */}
-        <View style={styles.heroContainer}>
-          <ImageWithFallback
-            source={{ uri: courseDetail.image }}
-            fallback={Images.placeholder}
-            style={styles.heroImage}
-          />
-          <View style={styles.heroOverlay} />
-        </View>
+      {/* Hero Image */}
+      <View style={styles.heroContainer}>
+        <ImageWithFallback
+          source={{ uri: courseDetail.image }}
+          fallback={Images.placeholder}
+          style={styles.heroImage}
+        />
+        <View style={styles.heroOverlay} />
+      </View>
 
-        {/* Content */}
-        <View style={styles.content}>
-          {/* Course Info */}
-          <Text style={styles.courseTitle}>{courseDetail.title}</Text>
-          
-          <Text style={styles.courseOverview}>Overview</Text>
-          <Text style={styles.courseDescription}>{courseDetail.description}</Text>
+      {/* Content */}
+      <View style={styles.content}>
+        {/* Course Info */}
+        <Text style={styles.courseTitle}>{courseDetail.title}</Text>
+        
+        <Text style={styles.courseOverview}>Overview</Text>
+        <Text style={styles.courseDescription}>{courseDetail.description}</Text>
 
-          {/* Course Progress Section */}
-          {courseContent && courseContent.userProgress && (
-            <>
-              <Text style={styles.sectionTitle}>Your Progress</Text>
-              <View style={styles.progressCard}>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>Course Progress</Text>
-                  <Text style={styles.progressPercentage}>{calculateCourseProgress()}%</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View style={styles.progressBarBackground}>
-                    <View 
-                      style={[
-                        styles.progressBarFill, 
-                        { width: `${calculateCourseProgress()}%` }
-                      ]} 
-                    />
-                  </View>
-                </View>
-                <View style={styles.progressStats}>
-                  <Text style={styles.progressStatsText}>
-                    {getCompletedModulesCount()} of {courseDetail.modules.length} modules completed
-                  </Text>
-                  {/* {calculateCourseProgress() === 100 && (
-                    <View style={styles.completedBadge}>
-                      <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
-                      <Text style={styles.completedBadgeText}>Course Completed!</Text>
-                    </View>
-                  )} */}
+        {/* Course Progress Section */}
+        {courseContent && courseContent.userProgress && (
+          <>
+            <Text style={styles.sectionTitle}>Your Progress</Text>
+            <View style={styles.progressCard}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>Course Progress</Text>
+                <Text style={styles.progressPercentage}>{calculateCourseProgress()}%</Text>
+              </View>
+              <View style={styles.progressBarContainer}>
+                <View style={styles.progressBarBackground}>
+                  <View 
+                    style={[
+                      styles.progressBarFill, 
+                      { width: `${calculateCourseProgress()}%` }
+                    ]} 
+                  />
                 </View>
               </View>
-            </>
-          )}
-
-          {/* Modules Section */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Modules</Text>
-            {courseContent && getCompletedModulesCount() === courseDetail.modules.length && courseDetail.modules.length > 0 && (
-              <View style={styles.completedBadge}>
-                <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
-                <Text style={styles.completedBadgeText}>All Completed</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.modulesList}>
-            {courseDetail.modules.length > 0 ? (
-              courseDetail.modules.map(renderModule)
-            ) : (
-              <View style={styles.noModulesContainer}>
-                <Text style={styles.noModulesText}>No modules available</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Instructor Section */}
-          <Text style={styles.sectionTitle}>Instructor</Text>
-          <View style={styles.instructorSection}>
-            <ImageWithFallback
-              source={{ uri: courseDetail.instructor.avatar }}
-              fallback={Images.defaultAvatar}
-              style={styles.instructorAvatar}
-            />
-            <View style={styles.instructorInfo}>
-              <Text style={styles.instructorName}>{courseDetail.instructor.name}</Text>
-              <Text style={styles.instructorRole}>Data Science Expert</Text>
-            </View>
-          </View>
-
-          {/* Course Reviews */}
-          <Text style={styles.sectionTitle}>Course Reviews</Text>
-          
-          {/* Rating Summary */}
-          <View style={styles.reviewsSectionCard}>
-            {/* Top row: Left summary (with button) + Right breakdown */}
-            <View style={styles.reviewsTopRow}>
-              {/* Left: summary + button */}
-              <View style={styles.reviewsSummaryCol}>
-                <Text style={styles.ratingNumber}>{courseDetail.rating.toFixed(1)}</Text>
-                <View style={styles.starsContainer}>
-                  {renderStarRating(courseDetail.rating)}
-                </View>
-                <Text style={styles.reviewCount}>
-                  {courseDetail.totalRatings} ratings · {courseDetail.reviews.length} reviews
+              <View style={styles.progressStats}>
+                <Text style={styles.progressStatsText}>
+                  {getCompletedModulesCount()} of {courseDetail.modules.length} modules completed
                 </Text>
-
-                <Pressable style={styles.leaveReviewButton} onPress={handleLeaveReview}>
-                  <Text style={styles.leaveReviewButtonText}>Leave a Review</Text>
-                </Pressable>
+                {/* {calculateCourseProgress() === 100 && (
+                  <View style={styles.completedBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
+                    <Text style={styles.completedBadgeText}>Course Completed!</Text>
+                  </View>
+                )} */}
               </View>
-
-              {/* Right: rating breakdown (kept as-is) */}
-              {renderRatingBreakdown(courseDetail.ratingBreakdown)}
             </View>
+          </>
+        )}
 
-            {/* Divider */}
-            <View style={styles.reviewsDivider} />
-
-            {/* Reviews list (rows feel part of same section) */}
-            <View style={styles.reviewsListTight}>
-              {courseDetail.reviews.map(renderReview)}
-            </View>
-          </View>
-
-          {/* Enroll Button */}
-          {!isEnrolled && (
-            <View style={styles.enrollSection}>
-              <Pressable
-                style={[styles.enrollButton, isEnrolling && { opacity: 0.6 }]}
-                onPress={handleEnroll}
-                disabled={isEnrolling}
-              >
-                {isEnrolling ? (
-                  <ActivityIndicator color={Colors.white} />
-                ) : (
-                  <Text style={styles.enrollButtonText}>Enroll Now</Text>
-                )}
-              </Pressable>
+        {/* Modules Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Modules</Text>
+          {courseContent && getCompletedModulesCount() === courseDetail.modules.length && courseDetail.modules.length > 0 && (
+            <View style={styles.completedBadge}>
+              <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
+              <Text style={styles.completedBadgeText}>All Completed</Text>
             </View>
           )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        <View style={styles.modulesList}>
+          {courseDetail.modules.length > 0 ? (
+            courseDetail.modules.map(renderModule)
+          ) : (
+            <View style={styles.noModulesContainer}>
+              <Text style={styles.noModulesText}>No modules available</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Instructor Section */}
+        <Text style={styles.sectionTitle}>Instructor</Text>
+        <View style={styles.instructorSection}>
+          <ImageWithFallback
+            source={{ uri: courseDetail.instructor.avatar }}
+            fallback={Images.defaultAvatar}
+            style={styles.instructorAvatar}
+          />
+          <View style={styles.instructorInfo}>
+            <Text style={styles.instructorName}>{courseDetail.instructor.name}</Text>
+            <Text style={styles.instructorRole}>Data Science Expert</Text>
+          </View>
+        </View>
+
+        {/* Course Reviews */}
+        <Text style={styles.sectionTitle}>Course Reviews</Text>
+        
+        {/* Rating Summary */}
+        <View style={styles.reviewsSectionCard}>
+          {/* Top row: Left summary (with button) + Right breakdown */}
+          <View style={styles.reviewsTopRow}>
+            {/* Left: summary + button */}
+            <View style={styles.reviewsSummaryCol}>
+              <Text style={styles.ratingNumber}>{courseDetail.rating.toFixed(1)}</Text>
+              <View style={styles.starsContainer}>
+                {renderStarRating(courseDetail.rating)}
+              </View>
+              <Text style={styles.reviewCount}>
+                {courseDetail.totalRatings} ratings · {courseDetail.reviews.length} reviews
+              </Text>
+
+              <ActionButton
+                onPress={handleLeaveReview}
+                text={'Leave a Review'}
+                style={{height: 42, padding: 12, paddingTop: 9, marginTop: Spacing.md, marginBottom: Spacing.xs}}
+              />
+            </View>
+
+            {/* Right: rating breakdown (kept as-is) */}
+            {renderRatingBreakdown(courseDetail.ratingBreakdown)}
+          </View>
+
+          {/* Divider */}
+          <View style={styles.reviewsDivider} />
+
+          {/* Reviews list (rows feel part of same section) */}
+          <View style={styles.reviewsListTight}>
+            {courseDetail.reviews.map(renderReview)}
+          </View>
+        </View>
+
+        {/* Enroll Button */}
+        {!isEnrolled && (
+          <ActionButton
+            onPress={handleEnroll}
+            text={'Enroll Now'}
+            disabled={isEnrolling}
+            loading={isEnrolling}
+          />
+        )}
+      </View>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -464,10 +460,10 @@ const styles = StyleSheet.create({
   },
   header: {
     position: 'absolute',
-    top: 60,
+    top: Spacing.lg*2,
     left: 0,
     right: 0,
-    zIndex: 10,
+    zIndex: 1,
     paddingHorizontal: Spacing.lg,
   },
   backButton: {
@@ -504,8 +500,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     marginTop: -20,
     paddingTop: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
-    minHeight: '100%',
+    paddingHorizontal: Spacing.lg
   },
   courseTitle: {
     fontSize: 24,
@@ -745,22 +740,6 @@ const styles = StyleSheet.create({
     minWidth: 28,
     textAlign: 'right',
   },
-  leaveReviewButton: {
-    backgroundColor: Colors.purple400,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.sm,
-    alignSelf: 'flex-start',
-    flexShrink: 0,
-  },
-  leaveReviewButtonText: {
-    color: Colors.white,
-    fontWeight: '600',
-    fontSize: TextStyles.body.fontSize,
-  },
   reviewItem: {
     backgroundColor: 'transparent',       // was Colors.textInputBg
     paddingVertical: Spacing.md,          // a bit tighter
@@ -812,21 +791,6 @@ const styles = StyleSheet.create({
     fontSize: TextStyles.body.fontSize,
     color: Colors.textSecondary,
     fontStyle: 'italic',
-  },
-  enrollSection: {
-    paddingVertical: Spacing.xl,
-    paddingBottom: 40,
-  },
-  enrollButton: {
-    backgroundColor: Colors.purple400,
-    paddingVertical: Spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  enrollButtonText: {
-    fontSize: TextStyles.h3.fontSize,
-    fontWeight: '600',
-    color: Colors.white,
   },
 });
 

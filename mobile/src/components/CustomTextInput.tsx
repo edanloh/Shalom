@@ -21,6 +21,7 @@ interface CustomTextInputProps {
   multiline?: boolean;
   numberOfLines?: number;
   textAlignVertical?: "auto" | "top" | "bottom";
+  maxLength?: number;
   inputContainerStyle?: any;
   leftIconName?: keyof typeof Ionicons.glyphMap;
   eyeIconStyle?: any;
@@ -54,6 +55,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
   multiline = false,
   numberOfLines,
   textAlignVertical,
+  maxLength,
   inputContainerStyle,
   leftIconName,
   eyeIconStyle,
@@ -102,6 +104,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
           returnKeyType={returnKeyType}
           multiline={multiline}
           numberOfLines={numberOfLines}
+          maxLength={maxLength}
           textAlignVertical={textAlignVertical}
         />
         {value.length > 0 && (

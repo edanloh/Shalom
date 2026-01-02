@@ -26,6 +26,8 @@ interface ScreenProps {
   customEdges?: Array<"top" | "bottom" | "left" | "right">;
   refreshing?: boolean;
   onRefresh?: () => void;
+  noHeader?: boolean;
+  widescreen?: boolean;
 }
 
 export default function Screen({
@@ -42,6 +44,8 @@ export default function Screen({
   customEdges,
   refreshing,
   onRefresh,
+  noHeader,
+  widescreen,
 }: ScreenProps) {
   const header = (
     <ScreenHeader
@@ -83,8 +87,8 @@ export default function Screen({
           overScrollMode="always" // Android
         >
           {/* Header */}
-          {header}
-          <View style={styles.scrollContent}>{children}</View>
+          {!noHeader && header}
+          <View style={widescreen ? styles.fullScrollContent : styles.scrollContent}>{children}</View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

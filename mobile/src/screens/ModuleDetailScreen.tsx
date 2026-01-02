@@ -573,13 +573,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     backgroundColor: Colors.primary,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray600,
+    borderBottomColor: Colors.textInputBg,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.md,
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xl * 2,
   },
   progressSection: {
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
     padding: Spacing.lg,
@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   sectionCard: {
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
     padding: Spacing.lg,
@@ -718,7 +718,7 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     flexDirection: "row",
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     borderRadius: 12,
     padding: Spacing.md,
     marginBottom: Spacing.md,
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     borderRadius: 10,
   },
   navButtonDisabled: {
