@@ -1,80 +1,88 @@
 import React from "react";
 import {
   View,
-  Text,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  TouchableOpacity,
   StatusBar,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants";
 import styles from "@/styles/styles";
+import ScreenHeader from "./ScreenHeader";
 
 interface ScreenProps {
   title: string;
+  subtitle?: string;
   children: React.ReactNode;
-  navigation: any;
-  showBackButton?: boolean;
-  showSettingsButton?: boolean;
-  onSettingsPress?: () => void;
+  navigation?: any;
+  headerLeftIcon?: string;
   headerRightIcon?: string;
+  onHeaderLeftPress?: () => void;
   onHeaderRightPress?: () => void;
+  customScreenStyle?: object;
+  customEdges?: Array<"top" | "bottom" | "left" | "right">;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }
 
 export default function Screen({
   title,
+  subtitle,
   children,
   navigation,
-  showBackButton = true,
-  showSettingsButton = false,
-  onSettingsPress,
+  headerLeftIcon,
   headerRightIcon,
+  onHeaderLeftPress,
   onHeaderRightPress,
+  customScreenStyle,
+  customEdges,
+  refreshing,
+  onRefresh,
 }: ScreenProps) {
+  const header = (
+    <ScreenHeader
+      title={title}
+      subtitle={subtitle}
+      headerLeftIcon={headerLeftIcon}
+      headerRightIcon={headerRightIcon}
+      onHeaderLeftPress={onHeaderLeftPress || (() => navigation?.goBack())}
+      onHeaderRightPress={onHeaderRightPress}
+    />
+  );
+
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right", "bottom"]}>
+    <SafeAreaView
+      style={styles.container}
+      edges={customEdges || ["top", "left", "right"]}
+    >
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.slimScrollContent}>
+        {/* Content */}
+        <ScrollView
+          contentContainerStyle={[styles.fullScrollContent, customScreenStyle]}
+          nestedScrollEnabled={true}
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl
+                refreshing={refreshing || false}
+                onRefresh={onRefresh}
+                tintColor={Colors.secondary}
+                colors={[Colors.secondary]}
+                
+              />
+            ) : undefined
+          }
+          alwaysBounceVertical={true} // iOS
+          overScrollMode="always" // Android
+        >
           {/* Header */}
-          <View style={styles.screenHeader}>
-            {showBackButton ? (
-              <TouchableOpacity
-                onPress={() => navigation.goBack()}
-                style={[styles.backButton, { width: 28 }]}
-              >
-                <Ionicons name="chevron-back" size={28} color="white" />
-              </TouchableOpacity>
-            ) : (
-              <View style={{ width: 28 }} />
-            )}
-
-            <Text style={styles.headerTitle}>{title}</Text>
-
-            {showSettingsButton && onSettingsPress ? (
-              <TouchableOpacity onPress={onSettingsPress}>
-                <Ionicons name="cog" size={28} color="white" />
-              </TouchableOpacity>
-            ) : headerRightIcon && onHeaderRightPress ? (
-              <TouchableOpacity onPress={onHeaderRightPress}>
-                <Ionicons
-                  name={headerRightIcon as any}
-                  size={28}
-                  color="white"
-                />
-              </TouchableOpacity>
-            ) : (
-              <View style={{ width: 28 }} />
-            )}
-          </View>
-
-          {/* Content */}
-          <View style={styles.form}>{children}</View>
+          {header}
+          <View style={styles.scrollContent}>{children}</View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

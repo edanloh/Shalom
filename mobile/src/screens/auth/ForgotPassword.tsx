@@ -13,7 +13,7 @@ import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import styles from "@/styles/styles";
-import { Colors, TextStyles } from "@/constants";
+import { Colors, Spacing, TextStyles } from "@/constants";
 
 const ForgotPasswordScreen = () => {
   const navigation = useNavigation<any>();
@@ -84,7 +84,12 @@ const ForgotPasswordScreen = () => {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { justifyContent: "center", padding: Spacing.lg },
+        ]}
+      >
         <View style={styles.header}>
           <View style={styles.logo}>
             <Image

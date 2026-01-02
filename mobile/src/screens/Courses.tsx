@@ -5,15 +5,11 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Image,
   TextInput,
   Dimensions,
   ScrollView,
   ActivityIndicator,
-  RefreshControl,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useCourses } from "../contexts/CourseContext";
@@ -22,6 +18,7 @@ import { Colors, Spacing, TextStyles } from "../constants";
 import type { Course } from "../types";
 import { ImageWithFallback } from "@components/common";
 import { Images } from "../../assets";
+import Screen from "../components/common/Screen";
 const { width } = Dimensions.get("window");
 
 const CARD_BG = "#3A3A45";
@@ -255,28 +252,15 @@ export default function CoursesScreen({ navigation }: any) {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      <StatusBar style="light" />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Browse</Text>
-      </View>
-
+    <Screen
+      title="Browse Courses"
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+    >
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: Spacing.lg * 2 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Colors.white} // iOS spinner color
-            colors={[Colors.purple400]} // Android spinner colors
-          />
-        }
-        alwaysBounceVertical={true} // iOS
-        overScrollMode="always" // Android
       >
         {/* Search */}
         <View style={styles.searchWrap}>
@@ -401,7 +385,7 @@ export default function CoursesScreen({ navigation }: any) {
           />
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 

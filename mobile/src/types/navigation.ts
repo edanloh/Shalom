@@ -1,7 +1,7 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
 export type MainStackParamList = {
-  Main: NavigatorScreenParams<TabParamList>;
+  MainTabs: NavigatorScreenParams<TabParamList>;
   CourseDetail: { courseId: string };
   ModuleDetail: { courseId: string; sectionId: string; userId?: string };
   LessonPlayer: { videoId: string; courseId: string; sectionId?: string; userId?: string };

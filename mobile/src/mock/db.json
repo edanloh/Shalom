@@ -664,6 +664,126 @@
           "location": "USA",
           "phone": "+1 555 123 4567",
           "authProvider": "google"
+        },
+        {
+          "id": "770e8400-e29b-41d4-a716-446655440103",
+          "email": "john.smith@gmail.com",
+          "username": "johnsmith",
+          "name": "John Smith",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=John+Smith&size=50&background=EF4444&color=fff",
+          "bio": "Software engineer looking to upgrade my skills",
+          "location": "United Kingdom",
+          "phone": "+44 20 7123 4567",
+          "authProvider": "email"
+        },
+        {
+          "id": "880e8400-e29b-41d4-a716-446655440104",
+          "email": "maria.garcia@gmail.com",
+          "username": "mariagarcia",
+          "name": "Maria Garcia",
+          "role": "instructor",
+          "avatar": "https://ui-avatars.com/api/?name=Maria+Garcia&size=50&background=F59E0B&color=fff",
+          "bio": "Data science educator with 10 years experience",
+          "location": "Spain",
+          "phone": "+34 91 123 4567",
+          "authProvider": "google"
+        },
+        {
+          "id": "990e8400-e29b-41d4-a716-446655440105",
+          "email": "david.chenbao@gmail.com",
+          "username": "davidchen",
+          "name": "David Chen",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=David+Chen&size=50&background=8B5CF6&color=fff",
+          "bio": "Student exploring AI and machine learning",
+          "location": "Canada",
+          "phone": "+1 416 555 7890",
+          "authProvider": "email"
+        },
+        {
+          "id": "aa0e8400-e29b-41d4-a716-446655440106",
+          "email": "sarah.wilson@gmail.com",
+          "username": "sarahwilson",
+          "name": "Sarah Wilson",
+          "role": "instructor",
+          "avatar": "https://ui-avatars.com/api/?name=Sarah+Wilson&size=50&background=EC4899&color=fff",
+          "bio": "UX/UI designer passionate about teaching design principles",
+          "location": "Australia",
+          "phone": "+61 2 9876 5432",
+          "authProvider": "google"
+        },
+        {
+          "id": "bb0e8400-e29b-41d4-a716-446655440107",
+          "email": "alex.kumar@gmail.com",
+          "username": "alexkumar",
+          "name": "Alex Kumar",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=Alex+Kumar&size=50&background=3B82F6&color=fff",
+          "bio": "Cloud architecture enthusiast and DevOps learner",
+          "location": "India",
+          "phone": "+91 98765 43210",
+          "authProvider": "email"
+        },
+        {
+          "id": "cc0e8400-e29b-41d4-a716-446655440108",
+          "email": "emma.brown@gmail.com",
+          "username": "emmabrown",
+          "name": "Emma Brown",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=Emma+Brown&size=50&background=14B8A6&color=fff",
+          "bio": "Marketing professional learning web development",
+          "location": "New Zealand",
+          "phone": "+64 9 123 4567",
+          "authProvider": "google"
+        },
+        {
+          "id": "dd0e8400-e29b-41d4-a716-446655440109",
+          "email": "james.park@gmail.com",
+          "username": "jamespark",
+          "name": "James Park",
+          "role": "instructor",
+          "avatar": "https://ui-avatars.com/api/?name=James+Park&size=50&background=F97316&color=fff",
+          "bio": "Full-stack developer teaching modern web technologies",
+          "location": "South Korea",
+          "phone": "+82 2 3456 7890",
+          "authProvider": "email"
+        },
+        {
+          "id": "ee0e8400-e29b-41d4-a716-446655440110",
+          "email": "lisa.anderson@gmail.com",
+          "username": "lisaanderson",
+          "name": "Lisa Anderson",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=Lisa+Anderson&size=50&background=06B6D4&color=fff",
+          "bio": "Career changer transitioning into tech",
+          "location": "Germany",
+          "phone": "+49 30 1234 5678",
+          "authProvider": "google"
+        },
+        {
+          "id": "ff0e8400-e29b-41d4-a716-446655440111",
+          "email": "michael.lee@gmail.com",
+          "username": "michaellee",
+          "name": "Michael Lee",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=Michael+Lee&size=50&background=A855F7&color=fff",
+          "bio": "Mobile app developer expanding into cross-platform development",
+          "location": "Japan",
+          "phone": "+81 3 9876 5432",
+          "authProvider": "email"
+        },
+        {
+          "id": "1a0e8400-e29b-41d4-a716-446655440112",
+          "email": "sophia.martinez@gmail.com",
+          "username": "sophiamartinez",
+          "name": "Sophia Martinez",
+          "role": "instructor",
+          "avatar": "https://ui-avatars.com/api/?name=Sophia+Martinez&size=50&background=84CC16&color=fff",
+          "bio": "Python expert specializing in data analytics and visualization",
+          "location": "Mexico",
+          "phone": "+52 55 1234 5678",
+          "authProvider": "google"
         }
       ]
     }

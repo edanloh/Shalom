@@ -15,7 +15,7 @@ import { useAuth } from "@contexts/AuthContext";
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import styles from "@/styles/styles";
-import { Colors, TextStyles } from "../../constants";
+import { Colors, Spacing, TextStyles } from "../../constants";
 WebBrowser.maybeCompleteAuthSession();
 
 import {
@@ -167,7 +167,12 @@ export default function RegisterScreen({ navigation }: any) {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { justifyContent: "center", padding: Spacing.lg },
+        ]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logo}>

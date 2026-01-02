@@ -1,17 +1,7 @@
-import { useMemo, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SectionList,
-  Image,
-  TouchableOpacity,
-  StatusBar,
-  RefreshControl
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, TextStyles } from '../constants';
+import { useMemo, useState, useCallback } from "react";
+import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
+import { Colors, Spacing, TextStyles } from "../constants";
+import Screen from "../components/common/Screen";
 
 type AppNotification = {
   id: string;
@@ -28,7 +18,7 @@ const MOCK_NOTIFICATIONS: AppNotification[] = [
     courseTitle: 'Data Science Fundamentals',
     subtitle: 'New content added to your course',
     thumbnail:
-      'https://images.unsplash.com/photo-1551281044-8b89c2e2baea?w=200&q=60',
+      "https://images.unsplash.com/photo-1666875753105-c63a6f3bdc86?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     createdAt: new Date().toISOString(),
   },
   {
@@ -36,7 +26,7 @@ const MOCK_NOTIFICATIONS: AppNotification[] = [
     courseTitle: 'Machine Learning Basics',
     subtitle: 'Deadline approaching for your assignment',
     thumbnail:
-      'https://images.unsplash.com/photo-1526378722484-bd91ca387e72?w=200&q=60',
+      "https://images.unsplash.com/photo-1526378722484-bd91ca387e72?w=200&q=60",
     createdAt: new Date().toISOString(),
   },
 
@@ -46,7 +36,7 @@ const MOCK_NOTIFICATIONS: AppNotification[] = [
     courseTitle: 'Data Science Fundamentals',
     subtitle: 'New content added to your course',
     thumbnail:
-      'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=200&q=60',
+      "https://images.unsplash.com/photo-1666875753105-c63a6f3bdc86?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
   },
   {
@@ -54,7 +44,7 @@ const MOCK_NOTIFICATIONS: AppNotification[] = [
     courseTitle: 'Machine Learning Basics',
     subtitle: 'Deadline approaching for your assignment',
     thumbnail:
-      'https://images.unsplash.com/photo-1518779578993-ec3579fee39f?w=200&q=60',
+      "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?w=200&q=60",
     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
   },
 
@@ -64,8 +54,24 @@ const MOCK_NOTIFICATIONS: AppNotification[] = [
     courseTitle: 'Data Science Fundamentals',
     subtitle: 'New content added to your course',
     thumbnail:
-      'https://images.unsplash.com/photo-1551281044-8b89c2e2baea?w=200&q=60',
+      "https://images.unsplash.com/photo-1666875753105-c63a6f3bdc86?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "o2",
+    courseTitle: "Machine Learning Basics",
+    subtitle: "Deadline approaching for your assignment",
+    thumbnail:
+      "https://images.unsplash.com/photo-1526378722484-bd91ca387e72?w=200&q=60",
+    createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "o3",
+    courseTitle: "Introduction to Python",
+    subtitle: "Your course has been updated",
+    thumbnail:
+      "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=200&q=60",
+    createdAt: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
   },
 ];
 
@@ -116,125 +122,75 @@ export default function NotificationsScreen({ navigation }: any) {
     return result;
   }, []);
 
-  const renderItem = ({ item }: { item: AppNotification }) => (
-    <TouchableOpacity activeOpacity={0.8} style={styles.row}>
-      <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
-      <View style={styles.rowText}>
-        <Text style={styles.title} numberOfLines={1}>
-          {item.courseTitle}
-        </Text>
-        <Text style={styles.subtitle} numberOfLines={1}>
-          {item.subtitle}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderSectionHeader = ({ section: { title } }: any) => (
-    <View style={styles.stickyHeader}>
-      <Text style={styles.stickyHeaderText}>{title}</Text>
-    </View>
-  );
-
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
       // TODO: call your real fetch here, e.g. await reloadNotifications();
-      await new Promise(r => setTimeout(r, 800)); // demo delay
+      await new Promise((r) => setTimeout(r, 800)); // demo delay
     } finally {
       setRefreshing(false);
     }
   }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+    <Screen
+      title="Notifications"
+      customEdges={["top", "left", "right"]}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+    >
+      {sections.map((section, sectionIndex) => (
+        <View key={section.title} style={{ marginBottom: Spacing.lg }}>
+          {/* Section Header */}
+          <View style={styles.stickyHeader}>
+            <Text style={styles.stickyHeaderText}>{section.title}</Text>
+          </View>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
-        >
-          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Notifications</Text>
-
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Settings')}
-          hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
-        >
-          <Ionicons name="settings-outline" size={22} color={Colors.textPrimary} />
-        </TouchableOpacity>
-      </View>
-
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
-        SectionSeparatorComponent={() => <View style={{ height: Spacing.sm }}/>}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Colors.white}             // iOS spinner color
-            colors={[Colors.purple400]}          // Android spinner colors
-            progressViewOffset={8}               // Android offset (optional)
-          />
-        }
-      />
-    </SafeAreaView>
+          {/* Section Items */}
+          {section.data.map((item, itemIndex) => (
+            <View key={item.id}>
+              <TouchableOpacity activeOpacity={0.8} style={styles.row}>
+                <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
+                <View style={styles.rowText}>
+                  <Text style={styles.title} numberOfLines={1}>
+                    {item.courseTitle}
+                  </Text>
+                  <Text style={styles.subtitle} numberOfLines={1}>
+                    {item.subtitle}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              {/* Item Separator */}
+              {itemIndex < section.data.length - 1 && (
+                <View style={{ height: Spacing.md }} />
+              )}
+            </View>
+          ))}
+        </View>
+      ))}
+    </Screen>
   );
 }
 
 const THUMB = 56;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingVertical: Spacing.base,
-    backgroundColor: Colors.primary, // dark bg
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontFamily: TextStyles.h4.fontFamily,
-    fontSize: TextStyles.h4.fontSize,
-    color: Colors.textPrimary,
-    fontWeight: 'bold',
-  },
-
   // List
-  listContent: {
-    paddingHorizontal: Spacing.lg,
-  },
   stickyHeader: {
     backgroundColor: Colors.primary,
-    paddingTop: Spacing.md,
   },
   stickyHeaderText: {
-    ...TextStyles.h2,
+    ...TextStyles.h4,
     color: Colors.textPrimary,
     fontSize: TextStyles.h4.fontSize,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   // Row
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.sm,
   },
   thumb: {
@@ -250,8 +206,8 @@ const styles = StyleSheet.create({
     ...TextStyles.h4,
     color: Colors.textPrimary,
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontWeight: "bold",
+    marginBottom: 0,
   },
   subtitle: {
     ...TextStyles.body,

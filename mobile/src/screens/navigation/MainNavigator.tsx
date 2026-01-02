@@ -79,7 +79,7 @@ export default function MainNavigator() {
   return (
     <Stack.Navigator>
       <Stack.Screen
-        name="Main"
+        name="MainTabs"
         component={TabNavigator}
         options={{ headerShown: false }}
       />
@@ -123,15 +123,15 @@ export default function MainNavigator() {
         component={UserConfigScreen}
         options={{ headerShown: false }}
       />
-       <Stack.Screen
+      <Stack.Screen
         name="MyCourses"
         component={MyCourses}
         options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="Wishlist" 
-        component={WishlistScreen} 
-        options={{ headerShown: false }} 
+      <Stack.Screen
+        name="Wishlist"
+        component={WishlistScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="LeaveReview"

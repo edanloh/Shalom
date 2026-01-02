@@ -12,7 +12,7 @@ export { default as Categories } from './Categories';
 export { default as CustomTextInput } from './CustomTextInput';
 export { default as FeaturedCourses } from './[unused]  FeaturedCourses';
 export { default as Footer } from './[unused] Footer';
-export { default as Header } from './Header';
+export { default as Header } from './[unused] Header';
 export { default as Hero } from './Hero';
 export { default as Stats } from './Stats';
 export { YouTubePlayerWrapper } from './YouTubePlayerWrapper';

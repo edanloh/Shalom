@@ -21,7 +21,7 @@ import styles from "@/styles/styles";
 import CustomTextInput from "@components/CustomTextInput";
 import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
-import { Colors, TextStyles } from "@/constants";
+import { Colors, Spacing, TextStyles } from "@/constants";
 import externalStyles from "@styles/styles";
 
 export default function LoginScreen({ navigation }: any) {
@@ -105,7 +105,12 @@ export default function LoginScreen({ navigation }: any) {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { justifyContent: "center", padding: Spacing.lg },
+        ]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logo}>
