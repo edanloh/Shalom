@@ -229,8 +229,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
-    borderBottomLeftRadius: Platform.OS === "web" ? 0 : 40,
-    borderBottomRightRadius: Platform.OS === "web" ? 0 : 40,
     borderColor: "rgba(255, 255, 255, 0.3)",
     borderWidth: 0.5
   },
