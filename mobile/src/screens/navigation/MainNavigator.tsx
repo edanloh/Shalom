@@ -23,6 +23,7 @@ import UserConfigScreen from '../admin/UserConfig';
 import TestScreen from '../TestScreen';
 import SearchScreen from '../[unused] Search';
 import PointsHistoryScreen from '../PointsHistory';
+import NotificationSettingsScreen from '../NotificationSettingsScreen';
 
 import { useAuth } from '../../contexts/AuthContext';
 import type { TabParamList, MainStackParamList } from '@/types/navigation';
@@ -213,6 +214,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="PointsHistory"
         component={PointsHistoryScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

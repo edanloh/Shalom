@@ -140,6 +140,8 @@ export default function NotificationsScreen({ navigation }: any) {
       customEdges={["top", "left", "right"]}
       refreshing={refreshing}
       onRefresh={onRefresh}
+      headerRightIcon="settings-outline"
+      onHeaderRightPress={() => navigation.navigate("NotificationSettings")}
     >
       {sections.map((section, sectionIndex) => (
         <View key={section.title} style={{ marginBottom: Spacing.lg }}>
