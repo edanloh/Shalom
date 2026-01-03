@@ -1,5 +1,11 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ImageWithFallback } from "../common"; // adjust path if needed
 import { Colors, Spacing, Typography } from "../../constants";
@@ -38,7 +44,10 @@ const CourseCard: React.FC<Props> = ({
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      style={[styles.card, variant === "compact" ? styles.cardCompact : styles.cardProgress]}
+      style={[
+        styles.card,
+        variant === "compact" ? styles.cardCompact : styles.cardProgress,
+      ]}
       onPress={() => onPress?.(course)}
     >
       {/* Image block with overlay */}
@@ -46,7 +55,9 @@ const CourseCard: React.FC<Props> = ({
         <ImageWithFallback
           source={{ uri: course?.image }}
           fallback={Images.coursePlaceholder ?? Images.placeholder}
-          style={variant === "compact" ? styles.imageCompact : styles.imageProgress}
+          style={
+            variant === "compact" ? styles.imageCompact : styles.imageProgress
+          }
         />
 
         <View style={styles.badgeRow}>
@@ -60,19 +71,27 @@ const CourseCard: React.FC<Props> = ({
               toggleWishlist(course);
             }}
             accessibilityRole="button"
-            accessibilityLabel={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+            accessibilityLabel={
+              isWishlisted ? "Remove from wishlist" : "Add to wishlist"
+            }
             hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
             style={styles.heartBtn}
             activeOpacity={0.7}
           >
-            <Ionicons name={isWishlisted ? "heart" : "heart-outline"} size={18} color="#fff" />
+            <Ionicons
+              name={isWishlisted ? "heart" : "heart-outline"}
+              size={18}
+              color="#fff"
+            />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Text/content */}
       <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={2}>{course.title}</Text>
+        <Text style={styles.title} numberOfLines={2}>
+          {course.title}
+        </Text>
         <MetaRow rating={course.rating} modules={course.modules} />
 
         {showInstructor && course.instructor?.name ? (
@@ -87,7 +106,12 @@ const CourseCard: React.FC<Props> = ({
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${Math.max(0, Math.min(100, course.progress?.percentage ?? 0))}%` },
+                  {
+                    width: `${Math.max(
+                      0,
+                      Math.min(100, course.progress?.percentage ?? 0)
+                    )}%`,
+                  },
                 ]}
               />
             </View>
@@ -136,9 +160,11 @@ const styles = StyleSheet.create({
   badgeRow: {
     position: "absolute",
     top: Spacing.sm,
+    left: Spacing.sm,
     right: Spacing.sm,
     flexDirection: "row",
     alignItems: "flex-start",
+    justifyContent: "space-between",
   },
   levelBadge: {
     backgroundColor: Colors.purple400,

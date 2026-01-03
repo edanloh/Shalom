@@ -11,6 +11,7 @@ import type { User } from '../../types';
 import { getAvatarUri } from '@/utils/avatar';
 import { Images } from '../../../assets';
 import { ImageWithFallback } from '../common';
+import ScreenHeader from '../common/ScreenHeader';
 
 // User interface matching the API structure
 
@@ -30,21 +31,25 @@ const CombinedHeader: React.FC<CombinedHeaderProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Top Header with Points and Notification */}
-      <View style={styles.topHeader}>
-        <View style={styles.pointsContainer}>
-          <Text style={styles.pointsIcon}>⭐</Text>
-          <Text style={styles.pointsText}>{user.points || 0} pts</Text>
-        </View>
-        
-        <TouchableOpacity 
-          style={styles.notificationButton} 
-          onPress={onNotificationPress}
-        >
-          <Text style={styles.notificationIcon}>🔔</Text>
-          {hasNotifications && <View style={styles.notificationBadge} />}
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title=""
+        customStyles={{ backgroundColor: Colors.purple400 }}
+        headerLeftComponent={
+          <View style={styles.pointsContainer}>
+            <Text style={styles.pointsIcon}>⭐</Text>
+            <Text style={styles.pointsText}>{user.points || 0} pts</Text>
+          </View>
+        }
+        headerRightComponent={
+          <TouchableOpacity 
+            style={styles.notificationButton} 
+            onPress={onNotificationPress}
+          >
+            <Text style={styles.notificationIcon}>🔔</Text>
+            {hasNotifications && <View style={styles.notificationBadge} />}
+          </TouchableOpacity>
+        }
+      />
 
       {/* Welcome Section with Avatar */}
       <View style={styles.welcomeSection}>
@@ -63,8 +68,8 @@ const CombinedHeader: React.FC<CombinedHeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.base,
+    // paddingHorizontal: Spacing.lg,
+    // paddingVertical: Spacing.base,
     marginBottom: Spacing.sm,
     backgroundColor: Colors.purple400,
   },
@@ -115,6 +120,8 @@ const styles = StyleSheet.create({
   welcomeSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.base,
   },
   avatarContainer: {
     marginRight: Spacing.base,

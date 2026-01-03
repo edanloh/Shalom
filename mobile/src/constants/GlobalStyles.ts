@@ -111,7 +111,7 @@ export const TextStyles = {
     fontSize: Typography.fontSize['2xl'],
     lineHeight: Typography.fontSize['2xl'] * Typography.lineHeight.normal,
     color: Colors.textPrimary,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.base,
   } as TextStyle,
   
   h4: {
@@ -119,7 +119,7 @@ export const TextStyles = {
     fontSize: Typography.fontSize.xl,
     lineHeight: Typography.fontSize.xl * Typography.lineHeight.normal,
     color: Colors.textPrimary,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.base,
   } as TextStyle,
 
   h5: {
@@ -127,7 +127,7 @@ export const TextStyles = {
     fontSize: Typography.fontSize.lg,
     lineHeight: Typography.fontSize.lg * Typography.lineHeight.normal,
     color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   } as TextStyle,
 
   body: {

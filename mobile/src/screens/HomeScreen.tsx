@@ -15,6 +15,7 @@ import { Colors, ContainerStyles, Spacing, Typography, TextStyles } from '../con
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { Screen } from '@/components';
 
 // components (values)
 import ProfileHeader from '../components/home/ProfileHeader';
@@ -193,173 +194,170 @@ const HomeScreen: React.FC = () => {
   // Handle user loading state
   if (!user) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      <Screen
+        title=""
+        noHeader
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.purple400} />
           <Text style={styles.loadingText}>Loading user profile...</Text>
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-      
-      <ScrollView 
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={Colors.white}
-            colors={[Colors.purple400]}
+    <Screen
+      title=""
+      noHeader
+      widescreen
+    >
+      {/* Combined Header with Profile, Welcome, and Notifications */}
+      <ProfileHeader 
+        user={user}
+        hasNotifications={true}
+        onNotificationPress={handleNotificationPress}
+      />
+
+      {/* Achievement Cards - Day Streak and Certificates */}
+      <ProgressSection achievements={achievements} currentHours={0} targetHours={10} />        
+
+      {/* My Courses Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={[TextStyles.h4]}>
+            My Courses
+          </Text>
+          <TouchableOpacity onPress={handleViewAllCourses}>
+            <Text style={styles.viewAllText}>View All</Text>
+          </TouchableOpacity>
+        </View>
+        
+        {myCoursesLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.purple400} />
+            <Text style={styles.loadingText}>Loading your courses...</Text>
+          </View>
+        ) : myCoursesError ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{myCoursesError}</Text>
+            <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (myCoursesData?.length ?? 0) === 0 ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>You haven't enrolled in any courses yet.</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Courses')}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryText}>Browse courses</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <SwipeableCourseCards 
+            courses={myCoursesData}
+            onCourseComplete={handleCourseComplete}
+            onCourseLike={handleCourseLike}
+            onToggleWishlist={toggleWishlist}
+            isWishlisted={(id) => isWishlisted?.(id) ?? false}
           />
-        }
-      >
-        {/* Combined Header with Profile, Welcome, and Notifications */}
-        <ProfileHeader 
-          user={user}
-          hasNotifications={true}
-          onNotificationPress={handleNotificationPress}
-        />
+        )}
+      </View>
 
-        {/* Achievement Cards - Day Streak and Certificates */}
-        <ProgressSection achievements={achievements} currentHours={0} targetHours={10} />        
-
-        {/* My Courses Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>My Courses</Text>
-            <TouchableOpacity onPress={handleViewAllCourses}>
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {myCoursesLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.purple400} />
-              <Text style={styles.loadingText}>Loading your courses...</Text>
-            </View>
-          ) : myCoursesError ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{myCoursesError}</Text>
-              <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
-                <Text style={styles.retryText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (myCoursesData?.length ?? 0) === 0 ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>You haven't enrolled in any courses yet.</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Courses')}
-                style={styles.retryButton}
-              >
-                <Text style={styles.retryText}>Browse courses</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <SwipeableCourseCards 
-              courses={myCoursesData}
-              onCourseComplete={handleCourseComplete}
-              onCourseLike={handleCourseLike}
-              onToggleWishlist={toggleWishlist}
-              isWishlisted={(id) => isWishlisted?.(id) ?? false}
-            />
-          )}
+      {/* Wishlist Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={[TextStyles.h4]}>
+            Wishlist
+          </Text>
+          <TouchableOpacity onPress={handleViewWishlist}>
+            <Text style={styles.viewAllText}>View All</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Wishlist Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Wishlist</Text>
-            <TouchableOpacity onPress={handleViewWishlist}>
-              <Text style={styles.viewAllText}>View All</Text>
+        {wishlistLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.purple400} />
+            <Text style={styles.loadingText}>Loading wishlist...</Text>
+          </View>
+        ) : wishlistError ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{wishlistError}</Text>
+            <TouchableOpacity onPress={refreshWishlist} style={styles.retryButton}>
+              <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
           </View>
+        ) : wishlist.length === 0 ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>You haven't added any courses into your wishlist yet.</Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
+          >
+            {wishlist.map((course) => (
+              <CourseCard
+                key={course.id}
+                course={course}
+                variant="compact"
+                showInstructor={false}
+                onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
+              />
+            ))}
+          </ScrollView>
+        )}
+      </View>
 
-          {wishlistLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.purple400} />
-              <Text style={styles.loadingText}>Loading wishlist...</Text>
-            </View>
-          ) : wishlistError ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{wishlistError}</Text>
-              <TouchableOpacity onPress={refreshWishlist} style={styles.retryButton}>
-                <Text style={styles.retryText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : wishlist.length === 0 ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>You haven't added any courses into your wishlist yet.</Text>
-            </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
-            >
-              {wishlist.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                  variant="compact"
-                  showInstructor={false}
-                  onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
-                />
-              ))}
-            </ScrollView>
-          )}
+      {/* Suggested Courses Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={[TextStyles.h4]}>
+            Suggested for You
+          </Text>
         </View>
 
-        {/* Suggested Courses Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Suggested for You</Text>
+        {suggestedLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.purple400} />
+            <Text style={styles.loadingText}>Loading suggestions...</Text>
           </View>
-
-          {suggestedLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.purple400} />
-              <Text style={styles.loadingText}>Loading suggestions...</Text>
-            </View>
-          ) : suggestedError ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{suggestedError}</Text>
-              <TouchableOpacity onPress={refreshSuggested} style={styles.retryButton}>
-                <Text style={styles.retryText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
-            >
-              {suggestedCoursesData.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                  variant="compact"
-                  showInstructor={false}
-                  onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
-                />
-              ))}
-            </ScrollView>
-          )}
+        ) : suggestedError ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{suggestedError}</Text>
+            <TouchableOpacity onPress={refreshSuggested} style={styles.retryButton}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
           </View>
-          <View style={{ height: 130 }} />
-      </ScrollView>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
+          >
+            {suggestedCoursesData.map((course) => (
+              <CourseCard
+                key={course.id}
+                course={course}
+                variant="compact"
+                showInstructor={false}
+                onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
+              />
+            ))}
+          </ScrollView>
+        )}
+        </View>
+        <View style={{ height: 130 }} />
 
       {/* Bottom Navigation - Home, My Courses, Search, Settings */}
       {/* <BottomNavigation 
         activeTab={activeTab}
         onTabPress={handleTabPress}
       /> */}
-    </SafeAreaView>
+    </Screen>
   );
 };
 
@@ -379,7 +377,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.base,
   },
   sectionTitle: {
     fontFamily: TextStyles.h3.fontFamily,
@@ -389,7 +386,8 @@ const styles = StyleSheet.create({
   viewAllText: {
     fontFamily: TextStyles.body.fontFamily,
     fontSize: TextStyles.body.fontSize,
-    color: Colors.purple400,
+    color: Colors.purple200,
+    marginBottom: Spacing.md
   },
   loadingContainer: {
     flex: 1,

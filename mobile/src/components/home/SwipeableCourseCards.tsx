@@ -31,7 +31,7 @@ import type { MainStackParamList } from "../../types/navigation";
 import { ImageWithFallback } from "../common";
 import { Ionicons } from '@expo/vector-icons';
 
-type NavigationProp = StackNavigationProp<MainStackParamList, 'Main'>;
+type NavigationProp = StackNavigationProp<MainStackParamList, 'MainTabs'>;
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const CARD_WIDTH = screenWidth * 0.82;
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    paddingVertical: 20, // Add padding for shadow space
+    paddingBottom: 20, // Add padding for shadow space
     paddingHorizontal: 10, // Add padding for shadow space
   },
   previewCard: {
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   },
   mainCard: {
     width: CARD_WIDTH,
-    height: CARD_HEIGHT * 1.15,
+    height: CARD_HEIGHT * 1.25,
     borderRadius: 20,
     backgroundColor: Colors.gray600,
     // iOS Shadow
@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   imageContainer: {
-    height: "45%",
+    height: "40%",
     position: "relative",
     overflow: "hidden",
     borderTopLeftRadius: 20,
@@ -633,7 +633,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 16,
   },
   indicator: {
     width: 6,

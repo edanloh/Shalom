@@ -101,8 +101,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
 
 const styles = StyleSheet.create({
   sectionContainer: {
-    marginTop: Spacing.lg,
-    marginBottom: Spacing["2xl"],
+    marginTop: Spacing.lg, 
   },
   // Weekly Goal styles
   goalContainer: {

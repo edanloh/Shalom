@@ -18,6 +18,7 @@ interface ScreenProps {
   children: React.ReactNode;
   navigation?: any;
   headerLeftIcon?: string;
+  headerLeftComponent?: React.ReactNode;
   headerRightIcon?: string;
   headerRightComponent?: React.ReactNode;
   onHeaderLeftPress?: () => void;
@@ -36,6 +37,7 @@ export default function Screen({
   children,
   navigation,
   headerLeftIcon,
+  headerLeftComponent,
   headerRightIcon,
   headerRightComponent,
   onHeaderLeftPress,
@@ -52,6 +54,7 @@ export default function Screen({
       title={title}
       subtitle={subtitle}
       headerLeftIcon={headerLeftIcon}
+      headerLeftComponent={headerLeftComponent}
       headerRightIcon={headerRightIcon}
       headerRightComponent={headerRightComponent}
       onHeaderLeftPress={onHeaderLeftPress || (() => navigation?.goBack())}

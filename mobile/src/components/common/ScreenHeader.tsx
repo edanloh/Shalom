@@ -7,24 +7,30 @@ interface ScreenHeaderProps {
   title: string;
   subtitle?: string;
   headerLeftIcon?: string;
+  headerLeftComponent?: React.ReactNode;
   headerRightIcon?: string;
   headerRightComponent?: React.ReactNode;
   onHeaderLeftPress?: () => void;
   onHeaderRightPress?: () => void;
+  customStyles?: object;
 }
 
 export default function ScreenHeader({
   title,
   subtitle,
   headerLeftIcon,
+  headerLeftComponent,
   headerRightIcon,
   headerRightComponent,
   onHeaderLeftPress,
   onHeaderRightPress,
+  customStyles,
 }: ScreenHeaderProps) {
   return (
-    <View style={styles.screenHeader}>
-      {headerLeftIcon ? (
+    <View style={customStyles ? [styles.screenHeader, customStyles] : styles.screenHeader}>
+      {headerLeftComponent ? (
+        headerLeftComponent
+      ) : ( headerLeftIcon ) ? (
         <TouchableOpacity
           onPress={onHeaderLeftPress}
           style={[styles.backButton, { width: 28 }]}
