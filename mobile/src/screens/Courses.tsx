@@ -366,6 +366,7 @@ export default function CoursesScreen({ navigation }: any) {
             subtext="Pull down to refresh."
           />
         )}
+        <View style={{ height: 100 }} />
     </Screen>
   );
 }

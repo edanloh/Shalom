@@ -169,7 +169,9 @@ export default function NotificationsScreen({ navigation }: any) {
             </View>
           ))}
         </View>
+        
       ))}
+      <View style={{ height: 100 }} />
     </Screen>
   );
 }

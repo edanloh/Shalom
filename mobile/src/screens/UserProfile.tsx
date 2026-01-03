@@ -204,6 +204,7 @@ const ProfileScreen: React.FC = () => {
           text="Log Out"
           onPress={logout}
         />
+        <View style={{ height: 100 }} />
 
       </ScrollView>
     </Screen>

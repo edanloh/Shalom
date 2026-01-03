@@ -351,6 +351,7 @@ const HomeScreen: React.FC = () => {
             </ScrollView>
           )}
           </View>
+          <View style={{ height: 120 }} />
       </ScrollView>
 
       {/* Bottom Navigation - Home, My Courses, Search, Settings */}
