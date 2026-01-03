@@ -28,7 +28,7 @@ import { BlurView } from 'expo-blur';
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
 
-const tabBarBottomOffset = Platform.OS === "android" ? 45 : 20;
+const tabBarBottomOffset = Platform.OS === "android" ? 50 : 20;
 
 function TabNavigator() {
   const { user } = useAuth();
@@ -63,7 +63,7 @@ function TabNavigator() {
           // Wrap icon in rounded background when focused
           if (focused) {
             return (
-              <View style={styles.activeIconContainer}>
+              <View style={styles.iconContainer}>
                 <Ionicons
                   name={iconName}
                   size={iconSize}
@@ -73,7 +73,11 @@ function TabNavigator() {
             );
           }
 
-          return <Ionicons name={iconName} size={iconSize} color={color} />;
+          return (
+            <View style={[styles.iconContainer, {backgroundColor: "rgba(0, 0, 0, 0.15)"}]}>
+              <Ionicons name={iconName} size={iconSize} color={color} />
+            </View>
+          )
         },
         tabBarActiveTintColor: Colors.white,
         tabBarInactiveTintColor: Colors.white,
@@ -81,7 +85,7 @@ function TabNavigator() {
         tabBarShowLabel: true,
         tabBarLabelStyle: {
           fontSize: 12,
-          marginTop: 6,
+          marginTop: 7,
         },
         tabBarBackground: () => (
           <>
@@ -207,24 +211,28 @@ export default function MainNavigator() {
 }
 
 const styles = StyleSheet.create({
-  activeIconContainer: {
+  iconContainer: {
     backgroundColor: Colors.white,
     borderRadius: 20,
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     justifyContent: "center",
     alignItems: "center",
   },
   tabBarBackground: {
     position: "absolute",
     top: -15,
-    bottom: -tabBarBottomOffset,
+    bottom: -tabBarBottomOffset-1,
     left: -10,
     right: -10,
     zIndex: 0,
     overflow: "hidden",
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
+    borderBottomLeftRadius: Platform.OS === "web" ? 0 : 40,
+    borderBottomRightRadius: Platform.OS === "web" ? 0 : 40,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderWidth: 0.5
   },
   tabBar: {
     position: "absolute",
@@ -233,6 +241,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: Colors.secondary,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderWidth: 0.5,
     borderRadius: 40,
     zIndex: 1,
   },
