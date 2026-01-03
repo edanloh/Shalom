@@ -112,7 +112,7 @@ export default function UserConfigScreen({ navigation, route }: any) {
           </View>
           <ActionButton
             text="Test Screen"
-            onPress={() => navigation.navigate("TestScreen")}
+            onPress={() => navigation.navigate("Wishlist")}
           />
         </> 
       )}

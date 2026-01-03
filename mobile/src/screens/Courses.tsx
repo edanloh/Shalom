@@ -289,6 +289,7 @@ export default function CoursesScreen({ navigation }: any) {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsRow}
+          style={{ maxHeight: 48, marginTop: Spacing.sm }}
         />
 
         {/* Jump Back In */}

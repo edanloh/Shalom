@@ -1,25 +1,22 @@
-import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  StatusBar,
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 import { useCourses } from '../contexts/CourseContext';
 import type { MainStackParamList } from '../types';
-import { Colors, Typography, Spacing, TextStyles, BorderRadius } from '../constants';
+import { Colors, Typography, Spacing, TextStyles } from '../constants';
 import { ImageWithFallback } from '../components/common';
 import { Images } from '../../assets';
-
-const CARD_RADIUS = 16;
+import Screen from '../components/common/Screen';
+import { ActionButton } from '@/components';
 
 const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
   <View style={styles.metaRow}>
@@ -39,10 +36,6 @@ export default function WishlistScreen() {
     refreshWishlist,
     toggleWishlist,
   } = useCourses();
-
-  const goToCoursesTab = () => {
-    (navigation as any).navigate('Main', { screen: 'Courses' });
-  };
 
   const renderItem = ({ item }: any) => (
     <TouchableOpacity
@@ -87,138 +80,80 @@ export default function WishlistScreen() {
   // Loading state (no list yet)
   if (wishlistLoading && (!wishlist || wishlist.length === 0)) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
-            <Ionicons name="chevron-back" size={26} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Wishlist</Text>
-          <View style={{ width: 26 }} />
+      <Screen
+        title="Wishlist"
+        navigation={navigation}
+        headerLeftIcon="chevron-back"
+      >
+        <View style={[styles.centerContainer, { flex: 1 }]}>
+          <ActivityIndicator size="large" color={Colors.secondary} />
+          <Text style={[TextStyles.body, {paddingTop: Spacing.md}]}>Loading your favourites…</Text>
         </View>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.purple400} />
-          <Text style={styles.loadingMessage}>Loading your favourites…</Text>
-        </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   // Error state (no list yet)
   if (wishlistError && (!wishlist || wishlist.length === 0)) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
-            <Ionicons name="chevron-back" size={26} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Wishlist</Text>
-          <View style={{ width: 26 }} />
-        </View>
-        <View style={styles.centerContainer}>
+      <Screen
+        title="Wishlist"
+        navigation={navigation}
+        headerLeftIcon="chevron-back"
+      >
+        <View>
           <Text style={styles.errorMessage}>Error: {wishlistError}</Text>
-          <TouchableOpacity onPress={refreshWishlist} style={styles.ctaButton}>
-            <Text style={styles.ctaText}>Retry</Text>
-          </TouchableOpacity>
+          <ActionButton
+            text="Retry"
+            onPress={refreshWishlist}
+          />
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-
-      {/* Header (outside the list) */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
-          <Ionicons name="chevron-back" size={26} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Wishlist</Text>
-        <View style={{ width: 26 }} />
-      </View>
-
+    <Screen
+      title="Wishlist"
+      navigation={navigation}
+      headerLeftIcon="chevron-back"
+    >
       <FlatList
         data={wishlist}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl * 1.5 }}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
         refreshing={!!wishlistLoading}
         onRefresh={refreshWishlist}
         ListEmptyComponent={
-          <View style={styles.centerContainer}>
-            <Text style={styles.emptyMessage}>Your wishlist is empty</Text>
-            <Text style={styles.emptySubMessage}>Tap the heart on any course to save it here.</Text>
-            <TouchableOpacity onPress={goToCoursesTab} style={[styles.ctaButton, { marginTop: Spacing.md }]}>
-              <Text style={styles.ctaText}>Browse courses</Text>
-            </TouchableOpacity>
+          <View style={{gap: Spacing.base, alignItems: 'center' }}>
+            <Text style={TextStyles.body}>Your wishlist is empty</Text>
+            <Text style={TextStyles.caption}>Tap the heart on any course to save it here.</Text>
+            <ActionButton
+              text="Browse courses"
+              onPress={() => navigation.navigate('MyCourses')}
+            />
           </View>
         }
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.primary },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
-  headerTitle: {
-    ...TextStyles.h3,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-    flex: 1,
-  },
-
   centerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
-    minHeight: 220,
-  },
-  loadingMessage: {
-    ...TextStyles.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.md,
-    textAlign: 'center',
   },
   errorMessage: {
     ...TextStyles.body,
     color: Colors.red,
     textAlign: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  emptyMessage: {
-    ...TextStyles.h4,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: Spacing.xs,
-  },
-  emptySubMessage: {
-    ...TextStyles.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-
-  ctaButton: {
-    backgroundColor: Colors.purple400,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: 8,
-    marginTop: Spacing.sm,
-  },
-  ctaText: { ...TextStyles.body, color: Colors.white, fontWeight: '600' },
 
   card: {
     flexDirection: 'row',

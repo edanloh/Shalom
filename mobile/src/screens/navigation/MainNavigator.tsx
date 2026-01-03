@@ -21,6 +21,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { TabParamList, MainStackParamList } from '@/types/navigation';
 import { ADMIN_EMAIL } from '../../constants';
 import TestScreen from '../TestScreen';
+import SearchScreen from '../Search';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
@@ -141,6 +142,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="TestScreen"
         component={TestScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SearchScreen"
+        component={SearchScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

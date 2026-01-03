@@ -475,9 +475,230 @@
             "createdAt": "2024-02-28T13:45:00Z",
             "updatedAt": "2024-09-18T15:20:00Z",
             "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_004",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "1",
+            "title": "React Native Fundamentals",
+            "description": "Learn the basics of React Native development with hands-on projects and real-world applications.",
+            "instructor": {
+              "id": "inst_001",
+              "name": "Sarah Johnson",
+              "avatar": "https://ui-avatars.com/api/?name=Sarah+Johnson&size=50&background=3B82F6&color=fff",
+              "category": "Mobile Development",
+              "rating": 4.8
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-12-10T10:00:00Z"
+            },
+            "duration": "12h",
+            "rating": 4.5,
+            "image": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+            "category": "Mobile Development",
+            "level": "beginner",
+            "modules": 12,
+            "tags": ["react-native", "mobile", "javascript", "ios", "android"],
+            "createdAt": "2024-01-15T08:00:00Z",
+            "updatedAt": "2024-10-01T14:30:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_005",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "3",
+            "title": "UI/UX Design Principles",
+            "description": "Learn fundamental design principles and create stunning user interfaces with practical design tools.",
+            "instructor": {
+              "id": "inst_003",
+              "name": "Emma Rodriguez",
+              "avatar": "https://ui-avatars.com/api/?name=Emma+Rodriguez&size=50&background=F59E0B&color=fff",
+              "category": "Design",
+              "rating": 4.6
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-11-20T14:00:00Z"
+            },
+            "duration": "14h",
+            "rating": 4.4,
+            "image": "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop",
+            "category": "Design",
+            "level": "beginner",
+            "modules": 10,
+            "tags": ["design", "ui", "ux", "figma", "creative"],
+            "createdAt": "2024-01-20T09:30:00Z",
+            "updatedAt": "2024-08-22T11:45:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_006",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "5",
+            "title": "Cloud Architecture with AWS",
+            "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
+            "instructor": {
+              "id": "inst_005",
+              "name": "Alex Kumar",
+              "avatar": "https://ui-avatars.com/api/?name=Alex+Kumar&size=50&background=8B5CF6&color=fff",
+              "category": "Cloud Computing",
+              "rating": 4.7
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-11-15T11:30:00Z"
+            },
+            "duration": "20h",
+            "rating": 4.5,
+            "image": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
+            "category": "Cloud Computing",
+            "level": "intermediate",
+            "modules": 15,
+            "tags": ["aws", "cloud", "architecture", "devops", "serverless"],
+            "createdAt": "2024-04-12T16:00:00Z",
+            "updatedAt": "2024-10-05T12:30:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_007",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "7",
+            "title": "Full Stack JavaScript",
+            "description": "Master full stack development with Node.js, Express, React, and MongoDB.",
+            "instructor": {
+              "id": "inst_007",
+              "name": "Tom Anderson",
+              "avatar": "https://ui-avatars.com/api/?name=Tom+Anderson&size=50&background=14B8A6&color=fff",
+              "category": "Web Development",
+              "rating": 4.7
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-12-05T09:00:00Z"
+            },
+            "duration": "25h",
+            "rating": 4.6,
+            "image": "https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=400&h=250&fit=crop",
+            "category": "Web Development",
+            "level": "intermediate",
+            "modules": 18,
+            "tags": ["javascript", "nodejs", "react", "mongodb", "fullstack"],
+            "createdAt": "2024-03-10T10:00:00Z",
+            "updatedAt": "2024-09-25T13:00:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_008",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "8",
+            "title": "Cybersecurity Fundamentals",
+            "description": "Learn essential cybersecurity concepts and protect systems from threats.",
+            "instructor": {
+              "id": "inst_008",
+              "name": "Rachel Kim",
+              "avatar": "https://ui-avatars.com/api/?name=Rachel+Kim&size=50&background=DC2626&color=fff",
+              "category": "Security",
+              "rating": 4.8
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-11-28T15:45:00Z"
+            },
+            "duration": "18h",
+            "rating": 4.7,
+            "image": "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&h=250&fit=crop",
+            "category": "Security",
+            "level": "beginner",
+            "modules": 14,
+            "tags": [
+              "security",
+              "cybersecurity",
+              "networking",
+              "ethical-hacking"
+            ],
+            "createdAt": "2024-05-08T11:00:00Z",
+            "updatedAt": "2024-10-12T14:20:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_009",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "9",
+            "title": "Mobile App Design with Figma",
+            "description": "Create beautiful mobile app designs using Figma's powerful design tools.",
+            "instructor": {
+              "id": "inst_009",
+              "name": "Jessica Lee",
+              "avatar": "https://ui-avatars.com/api/?name=Jessica+Lee&size=50&background=F97316&color=fff",
+              "category": "Design",
+              "rating": 4.5
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-12-03T13:20:00Z"
+            },
+            "duration": "10h",
+            "rating": 4.3,
+            "image": "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=400&h=250&fit=crop",
+            "category": "Design",
+            "level": "beginner",
+            "modules": 8,
+            "tags": ["figma", "design", "mobile", "ui", "prototyping"],
+            "createdAt": "2024-04-22T09:15:00Z",
+            "updatedAt": "2024-09-08T10:30:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_010",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "10",
+            "title": "Docker & Kubernetes Essentials",
+            "description": "Master container orchestration with Docker and Kubernetes for modern deployments.",
+            "instructor": {
+              "id": "inst_010",
+              "name": "Mark Peterson",
+              "avatar": "https://ui-avatars.com/api/?name=Mark+Peterson&size=50&background=0891B2&color=fff",
+              "category": "DevOps",
+              "rating": 4.9
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-11-30T16:00:00Z"
+            },
+            "duration": "22h",
+            "rating": 4.8,
+            "image": "https://images.unsplash.com/photo-1605745341112-85968b19335b?w=400&h=250&fit=crop",
+            "category": "DevOps",
+            "level": "intermediate",
+            "modules": 16,
+            "tags": [
+              "docker",
+              "kubernetes",
+              "devops",
+              "containers",
+              "orchestration"
+            ],
+            "createdAt": "2024-06-01T12:30:00Z",
+            "updatedAt": "2024-10-20T11:00:00Z",
+            "isWishlisted": true
           }
         ],
-        "count": 3,
+        "count": 10,
         "meta": {
           "timestamp": "2025-01-11T10:00:00Z",
           "requestId": "req_wishlist_456"
