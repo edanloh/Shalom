@@ -383,6 +383,7 @@ const QuizScreen = () => {
 
   const currentQuestion = quizDetail.questions[currentQuestionIndex];
   const answeredCount = selectedAnswers.size;
+  const isCurrentQuestionAnswered = selectedAnswers.has(currentQuestion.id);
 
   // Get the correct answer for current question (if in review mode)
   const correctAnswerForCurrentQuestion =
@@ -607,6 +608,8 @@ const QuizScreen = () => {
           <ActionButton
             onPress={handleNextQuestion}
             text={"Next"}
+            disabled={!reviewMode && !isCurrentQuestionAnswered}
+            style={!reviewMode && !isCurrentQuestionAnswered && { opacity: 0.2 } }
           />
         )}
       </View>
