@@ -21,7 +21,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { TabParamList, MainStackParamList } from '@/types/navigation';
 import { ADMIN_EMAIL } from '../../constants';
 import TestScreen from '../TestScreen';
-import SearchScreen from '../Search';
+import SearchScreen from '../[unused] Search';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
