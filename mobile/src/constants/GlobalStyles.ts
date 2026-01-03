@@ -164,6 +164,13 @@ export const TextStyles = {
     lineHeight: Typography.fontSize.sm * Typography.lineHeight.normal,
     color: Colors.textSecondary,
   } as TextStyle,
+
+  captionSmall: {
+    fontFamily: Typography.fontFamily.regular,
+    fontSize: Typography.fontSize.xs,
+    lineHeight: Typography.fontSize.xs * Typography.lineHeight.normal,
+    color: Colors.textSecondary,
+  } as TextStyle,
   
   small: {
     fontFamily: Typography.fontFamily.regular,

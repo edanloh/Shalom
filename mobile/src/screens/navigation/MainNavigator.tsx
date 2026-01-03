@@ -3,6 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+
+// Screens
 import HomeScreen from '../HomeScreen';
 import CoursesScreen from '../Courses';
 import ProfileScreen from '../UserProfile';
@@ -18,11 +20,13 @@ import WishlistScreen from '../WishlistScreen';
 import LeaveReviewScreen from '../LeaveReviewScreen';
 import UserManagementScreen from '../admin/UserManagement';
 import UserConfigScreen from '../admin/UserConfig';
+import TestScreen from '../TestScreen';
+import SearchScreen from '../[unused] Search';
+import PointsHistoryScreen from '../PointsHistory';
+
 import { useAuth } from '../../contexts/AuthContext';
 import type { TabParamList, MainStackParamList } from '@/types/navigation';
 import { ADMIN_EMAIL, Colors } from '../../constants';
-import TestScreen from '../TestScreen';
-import SearchScreen from '../[unused] Search';
 import { BlurView } from 'expo-blur';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -204,6 +208,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="SearchScreen"
         component={SearchScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="PointsHistory"
+        component={PointsHistoryScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

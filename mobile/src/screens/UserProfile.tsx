@@ -45,9 +45,9 @@ const ProfileScreen: React.FC = () => {
 
   const quickActions = useMemo(
     () => [
-      { label: 'Point History', icon: 'trending-up-outline' },
-      { label: 'Learning Goal', icon: 'podium-outline' },
-      { label: 'Certificate', icon: 'ribbon-outline' },
+      { label: 'Point History', icon: 'trending-up-outline', action: () => navigation.navigate('PointsHistory') },
+      { label: 'Learning Goal', icon: 'podium-outline', action: () => navigation.navigate('PointsHistory') },
+      { label: 'Certificate', icon: 'ribbon-outline', action: () => navigation.navigate('PointsHistory') },
     ],
     []
   );
@@ -132,10 +132,15 @@ const ProfileScreen: React.FC = () => {
         {/* Quick actions (visual-only) */}
         <View style={styles.quickRow}>
           {quickActions.map((qa) => (
-            <View key={qa.label} style={styles.quickCard}>
+            // <View key={qa.label} style={styles.quickCard}>
+            <Pressable 
+              key={qa.label} 
+              style={styles.quickCard} 
+              onPress={() => {qa.action()}}
+            >
               <Ionicons name={qa.icon as any} size={22} color={Colors.white} />
               <Text style={styles.quickLabel}>{qa.label}</Text>
-            </View>
+            </Pressable>
           ))}
         </View>
 

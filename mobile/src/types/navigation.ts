@@ -15,6 +15,7 @@ export type MainStackParamList = {
   UserConfig: undefined;
   TestScreen: undefined;
   SearchScreen: undefined;
+  PointsHistory: undefined;
 };
 
 export type TabParamList = {
