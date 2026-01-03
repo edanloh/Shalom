@@ -1,4 +1,4 @@
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -23,9 +23,12 @@ import type { TabParamList, MainStackParamList } from '@/types/navigation';
 import { ADMIN_EMAIL, Colors } from '../../constants';
 import TestScreen from '../TestScreen';
 import SearchScreen from '../[unused] Search';
+import { BlurView } from 'expo-blur';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
+
+const tabBarBottomOffset = Platform.OS === "android" ? 45 : 20;
 
 function TabNavigator() {
   const { user } = useAuth();
@@ -34,6 +37,7 @@ function TabNavigator() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
+          const iconSize = 22; // Custom icon size
           let iconName: keyof typeof Ionicons.glyphMap;
 
           switch (route.name) {
@@ -62,14 +66,14 @@ function TabNavigator() {
               <View style={styles.activeIconContainer}>
                 <Ionicons
                   name={iconName}
-                  size={size}
+                  size={iconSize}
                   color={Colors.secondary}
                 />
               </View>
             );
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName} size={iconSize} color={color} />;
         },
         tabBarActiveTintColor: Colors.white,
         tabBarInactiveTintColor: Colors.white,
@@ -81,12 +85,20 @@ function TabNavigator() {
         },
         tabBarBackground: () => (
           <>
-            <LinearGradient
-              colors={["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.45)"]}
-              locations={[0, 0.2]}
-              style={styles.tabBarBackground}
-              pointerEvents="auto"
-            />
+            <View style={styles.tabBarBackground}>
+              <BlurView
+                intensity={20}
+                tint="dark"
+                style={StyleSheet.absoluteFill}
+                experimentalBlurMethod="dimezisBlurView"
+                blurReductionFactor={8}
+              />
+              <LinearGradient
+                colors={["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.35)"]}
+                locations={[0, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
             <View style={styles.tabBar} />
           </>
         ),
@@ -94,7 +106,7 @@ function TabNavigator() {
           backgroundColor: Colors.secondary,
           borderTopColor: "transparent",
           position: "absolute",
-          bottom: 45,
+          bottom: tabBarBottomOffset,
           elevation: 1,
           borderRadius: 40,
           height: 74,
@@ -198,18 +210,21 @@ const styles = StyleSheet.create({
   activeIconContainer: {
     backgroundColor: Colors.white,
     borderRadius: 20,
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     justifyContent: "center",
     alignItems: "center",
   },
   tabBarBackground: {
     position: "absolute",
-    top: -30,
-    bottom: -45,
-    left: -20,
-    right: -20,
+    top: -15,
+    bottom: -tabBarBottomOffset,
+    left: -10,
+    right: -10,
     zIndex: 0,
+    overflow: "hidden",
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
   },
   tabBar: {
     position: "absolute",
