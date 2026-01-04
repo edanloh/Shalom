@@ -1,9 +1,10 @@
 import { useMemo, useState, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { Spacing, TextStyles } from "../constants";
+import { Spacing, TextStyles, Colors } from "../constants";
 import Screen from "../components/common/Screen";
 import { Ionicons } from "@expo/vector-icons";
 import CustomTextInput from "@/components/CustomTextInput";
+import CustomModal from "../components/common/CustomModal";
 
 type Achievement = {
   id: string;
@@ -11,6 +12,7 @@ type Achievement = {
   label: string;
   subtitle: string;
   createdAt: string; // ISO date
+  points?: number;
 };
 
 const MOCK_ACHIEVEMENTS: Achievement[] = [
@@ -21,6 +23,7 @@ const MOCK_ACHIEVEMENTS: Achievement[] = [
     label: "Digital Literacy",
     subtitle: "Completed digital literacy fundamentals course",
     createdAt: new Date().toISOString(),
+    points: 50,
   },
   {
     id: "t2",
@@ -28,6 +31,7 @@ const MOCK_ACHIEVEMENTS: Achievement[] = [
     label: "Perfect Scorer",
     subtitle: "Scored 100% on Data Science quiz",
     createdAt: new Date().toISOString(),
+    points: 75,
   },
 
   // Yesterday
@@ -37,6 +41,7 @@ const MOCK_ACHIEVEMENTS: Achievement[] = [
     label: "Review Master",
     subtitle: "Left 10 helpful course reviews",
     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    points: 30,
   },
   {
     id: "y2",
@@ -44,6 +49,7 @@ const MOCK_ACHIEVEMENTS: Achievement[] = [
     label: "Dedicated Learner",
     subtitle: "Completed 5 courses this month",
     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    points: 100,
   },
 
   // Older
@@ -53,6 +59,7 @@ const MOCK_ACHIEVEMENTS: Achievement[] = [
     label: "Knowledge Seeker",
     subtitle: "Completed all quizzes in a course",
     createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+    points: 40,
   },
   {
     id: "o2",
@@ -60,6 +67,7 @@ const MOCK_ACHIEVEMENTS: Achievement[] = [
     label: "Learning Champion",
     subtitle: "Watched 20 hours of course videos",
     createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
+    points: 20,
   },
   {
     id: "o3",
@@ -67,6 +75,7 @@ const MOCK_ACHIEVEMENTS: Achievement[] = [
     label: "Digital Literacy",
     subtitle: "Mastered digital literacy basics",
     createdAt: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
+    points: 50,
   },
 ];
 
@@ -88,8 +97,19 @@ const fmt = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
 });
 
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+};
+
 export default function AchievementsScreen({ navigation }: any) {
   const [query, setQuery] = useState("");
+  const [selectedAchievement, setSelectedAchievement] =
+    useState<Achievement | null>(null);
 
   const sections = useMemo(() => {
     // Filter achievements based on search query
@@ -174,7 +194,11 @@ export default function AchievementsScreen({ navigation }: any) {
           {/* Section Items */}
           {section.data.map((item, itemIndex) => (
             <View key={item.id}>
-              <TouchableOpacity activeOpacity={0.8} style={styles.row}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.row}
+                onPress={() => setSelectedAchievement(item)}
+              >
                 <View style={styles.iconContainer}>
                   <Ionicons name={item.icon as any} size={28} color="#FACC15" />
                 </View>
@@ -193,6 +217,77 @@ export default function AchievementsScreen({ navigation }: any) {
           ))}
         </View>
       ))}
+
+      {/* Achievement Detail Modal */}
+      <CustomModal
+        visible={selectedAchievement !== null}
+        onClose={() => setSelectedAchievement(null)}
+      >
+        {/* Achievement Icon */}
+        <View style={styles.modalIconContainer}>
+          <View style={styles.modalIconBadge}>
+            <Ionicons
+              name={selectedAchievement?.icon as any}
+              size={64}
+              color={Colors.yellow}
+            />
+          </View>
+        </View>
+
+        <Text
+          style={[
+            TextStyles.h3,
+            { textAlign: "center", marginBottom: Spacing.md },
+          ]}
+        >
+          {selectedAchievement?.label}
+        </Text>
+
+        <Text
+          style={[
+            TextStyles.body,
+            {
+              textAlign: "center",
+              marginBottom: Spacing.lg,
+              color: Colors.textSecondary,
+            },
+          ]}
+        >
+          {selectedAchievement?.subtitle}
+        </Text>
+
+        {/* Points Badge */}
+        {selectedAchievement?.points && (
+          <View
+            style={[
+              styles.pointsBadge,
+              { alignSelf: "center", marginBottom: Spacing.md },
+            ]}
+          >
+            <Ionicons
+              name="flame"
+              size={20}
+              color="#fff"
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[TextStyles.bodyMedium, { color: "#fff" }]}>
+              + {selectedAchievement.points} points
+            </Text>
+          </View>
+        )}
+
+        {/* Earned On */}
+        {selectedAchievement?.createdAt && (
+          <Text
+            style={[
+              TextStyles.caption,
+              { textAlign: "center", marginTop: Spacing.md },
+            ]}
+          >
+            Earned on: {formatDate(selectedAchievement.createdAt)}
+          </Text>
+        )}
+      </CustomModal>
     </Screen>
   );
 }
@@ -214,5 +309,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: Spacing.md,
+  },
+
+  // Modal Styles
+  modalIconContainer: {
+    alignSelf: "center",
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.md,
+  },
+  modalIconBadge: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#80703e",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pointsBadge: {
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    flexDirection: "row",
+    alignItems: "center",
   },
 });

@@ -1,11 +1,11 @@
 import { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Spacing, TextStyles, Colors, BorderRadius } from "../constants";
 import Screen from "../components/common/Screen";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 import { ActionButton, CustomTextInput } from "@/components";
+import CustomModal from "../components/common/CustomModal";
 
 type Certificate = {
   id: string;
@@ -194,144 +194,131 @@ export default function CertificatesScreen({ navigation }: any) {
       ))}
 
       {/* Certificate Detail Modal */}
-      <Modal
+      <CustomModal
         visible={selectedCert !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedCert(null)}
+        onClose={() => setSelectedCert(null)}
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setSelectedCert(null)}
+        {/* Certificate Icon */}
+        <View style={styles.modalIconContainer}>
+          <Ionicons name="ribbon" size={48} color={Colors.yellow} />
+        </View>
+
+        <Text
+          style={[
+            TextStyles.h3,
+            { textAlign: "center", marginBottom: Spacing.md },
+          ]}
+        >
+          {selectedCert?.courseName}
+        </Text>
+
+        {/* Score Badge */}
+        {selectedCert?.score && (
+          <View
+            style={[
+              styles.scoreBadge,
+              { alignSelf: "center", marginBottom: Spacing.md },
+            ]}
+          >
+            <Ionicons
+              name="star"
+              size={16}
+              color="#1E293B"
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[TextStyles.bodySmallBold, { color: "#1E293B" }]}>
+              Score: {selectedCert.score}%
+            </Text>
+          </View>
+        )}
+
+        {/* Divider */}
+        <View style={[styles.divider, { marginVertical: Spacing.lg }]} />
+
+        {/* Details */}
+        <View style={styles.modalDetailRow}>
+          <Ionicons
+            name="person-outline"
+            size={18}
+            color={Colors.textSecondary}
           />
-          <View style={styles.modalContent}>
-            <BlurView
-              intensity={20}
-              tint="dark"
-              style={styles.modalBlur}
-              experimentalBlurMethod="dimezisBlurView"
-              blurReductionFactor={2}
-            >
-              {/* Close Button */}
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setSelectedCert(null)}
-              >
-                <Ionicons name="close" size={24} color={Colors.textPrimary} />
-              </TouchableOpacity>
-
-              {/* Certificate Icon */}
-              <View style={styles.modalIconContainer}>
-                <Ionicons name="ribbon" size={48} color={Colors.yellow} />
-              </View>
-
-              <Text
-                style={[
-                  TextStyles.h3,
-                  { textAlign: "center", marginBottom: Spacing.md },
-                ]}
-              >
-                {selectedCert?.courseName}
-              </Text>
-
-              {/* Score Badge */}
-              {selectedCert?.score && (
-                <View
-                  style={[
-                    styles.scoreBadge,
-                    { alignSelf: "center", marginBottom: Spacing.md },
-                  ]}
-                >
-                  <Ionicons
-                    name="star"
-                    size={16}
-                    color="#1E293B"
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text
-                    style={[TextStyles.bodySmallBold, { color: "#1E293B" }]}
-                  >
-                    Score: {selectedCert.score}%
-                  </Text>
-                </View>
-              )}
-
-              {/* Divider */}
-              <View style={[styles.divider, { marginVertical: Spacing.lg }]} />
-
-              {/* Details */}
-              <View style={styles.modalDetailRow}>
-                <Ionicons
-                  name="person-outline"
-                  size={18}
-                  color={Colors.textSecondary}
-                />
-                <View style={{ marginLeft: Spacing.md, flex: 1 }}>
-                  <Text style={[TextStyles.captionSmall]}>Instructor</Text>
-                  <Text style={[TextStyles.bodyMedium, { marginTop: 2 }]}>
-                    {selectedCert?.instructor}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.modalDetailRow}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color={Colors.textSecondary}
-                />
-                <View style={{ marginLeft: Spacing.md, flex: 1 }}>
-                  <Text style={[TextStyles.captionSmall]}>Completed On</Text>
-                  <Text style={[TextStyles.bodyMedium, { marginTop: 2 }]}>
-                    {selectedCert && formatDate(selectedCert.completedAt)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.modalDetailRow}>
-                <Ionicons
-                  name="time-outline"
-                  size={18}
-                  color={Colors.textSecondary}
-                />
-                <View style={{ marginLeft: Spacing.md, flex: 1 }}>
-                  <Text style={[TextStyles.captionSmall]}>Duration</Text>
-                  <Text style={[TextStyles.bodyMedium, { marginTop: 2 }]}>
-                    {selectedCert?.duration}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.modalDetailRow}>
-                <Ionicons
-                  name="shield-checkmark-outline"
-                  size={18}
-                  color={Colors.textSecondary}
-                />
-                <View style={{ marginLeft: Spacing.md, flex: 1 }}>
-                  <Text style={[TextStyles.captionSmall]}>Credential ID</Text>
-                  <Text
-                    style={[
-                      TextStyles.bodySmall,
-                      { marginTop: 2, fontFamily: "monospace" },
-                    ]}
-                  >
-                    {selectedCert?.credentialId}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.modalActions}>
-                <ActionButton text="Share" onPress={() => {}} style={{borderColor: Colors.textSecondary, borderWidth: 0.5, borderRadius: BorderRadius.md}}/>
-                <ActionButton text="Download" onPress={() => {}} style={{borderColor: Colors.textSecondary, borderWidth: 0.5, borderRadius: BorderRadius.md}}/>
-              </View>
-            </BlurView>
+          <View style={{ marginLeft: Spacing.md, flex: 1 }}>
+            <Text style={[TextStyles.captionSmall]}>Instructor</Text>
+            <Text style={[TextStyles.bodyMedium, { marginTop: 2 }]}>
+              {selectedCert?.instructor}
+            </Text>
           </View>
         </View>
-      </Modal>
+
+        <View style={styles.modalDetailRow}>
+          <Ionicons
+            name="calendar-outline"
+            size={18}
+            color={Colors.textSecondary}
+          />
+          <View style={{ marginLeft: Spacing.md, flex: 1 }}>
+            <Text style={[TextStyles.captionSmall]}>Completed On</Text>
+            <Text style={[TextStyles.bodyMedium, { marginTop: 2 }]}>
+              {selectedCert && formatDate(selectedCert.completedAt)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.modalDetailRow}>
+          <Ionicons
+            name="time-outline"
+            size={18}
+            color={Colors.textSecondary}
+          />
+          <View style={{ marginLeft: Spacing.md, flex: 1 }}>
+            <Text style={[TextStyles.captionSmall]}>Duration</Text>
+            <Text style={[TextStyles.bodyMedium, { marginTop: 2 }]}>
+              {selectedCert?.duration}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.modalDetailRow}>
+          <Ionicons
+            name="shield-checkmark-outline"
+            size={18}
+            color={Colors.textSecondary}
+          />
+          <View style={{ marginLeft: Spacing.md, flex: 1 }}>
+            <Text style={[TextStyles.captionSmall]}>Credential ID</Text>
+            <Text
+              style={[
+                TextStyles.bodySmall,
+                { marginTop: 2, fontFamily: "monospace" },
+              ]}
+            >
+              {selectedCert?.credentialId}
+            </Text>
+          </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.modalActions}>
+          <ActionButton
+            text="Share"
+            onPress={() => {}}
+            style={{
+              borderColor: Colors.textSecondary,
+              borderWidth: 0.5,
+              borderRadius: BorderRadius.md,
+            }}
+          />
+          <ActionButton
+            text="Download"
+            onPress={() => {}}
+            style={{
+              borderColor: Colors.textSecondary,
+              borderWidth: 0.5,
+              borderRadius: BorderRadius.md,
+            }}
+          />
+        </View>
+      </CustomModal>
 
       {certificates.length === 0 && query && (
         <View style={styles.emptyState}>
@@ -402,50 +389,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    pointerEvents: "auto",
-  },
-  modalContent: {
-    width: "90%",
-    maxWidth: 500,
-    borderRadius: 20,
-    overflow: "hidden",
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-  },
-  modalBlur: {
-    padding: Spacing.xl,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#475569",
-  },
-  modalGradient: {
-    padding: Spacing.xl,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#475569",
-  },
-  closeButton: {
-    position: "absolute",
-    top: Spacing.md,
-    right: Spacing.md,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
+  // Modal Content Styles
   modalIconContainer: {
     alignSelf: "center",
     marginBottom: Spacing.md,
@@ -473,16 +417,6 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     marginTop: Spacing.lg,
     justifyContent: "center",
-  },
-  modalButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.yellow,
   },
   emptyState: {
     alignItems: "center",

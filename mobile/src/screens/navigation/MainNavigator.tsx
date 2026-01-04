@@ -1,24 +1,67 @@
-import { View, StyleSheet, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
+import { View, StyleSheet, Platform, Dimensions } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createStackNavigator } from "@react-navigation/stack";
+import { Ionicons } from "@expo/vector-icons";
+import { useEffect } from "react";
+import Animated, {
+  useAnimatedStyle,
+  withSpring,
+  useSharedValue,
+  runOnJS,
+} from "react-native-reanimated";
+import { useNavigationState } from "@react-navigation/native";
 
 // Screens
-import * as Screens from '../index';
+import * as Screens from "../index";
 
-import { useAuth } from '../../contexts/AuthContext';
-import type { TabParamList, MainStackParamList } from '@/types/navigation';
-import { ADMIN_EMAIL, Colors } from '../../constants';
-import { BlurView } from 'expo-blur';
+import { useAuth } from "../../contexts/AuthContext";
+import type { TabParamList, MainStackParamList } from "@/types/navigation";
+import { ADMIN_EMAIL, Colors } from "../../constants";
+import { BlurView } from "expo-blur";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
 
 const tabBarBottomOffset = Platform.OS === "android" ? 50 : 20;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// Tab routes mapping to indices
+const TAB_ROUTES = ["Home", "Courses", "Notifications", "Profile"];
 
 function TabNavigator() {
   const { user } = useAuth();
+  const activeTabIndex = useSharedValue(0);
+
+  // Get the current route index from navigation state
+  const currentTabIndex = useNavigationState((state) => {
+    if (!state) return 0;
+    const tabState = state.routes.find(
+      (route) => route.name === "MainTabs"
+    )?.state;
+    return tabState?.index ?? 0;
+  });
+
+  // Update the shared value when tab changes
+  useEffect(() => {
+    activeTabIndex.value = currentTabIndex;
+  }, [currentTabIndex]);
+
+  // Calculate the position for the sliding white circle
+  const tabWidth = (SCREEN_WIDTH - 20) / 4 - 0.3; // 4 tabs, minus margins
+
+  const animatedCircleStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateX: withSpring(activeTabIndex.value * tabWidth, {
+            damping: 130,
+            stiffness: 2000,
+          }),
+        },
+      ],
+    };
+  });
 
   return (
     <Tab.Navigator
@@ -47,24 +90,18 @@ function TabNavigator() {
               iconName = "ellipse";
           }
 
-          // Wrap icon in rounded background when focused
-          if (focused) {
-            return (
-              <View style={styles.iconContainer}>
-                <Ionicons
-                  name={iconName}
-                  size={iconSize}
-                  color={Colors.secondary}
-                />
-              </View>
-            );
-          }
-
           return (
-            <View style={[styles.iconContainer, {backgroundColor: "rgba(0, 0, 0, 0.15)"}]}>
-              <Ionicons name={iconName} size={iconSize} color={color} />
+            <View style={[
+              styles.iconWrapper,
+              !focused && styles.inactiveIconCircle
+            ]}>
+              <Ionicons
+                name={iconName}
+                size={iconSize}
+                color={focused ? Colors.secondary : Colors.white}
+              />
             </View>
-          )
+          );
         },
         tabBarActiveTintColor: Colors.white,
         tabBarInactiveTintColor: Colors.white,
@@ -90,7 +127,18 @@ function TabNavigator() {
                 style={StyleSheet.absoluteFill}
               />
             </View>
-            <View style={styles.tabBar} />
+            <View style={styles.tabBar}>
+              {/* Sliding white circle indicator */}
+              <Animated.View
+                style={[
+                  styles.slidingCircle,
+                  animatedCircleStyle,
+                  { width: tabWidth },
+                ]}
+              >
+                <View style={styles.iconContainer} />
+              </Animated.View>
+            </View>
           </>
         ),
         tabBarStyle: {
@@ -226,10 +274,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  iconWrapper: {
+    width: 38,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  inactiveIconCircle: {
+    backgroundColor: "rgba(58, 51, 159, 0.4)",
+    borderRadius: 20,
+  },
+  slidingCircle: {
+    position: "absolute",
+    top: 10,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+  },
   tabBarBackground: {
     position: "absolute",
     top: -15,
-    bottom: -tabBarBottomOffset-1,
+    bottom: -tabBarBottomOffset - 1,
     left: -10,
     right: -10,
     zIndex: 0,
@@ -237,7 +304,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     borderColor: "rgba(255, 255, 255, 0.3)",
-    borderWidth: 0.5
+    borderWidth: 0.5,
   },
   tabBar: {
     position: "absolute",

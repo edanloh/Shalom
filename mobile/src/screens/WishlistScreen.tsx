@@ -126,6 +126,7 @@ export default function WishlistScreen() {
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
         refreshing={!!wishlistLoading}
         onRefresh={refreshWishlist}
+        scrollEnabled={false}
         ListEmptyComponent={
           <View style={{gap: Spacing.base, alignItems: 'center' }}>
             <Text style={TextStyles.body}>Your wishlist is empty</Text>

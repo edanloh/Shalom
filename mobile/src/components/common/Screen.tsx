@@ -29,6 +29,7 @@ interface ScreenProps {
   onRefresh?: () => void;
   noHeader?: boolean;
   widescreen?: boolean;
+  scrollEnabled?: boolean;
 }
 
 export default function Screen({
@@ -48,6 +49,7 @@ export default function Screen({
   onRefresh,
   noHeader,
   widescreen,
+  scrollEnabled = true,
 }: ScreenProps) {
   const header = (
     <ScreenHeader
@@ -88,6 +90,7 @@ export default function Screen({
           }
           alwaysBounceVertical={true} // iOS
           overScrollMode="always" // Android
+          scrollEnabled={scrollEnabled}
         >
           {/* Header */}
           {!noHeader && header}
