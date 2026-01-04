@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Image, Platform } from "react-native";
+import { View, Text, StyleSheet, Image, Platform, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Typography, Spacing, BorderRadius } from "../../constants";
 
@@ -39,13 +39,15 @@ interface Achievement {
   title: string;
   value: string | number;
   color: string;
+  navigationTarget?: string;
 }
 
 interface AchievementCardProps {
   achievement: Achievement;
+  navigation: any;
 }
 
-const AchievementCard: React.FC<AchievementCardProps> = ({ achievement }) => {
+const AchievementCard: React.FC<AchievementCardProps> = ({ achievement, navigation }) => {
   // const getCardColor = () => {
   //   if (achievement.title.includes("Streak")) {
   //     return Colors.streakCardBg;
@@ -67,18 +69,23 @@ const AchievementCard: React.FC<AchievementCardProps> = ({ achievement }) => {
   };
 
   return (
-    <View style={[styles.achievementCard]}>
+    <Pressable style={[styles.achievementCard]} onPress={() => {
+      if (achievement.navigationTarget) {
+        navigation.navigate(achievement.navigationTarget);
+      }
+    }}>
       <View style={styles.iconContainer}>
         <Image source={getLogo()} style={{ width: 32, height: 32 }} />
       </View>
       <Text style={styles.achievementValue}>{achievement.value}</Text>
       <Text style={styles.achievementTitle}>{achievement.title}</Text>
-    </View>
+    </Pressable>
   );
 };
 
 interface ProgressSectionProps extends WeeklyGoalProps {
   achievements: Achievement[];
+  navigation: any;
 }
 
 // ---------- Combined Section ----------
@@ -86,12 +93,13 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
   currentHours,
   targetHours,
   achievements,
+  navigation
 }) => {
   return (
     <View style={styles.sectionContainer}>
       <View style={styles.achievementsRow}>
         {achievements.map((achievement) => (
-          <AchievementCard key={achievement.id} achievement={achievement} />
+          <AchievementCard key={achievement.id} achievement={achievement} navigation={navigation} />
         ))}
       </View>
       <WeeklyGoal currentHours={currentHours} targetHours={targetHours} />

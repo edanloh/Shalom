@@ -17,6 +17,7 @@ export { default as SplashScreen } from "./SplashScreen";
 export { default as TestScreen } from "./TestScreen";
 export { default as UserProfile } from "./UserProfile";
 export { default as WishlistScreen } from "./WishlistScreen";
+export { default as CertificatesScreen } from "./CertificatesScreen";
 
 // Re-export from subdirectories
 export * from "./auth/index";

@@ -137,7 +137,7 @@ export default function NotificationsScreen({ navigation }: any) {
   return (
     <Screen
       title="Notifications"
-      customEdges={["top", "left", "right"]}
+      customEdges={["top"]}
       refreshing={refreshing}
       onRefresh={onRefresh}
       headerRightIcon="settings-outline"

@@ -1,82 +1,78 @@
 import { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
-import { Colors, Spacing, TextStyles } from "../constants";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Spacing, TextStyles } from "../constants";
 import Screen from "../components/common/Screen";
+import { Ionicons } from "@expo/vector-icons";
 
-type Achievements = {
+type Achievement = {
   id: string;
-  pointsTitle: string;
+  icon: string;
+  label: string;
   subtitle: string;
-  thumbnail: string;
   createdAt: string; // ISO date
 };
 
-const MOCK_POINTS_HISTORY: Achievements[] = [
+const MOCK_ACHIEVEMENTS: Achievement[] = [
   // Today
   {
-    id: 't1',
-    pointsTitle: '+100 points',
-    subtitle: 'Quiz completed: Data Science Fundamentals',
-    thumbnail:
-      "https://plus.unsplash.com/premium_photo-1681487870238-4a2dfddc6bcb?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    id: "t1",
+    icon: "medal-outline",
+    label: "Digital Literacy",
+    subtitle: "Completed digital literacy fundamentals course",
     createdAt: new Date().toISOString(),
   },
   {
-    id: 't2',
-    pointsTitle: '+500 points',
-    subtitle: 'Course completed: Data Science Fundamentals',
-    thumbnail:
-      "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    id: "t2",
+    icon: "trophy-outline",
+    label: "Perfect Scorer",
+    subtitle: "Scored 100% on Data Science quiz",
     createdAt: new Date().toISOString(),
   },
 
   // Yesterday
   {
-    id: 'y1',
-    pointsTitle: '+100 points',
-    subtitle: 'Quiz completed: Data Science Fundamentals',
-    thumbnail:
-      "https://plus.unsplash.com/premium_photo-1681487870238-4a2dfddc6bcb?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    id: "y1",
+    icon: "thumbs-up-outline",
+    label: "Review Master",
+    subtitle: "Left 10 helpful course reviews",
     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
   },
   {
-    id: 'y2',
-   pointsTitle: '+500 points',
-    subtitle: 'Course completed: Data Science Fundamentals',
-    thumbnail:
-      "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    id: "y2",
+    icon: "school-outline",
+    label: "Dedicated Learner",
+    subtitle: "Completed 5 courses this month",
     createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
   },
 
   // Older
   {
-    id: 'o1',
-    pointsTitle: '+100 points',
-    subtitle: 'Quiz completed: Data Science Fundamentals',
-    thumbnail:
-      "https://plus.unsplash.com/premium_photo-1681487870238-4a2dfddc6bcb?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    id: "o1",
+    icon: "checkmark-done-circle-outline",
+    label: "Knowledge Seeker",
+    subtitle: "Completed all quizzes in a course",
     createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: "o2",
-    pointsTitle: '+500 points',
-    subtitle: 'Course completed: Data Science Fundamentals',
-    thumbnail:
-      "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    icon: "play-circle-outline",
+    label: "Learning Champion",
+    subtitle: "Watched 20 hours of course videos",
     createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: "o3",
-    pointsTitle: '+100 points',
-    subtitle: 'Quiz completed: Data Science Fundamentals',
-    thumbnail:
-      "https://plus.unsplash.com/premium_photo-1681487870238-4a2dfddc6bcb?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    icon: "medal-outline",
+    label: "Digital Literacy",
+    subtitle: "Mastered digital literacy basics",
     createdAt: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
   },
 ];
 
-const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const isSameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
+const startOfDay = (d: Date) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const isSameDay = (a: Date, b: Date) =>
+  startOfDay(a).getTime() === startOfDay(b).getTime();
 
 const isToday = (d: Date) => isSameDay(d, new Date());
 const isYesterday = (d: Date) => {
@@ -85,15 +81,19 @@ const isYesterday = (d: Date) => {
   return isSameDay(d, y);
 };
 
-const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const fmt = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 export default function AchievementsScreen({ navigation }: any) {
   const sections = useMemo(() => {
-    const today: Achievements[] = [];
-    const yesterday: Achievements[] = [];
-    const byDate: Record<string, Achievements[]> = {};
+    const today: Achievement[] = [];
+    const yesterday: Achievement[] = [];
+    const byDate: Record<string, Achievement[]> = {};
 
-    for (const n of MOCK_POINTS_HISTORY) {
+    for (const n of MOCK_ACHIEVEMENTS) {
       const dt = new Date(n.createdAt);
 
       if (isToday(dt)) {
@@ -107,13 +107,14 @@ export default function AchievementsScreen({ navigation }: any) {
       }
     }
 
-    const result: Array<{ title: string; data: Achievements[] }> = [];
-    if (today.length) result.push({ title: 'Today', data: today });
-    if (yesterday.length) result.push({ title: 'Yesterday', data: yesterday });
+    const result: Array<{ title: string; data: Achievement[] }> = [];
+    if (today.length) result.push({ title: "Today", data: today });
+    if (yesterday.length) result.push({ title: "Yesterday", data: yesterday });
 
     // Add older groups sorted by most-recent first
-    const olderDates = Object.keys(byDate)
-      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    const olderDates = Object.keys(byDate).sort(
+      (a, b) => new Date(b).getTime() - new Date(a).getTime()
+    );
 
     for (const key of olderDates) {
       result.push({ title: key, data: byDate[key] });
@@ -127,7 +128,7 @@ export default function AchievementsScreen({ navigation }: any) {
   const onRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      // TODO: call your real fetch here, e.g. await reloadPointsHistory();
+      // TODO: call your real fetch here, e.g. await reloadAchievements();
       await new Promise((r) => setTimeout(r, 800)); // demo delay
     } finally {
       setRefreshing(false);
@@ -136,8 +137,8 @@ export default function AchievementsScreen({ navigation }: any) {
 
   return (
     <Screen
-      title="Points History"
-      customEdges={["top", "left", "right"]}
+      title="Achievements"
+      customEdges={["top", "left", "right", "bottom"]}
       refreshing={refreshing}
       onRefresh={onRefresh}
       headerLeftIcon="chevron-back"
@@ -152,14 +153,14 @@ export default function AchievementsScreen({ navigation }: any) {
           {section.data.map((item, itemIndex) => (
             <View key={item.id}>
               <TouchableOpacity activeOpacity={0.8} style={styles.row}>
-                <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
+                <View style={styles.iconContainer}>
+                  <Ionicons name={item.icon as any} size={28} color="#FACC15" />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={TextStyles.body} numberOfLines={1}>
-                    {item.pointsTitle}
+                    {item.label}
                   </Text>
-                  <Text style={TextStyles.captionSmall}>
-                    {item.subtitle}
-                  </Text>
+                  <Text style={TextStyles.captionSmall}>{item.subtitle}</Text>
                 </View>
               </TouchableOpacity>
               {/* Item Separator */}
@@ -174,7 +175,7 @@ export default function AchievementsScreen({ navigation }: any) {
   );
 }
 
-const THUMB = 56;
+const ICON_SIZE = 56;
 
 const styles = StyleSheet.create({
   // Row
@@ -183,10 +184,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: Spacing.sm,
   },
-  thumb: {
-    width: THUMB,
-    height: THUMB,
+  iconContainer: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
     borderRadius: 12,
+    backgroundColor: "#3A3A45",
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: Spacing.md,
   },
 });

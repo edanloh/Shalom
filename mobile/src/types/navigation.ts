@@ -17,6 +17,8 @@ export type MainStackParamList = {
   // SearchScreen: undefined;
   PointsHistory: undefined;
   // NotificationSettings: undefined;
+  AchievementsScreen: undefined;
+  CertificatesScreen: undefined;
 };
 
 export type TabParamList = {

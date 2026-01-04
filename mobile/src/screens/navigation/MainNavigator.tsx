@@ -85,7 +85,7 @@ function TabNavigator() {
                 blurReductionFactor={8}
               />
               <LinearGradient
-                colors={["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.35)"]}
+                colors={["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.7)"]}
                 locations={[0, 1]}
                 style={StyleSheet.absoluteFill}
               />
@@ -203,6 +203,16 @@ export default function MainNavigator() {
         component={NotificationSettingsScreen}
         options={{ headerShown: false }}
       /> */}
+      <Stack.Screen
+        name="AchievementsScreen"
+        component={Screens.AchievementsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="CertificatesScreen"
+        component={Screens.CertificatesScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

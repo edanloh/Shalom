@@ -34,7 +34,7 @@ export default function ProfileScreen({ navigation }: any) {
     () => [
       { label: 'Point History', icon: 'trending-up-outline', action: () => navigation.navigate('PointsHistory') },
       { label: 'Learning Goal', icon: 'podium-outline', action: () => navigation.navigate('PointsHistory') },
-      { label: 'Certificate', icon: 'ribbon-outline', action: () => navigation.navigate('PointsHistory') },
+      { label: 'Certificates', icon: 'ribbon-outline', action: () => navigation.navigate('CertificatesScreen') },
     ],
     []
   );
@@ -78,6 +78,7 @@ export default function ProfileScreen({ navigation }: any) {
       navigation={navigation}
       headerRightIcon="settings-outline"
       onHeaderRightPress={() => navigation.navigate('Settings')}
+      customEdges={["top"]}
     >
       <ScrollView
         contentContainerStyle={[externalStyles.fullScrollContent]}
@@ -136,7 +137,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={styles.sectionTitle}>Recent Achievements</Text>
           {/* visual-only */}
           <TouchableOpacity
-            onPress={() => {}}
+            onPress={() => {navigation.navigate('AchievementsScreen')}}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             activeOpacity={0.7}
           >

@@ -255,6 +255,7 @@ export default function CoursesScreen({ navigation }: any) {
       title="Browse Courses"
       refreshing={refreshing}
       onRefresh={onRefresh}
+      customEdges={["top"]}
     >
         {/* Search */}
         <CustomTextInput

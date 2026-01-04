@@ -39,6 +39,7 @@ interface Achievement {
   value: string | number;
   color: string;
   type: 'streak' | 'certificate' | 'badge' | 'level';
+  navigationTarget?: string;
 }
 
 interface WeeklyGoalData {
@@ -107,6 +108,7 @@ export default function HomeScreen({ navigation, route }: any) {
       value: 3,
       color: Colors.certificateCardBg,
       type: 'certificate',
+      navigationTarget: 'CertificatesScreen',
     },
   ];
 
@@ -211,6 +213,7 @@ export default function HomeScreen({ navigation, route }: any) {
       title=""
       noHeader
       widescreen
+      customEdges={["top"]}
     >
       {/* Combined Header with Profile, Welcome, and Notifications */}
       <ProfileHeader 
@@ -220,7 +223,7 @@ export default function HomeScreen({ navigation, route }: any) {
       />
 
       {/* Achievement Cards - Day Streak and Certificates */}
-      <ProgressSection achievements={achievements} currentHours={0} targetHours={10} />        
+      <ProgressSection achievements={achievements} currentHours={0} targetHours={10} navigation={navigation} />        
 
       {/* My Courses Section */}
       <View style={styles.section}>

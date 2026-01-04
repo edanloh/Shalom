@@ -137,7 +137,7 @@ export default function PointsHistoryScreen({ navigation }: any) {
   return (
     <Screen
       title="Points History"
-      customEdges={["top", "left", "right"]}
+      customEdges={["top", "left", "right", "bottom"]}
       refreshing={refreshing}
       onRefresh={onRefresh}
       headerLeftIcon="chevron-back"

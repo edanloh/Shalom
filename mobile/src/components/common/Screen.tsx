@@ -65,7 +65,7 @@ export default function Screen({
   return (
     <SafeAreaView
       style={styles.container}
-      edges={customEdges || ["top", "left", "right"]}
+      edges={customEdges || ["top", "left", "right", "bottom"]}
     >
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
       <KeyboardAvoidingView
