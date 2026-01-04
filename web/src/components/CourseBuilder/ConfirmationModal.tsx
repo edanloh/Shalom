@@ -14,7 +14,7 @@ interface ConfirmationModalProps {
   showCancel?: boolean;
 }
 
-export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
+export default function ConfirmationModal({ 
   isOpen,
   onClose,
   onConfirm,
@@ -24,7 +24,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   confirmText = 'OK',
   cancelText = 'Cancel',
   showCancel = false,
-}) => {
+}: ConfirmationModalProps) {
   if (!isOpen) return null;
 
   const getIcon = () => {
@@ -32,7 +32,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       case 'success':
         return <Check className="h-12 w-12" style={{ color: Colors.green }} />;
       case 'error':
-        return <X className="h-12 w-12" style={{ color: Colors.error }} />;
+        return <X className="h-12 w-12" style={{ color: Colors.red }} />;
       case 'warning':
         return <AlertCircle className="h-12 w-12" style={{ color: Colors.yellow }} />;
       case 'info':
@@ -46,7 +46,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       case 'success':
         return Colors.green;
       case 'error':
-        return Colors.error;
+        return Colors.red;
       case 'warning':
         return Colors.yellow;
       case 'info':
@@ -145,7 +145,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 minWidth: '100px',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = Colors.gray700;
+                e.currentTarget.style.backgroundColor = Colors.gray600;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = Colors.backgroundGray;
@@ -160,7 +160,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               padding: '12px 24px',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: type === 'error' ? Colors.error : Colors.secondary,
+              backgroundColor: type === 'error' ? Colors.red : Colors.secondary,
               color: Colors.textPrimary,
               fontSize: '16px',
               fontWeight: '600',

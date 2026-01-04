@@ -32,12 +32,12 @@ const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
   </View>
 );
 
-const CourseCard: React.FC<Props> = ({
+export default function CourseCard({ 
   course,
   onPress,
   variant = "compact",
   showInstructor = false,
-}) => {
+}: Props) {
   const { wishlist = [], toggleWishlist } = useCourses();
   const isWishlisted = !!wishlist?.some((c) => c.id === course.id);
 
@@ -236,5 +236,3 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.regular,
   },
 });
-
-export default CourseCard;

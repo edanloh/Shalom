@@ -19,8 +19,8 @@ import styles from "@/styles/styles";
 
 import { useRoute } from "@react-navigation/native";
 
-const ConfirmSignUp = () => {
-  const route = useRoute();
+export default function ConfirmSignUp({ navigation, route }: any) {
+  // const route = useRoute();
   // @ts-ignore
   const initialEmail = route.params?.email || "";
   const [email] = useState(initialEmail);
@@ -29,8 +29,8 @@ const ConfirmSignUp = () => {
   const [confirmed, setConfirmed] = useState(false);
   const [warningText, setWarningText] = useState("");
   const { confirmSignUp } = useAuth();
-  const navigation =
-    useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+  // const navigation =
+  //   useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -105,5 +105,3 @@ const ConfirmSignUp = () => {
     </KeyboardAvoidingView>
   );
 };
-
-export default ConfirmSignUp;

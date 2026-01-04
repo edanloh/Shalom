@@ -20,7 +20,7 @@ interface ActionButtonProps {
   variant?: "primary" | "secondary";
 }
 
-const ActionButton: React.FC<ActionButtonProps> = ({
+export default function ActionButton({ 
   onPress,
   disabled = false,
   loading = false,
@@ -29,8 +29,8 @@ const ActionButton: React.FC<ActionButtonProps> = ({
   imageStyle,
   style,
   textStyle,
-  variant = "primary",
-}) => {
+  variant = "primary", 
+}: ActionButtonProps) {
   const buttonStyle = [
     variant === "primary" ? styles.buttonPrimary : styles.buttonSecondary,
     style,
@@ -86,5 +86,3 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
 });
-
-export default ActionButton;

@@ -15,8 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 import styles from "@/styles/styles";
 import { Colors, Spacing, TextStyles } from "@/constants";
 
-const ForgotPasswordScreen = () => {
-  const navigation = useNavigation<any>();
+export default function ForgotPasswordScreen({ navigation }: any) {
   const [step, setStep] = useState(1); // 1: request, 2: confirm
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -195,5 +194,3 @@ const ForgotPasswordScreen = () => {
     </KeyboardAvoidingView>
   );
 };
-
-export default ForgotPasswordScreen;

@@ -38,7 +38,7 @@ interface CourseContextType {
 
 const CourseContext = createContext<CourseContextType | undefined>(undefined);
 
-export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export default function CourseProvider({ children }: { children: React.ReactNode }) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

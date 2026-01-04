@@ -1,4 +1,3 @@
-// src/screens/ProfileScreen.tsx
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -9,31 +8,19 @@ import {
   Text,
   Image
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, ContainerStyles, Spacing, TextStyles } from '../constants';
+import { Colors, Spacing, TextStyles } from '../constants';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import type { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../contexts/AuthContext';
-import type { MainStackParamList, TabParamList } from '../types/navigation';
 import { ImageWithFallback } from '../components/common';
 import { Images } from '../../assets';
 import { getAvatarUri } from '@/utils/avatar';
 import { ActionButton, Screen } from "@/components";
 import externalStyles from "@styles/styles";
 
-type Nav = CompositeNavigationProp<
-  StackNavigationProp<MainStackParamList>,
-  BottomTabNavigationProp<TabParamList>
->;
-
 const CARD_BG = '#3A3A45';
 const TILE_BG = '#5B38E3';
 
-const ProfileScreen: React.FC = () => {
-  const navigation = useNavigation<Nav>();
+export default function ProfileScreen({ navigation }: any) {
   const { user, logout } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
@@ -339,5 +326,3 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.lg + 20, // indents divider under the icon
   },
 });
-
-export default ProfileScreen;

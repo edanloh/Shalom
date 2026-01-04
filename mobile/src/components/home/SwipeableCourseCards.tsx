@@ -48,13 +48,13 @@ interface SwipeableCourseCardsProps {
   isWishlisted?: (courseId: string) => boolean;
 }
 
-const SwipeableCourseCards: React.FC<SwipeableCourseCardsProps> = ({
+export default function SwipeableCourseCards({ 
   courses,
   onCourseComplete,
   onCourseLike,
   onToggleWishlist,
   isWishlisted,
-}) => {
+}: SwipeableCourseCardsProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useSharedValue(0);
   const opacity = useSharedValue(1);
@@ -675,5 +675,3 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 });
-
-export default SwipeableCourseCards;

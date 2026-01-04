@@ -13,8 +13,8 @@ import AuthNavigator from "./src/screens/navigation/AuthNavigator";
 import MainNavigator from "./src/screens/navigation/MainNavigator";
 import NotFoundScreen from "./src/screens/NotFoundScreen";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
-import { UserProvider } from "./src/contexts/UserContext";
-import { CourseProvider } from "./src/contexts/CourseContext";
+import UserProvider from "./src/contexts/UserContext";
+import CourseProvider from "./src/contexts/CourseContext";
 import SplashScreen from "./src/screens/SplashScreen";
 import type { MainStackParamList } from "./src/types";
 

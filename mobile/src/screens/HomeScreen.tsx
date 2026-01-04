@@ -52,15 +52,15 @@ interface WeeklyGoalData {
 
 type TabType = 'home' | 'courses' | 'search' | 'settings';
 
-const HomeScreen: React.FC = () => {
+export default function HomeScreen({ navigation, route }: any) {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { user, login, register } = useAuth();
 
-  const navigation = useNavigation<CompositeNavigationProp<
-    StackNavigationProp<MainStackParamList>,
-    BottomTabNavigationProp<TabParamList>
-  >>();
+  // const navigation = useNavigation<CompositeNavigationProp<
+  //   StackNavigationProp<MainStackParamList>,
+  //   BottomTabNavigationProp<TabParamList>
+  // >>();
 
   // Use unified CourseContext for all course data
   const {
@@ -430,5 +430,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default HomeScreen;

@@ -17,7 +17,7 @@ interface CourseCardProps {
   category: string;
 }
 
-const CourseCard: React.FC<CourseCardProps> = ({
+export default function CourseCard({ 
   title,
   subtitle,
   image,
@@ -29,53 +29,56 @@ const CourseCard: React.FC<CourseCardProps> = ({
   instructor,
   instructorAvatar,
   category,
-}) => (
-  <View style={styles.courseCard}>
-    <Image 
-      source={{ uri: image }} 
-      defaultSource={Images.placeholder}
-      style={styles.courseImage} 
-    />
-    <View style={styles.courseContent}>
-      <Text style={styles.courseTitle} numberOfLines={2}>
-        {title}
-      </Text>
-      <Text style={styles.courseSubtitle} numberOfLines={2}>
-        {subtitle}
-      </Text>
-      <Text style={styles.courseProgress}>{completedModules} of {totalModules} modules completed</Text>
-      
-      <View style={styles.courseFooter}>
-        <View style={styles.instructorSection}>
-          <Image 
-            source={{ uri: instructorAvatar }} 
-            defaultSource={Images.defaultAvatar}
-            style={styles.instructorAvatar} 
-          />
-          <Text style={styles.instructorName}>{instructor}</Text>
-          <View style={styles.categoryTag}>
-            <Text style={styles.categoryText}>{category}</Text>
-          </View>
-        </View>
+}: CourseCardProps) {
+
+  return (
+    <View style={styles.courseCard}>
+      <Image 
+        source={{ uri: image }} 
+        defaultSource={Images.placeholder}
+        style={styles.courseImage} 
+      />
+      <View style={styles.courseContent}>
+        <Text style={styles.courseTitle} numberOfLines={2}>
+          {title}
+        </Text>
+        <Text style={styles.courseSubtitle} numberOfLines={2}>
+          {subtitle}
+        </Text>
+        <Text style={styles.courseProgress}>{completedModules} of {totalModules} modules completed</Text>
         
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{completion}%</Text>
-            <Text style={styles.statLabel}>Complete</Text>
+        <View style={styles.courseFooter}>
+          <View style={styles.instructorSection}>
+            <Image 
+              source={{ uri: instructorAvatar }} 
+              defaultSource={Images.defaultAvatar}
+              style={styles.instructorAvatar} 
+            />
+            <Text style={styles.instructorName}>{instructor}</Text>
+            <View style={styles.categoryTag}>
+              <Text style={styles.categoryText}>{category}</Text>
+            </View>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{duration}</Text>
-            <Text style={styles.statLabel}>Duration</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{rating}</Text>
-            <Text style={styles.statLabel}>Rating</Text>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{completion}%</Text>
+              <Text style={styles.statLabel}>Complete</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{duration}</Text>
+              <Text style={styles.statLabel}>Duration</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{rating}</Text>
+              <Text style={styles.statLabel}>Rating</Text>
+            </View>
           </View>
         </View>
       </View>
     </View>
-  </View>
-);
+  );
+}
 
 const styles = StyleSheet.create({
   courseCard: {
@@ -158,5 +161,3 @@ const styles = StyleSheet.create({
     color: '#a19eb8',
   },
 });
-
-export default CourseCard;

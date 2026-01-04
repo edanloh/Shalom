@@ -1,7 +1,5 @@
-import React, { useMemo, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useMyCourses } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,7 +7,6 @@ import { ImageWithFallback } from '../components/common';
 import { Images } from '../../assets';
 import { Colors, Spacing, TextStyles, BorderRadius, Shadows } from '../constants';
 import type { Course } from '../types';
-import type { MainStackParamList } from '../types';
 import { useCourses } from '../contexts/CourseContext';
 import { ActionButton, Screen } from '@/components';
 
@@ -22,8 +19,7 @@ const ProgressBar = ({ percent }: { percent: number }) => {
   );
 };
 
-const MyCourses: React.FC = () => {
-  const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
+export default function MyCourses({ navigation }: any) {
   const { user } = useAuth();
   const { courses, loading, error, refreshing, refresh, retry } = useMyCourses();
   const { wishlist = [], toggleWishlist } = useCourses();
@@ -413,5 +409,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default MyCourses;

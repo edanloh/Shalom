@@ -5,25 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 // Screens
-import HomeScreen from '../HomeScreen';
-import CoursesScreen from '../Courses';
-import ProfileScreen from '../UserProfile';
-import CourseDetailScreen from '../CourseDetailScreen';
-import ModuleDetailScreen from '../ModuleDetailScreen';
-import LessonPlayer from '../LessonPlayer';
-import QuizScreen from '../QuizScreen';
-import NotificationsScreen from '../Notification';
-import SettingsScreen from '../Settings';
-import EditProfileScreen from '../EditProfile';
-import MyCourses from '../MyCourses';
-import WishlistScreen from '../WishlistScreen';
-import LeaveReviewScreen from '../LeaveReviewScreen';
-import UserManagementScreen from '../admin/UserManagement';
-import UserConfigScreen from '../admin/UserConfig';
-import TestScreen from '../TestScreen';
-// import SearchScreen from '../[unused] Search';
-import PointsHistoryScreen from '../PointsHistory';
-// import NotificationSettingsScreen from '../[unused] NotificationSettingsScreen';
+import * as Screens from '../index';
 
 import { useAuth } from '../../contexts/AuthContext';
 import type { TabParamList, MainStackParamList } from '@/types/navigation';
@@ -127,10 +109,10 @@ function TabNavigator() {
         tabBarLabelPosition: "below-icon",
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Courses" component={CoursesScreen} />
-      <Tab.Screen name="Notifications" component={NotificationsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Home" component={Screens.HomeScreen} />
+      <Tab.Screen name="Courses" component={Screens.CoursesScreen} />
+      <Tab.Screen name="Notifications" component={Screens.Notification} />
+      <Tab.Screen name="Profile" component={Screens.UserProfile} />
       {/* {user?.email === ADMIN_EMAIL && (
         <Tab.Screen name="Admin" component={UserManagementScreen} />
       )} */}
@@ -148,72 +130,72 @@ export default function MainNavigator() {
       />
       <Stack.Screen
         name="CourseDetail"
-        component={CourseDetailScreen}
+        component={Screens.CourseDetailScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="ModuleDetail"
-        component={ModuleDetailScreen}
+        component={Screens.ModuleDetailScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="LessonPlayer"
-        component={LessonPlayer}
+        component={Screens.LessonPlayer}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="QuizScreen"
-        component={QuizScreen}
+        component={Screens.QuizScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="Settings"
-        component={SettingsScreen}
+        component={Screens.Settings}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="EditProfile"
-        component={EditProfileScreen}
+        component={Screens.EditProfile}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="UserManagement"
-        component={UserManagementScreen}
+        component={Screens.UserManagement}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="UserConfig"
-        component={UserConfigScreen}
+        component={Screens.UserConfig}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="MyCourses"
-        component={MyCourses}
+        component={Screens.MyCourses}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="Wishlist"
-        component={WishlistScreen}
+        component={Screens.WishlistScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="LeaveReview"
-        component={LeaveReviewScreen}
+        component={Screens.LeaveReviewScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="TestScreen"
-        component={TestScreen}
+        component={Screens.TestScreen}
         options={{ headerShown: false }}
       />
       {/* <Stack.Screen
         name="SearchScreen"
-        component={SearchScreen}
+        component={Screens.SearchScreen}
         options={{ headerShown: false }}
       /> */}
       <Stack.Screen
         name="PointsHistory"
-        component={PointsHistoryScreen}
+        component={Screens.PointsHistory}
         options={{ headerShown: false }}
       />
       {/* <Stack.Screen

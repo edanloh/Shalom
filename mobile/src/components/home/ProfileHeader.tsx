@@ -21,11 +21,12 @@ interface CombinedHeaderProps {
   onNotificationPress?: () => void;
 }
 
-const CombinedHeader: React.FC<CombinedHeaderProps> = ({
+export default function CombinedHeader({ 
   user,
   hasNotifications = false,
   onNotificationPress,
-}) => {
+}: CombinedHeaderProps) {
+
   const uri = getAvatarUri(user as any);
   const avatarSrc = uri ? { uri } : Images.profile;
 
@@ -148,5 +149,3 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
 });
-
-export default CombinedHeader;

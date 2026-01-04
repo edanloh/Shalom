@@ -44,7 +44,7 @@ interface CustomTextInputProps {
     | "emergency-call";
 }
 
-const CustomTextInput: React.FC<CustomTextInputProps> = ({
+export default function CustomTextInput({ 
   value,
   onChangeText,
   placeholder,
@@ -65,7 +65,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
   warningTextColor,
   onSubmitEditing,
   returnKeyType = "default",
-}) => {
+}: CustomTextInputProps) {
   const inputMarginBottom = warningText ? 8 : 16;
   return (
     <View>
@@ -147,5 +147,3 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
     </View>
   );
 };
-
-export default CustomTextInput;

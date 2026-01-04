@@ -30,7 +30,11 @@ const { width: screenWidth } = Dimensions.get('window');
 type Props = StackScreenProps<MainStackParamList, 'CourseDetail'>;
 type CourseContent = ModuleDetailResponse['data'];
 
-const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
+export default function CourseDetailScreen({
+  navigation,
+  route,
+}: StackScreenProps<MainStackParamList, "CourseDetail">) {
+  
   const { courseId } = route.params;
   const [courseDetail, setCourseDetail] = useState<ProcessedCourseDetail | null>(null);
   const [courseContent, setCourseContent] = useState<CourseContent | null>(null);
@@ -793,5 +797,3 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 });
-
-export default CourseDetailScreen;
