@@ -21,9 +21,9 @@ import LeaveReviewScreen from '../LeaveReviewScreen';
 import UserManagementScreen from '../admin/UserManagement';
 import UserConfigScreen from '../admin/UserConfig';
 import TestScreen from '../TestScreen';
-import SearchScreen from '../[unused] Search';
+// import SearchScreen from '../[unused] Search';
 import PointsHistoryScreen from '../PointsHistory';
-import NotificationSettingsScreen from '../NotificationSettingsScreen';
+// import NotificationSettingsScreen from '../[unused] NotificationSettingsScreen';
 
 import { useAuth } from '../../contexts/AuthContext';
 import type { TabParamList, MainStackParamList } from '@/types/navigation';
@@ -206,21 +206,21 @@ export default function MainNavigator() {
         component={TestScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen
+      {/* <Stack.Screen
         name="SearchScreen"
         component={SearchScreen}
         options={{ headerShown: false }}
-      />
+      /> */}
       <Stack.Screen
         name="PointsHistory"
         component={PointsHistoryScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen
+      {/* <Stack.Screen
         name="NotificationSettings"
         component={NotificationSettingsScreen}
         options={{ headerShown: false }}
-      />
+      /> */}
     </Stack.Navigator>
   );
 }
