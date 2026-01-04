@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Spacing, TextStyles } from "../constants";
 import Screen from "../components/common/Screen";
 import { Ionicons } from "@expo/vector-icons";
+import CustomTextInput from "@/components/CustomTextInput";
 
 type Achievement = {
   id: string;
@@ -88,12 +89,24 @@ const fmt = new Intl.DateTimeFormat(undefined, {
 });
 
 export default function AchievementsScreen({ navigation }: any) {
+  const [query, setQuery] = useState("");
+
   const sections = useMemo(() => {
+    // Filter achievements based on search query
+    const filteredAchievements = MOCK_ACHIEVEMENTS.filter((achievement) => {
+      if (!query.trim()) return true;
+      const searchTerm = query.toLowerCase();
+      return (
+        achievement.label.toLowerCase().includes(searchTerm) ||
+        achievement.subtitle.toLowerCase().includes(searchTerm)
+      );
+    });
+
     const today: Achievement[] = [];
     const yesterday: Achievement[] = [];
     const byDate: Record<string, Achievement[]> = {};
 
-    for (const n of MOCK_ACHIEVEMENTS) {
+    for (const n of filteredAchievements) {
       const dt = new Date(n.createdAt);
 
       if (isToday(dt)) {
@@ -121,7 +134,7 @@ export default function AchievementsScreen({ navigation }: any) {
     }
 
     return result;
-  }, []);
+  }, [query]);
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -144,6 +157,15 @@ export default function AchievementsScreen({ navigation }: any) {
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
     >
+      <CustomTextInput
+        placeholder="Search for achievements..."
+        value={query}
+        onChangeText={setQuery}
+        autoCapitalize={"none"}
+        leftIconName="search"
+        returnKeyType="search"
+      />
+
       {sections.map((section, sectionIndex) => (
         <View key={section.title} style={{ marginBottom: Spacing.lg }}>
           {/* Section Header */}
