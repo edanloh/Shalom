@@ -261,6 +261,11 @@ export default function MainNavigator() {
         component={Screens.CertificatesScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="PDFView"
+        component={Screens.PDFView}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

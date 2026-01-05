@@ -6,6 +6,7 @@ export type MainStackParamList = {
   ModuleDetail: { courseId: string; sectionId: string; userId?: string };
   LessonPlayer: { videoId: string; courseId: string; sectionId?: string; userId?: string };
   QuizScreen: { quizId: string; courseId: string; sectionId?: string; userId?: string };
+  PDFView: { pdfId: string; courseId: string; sectionId?: string; userId?: string;};
   LeaveReview: { courseId: string };
   Settings: undefined;
   EditProfile: undefined;

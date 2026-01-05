@@ -1085,9 +1085,16 @@
                 "time_limit_minutes": 10,
                 "max_attempts": 3,
                 "is_completed": false
+              },
+              {
+                "id": "pdf_1",
+                "type": "pdf",
+                "title": "Installing Required Tools",
+                "order_index": 5,
+                "is_completed": false
               }
             ],
-            "itemCount": 4,
+            "itemCount": 5,
             "module_is_completed": false
           },
           {

@@ -8,7 +8,7 @@ import { apiService } from './apiService';
 // Module Item (Video or Quiz)
 export interface ModuleItem {
   id: string;
-  type: 'video' | 'quiz';
+  type: 'video' | 'quiz' | 'pdf';
   title: string;
   description?: string;
   order_index: number;
@@ -144,7 +144,7 @@ class ModuleService {
    */
   getItemProgress(
     itemId: string,
-    itemType: 'video' | 'quiz',
+    itemType: ModuleItem['type'],
     userProgress?: UserProgress
   ): any {
     if (!userProgress) return null;
@@ -153,6 +153,8 @@ class ModuleService {
       return userProgress.videoProgress?.find(vp => vp.video_id === itemId);
     } else if (itemType === 'quiz') {
       return userProgress.quizAttempts?.find(qa => qa.quiz_id === itemId);
+    } else if (itemType === 'pdf') {
+      return null; // No progress tracking for PDFs
     }
 
     return null;

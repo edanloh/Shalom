@@ -89,7 +89,7 @@ const ModuleDetailScreen = () => {
     return moduleService.formatDuration(seconds);
   };
 
-  const getItemProgress = (itemId: string, itemType: "video" | "quiz") => {
+  const getItemProgress = (itemId: string, itemType: ModuleItem['type'] ) => {
     if (!courseContent) return null;
     return moduleService.getItemProgress(
       itemId,
@@ -126,6 +126,13 @@ const ModuleDetailScreen = () => {
     } else if (item.type === "quiz") {
       navigation.navigate("QuizScreen", {
         quizId: item.id,
+        courseId,
+        sectionId: currentSection?.id,
+        userId,
+      });
+    } else if (item.type === "pdf") {
+      navigation.navigate("PDFView", {
+        pdfId: item.id,
         courseId,
         sectionId: currentSection?.id,
         userId,
@@ -184,6 +191,8 @@ const ModuleDetailScreen = () => {
         <View style={styles.itemIconContainer}>
           {item.type === "video" ? (
             <Ionicons name="play-circle" size={24} color={Colors.purple400} />
+          ) : item.type === "pdf" ? (
+            <Ionicons name="newspaper-outline" size={24} color={Colors.white} />
           ) : (
             <Ionicons name="document-text" size={24} color={Colors.yellow} />
           )}
