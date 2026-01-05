@@ -13,6 +13,7 @@ import * as Notifications from "expo-notifications";
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, TextStyles } from '../constants';
 import Screen from '../components/common/Screen';
+import CustomModal from "../components/common/CustomModal";
 import externalStyles from '../styles/styles';
 
 export default function SettingsScreen({ navigation }: any) {
@@ -28,6 +29,10 @@ export default function SettingsScreen({ navigation }: any) {
     autoPlay: true,
     downloadOverWifi: true,
   });
+
+  const [activeModal, setActiveModal] = useState<
+    "help" | "terms" | "about" | null
+  >(null);
 
   // Check notification permission status on mount
   useEffect(() => {
@@ -125,21 +130,21 @@ export default function SettingsScreen({ navigation }: any) {
     icon: 'help-circle-outline' as const,
     title: 'Help & Support',
     subtitle: 'Get help and contact support',
-    onPress: () => console.log('Help & Support'),
+    onPress: () => setActiveModal("help"),
     },
     {
     key: 'terms',
     icon: 'document-text-outline' as const,
     title: 'Terms & Conditions',
     subtitle: 'Read our terms of service',
-    onPress: () => console.log('Terms & Conditions'),
+    onPress: () => setActiveModal("terms"),
     },
     {
     key: 'about',
     icon: 'information-circle-outline' as const,
     title: 'About',
     subtitle: 'App version and information',
-    onPress: () => console.log('About'),
+    onPress: () => setActiveModal("about"),
     },
   ];
 
@@ -299,6 +304,126 @@ export default function SettingsScreen({ navigation }: any) {
         </View>
 
         <Text style={styles.version}>Version 1.0.0</Text>
+
+        {/* Help & Support Modal */}
+        <CustomModal
+          visible={activeModal === "help"}
+          onClose={() => setActiveModal(null)}
+        >
+          <View>
+            <View style={styles.modalHeader}>
+              <Ionicons name="help-circle" size={32} color={Colors.white} />
+              <Text style={TextStyles.h3}>Help & Support</Text>
+            </View>
+            <Text style={TextStyles.caption}>
+              Need assistance? We're here to help!
+            </Text>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>Contact Us:</Text>
+              <Text style={TextStyles.caption}>
+                • Email: @gmail.com
+              </Text>
+              <Text style={TextStyles.caption}>• Phone: +65</Text>
+              <Text style={TextStyles.caption}>
+                • Hours: Mon-Fri, 9am-6pm
+              </Text>
+            </View>
+          </View>
+        </CustomModal>
+
+        {/* Terms & Conditions Modal */}
+        <CustomModal
+          visible={activeModal === "terms"}
+          onClose={() => setActiveModal(null)}
+        >
+          <View>
+            <View style={styles.modalHeader}>
+              <Ionicons
+                name="document-text"
+                size={32}
+                color={Colors.white}
+              />
+              <Text style={TextStyles.h3}>Terms & Conditions</Text>
+            </View>
+            <Text style={TextStyles.caption}>
+              Last updated: January 6, 2026
+            </Text>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>1. Acceptance of Terms</Text>
+              <Text style={TextStyles.caption}>
+                By accessing and using this app, you accept and agree to be
+                bound by the terms and provision of this agreement.
+              </Text>
+            </View>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>2. Use License</Text>
+              <Text style={TextStyles.caption}>
+                Permission is granted to temporarily access the materials for
+                personal, non-commercial use only.
+              </Text>
+            </View>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>
+                3. User Responsibilities
+              </Text>
+              <Text style={TextStyles.caption}>
+                You are responsible for maintaining the confidentiality of your
+                account and password.
+              </Text>
+            </View>
+            <Text
+              style={[
+                TextStyles.captionSmall,
+                { marginTop: Spacing.lg, fontStyle: "italic" },
+              ]}
+            >
+              For full terms and conditions, please visit our website.
+            </Text>
+          </View>
+        </CustomModal>
+
+        {/* About Modal */}
+        <CustomModal
+          visible={activeModal === "about"}
+          onClose={() => setActiveModal(null)}
+        >
+          <View>
+            <View style={styles.modalHeader}>
+              <Ionicons
+                name="information-circle"
+                size={32}
+                color={Colors.white}
+              />
+              <Text style={TextStyles.h3}>About</Text>
+            </View>
+            <Text style={TextStyles.caption}>Version 1.0.0</Text>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>Mission</Text>
+              <Text style={TextStyles.caption}>
+                ---
+              </Text>
+            </View>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>Features</Text>
+              <Text style={TextStyles.caption}>
+                • Interactive video courses
+              </Text>
+              <Text style={TextStyles.caption}>
+                • Progress tracking & analytics
+              </Text>
+              <Text style={TextStyles.caption}>
+                • Certificates of completion
+              </Text>
+              <Text style={TextStyles.caption}>• Community discussions</Text>
+            </View>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>Credits</Text>
+              <Text style={TextStyles.caption}>
+                Shalom. All rights reserved.
+              </Text>
+            </View>
+          </View>
+        </CustomModal>
       </>
     </Screen>
   );
@@ -385,4 +510,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     fontSize: 12,
   },
+  // Modal styles
+  modalHeader: {
+    flexDirection: "row",
+    gap: 12,
+  }
 });
