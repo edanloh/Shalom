@@ -51,7 +51,7 @@ export default function ProfileScreen({ navigation }: any) {
       {
         label: "Learning Goal",
         icon: "podium-outline",
-        action: () => navigation.navigate("PointsHistory"),
+        action: () => navigation.navigate("LearningGoalScreen"),
       },
       {
         label: "Certificates",
