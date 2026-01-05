@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   StyleSheet,
   Switch,
   Alert,
-  ScrollView,
   Platform,
+  Linking,
 } from 'react-native';
+import * as Notifications from "expo-notifications";
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, TextStyles } from '../constants';
 import Screen from '../components/common/Screen';
@@ -22,11 +23,62 @@ export default function SettingsScreen({ navigation }: any) {
     socialActivity: false,
     systemUpdates: true,
     emailNotifications: true,
-    pushNotifications: true,
+    pushNotifications: false,
     darkMode: false,
     autoPlay: true,
     downloadOverWifi: true,
   });
+
+  // Check notification permission status on mount
+  useEffect(() => {
+    checkNotificationPermission();
+  }, []);
+
+  const checkNotificationPermission = async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    setSettings((s) => ({ ...s, pushNotifications: status === "granted" }));
+  };
+
+  const handlePushNotificationToggle = async () => {
+    const { status: currentStatus } = await Notifications.getPermissionsAsync();
+
+    if (currentStatus === "granted") {
+      // User wants to turn off - direct them to settings
+      Alert.alert(
+        "Disable Notifications",
+        "To disable notifications, please go to your device settings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Open Settings",
+            onPress: () => Linking.openSettings(),
+          },
+        ]
+      );
+    } else {
+      // Request permission
+      const { status: newStatus } =
+        await Notifications.requestPermissionsAsync();
+      setSettings((s) => ({
+        ...s,
+        pushNotifications: newStatus === "granted",
+      }));
+
+      if (newStatus !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Please enable notifications in your device settings to receive updates.",
+          [
+            { text: "OK", style: "cancel" },
+            {
+              text: "Open Settings",
+              onPress: () => Linking.openSettings(),
+            },
+          ]
+        );
+      }
+    }
+  };
 
   const notificationSettings = [
     { key: 'courseUpdates',   title: 'Course Updates',     subtitle: 'Get notified about new lessons and course updates', icon: 'play-circle-outline' },
@@ -45,56 +97,60 @@ export default function SettingsScreen({ navigation }: any) {
   ];
 
   const accountItems = [
-  {
+    {
     key: 'editProfile',
     icon: 'person-outline' as const,
     title: 'Edit Profile',
     subtitle: 'Update your personal information',
     onPress: () => navigation.navigate('EditProfile'),
-  },
-  {
+    },
+    {
     key: 'privacy',
     icon: 'shield-checkmark-outline' as const,
     title: 'Privacy & Security',
     subtitle: 'Manage your privacy settings',
     onPress: () => console.log('Privacy & Security'),
-  },
-  {
+    },
+    {
     key: 'changePassword',
     icon: 'lock-closed-outline' as const,
     title: 'Change Password',
     subtitle: 'Update your account password',
     onPress: () => console.log('Change Password'),
-  },
-];
+    },
+  ];
 
-const supportItems = [
-  {
+  const supportItems = [
+    {
     key: 'help',
     icon: 'help-circle-outline' as const,
     title: 'Help & Support',
     subtitle: 'Get help and contact support',
     onPress: () => console.log('Help & Support'),
-  },
-  {
+    },
+    {
     key: 'terms',
     icon: 'document-text-outline' as const,
     title: 'Terms & Conditions',
     subtitle: 'Read our terms of service',
     onPress: () => console.log('Terms & Conditions'),
-  },
-  {
+    },
+    {
     key: 'about',
     icon: 'information-circle-outline' as const,
     title: 'About',
     subtitle: 'App version and information',
     onPress: () => console.log('About'),
-  },
-];
+    },
+  ];
 
-
-  const onToggle = (key: keyof typeof settings) =>
-    setSettings((s) => ({ ...s, [key]: !s[key] }));
+  const onToggle = (key: keyof typeof settings) => {
+    if (key === "pushNotifications") {
+      handlePushNotificationToggle();
+    } else {
+      setSettings((s) => ({ ...s, [key]: !s[key] }));
+    }
+  };
 
   const renderSettingItem = (item: any) => (
     <View key={item.key} style={styles.settingItem}>

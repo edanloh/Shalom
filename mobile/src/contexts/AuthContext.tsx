@@ -15,6 +15,7 @@ import {
   COGNITO_CLIENT_ID,
   API_BASE_URL,
 } from "react-native-dotenv";
+import { handleLogoutCleanup } from "./NotificationContext";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -106,7 +107,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   // const [user, setUser] = useState<User | null>(null);
   // const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
+
   // Set the below to skip auth during development
   const [user, setUser] = useState<User | null>({
     id: "550e8400-e29b-41d4-a716-446655440101",
@@ -212,6 +213,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
+    // Remove push token from backend before logging out
+    if (user?.id) {
+      try {
+        const pushToken = await AsyncStorage.getItem("@expo_push_token");
+        if (pushToken) {
+          await handleLogoutCleanup(user.id, pushToken);
+        }
+      } catch (error) {
+        console.error("Error cleaning up push token:", error);
+      }
+    }
+
     await AsyncStorage.removeItem(USER_STORAGE_KEY);
     setUser(null);
     setIsAuthenticated(false);

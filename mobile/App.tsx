@@ -15,6 +15,7 @@ import NotFoundScreen from "./src/screens/NotFoundScreen";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import UserProvider from "./src/contexts/UserContext";
 import CourseProvider from "./src/contexts/CourseContext";
+import { NotificationProvider } from "./src/contexts/NotificationContext";
 import SplashScreen from "./src/screens/SplashScreen";
 import type { MainStackParamList } from "./src/types";
 
@@ -106,12 +107,14 @@ const App = () => {
     <AuthProvider>
       <UserProvider>
         <CourseProvider>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaProvider>
-              <StatusBar style="dark" />
-              <AppNavigator />
-            </SafeAreaProvider>
-          </GestureHandlerRootView>
+          <NotificationProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <SafeAreaProvider>
+                <StatusBar style="dark" />
+                <AppNavigator />
+              </SafeAreaProvider>
+            </GestureHandlerRootView>
+          </NotificationProvider>
         </CourseProvider>
       </UserProvider>
     </AuthProvider>
