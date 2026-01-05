@@ -30,6 +30,7 @@ import { useAuth } from '../contexts/AuthContext';
 // types
 import type { Course } from '../types';
 import type { MainStackParamList, TabParamList } from '../types/navigation';
+import CourseCarousel from '@/components/home/CourseCarousel';
 
 // Types for API-ready data structures
 interface Achievement {
@@ -193,6 +194,13 @@ export default function HomeScreen({ navigation, route }: any) {
     // TODO: Update course like status or mark as in-progress via API
   };
 
+  const getTop10Courses = (courses: Course[]): Course[] => {
+    // Sort by percentage completed descending and return top 10
+    return courses
+      .sort((a, b) => b.progress.percentage - a.progress.percentage)
+      .slice(0, 10);
+  }
+
   // Handle user loading state
   if (!user) {
     return (
@@ -259,13 +267,21 @@ export default function HomeScreen({ navigation, route }: any) {
             </TouchableOpacity>
           </View>
         ) : (
-          <SwipeableCourseCards 
+          <>
+          {/* <SwipeableCourseCards 
             courses={myCoursesData}
             onCourseComplete={handleCourseComplete}
             onCourseLike={handleCourseLike}
             onToggleWishlist={toggleWishlist}
             isWishlisted={(id) => isWishlisted?.(id) ?? false}
+          /> */}
+          <CourseCarousel
+            courses={getTop10Courses(myCoursesData)}
+            // onCourseLike={(courseId: string) => {console.log("Liked" + courseId)}}
+            onToggleWishlist={toggleWishlist}
+            isWishlisted={(id) => isWishlisted?.(id) ?? false}
           />
+          </>
         )}
       </View>
 
@@ -373,7 +389,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
