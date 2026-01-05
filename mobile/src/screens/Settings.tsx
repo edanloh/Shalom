@@ -91,7 +91,6 @@ export default function SettingsScreen({ navigation }: any) {
   const generalSettings = [
     { key: 'emailNotifications', title: 'Email Notifications',  subtitle: 'Receive notifications via email',         icon: 'mail-outline' },
     { key: 'pushNotifications',  title: 'Push Notifications',   subtitle: 'Receive notifications on your device',    icon: 'notifications-outline' },
-    { key: 'darkMode',           title: 'Dark Mode',            subtitle: 'Use dark theme throughout the app',       icon: 'moon-outline' },
     { key: 'autoPlay',           title: 'Auto-play Videos',     subtitle: 'Automatically play video lessons',        icon: 'play-outline' },
     { key: 'downloadOverWifi',   title: 'Download over WiFi only', subtitle: 'Only download content when connected to WiFi', icon: 'wifi-outline' },
   ];
@@ -112,11 +111,11 @@ export default function SettingsScreen({ navigation }: any) {
     onPress: () => console.log('Privacy & Security'),
     },
     {
-    key: 'changePassword',
-    icon: 'lock-closed-outline' as const,
-    title: 'Change Password',
-    subtitle: 'Update your account password',
-    onPress: () => console.log('Change Password'),
+      key: 'changePassword',
+      icon: 'lock-closed-outline' as const,
+      title: 'Change Password',
+      subtitle: 'Update your account password',
+      onPress: () => navigation.navigate('ChangePassword'),
     },
   ];
 

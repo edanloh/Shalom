@@ -9,6 +9,7 @@ import {
   ForgotPasswordCommand,
   ConfirmForgotPasswordCommand,
   GetUserCommand,
+  ChangePasswordCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   COGNITO_POOL_ID,
@@ -63,6 +64,10 @@ interface AuthContextType {
   confirmSignUp: (email: string, code: string) => Promise<boolean>;
   loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 const USER_STORAGE_KEY = "shalom_user";
@@ -330,6 +335,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const changePassword = async (
+    currentPassword: string,
+    newPassword: string
+  ) => {
+    try {
+      if (!user?.accessToken) {
+        return { success: false, error: "Not authenticated" };
+      }
+
+      await cognitoClient.send(
+        new ChangePasswordCommand({
+          AccessToken: user.accessToken,
+          PreviousPassword: currentPassword,
+          ProposedPassword: newPassword,
+        })
+      );
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: getAuthErrorMessage(error) };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -344,6 +371,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         confirmSignUp,
         loginWithGoogle,
         updateProfile,
+        changePassword,
       }}
     >
       {children}

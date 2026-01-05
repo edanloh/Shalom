@@ -113,7 +113,7 @@ export default function ProfileScreen({ navigation }: any) {
         icon: "person-outline" as const,
         title: "Edit Profile",
         subtitle: "Update your personal information",
-        onPress: () => navigation.navigate("EditProfile" as never),
+        onPress: () => navigation.navigate("EditProfile"),
       },
       {
         icon: "shield-checkmark-outline" as const,
@@ -125,7 +125,7 @@ export default function ProfileScreen({ navigation }: any) {
         icon: "lock-closed-outline" as const,
         title: "Change Password",
         subtitle: "Update your account password",
-        onPress: () => console.log("Navigate to Change Password"),
+        onPress: () => navigation.navigate("ChangePassword"),
       },
     ],
     [navigation]
