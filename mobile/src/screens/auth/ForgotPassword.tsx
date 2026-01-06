@@ -14,6 +14,7 @@ import { useAuth } from "@contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import styles from "@/styles/styles";
 import { Colors, Spacing, TextStyles } from "@/constants";
+import { validatePassword } from "@/utils/validatePassword";
 
 export default function ForgotPasswordScreen({ navigation }: any) {
   const [step, setStep] = useState(1); // 1: request, 2: confirm
@@ -26,25 +27,6 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   const [showPassword, setShowPassword] = useState(false);
   const [passwordWarning, setPasswordWarning] = useState("");
   const { resetPassword, confirmPasswordReset } = useAuth();
-
-  const validatePassword = (pwd: string) => {
-    if (pwd.length < 8) {
-      return "Password must be at least 8 characters";
-    }
-    if (!/[0-9]/.test(pwd)) {
-      return "Password must contain at least 1 number";
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) {
-      return "Password must contain at least 1 special character";
-    }
-    if (!/[A-Z]/.test(pwd)) {
-      return "Password must contain at least 1 uppercase letter";
-    }
-    if (!/[a-z]/.test(pwd)) {
-      return "Password must contain at least 1 lowercase letter";
-    }
-    return "";
-  };
 
   const handleRequestReset = async () => {
     if (!email) {
