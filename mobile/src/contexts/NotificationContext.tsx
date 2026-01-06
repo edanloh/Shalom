@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { Platform, Alert } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
@@ -39,7 +39,9 @@ async function registerForPushNotificationsAsync(skipPrompt: boolean = false) {
   // If permission not granted and we should prompt
   if (existingStatus !== "granted" && !skipPrompt) {
     // Check if this is first time
-    const hasPrompted = await AsyncStorage.getItem("@notification_prompted");
+    const hasPrompted = await SecureStore.getItemAsync(
+      "@notification_prompted"
+    );
 
     if (!hasPrompted) {
       // Show alert on first app open
@@ -52,14 +54,14 @@ async function registerForPushNotificationsAsync(skipPrompt: boolean = false) {
               text: "Not Now",
               style: "cancel",
               onPress: () => {
-                AsyncStorage.setItem("@notification_prompted", "true");
+                SecureStore.setItemAsync("@notification_prompted", "true");
                 resolve();
               },
             },
             {
               text: "Enable",
               onPress: async () => {
-                AsyncStorage.setItem("@notification_prompted", "true");
+                SecureStore.setItemAsync("@notification_prompted", "true");
                 const { status } =
                   await Notifications.requestPermissionsAsync();
                 finalStatus = status;
@@ -148,9 +150,9 @@ export const NotificationProvider = ({
     registerForPushNotificationsAsync()
       .then(async (token) => {
         setExpoPushToken(token ?? "");
-        // Store token in AsyncStorage for logout cleanup
+        // Store token in SecureStore for logout cleanup
         if (token) {
-          await AsyncStorage.setItem("@expo_push_token", token);
+          await SecureStore.setItemAsync("@expo_push_token", token);
         }
       })
       .catch((error: any) => setExpoPushToken(`${error}`));

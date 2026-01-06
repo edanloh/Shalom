@@ -3,7 +3,7 @@
  * Industry-standard HTTP client with proper error handling, retries, and interceptors
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { ApiResponse, PaginatedResponse } from '../types';
 
 // API Configuration
@@ -106,10 +106,10 @@ class ApiService {
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
     this.defaultTimeout = API_CONFIG.TIMEOUT;
-    
+
     // Add default request interceptor for authentication
     this.addRequestInterceptor(this.authInterceptor);
-    
+
     // Add default response interceptor for error handling
     this.addResponseInterceptor(this.errorInterceptor);
   }
@@ -127,7 +127,7 @@ class ApiService {
   // Authentication interceptor - adds JWT token to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
-      const token = await AsyncStorage.getItem('authToken');
+      const token = await SecureStore.getItemAsync('authToken');
       if (token) {
         config.headers = {
           ...config.headers,
@@ -151,62 +151,62 @@ class ApiService {
   };
 
   // Error handling interceptor
-private errorInterceptor: ResponseInterceptor = async (response) => {
-  if (!response.ok) {
-    // Clone so we can safely read the body
-    const clone = response.clone();
+  private errorInterceptor: ResponseInterceptor = async (response) => {
+    if (!response.ok) {
+      // Clone so we can safely read the body
+      const clone = response.clone();
 
-    let errorData: any = {};
-    try {
-      errorData = isJsonResponse(clone)
-        ? await safeParseJson(clone)
-        : { body: await clone.text() };
-    } catch {
-      // leave errorData minimal
+      let errorData: any = {};
+      try {
+        errorData = isJsonResponse(clone)
+          ? await safeParseJson(clone)
+          : { body: await clone.text() };
+      } catch {
+        // leave errorData minimal
+      }
+
+      // Prefer server's message if present
+      const serverMsg =
+      (errorData && (errorData.message || errorData.error || errorData.reason)) ||
+        (typeof errorData === 'string' ? errorData : undefined);
+
+      // Capture useful IDs for CloudWatch correlation
+      const hdrs = {
+        'apigw-requestid': response.headers.get('apigw-requestid'),
+        'x-amzn-requestid': response.headers.get('x-amzn-requestid'),
+        'x-lambda-fn': response.headers.get('x-lambda-fn'),
+        'x-lambda-ver': response.headers.get('x-lambda-ver'),
+        'x-lambda-req': response.headers.get('x-lambda-req'),
+      };
+
+      const status = response.status;
+      const codeMap: Record<number, string> = {
+        400: 'BAD_REQUEST',
+        401: 'UNAUTHORIZED',
+        403: 'FORBIDDEN',
+        404: 'NOT_FOUND',
+        409: 'CONFLICT',
+        429: 'RATE_LIMIT',
+        500: 'SERVER_ERROR',
+        502: 'BAD_GATEWAY',
+        503: 'SERVICE_UNAVAILABLE',
+      };
+
+      const err = new ApiError(
+        serverMsg || `HTTP ${status}`,
+        status,
+        codeMap[status] || 'HTTP_ERROR',
+        errorData,
+        hdrs
+      );
+
+      // helpful console for debugging
+      console.log('[HTTP ✖]', response.url, status, hdrs, errorData);
+      throw err;
     }
 
-    // Prefer server's message if present
-    const serverMsg =
-      (errorData && (errorData.message || errorData.error || errorData.reason)) ||
-      (typeof errorData === 'string' ? errorData : undefined);
-
-    // Capture useful IDs for CloudWatch correlation
-    const hdrs = {
-      'apigw-requestid': response.headers.get('apigw-requestid'),
-      'x-amzn-requestid': response.headers.get('x-amzn-requestid'),
-      'x-lambda-fn': response.headers.get('x-lambda-fn'),
-      'x-lambda-ver': response.headers.get('x-lambda-ver'),
-      'x-lambda-req': response.headers.get('x-lambda-req'),
-    };
-
-    const status = response.status;
-    const codeMap: Record<number, string> = {
-      400: 'BAD_REQUEST',
-      401: 'UNAUTHORIZED',
-      403: 'FORBIDDEN',
-      404: 'NOT_FOUND',
-      409: 'CONFLICT',
-      429: 'RATE_LIMIT',
-      500: 'SERVER_ERROR',
-      502: 'BAD_GATEWAY',
-      503: 'SERVICE_UNAVAILABLE',
-    };
-
-    const err = new ApiError(
-      serverMsg || `HTTP ${status}`,
-      status,
-      codeMap[status] || 'HTTP_ERROR',
-      errorData,
-      hdrs
-    );
-
-    // helpful console for debugging
-    console.log('[HTTP ✖]', response.url, status, hdrs, errorData);
-    throw err;
-  }
-
-  return response; // ok → let makeRequest() parse the body
-};
+    return response; // ok → let makeRequest() parse the body
+  };
 
 
   // Build query string from parameters

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import {
   CognitoIdentityProviderClient,
@@ -137,21 +137,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const loadStoredAuth = async () => {
     try {
-      const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
+      const storedUser = await SecureStore.getItemAsync(USER_STORAGE_KEY);
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
         setIsAuthenticated(true);
       }
     } catch (error) {
-      await AsyncStorage.removeItem(USER_STORAGE_KEY);
+      await SecureStore.deleteItemAsync(USER_STORAGE_KEY);
     } finally {
       setIsLoading(false);
     }
   };
 
   const persistUser = async (userData: User) => {
-    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+    await SecureStore.setItemAsync(USER_STORAGE_KEY, JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
   };
@@ -223,7 +223,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Remove push token from backend before logging out
     if (user?.id) {
       try {
-        const pushToken = await AsyncStorage.getItem("@expo_push_token");
+        const pushToken = await SecureStore.getItemAsync("@expo_push_token");
         if (pushToken) {
           await handleLogoutCleanup(user.id, pushToken);
         }
@@ -232,7 +232,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
-    await AsyncStorage.removeItem(USER_STORAGE_KEY);
+    await SecureStore.deleteItemAsync(USER_STORAGE_KEY);
     setUser(null);
     setIsAuthenticated(false);
   };
@@ -289,7 +289,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const loginWithGoogle = () => {
     console.log("Google login is currently disabled.");
     return Promise.resolve();
-  }
+  };
 
   const fetchEmail = async (email: string) => {
     try {
@@ -308,7 +308,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("Error fetching email:", error);
       throw error;
     }
-  }
+  };
 
   // const loginWithGoogle = async (tokens: AuthTokens) => {
   //   try {
@@ -398,7 +398,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loginWithGoogle,
         updateProfile,
         changePassword,
-        fetchEmail
+        fetchEmail,
       }}
     >
       {children}
