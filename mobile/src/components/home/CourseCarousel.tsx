@@ -1,5 +1,11 @@
-import React, { useRef } from "react";
-import { View, StyleSheet, Dimensions, Text, Pressable } from "react-native";
+import React, { useRef, useMemo } from "react";
+import {
+  View,
+  StyleSheet,
+  Text,
+  Pressable,
+  useWindowDimensions,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import Animated, {
@@ -20,10 +26,6 @@ import { useCourses } from "../../contexts/CourseContext";
 
 type NavigationProp = StackNavigationProp<MainStackParamList, "MainTabs">;
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
-const CARD_HEIGHT = screenHeight * 0.6;
-const CARD_WIDTH = screenWidth * 0.7;
-
 interface CourseCarouselProps {
   courses: Course[];
   onCourseComplete?: (courseId: string) => void;
@@ -42,6 +44,12 @@ export default function CourseCarousel({
   const navigation = useNavigation<NavigationProp>();
   const scrollX = useSharedValue(0);
   const { wishlist = [], toggleWishlist } = useCourses();
+  const { width: screenWidth } = useWindowDimensions();
+
+  const CARD_WIDTH = useMemo(
+    () => Math.min(screenWidth * 0.7, 400),
+    [screenWidth]
+  );
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -58,7 +66,10 @@ export default function CourseCarousel({
         showsHorizontalScrollIndicator={false}
         snapToInterval={CARD_WIDTH + Spacing.md}
         decelerationRate="fast"
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingHorizontal: (screenWidth - CARD_WIDTH) / 2 },
+        ]}
       >
         {courses.map((course, index) => {
           const inputRange = [
@@ -74,6 +85,7 @@ export default function CourseCarousel({
               index={index}
               scrollX={scrollX}
               inputRange={inputRange}
+              cardWidth={CARD_WIDTH}
               onPress={() =>
                 navigation.navigate("CourseDetail", { courseId: course.id })
               }
@@ -93,12 +105,14 @@ export default function CourseCarousel({
               index={index}
               scrollX={scrollX}
               coursesLength={courses.length}
+              cardWidth={CARD_WIDTH}
             />
           ))
         ) : (
           <LimitedPaginationDots
             scrollX={scrollX}
             totalCourses={courses.length}
+            cardWidth={CARD_WIDTH}
           />
         )}
       </View>
@@ -111,6 +125,7 @@ interface CourseCardItemProps {
   index: number;
   scrollX: SharedValue<number>;
   inputRange: number[];
+  cardWidth: number;
   onPress: () => void;
   onToggleWishlist?: (course: Course) => void;
   isWishlisted?: (courseId: string) => boolean;
@@ -121,6 +136,7 @@ function CourseCardItem({
   index,
   scrollX,
   inputRange,
+  cardWidth,
   onPress,
   onToggleWishlist,
   isWishlisted,
@@ -149,8 +165,8 @@ function CourseCardItem({
   const wishlisted = isWishlisted?.(course.id) ?? false;
 
   return (
-    <Animated.View style={[styles.card, animatedStyle]}>
-      <Pressable onPress={onPress} style={{flex: 1}}>
+    <Animated.View style={[styles.card, animatedStyle, { width: cardWidth }]}>
+      <Pressable onPress={onPress} style={{ flex: 1 }}>
         {/* Image Section */}
         <View style={styles.imageContainer}>
           <ImageWithFallback
@@ -182,7 +198,7 @@ function CourseCardItem({
           </Text>
 
           {/* Progress Section */}
-          <Text style={[TextStyles.bodySmall, {marginVertical: Spacing.sm}]}>
+          <Text style={[TextStyles.bodySmall, { marginVertical: Spacing.sm }]}>
             {course.progress?.completed || 0} of{" "}
             {course.progress?.total || course.modules || 0} modules completed
           </Text>
@@ -256,14 +272,20 @@ interface PaginationDotProps {
   index: number;
   scrollX: SharedValue<number>;
   coursesLength: number;
+  cardWidth: number;
 }
 
-function PaginationDot({ index, scrollX, coursesLength }: PaginationDotProps) {
+function PaginationDot({
+  index,
+  scrollX,
+  coursesLength,
+  cardWidth,
+}: PaginationDotProps) {
   const animatedDotStyle = useAnimatedStyle(() => {
     const inputRange = [
-      (index - 1) * (CARD_WIDTH + Spacing.md),
-      index * (CARD_WIDTH + Spacing.md),
-      (index + 1) * (CARD_WIDTH + Spacing.md),
+      (index - 1) * (cardWidth + Spacing.md),
+      index * (cardWidth + Spacing.md),
+      (index + 1) * (cardWidth + Spacing.md),
     ];
 
     const dotWidth = interpolate(
@@ -292,11 +314,13 @@ function PaginationDot({ index, scrollX, coursesLength }: PaginationDotProps) {
 interface LimitedPaginationDotsProps {
   scrollX: SharedValue<number>;
   totalCourses: number;
+  cardWidth: number;
 }
 
 function LimitedPaginationDots({
   scrollX,
   totalCourses,
+  cardWidth,
 }: LimitedPaginationDotsProps) {
   const MAX_DOTS = 10;
 
@@ -305,7 +329,7 @@ function LimitedPaginationDots({
       {Array.from({ length: MAX_DOTS }).map((_, i) => {
         const animatedDotStyle = useAnimatedStyle(() => {
           const currentIndex = Math.round(
-            scrollX.value / (CARD_WIDTH + Spacing.md)
+            scrollX.value / (cardWidth + Spacing.md)
           );
 
           // Calculate which dots to show based on current position
@@ -328,9 +352,9 @@ function LimitedPaginationDots({
           }
 
           const inputRange = [
-            (actualIndex - 1) * (CARD_WIDTH + Spacing.md),
-            actualIndex * (CARD_WIDTH + Spacing.md),
-            (actualIndex + 1) * (CARD_WIDTH + Spacing.md),
+            (actualIndex - 1) * (cardWidth + Spacing.md),
+            actualIndex * (cardWidth + Spacing.md),
+            (actualIndex + 1) * (cardWidth + Spacing.md),
           ];
 
           const dotWidth = interpolate(
@@ -367,11 +391,8 @@ function LimitedPaginationDots({
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    height: CARD_HEIGHT*1.12,
   },
   scrollContent: {
-    paddingHorizontal: (screenWidth - CARD_WIDTH) / 2,
-    paddingVertical: Spacing.base,
     alignContent: "center",
     gap: Spacing.md,
   },
@@ -388,8 +409,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.purple400,
   },
   card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
     borderRadius: 20,
     backgroundColor: Colors.gray600,
     shadowColor: "#000",
@@ -401,7 +420,8 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   imageContainer: {
-    height: "35%",
+    height: 200,
+    minHeight: 150,
     position: "relative",
     overflow: "hidden",
     borderTopLeftRadius: 20,
@@ -445,33 +465,31 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray600,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+    gap: Spacing.xs,
   },
   courseTitle: {
     fontFamily: Typography.fontFamily.bold,
     fontSize: TextStyles.h3.fontSize,
     color: Colors.textPrimary,
-    marginBottom: 6,
     lineHeight: 24,
   },
   courseDescription: {
     fontFamily: Typography.fontFamily.regular,
     fontSize: TextStyles.body.fontSize,
     color: Colors.textSecondary,
-    marginBottom: 12,
     lineHeight: 18,
   },
   progressLabel: {
     fontFamily: Typography.fontFamily.medium,
     fontSize: TextStyles.caption.fontSize,
     color: Colors.textSecondary,
-    marginBottom: 8,
   },
   progressBarContainer: {
     width: "100%",
     height: 6,
     backgroundColor: Colors.gray200,
     borderRadius: 3,
-    marginBottom: 16,
+    marginBottom: Spacing.md,
     overflow: "hidden",
   },
   progressBarFill: {
@@ -482,7 +500,6 @@ const styles = StyleSheet.create({
   instructorSection: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
   },
   instructorAvatar: {
     width: 35,
@@ -499,6 +516,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
+    marginVertical: Spacing.sm,
   },
   statItem: {
     alignItems: "center",

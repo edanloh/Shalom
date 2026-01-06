@@ -101,6 +101,7 @@ export default function HomeScreen({ navigation, route }: any) {
       value: 12,
       color: Colors.streakCardBg,
       type: 'streak',
+      navigationTarget: 'LearningGoalScreen',
     },
     {
       id: '2',

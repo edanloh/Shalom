@@ -1,41 +1,42 @@
 import React from "react";
-import { View, Text, StyleSheet, Image, Platform, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { Colors, Typography, Spacing, BorderRadius } from "../../constants";
+import { View, Text, StyleSheet, Image, Pressable } from "react-native";
+import { Colors, Spacing, BorderRadius, TextStyles } from "../../constants";
 
-// ---------- Weekly Goal ----------
 interface WeeklyGoalProps {
   currentHours: number;
   targetHours: number;
+  navigation: any;
 }
 
 const WeeklyGoal: React.FC<WeeklyGoalProps> = ({
   currentHours,
   targetHours,
+  navigation,
 }) => {
   const progressPercentage = Math.min((currentHours / targetHours) * 100, 100);
 
   return (
-    <View style={styles.goalContainer}>
-      <View style={styles.goalHeader}>
-        <Text style={styles.goalTitle}>Weekly Goal</Text>
-        <Text style={styles.goalHours}>
+    <Pressable
+      style={styles.card}
+      onPress={() => navigation.navigate("LearningGoalScreen")}
+    >
+      <View style={styles.row}>
+        <Text style={TextStyles.bodyMedium}>Weekly Goal</Text>
+        <Text style={TextStyles.caption}>
           {currentHours}h/{targetHours}h
         </Text>
       </View>
-      <View style={styles.progressBarContainer}>
+      <View style={styles.progressContainer}>
         <View
-          style={[styles.progressBar, { width: `${progressPercentage}%` }]}
+          style={[styles.progressFill, { width: `${progressPercentage}%` }]}
         />
       </View>
-    </View>
+    </Pressable>
   );
 };
 
-// ---------- Achievements ----------
 interface Achievement {
   id: string;
-  // icon: string;
   title: string;
   value: string | number;
   color: string;
@@ -47,38 +48,39 @@ interface AchievementCardProps {
   navigation: any;
 }
 
-const AchievementCard: React.FC<AchievementCardProps> = ({ achievement, navigation }) => {
-  // const getCardColor = () => {
-  //   if (achievement.title.includes("Streak")) {
-  //     return Colors.streakCardBg;
-  //   } else if (achievement.title.includes("Certificates")) {
-  //     return Colors.certificateCardBg;
-  //   }
-  //   return achievement.color;
-  // };
+const ACHIEVEMENT_LOGOS = {
+  Streak: require("../../../assets/streak.png"),
+  Certificates: require("../../../assets/certificates.png"),
+  default: require("../../../assets/placeholder_icon.png"),
+} as const;
 
-  // Map achievement title to asset logo
-  const getLogo = () => {
-    if (achievement.title.includes("Streak")) {
-      return require("../../../assets/streak.png");
-    } else if (achievement.title.includes("Certificates")) {
-      return require("../../../assets/certificates.png");
-    }
-    // Default icon (use placeholder or shalom.png)
-    return require("../../../assets/placeholder_icon.png");
-  };
+const AchievementCard: React.FC<AchievementCardProps> = ({
+  achievement,
+  navigation,
+}) => {
+  const logoKey = achievement.title.includes("Streak")
+    ? "Streak"
+    : achievement.title.includes("Certificates")
+    ? "Certificates"
+    : "default";
 
   return (
-    <Pressable style={[styles.achievementCard]} onPress={() => {
-      if (achievement.navigationTarget) {
-        navigation.navigate(achievement.navigationTarget);
+    <Pressable
+      style={styles.card}
+      onPress={() =>
+        achievement.navigationTarget &&
+        navigation.navigate(achievement.navigationTarget)
       }
-    }}>
-      <View style={styles.iconContainer}>
-        <Image source={getLogo()} style={{ width: 32, height: 32 }} />
-      </View>
-      <Text style={styles.achievementValue}>{achievement.value}</Text>
-      <Text style={styles.achievementTitle}>{achievement.title}</Text>
+    >
+      <Image source={ACHIEVEMENT_LOGOS[logoKey]} style={styles.icon} />
+      <Text style={[TextStyles.h2, { color: Colors.white, marginBottom: 0 }]}>
+        {achievement.value}
+      </Text>
+      <Text
+        style={[TextStyles.bodySmall, { color: Colors.white, opacity: 0.9 }]}
+      >
+        {achievement.title}
+      </Text>
     </Pressable>
   );
 };
@@ -88,108 +90,62 @@ interface ProgressSectionProps extends WeeklyGoalProps {
   navigation: any;
 }
 
-// ---------- Combined Section ----------
 const ProgressSection: React.FC<ProgressSectionProps> = ({
   currentHours,
   targetHours,
   achievements,
-  navigation
-}) => {
-  return (
-    <View style={styles.sectionContainer}>
-      <View style={styles.achievementsRow}>
-        {achievements.map((achievement) => (
-          <AchievementCard key={achievement.id} achievement={achievement} navigation={navigation} />
-        ))}
-      </View>
-      <WeeklyGoal currentHours={currentHours} targetHours={targetHours} />
+  navigation,
+}) => (
+  <View
+    style={{ gap: Spacing.lg, padding: Spacing.lg, paddingTop: Spacing.md }}
+  >
+    <View style={{ flexDirection: "row", gap: Spacing.lg }}>
+      {achievements.map((achievement) => (
+        <AchievementCard
+          key={achievement.id}
+          achievement={achievement}
+          navigation={navigation}
+        />
+      ))}
     </View>
-  );
-};
+    <WeeklyGoal
+      currentHours={currentHours}
+      targetHours={targetHours}
+      navigation={navigation}
+    />
+  </View>
+);
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: Spacing.lg, 
-  },
-  // Weekly Goal styles
-  goalContainer: {
+  card: {
+    flex: 1,
     backgroundColor: Colors.purple850,
-    marginHorizontal: Spacing.lg,
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.base,
     borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.lg,
-    marginTop: Spacing.lg,
+    alignItems: "center",
+    gap: Spacing.xs,
   },
-  goalHeader: {
+  row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignSelf: "stretch",
     marginBottom: Spacing.md,
   },
-  goalTitle: {
-    fontFamily: Typography.fontFamily.medium,
-    fontSize: Typography.fontSize.base,
-    color: Colors.textPrimary,
-  },
-  goalHours: {
-    fontFamily: Typography.fontFamily.medium,
-    fontSize: Typography.fontSize.base,
-    color: Colors.textSecondary,
-  },
-  progressBarContainer: {
+  progressContainer: {
     height: 6,
+    alignSelf: "stretch",
     backgroundColor: Colors.backgroundGray,
     borderRadius: BorderRadius.sm,
     overflow: "hidden",
   },
-  progressBar: {
+  progressFill: {
     height: "100%",
     backgroundColor: Colors.purple400,
-    borderRadius: BorderRadius.sm,
   },
-  // Achievements styles
-  achievementsRow: {
-    flexDirection: "row",
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.base,
-  },
-  achievementCard: {
-    flex: 1,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.base,
-    borderRadius: BorderRadius.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 80,
-    backgroundColor: Colors.purple850
-  },
-  iconContainer: {
-    marginBottom: Spacing.md,
-    // React Native Web compatible shadow
-    ...(Platform.OS === 'web' ? {
-      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-    } : {
-      shadowColor: Colors.black,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
-      elevation: 2,
-    }),
-  },
-  achievementValue: {
-    fontFamily: Typography.fontFamily.bold,
-    fontSize: Typography.fontSize["3xl"],
-    color: Colors.white,
-    marginBottom: 4,
-    textAlign: "center",
-  },
-  achievementTitle: {
-    fontFamily: Typography.fontFamily.medium,
-    fontSize: Typography.fontSize.sm,
-    color: Colors.white,
-    textAlign: "center",
-    opacity: 0.9,
+  icon: {
+    width: 32,
+    height: 32,
   },
 });
 
