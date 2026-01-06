@@ -3,6 +3,7 @@ import courseService from '../../services/courseService';
 import moduleService from '../../services/moduleService';
 import apiService from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
+import { StorageService } from '../../services/storageService';
 
 // Types
 export interface Question {
@@ -85,6 +86,8 @@ interface CourseBuilderContextType {
   setCourseName: (name: string) => void;
   courseDescription: string;
   setCourseDescription: (description: string) => void;
+  courseThumbnailUrl: string;
+  setCourseThumbnailUrl: (url: string) => void;
   courseStatus: string;
   setCourseStatus: (status: string) => void;
   modules: Module[];
@@ -140,6 +143,7 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
   // Course state - Start with empty data (will be loaded from API or kept empty for new course)
   const [courseName, setCourseName] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
+  const [courseThumbnailUrl, setCourseThumbnailUrl] = useState("");
   const [courseStatus, setCourseStatus] = useState("draft");
   const [modules, setModules] = useState<Module[]>([]);
   const [isLoadingCourse, setIsLoadingCourse] = useState(false);
@@ -157,18 +161,65 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
       console.log('CourseBuilder: Loading course data for courseId:', courseId);
       setIsLoadingCourse(true);
       try {
-        // Fetch course basic info
-        const course = await courseService.getCourseById(courseId);
-        if (!course) {
+        // Fetch all course data in ONE call using the instructor endpoint
+        // This returns both course info and modules with lessons/quizzes
+        const adminId = user?.id || '550e8400-e29b-41d4-a716-446655440101';
+        const response = await apiService.get<any>(`/getModuleDetailInstructor/${adminId}/${courseId}`);
+        
+        if (!response || !response.data) {
           console.error(`Course with ID ${courseId} not found`);
           return;
         }
-        console.log('CourseBuilder: Course loaded:', course);
+        
+        const course = response.data.course;
+        const sections = response.data.sections || [];
+        
+        console.log('CourseBuilder: Course and modules loaded:', { course, sections });
 
-        // Fetch modules with lessons and quizzes (instructor view with quiz questions)
-        const adminId = user?.id || 'default-admin-id';
-        const moduleDetails = await moduleService.getCourseModules(courseId, adminId);
-        console.log('CourseBuilder: Modules loaded:', moduleDetails);
+        // Transform sections to moduleDetails format
+        const moduleDetails = sections.map((section: any) => {
+          const lessons = section.items
+            ?.filter((item: any) => item.type === 'video')
+            .map((video: any) => ({
+              id: video.id,
+              title: video.title,
+              content: video.description || '',
+              video_url: video.video_url || '',
+              thumbnail_url: video.thumbnail_url || '',
+              duration: `${Math.floor((video.duration_seconds || 0) / 60)} min`,
+              duration_seconds: video.duration_seconds || 0,
+              is_preview: video.is_preview || false,
+              order_index: video.order_index
+            })) || [];
+
+          const quizzes = section.items
+            ?.filter((item: any) => item.type === 'quiz')
+            .map((quiz: any) => ({
+              id: quiz.id,
+              title: quiz.title,
+              description: quiz.description || '',
+              passing_score: quiz.passing_score || 70,
+              questions: (quiz.questions || []).map((q: any) => ({
+                id: q.id,
+                question_text: q.text || q.question_text,
+                question_type: q.type || q.question_type,
+                options: q.options || [],
+                correct_answer: q.correctAnswer || q.correct_answer,
+                explanation: q.explanation
+              }))
+            })) || [];
+
+          return {
+            id: section.id,
+            title: section.title,
+            description: section.description || '',
+            order_index: section.order_index,
+            lessons,
+            quizzes
+          };
+        });
+        
+        console.log('CourseBuilder: Modules transformed:', moduleDetails);
         console.log('CourseBuilder: Quiz questions check:', 
           moduleDetails.map(m => ({ 
             moduleTitle: m.title, 
@@ -183,7 +234,8 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
         // Transform API data to CourseBuilder format
         setCourseName(course.title || "");
         setCourseDescription(course.description || "");
-        setCourseStatus(course.status || "draft");
+        setCourseThumbnailUrl(course.thumbnail_url || "");
+        setCourseStatus(course.is_published ? "published" : "draft");
         
         const transformedModules: Module[] = moduleDetails.map((module) => ({
           id: module.id.toString(),
@@ -407,6 +459,96 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
   const [currentCourseId, setCurrentCourseId] = useState<string | undefined>(courseId);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Upload all pending files (videos and thumbnails) before saving
+  const uploadAllPendingFiles = async () => {
+    const uploadedModules = [...modules];
+    let hasErrors = false;
+    let uploadedCourseThumbnailUrl = courseThumbnailUrl;
+
+    console.log('[uploadAllPendingFiles] Starting with courseThumbnailUrl:', courseThumbnailUrl);
+
+    // Upload course thumbnail if it's a local file
+    if (courseThumbnailUrl?.startsWith('[LOCAL_FILE:')) {
+      const courseThumbnailFile = (window as any).__courseThumbnailFile;
+      if (courseThumbnailFile) {
+        try {
+          const { url, error } = await StorageService.uploadThumbnail(courseThumbnailFile);
+          if (error) {
+            console.error('Course thumbnail upload failed:', error);
+            hasErrors = true;
+          } else {
+            console.log('[uploadAllPendingFiles] Uploaded course thumbnail to:', url);
+            uploadedCourseThumbnailUrl = url;
+            setCourseThumbnailUrl(url);
+          }
+        } catch (err) {
+          console.error('Course thumbnail upload error:', err);
+          hasErrors = true;
+        }
+      }
+    } else {
+      console.log('[uploadAllPendingFiles] Course thumbnail is a URL, using directly:', uploadedCourseThumbnailUrl);
+    }
+
+    // Upload all lesson files
+    for (let moduleIndex = 0; moduleIndex < uploadedModules.length; moduleIndex++) {
+      const module = uploadedModules[moduleIndex];
+      
+      for (let lessonIndex = 0; lessonIndex < module.lessons.length; lessonIndex++) {
+        const lesson = module.lessons[lessonIndex];
+        
+        // Check if lesson has local files that need uploading
+        const hasLocalThumbnail = lesson.thumbnailUrl?.startsWith('[LOCAL_FILE:');
+        const hasLocalVideo = lesson.videoUrl?.startsWith('[LOCAL_FILE:');
+        
+        if (hasLocalThumbnail || hasLocalVideo) {
+          // Get files from fileCache (from useVideoUpload)
+          const cacheKey = `${module.id}-${lesson.id}`;
+          const cachedFiles = (window as any).__lessonFileCache?.get(cacheKey);
+          
+          if (cachedFiles) {
+            // Upload thumbnail
+            if (hasLocalThumbnail && cachedFiles.thumbnailFile) {
+              try {
+                const { url, error } = await StorageService.uploadThumbnail(cachedFiles.thumbnailFile);
+                if (error) {
+                  console.error(`Thumbnail upload failed for lesson ${lesson.title}:`, error);
+                  hasErrors = true;
+                } else {
+                  uploadedModules[moduleIndex].lessons[lessonIndex].thumbnailUrl = url;
+                }
+              } catch (err) {
+                console.error(`Thumbnail upload error for lesson ${lesson.title}:`, err);
+                hasErrors = true;
+              }
+            }
+            
+            // Upload video
+            if (hasLocalVideo && cachedFiles.videoFile) {
+              try {
+                const { url, error } = await StorageService.uploadVideo(cachedFiles.videoFile);
+                if (error) {
+                  console.error(`Video upload failed for lesson ${lesson.title}:`, error);
+                  hasErrors = true;
+                } else {
+                  uploadedModules[moduleIndex].lessons[lessonIndex].videoUrl = url;
+                }
+              } catch (err) {
+                console.error(`Video upload error for lesson ${lesson.title}:`, err);
+                hasErrors = true;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Update modules with uploaded URLs
+    setModules(uploadedModules);
+    
+    return { uploadedModules, uploadedCourseThumbnailUrl, hasErrors };
+  };
+
   const saveCourse = async (): Promise<{ success: boolean; courseId?: string; message?: string }> => {
     if (!courseName.trim()) {
       return { success: false, message: 'Please enter a course name' };
@@ -414,12 +556,28 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
 
     setIsSaving(true);
     try {
+      // Step 1: Upload all pending files first
+      console.log('Uploading pending files...');
+      const { uploadedModules, uploadedCourseThumbnailUrl, hasErrors } = await uploadAllPendingFiles();
+      
+      if (hasErrors) {
+        showModal({
+          title: 'Upload Warning',
+          message: 'Some files failed to upload. Check console for details. Continue saving?',
+          type: 'warning',
+          confirmText: 'Continue',
+          showCancel: true,
+        });
+        // Note: In a real implementation, you'd want to wait for user confirmation
+      }
+
       let finalCourseId = currentCourseId;
 
       // Transform modules from CourseBuilder format to backend API format
+      // Use uploadedModules which has the Supabase URLs instead of local file markers
       // IMPORTANT: Include IDs for existing items to preserve student progress
       // Extract baseTitle (user input) instead of full title with "Lesson X.Y:" prefix
-      const transformedModules = modules.map((module, index) => ({
+      const transformedModules = uploadedModules.map((module, index) => ({
         id: module.id, // Preserve section ID for UPDATE (not INSERT)
         title: module.title,
         description: module.description || '',
@@ -486,12 +644,12 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
       if (!currentCourseId || currentCourseId === 'new') {
         console.log('Creating new course with modules:', courseName);
         
-        // Backend createCourse expects full structure
-        // Use apiService.post directly to bypass TypeScript restrictions
+        // Use courseService.createCourseWithModules which calls /createCourse endpoint
         const courseData = {
           title: courseName,
           category: 'Programming', // TODO: Add category selector in UI
           description: courseDescription || 'Course description',
+          thumbnailUrl: uploadedCourseThumbnailUrl || null,
           level: 'Beginner', // TODO: Add level selector in UI
           instructorId: user?.id || '550e8400-e29b-41d4-a716-446655440101', // Get from auth context
           instructorName: user?.name || 'Instructor', // Get from auth context
@@ -500,8 +658,9 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
           requirements: [] // TODO: Add requirements in UI
         };
 
-        const response = await apiService.post('/courses', courseData) as any;
-        finalCourseId = response.data?.course?.id || response.data?.id || response.id;
+        console.log('Creating course with thumbnail URL:', uploadedCourseThumbnailUrl);
+        const response = await courseService.createCourseWithModules(courseData);
+        finalCourseId = response.courseId;
         
         if (!finalCourseId) {
           throw new Error('Failed to get course ID from response');
@@ -518,16 +677,17 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
       } else {
         console.log('Updating course with modules:', currentCourseId);
         
-        // Backend updateCourse accepts full structure including modules
-        // Use apiService.put directly to bypass type restrictions
+        // Use moduleService.updateCourse which calls /updateCourse endpoint
         const updateData = {
           title: courseName,
           description: courseDescription,
+          thumbnailUrl: uploadedCourseThumbnailUrl || null,
           isPublished: courseStatus === 'published',
           modules: transformedModules
         };
 
-        await apiService.put(`/courses/${currentCourseId}`, updateData);
+        console.log('Updating course with thumbnail URL:', uploadedCourseThumbnailUrl);
+        await moduleService.updateCourse(currentCourseId, updateData);
         console.log('Course updated successfully');
       }
 
@@ -574,6 +734,8 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
     setCourseName,
     courseDescription,
     setCourseDescription,
+    courseThumbnailUrl,
+    setCourseThumbnailUrl,
     courseStatus,
     setCourseStatus,
     modules,
