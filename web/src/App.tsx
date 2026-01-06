@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Courses from "./pages/Courses";
 import Analytics from "./pages/Analytics";
 import Students from "./pages/Students";
+import CourseStudents from "./pages/CourseStudents";
 import Assessments from "./pages/Assessments";
 import Messages from "./pages/Messages";
 import Settings from "./pages/Settings";
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/courses" element={<Courses />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/students" element={<Students />} />
+              <Route path="/course/:courseId/students" element={<CourseStudents />} />
               <Route path="/assessments" element={<Assessments />} />
               <Route path="/messages" element={<Messages />} />
               <Route path="/settings" element={<Settings />} />

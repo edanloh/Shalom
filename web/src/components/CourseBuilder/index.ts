@@ -8,4 +8,4 @@ export { CoursePreview } from './CoursePreview';
 export { CenterContent } from './CenterContent';
 export { RightSidebar } from './RightSidebar';
 export { LoadingScreen } from './LoadingScreen';
-export { ConfirmationModal } from './ConfirmationModal';
+export { default as ConfirmationModal } from './ConfirmationModal';

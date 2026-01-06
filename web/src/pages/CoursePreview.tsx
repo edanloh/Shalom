@@ -1,48 +1,82 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, Star, Clock, BookOpen, Users, Award, Play } from "lucide-react";
+import { ChevronLeft, Star, Clock, BookOpen, Users, Award, Play, Loader2 } from "lucide-react";
 import { DEFAULT_COURSE_THUMBNAIL } from "@/constants/images";
+import { courseService, type Course } from "@/services/courseService";
 
 const CoursePreview = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const [course, setCourse] = useState<Course | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const course = {
-    id: courseId,
-    title: "Data Science Fundamentals",
-    description: "Master the core concepts of data science including statistics, machine learning, data visualization, and real-world applications.",
-    thumbnail: DEFAULT_COURSE_THUMBNAIL,
-    category: "Data Science",
-    instructor: "Dr. Sarah Johnson",
-    rating: 4.8,
-    totalRatings: 156,
-    duration: "12 weeks",
-    modules: 8,
-    lessons: 42,
-    modules_list: [
-      {
-        id: 1,
-        title: "Introduction to Data Science",
-        lessons: 5,
-        duration: "2 hours"
-      },
-      {
-        id: 2,
-        title: "Python for Data Science",
-        lessons: 6,
-        duration: "3 hours"
-      },
-      {
-        id: 3,
-        title: "Data Analysis with Pandas",
-        lessons: 5,
-        duration: "2.5 hours"
-      },
-    ],
-  };
+  useEffect(() => {
+    const fetchCourse = async () => {
+      if (!courseId) {
+        setError("No course ID provided");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const courseData = await courseService.getCourseById(courseId);
+        
+        if (!courseData) {
+          setError("Course not found");
+        } else {
+          setCourse(courseData);
+        }
+      } catch (err) {
+        console.error("Error fetching course:", err);
+        setError("Failed to load course");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourse();
+  }, [courseId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-6 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !course) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-6 py-8">
+          <Button
+            variant="ghost"
+            onClick={() => navigate(`/course-builder/${courseId}`)}
+            className="mb-4"
+          >
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Back to Editor
+          </Button>
+          <div className="gradient-card border border-border rounded-xl p-8 text-center">
+            <h2 className="text-2xl font-bold mb-2">Course Not Found</h2>
+            <p className="text-muted-foreground">{error || "The course could not be loaded."}</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,25 +132,22 @@ const CoursePreview = () => {
             <div className="gradient-card border border-border rounded-xl p-6">
               <h2 className="text-2xl font-bold mb-4">Course Content</h2>
               <div className="space-y-3">
-                {course.modules_list.map((module) => (
-                  <div key={module.id} className="border border-border rounded-lg p-4 hover:bg-muted/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <BookOpen className="h-5 w-5 text-primary" />
-                        <div>
-                          <div className="font-semibold">{module.title}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {module.lessons} lessons • {module.duration}
-                          </div>
+                <div className="border border-border rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                      <div>
+                        <div className="font-semibold">Course Overview</div>
+                        <div className="text-sm text-muted-foreground">
+                          {course.modules} modules • {course.lessons} lessons • {course.quizzes} quizzes
                         </div>
                       </div>
-                      <Button size="sm" variant="outline">
-                        <Play className="h-4 w-4 mr-2" />
-                        Preview
-                      </Button>
                     </div>
                   </div>
-                ))}
+                </div>
+                <div className="text-sm text-muted-foreground p-4">
+                  Detailed course modules will be available once you publish the course.
+                </div>
               </div>
             </div>
           </div>

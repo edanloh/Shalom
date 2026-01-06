@@ -3,7 +3,7 @@
  * Industry-standard HTTP client with proper error handling, retries, and interceptors
  */
 
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse, PaginatedResponse } from '../types';
 
 // API Configuration
@@ -130,20 +130,9 @@ class ApiService {
   // Authentication interceptor - adds JWT token and Supabase API key to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
-<<<<<<< HEAD
-      const token = await SecureStore.getItemAsync('authToken');
-      if (token) {
-        config.headers = {
-          ...config.headers,
-          'Authorization': `Bearer ${token}`,
-        };
-      }
-      // Always add Content-Type header
-=======
       const token = await AsyncStorage.getItem('authToken');
       
       // Add Supabase API key and Content-Type headers
->>>>>>> 1ab944d ([MOBILE] feat: integrate Supabase Edge function)
       config.headers = {
         ...config.headers,
         'Content-Type': 'application/json',
@@ -187,16 +176,13 @@ class ApiService {
 
       // Prefer server's message if present
       const serverMsg =
-      (errorData && (errorData.message || errorData.error || errorData.reason)) ||
+        (errorData && (errorData.message || errorData.error || errorData.reason)) ||
         (typeof errorData === 'string' ? errorData : undefined);
 
-      // Capture useful IDs for CloudWatch correlation
+      // Capture useful IDs for Supabase correlation
       const hdrs = {
-        'apigw-requestid': response.headers.get('apigw-requestid'),
-        'x-amzn-requestid': response.headers.get('x-amzn-requestid'),
-        'x-lambda-fn': response.headers.get('x-lambda-fn'),
-        'x-lambda-ver': response.headers.get('x-lambda-ver'),
-        'x-lambda-req': response.headers.get('x-lambda-req'),
+        'x-request-id': response.headers.get('x-request-id'),
+        'x-supabase-trace-id': response.headers.get('x-supabase-trace-id'),
       };
 
       const status = response.status;
@@ -225,50 +211,9 @@ class ApiService {
       throw err;
     }
 
-<<<<<<< HEAD
     return response; // ok → let makeRequest() parse the body
   };
-=======
-    // Prefer server's message if present
-    const serverMsg =
-      (errorData && (errorData.message || errorData.error || errorData.reason)) ||
-      (typeof errorData === 'string' ? errorData : undefined);
 
-    // Capture useful IDs for Supabase correlation
-    const hdrs = {
-      'x-request-id': response.headers.get('x-request-id'),
-      'x-supabase-trace-id': response.headers.get('x-supabase-trace-id'),
-    };
-
-    const status = response.status;
-    const codeMap: Record<number, string> = {
-      400: 'BAD_REQUEST',
-      401: 'UNAUTHORIZED',
-      403: 'FORBIDDEN',
-      404: 'NOT_FOUND',
-      409: 'CONFLICT',
-      429: 'RATE_LIMIT',
-      500: 'SERVER_ERROR',
-      502: 'BAD_GATEWAY',
-      503: 'SERVICE_UNAVAILABLE',
-    };
-
-    const err = new ApiError(
-      serverMsg || `HTTP ${status}`,
-      status,
-      codeMap[status] || 'HTTP_ERROR',
-      errorData,
-      hdrs
-    );
-
-    // helpful console for debugging
-    console.log('[HTTP ✖]', response.url, status, hdrs, errorData);
-    throw err;
-  }
-
-  return response; // ok → let makeRequest() parse the body
-};
->>>>>>> 1ab944d ([MOBILE] feat: integrate Supabase Edge function)
 
 
   // Build query string from parameters
