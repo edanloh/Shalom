@@ -18,6 +18,7 @@ import CourseProvider from "./src/contexts/CourseContext";
 import { NotificationProvider } from "./src/contexts/NotificationContext";
 import SplashScreen from "./src/screens/SplashScreen";
 import type { MainStackParamList } from "./src/types";
+import { Colors } from "./src/constants";
 
 // Fix for web scrolling - override root height
 if (Platform.OS === "web") {
@@ -55,10 +56,10 @@ const AppNavigator = () => {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#fff",
+          backgroundColor: Colors.primary,
         }}
       >
-        <ActivityIndicator size="large" color="#8B5CF6" />
+        <ActivityIndicator size="large" color={Colors.secondary} />
       </View>
     );
   }
@@ -104,20 +105,27 @@ const App = () => {
   }
 
   return (
-    <AuthProvider>
-      <UserProvider>
-        <CourseProvider>
-          <NotificationProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <SafeAreaProvider>
-                <StatusBar style="dark" />
-                <AppNavigator />
-              </SafeAreaProvider>
-            </GestureHandlerRootView>
-          </NotificationProvider>
-        </CourseProvider>
-      </UserProvider>
-    </AuthProvider>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: showSplash ? Colors.secondary : Colors.primary,
+      }}
+    >
+      <AuthProvider>
+        <UserProvider>
+          <CourseProvider>
+            <NotificationProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <SafeAreaProvider>
+                  <StatusBar style="dark" />
+                  <AppNavigator />
+                </SafeAreaProvider>
+              </GestureHandlerRootView>
+            </NotificationProvider>
+          </CourseProvider>
+        </UserProvider>
+      </AuthProvider>
+    </View>
   );
 };
 

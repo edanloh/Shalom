@@ -11,6 +11,7 @@ import type { User } from '../../types';
 import { getAvatarUri } from '@/utils/avatar';
 import { Images } from '../../../assets';
 import { ImageWithFallback } from '../common';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // User interface matching the API structure
 
@@ -32,6 +33,10 @@ export default function CombinedHeader({
   return (
     <View style={styles.container}>
       {/* Welcome Section with Avatar */}
+      <LinearGradient
+        colors={[Colors.purple850, Colors.secondary]}
+        style={{height: Spacing.lg}}
+      />
       <View style={styles.welcomeSection}>
         <View style={styles.avatarContainer}>
           <ImageWithFallback source={avatarSrc} fallback={Images.profile} style={styles.avatar} />
@@ -63,7 +68,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing['3xl'],
+    paddingTop: Spacing.md,
     paddingBottom: Spacing.base,
   },
   avatarContainer: {

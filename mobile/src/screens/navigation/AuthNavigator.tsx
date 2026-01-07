@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Login, Register, ConfirmSignUp, ForgotPassword } from '../index';
 import type { AuthStackParamList } from "@/types/navigation";
+import { Colors } from "@/constants/Colors";
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -10,7 +11,7 @@ export default function AuthNavigator() {
       initialRouteName="Login"
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: "#fff" }, // works on web & mobile
+        contentStyle: { backgroundColor: Colors.primary }, // works on web & mobile
       }}
     >
       <Stack.Screen name="Login" component={Login} />
