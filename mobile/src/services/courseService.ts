@@ -761,7 +761,22 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
       requestId: payload.requestId,
     };
 
-    await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
+    try {
+      await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
+      console.info('rec_event_ok', {
+        eventType: body.eventType,
+        courseId: body.courseId,
+        placement: body.context?.placement,
+      });
+    } catch (err) {
+      console.warn('rec_event_fail', {
+        eventType: body.eventType,
+        courseId: body.courseId,
+        placement: body.context?.placement,
+        error: (err as any)?.message || err,
+      });
+      throw err;
+    }
   }
 
 }

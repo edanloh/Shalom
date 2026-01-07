@@ -3,17 +3,23 @@ import { View, Text, StyleSheet, Image, Pressable } from "react-native";
 import { Colors, Spacing, BorderRadius, TextStyles } from "../../constants";
 
 interface WeeklyGoalProps {
-  currentHours: number;
-  targetHours: number;
+  current: number;
+  target: number;
+  unit: "hours" | "courses" | "points";
+  label?: string;
   navigation: any;
 }
 
 const WeeklyGoal: React.FC<WeeklyGoalProps> = ({
-  currentHours,
-  targetHours,
+  current,
+  target,
+  unit,
+  label,
   navigation,
 }) => {
-  const progressPercentage = Math.min((currentHours / targetHours) * 100, 100);
+  const progressPercentage = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+  const unitLabel = unit === "hours" ? " hours" : unit === "courses" ? " courses" : " pts";
+  const formatValue = (value: number) => `${value}`;
 
   return (
     <Pressable
@@ -21,9 +27,10 @@ const WeeklyGoal: React.FC<WeeklyGoalProps> = ({
       onPress={() => navigation.navigate("LearningGoalScreen")}
     >
       <View style={styles.row}>
-        <Text style={TextStyles.bodyMedium}>Weekly Goal</Text>
+        <Text style={TextStyles.bodyMedium}>{label || "Weekly Goal"}</Text>
         <Text style={TextStyles.caption}>
-          {currentHours}h/{targetHours}h
+          {formatValue(current)}/{formatValue(target)}
+          {unitLabel}
         </Text>
       </View>
       <View style={styles.progressContainer}>
@@ -91,8 +98,10 @@ interface ProgressSectionProps extends WeeklyGoalProps {
 }
 
 const ProgressSection: React.FC<ProgressSectionProps> = ({
-  currentHours,
-  targetHours,
+  current,
+  target,
+  unit,
+  label,
   achievements,
   navigation,
 }) => (
@@ -109,8 +118,10 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
       ))}
     </View>
     <WeeklyGoal
-      currentHours={currentHours}
-      targetHours={targetHours}
+      current={current}
+      target={target}
+      unit={unit}
+      label={label}
       navigation={navigation}
     />
   </View>

@@ -56,7 +56,15 @@ const endpointMap = {
     },
     "/dev/getAllUserInfo": () => db["all-users-info"].data,
     "/recommendations": () => db.recommendations,
+    "/getRecommendations": () => db.recommendations,
     "/credits": () => ({
+      success: true,
+      data: {
+        balance: db.credits.balance,
+        lastUpdated: db.credits.lastUpdated,
+      },
+    }),
+    "/getCredits": () => ({
       success: true,
       data: {
         balance: db.credits.balance,
@@ -67,7 +75,15 @@ const endpointMap = {
       success: true,
       data: db.credits.history || [],
     }),
+    "/getCreditHistory": () => ({
+      success: true,
+      data: db.credits.history || [],
+    }),
     "/credits/achievements": () => ({
+      success: true,
+      data: db.credits.achievements || [],
+    }),
+    "/getAchievements": () => ({
       success: true,
       data: db.credits.achievements || [],
     }),
@@ -75,12 +91,60 @@ const endpointMap = {
       success: true,
       data: db.credits.goals || [],
     }),
+    "/getGoals": () => ({
+      success: true,
+      data: db.credits.goals || [],
+    }),
     "/credits/certificates": () => ({
+      success: true,
+      data: db.credits.certificates || [],
+    }),
+    "/getCertificates": () => ({
       success: true,
       data: db.credits.certificates || [],
     }),
   },
   POST: {
+    "/recommendations/events": (params, body) => {
+      const event = {
+        userId: body.userId || body.user_id || "anon",
+        courseId: body.courseId || body.course_id || null,
+        eventType: body.eventType || body.event_type || "unknown",
+        placement: body.context?.placement || body.placement || "unknown",
+        context: body.context || {},
+        timestamp: new Date().toISOString(),
+      };
+      const line = JSON.stringify(event) + "\n";
+      try {
+        fs.appendFileSync(eventsLogPath, line, "utf8");
+      } catch (err) {
+        console.warn("Failed to write event log", err);
+      }
+      return {
+        success: true,
+        message: "Mock event recorded",
+      };
+    },
+    "/postRecommendationEvent": (params, body) => {
+      const event = {
+        userId: body.userId || body.user_id || "anon",
+        courseId: body.courseId || body.course_id || null,
+        eventType: body.eventType || body.event_type || "unknown",
+        placement: body.context?.placement || body.placement || "unknown",
+        context: body.context || {},
+        timestamp: new Date().toISOString(),
+      };
+      const line = JSON.stringify(event) + "\n";
+      try {
+        fs.appendFileSync(eventsLogPath, line, "utf8");
+      } catch (err) {
+        console.warn("Failed to write event log", err);
+      }
+      return {
+        success: true,
+        message: "Mock event recorded",
+      };
+    },
     "/credits/events": (params, body) => {
       const event = {
         id: `credit_${Date.now()}`,
@@ -97,6 +161,33 @@ const endpointMap = {
       db.credits.history = [event, ...(db.credits.history || [])];
 
       // Log to events.log for parity with recommendations
+      const line = JSON.stringify({ kind: "credit", ...event }) + "\n";
+      try {
+        fs.appendFileSync(eventsLogPath, line, "utf8");
+      } catch (err) {
+        console.warn("Failed to write credit event log", err);
+      }
+
+      return {
+        success: true,
+        message: "Credit event recorded",
+        data: { balance: db.credits.balance, event },
+      };
+    },
+    "/postCreditEvent": (params, body) => {
+      const event = {
+        id: `credit_${Date.now()}`,
+        userId: body.userId || body.user_id || "anon",
+        type: body.type || "generic",
+        title: body.title || "Credit event",
+        points: Number(body.points) || 0,
+        courseId: body.courseId || body.course_id || null,
+        timestamp: body.timestamp || new Date().toISOString(),
+      };
+
+      db.credits.balance = (db.credits.balance || 0) + event.points;
+      db.credits.history = [event, ...(db.credits.history || [])];
+
       const line = JSON.stringify({ kind: "credit", ...event }) + "\n";
       try {
         fs.appendFileSync(eventsLogPath, line, "utf8");
