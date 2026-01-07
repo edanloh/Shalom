@@ -17,6 +17,11 @@ export const notificationService = {
       });
       return response;
     } catch (error) {
+      const status = (error as any)?.status ?? (error as any)?.statusCode;
+      if (status === 404) {
+        console.warn("Push register endpoint not found; skipping register");
+        return null;
+      }
       console.error("Failed to register push token:", error);
       throw error;
     }
@@ -33,6 +38,11 @@ export const notificationService = {
       });
       return response;
     } catch (error) {
+      const status = (error as any)?.status ?? (error as any)?.statusCode;
+      if (status === 404) {
+        console.warn("Push unregister endpoint not found; skipping unregister");
+        return null;
+      }
       console.error("Failed to remove push token:", error);
       throw error;
     }

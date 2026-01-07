@@ -111,15 +111,17 @@ class ModuleService {
    */
   async getModuleDetail(courseId: string, userId?: string): Promise<ModuleDetailResponse['data']> {
     try {      
-      const params: Record<string, string> = {};
-      if (userId) {
-        params.userId = userId;
-      }
+      const uid =
+        userId ||
+        process.env.EXPO_PUBLIC_DEFAULT_USER_ID ||
+        "550e8400-e29b-41d4-a716-446655440101";
 
-      const response = await apiService.get<ModuleDetailResponse>(
-        `/courses/${courseId}/module`,
-        params
-      );
+      // Some edge functions expect identifiers in the path; include both to satisfy either parsing.
+      const url = `/getModuleDetail/${encodeURIComponent(
+        courseId
+      )}?userId=${encodeURIComponent(uid)}`;
+
+      const response = await apiService.get<ModuleDetailResponse>(url);
 
       if (!response.success || !response.data) {
         throw new Error(response.message || 'Failed to fetch module details');

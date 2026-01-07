@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   ScrollView,
@@ -17,6 +17,9 @@ import { getAvatarUri } from "@/utils/avatar";
 import { ActionButton, Screen } from "@/components";
 import externalStyles from "@styles/styles";
 import CustomModal from "../components/common/CustomModal";
+import creditService from "../services/creditService";
+import { showToast } from "@/components/common/Toast";
+import { AchievementItem, CreditEvent } from "../types";
 
 const CARD_BG = "#3A3A45";
 const TILE_BG = "#5B38E3";
@@ -32,19 +35,22 @@ type Achievement = {
 export default function ProfileScreen({ navigation }: any) {
   const { user, logout } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [balance, setBalance] = useState<number>((user as any)?.points ?? 0);
+  const [creditHistory, setCreditHistory] = useState<CreditEvent[]>([]);
+  const [achievementsData, setAchievementsData] = useState<AchievementItem[]>([]);
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Safe fallbacks so the UI renders even if some fields are missing
   const displayName = user?.name ?? "User";
-  const points = (user as any)?.points ?? 0;
   const avatarUri = getAvatarUri(user);
   const avatarSrc = avatarUri ? { uri: avatarUri } : Images.profile;
 
   const quickActions = useMemo(
     () => [
       {
-        label: "Point History",
+        label: "Points History",
         icon: "trending-up-outline",
         action: () => navigation.navigate("PointsHistory"),
       },
@@ -62,50 +68,61 @@ export default function ProfileScreen({ navigation }: any) {
     []
   );
 
-  const achievements: Achievement[] = [
-    {
-      icon: "medal-outline",
-      label: "Digital Literacy",
-      description: "Completed digital literacy fundamentals course",
-      earnedOn: "08 Aug 2025",
-      points: 50,
-    },
-    {
-      icon: "thumbs-up-outline",
-      label: "Review Master",
-      description: "Left 10 helpful course reviews",
-      earnedOn: "15 Sep 2025",
-      points: 30,
-    },
-    {
-      icon: "school-outline",
-      label: "Dedicated Learner",
-      description: "Completed 5 courses this month",
-      earnedOn: "22 Oct 2025",
-      points: 100,
-    },
-    {
-      icon: "checkmark-done-circle-outline",
-      label: "Knowledge Seeker",
-      description: "Completed all quizzes in a course",
-      earnedOn: "10 Nov 2025",
-      points: 40,
-    },
-    {
-      icon: "play-circle-outline",
-      label: "Learning Champion",
-      description: "Completed 30 modules across multiple subject.",
-      earnedOn: "08 Aug 2025",
-      points: 20,
-    },
-    {
-      icon: "trophy-outline",
-      label: "Perfect Scorer",
-      description: "Scored 100% on Data Science quiz",
-      earnedOn: "05 Dec 2025",
-      points: 75,
-    },
-  ];
+  const loadCredits = React.useCallback(async () => {
+    try {
+      const uid = user?.id;
+      const [bal, ach, hist] = await Promise.all([
+        creditService.getCreditBalance(uid).catch(() => null),
+        creditService.getAchievements(uid).catch(() => []),
+        creditService.getCreditHistory(uid).catch(() => []),
+      ]);
+      if (bal?.balance != null) setBalance(bal.balance);
+
+      const iconFor = (a: any) => {
+        const byType: Record<string, string> = {
+          badge: "trophy-outline",
+          streak: "flame",
+          certificate: "ribbon-outline",
+          level: "ribbon-outline",
+        };
+        return byType[a.type] || byType[a.icon] || "trophy-outline";
+      };
+
+      const normalized = (Array.isArray(ach) ? ach : []).map((a: any) => ({
+       ...a,
+       label: a.label || a.name || "Achievement",
+       icon: iconFor(a),
+      }));
+      setAchievementsData(normalized);
+      setCreditHistory(Array.isArray(hist) ? hist : []);
+    } catch (err) {
+      console.warn("Profile: failed to load credits/achievements", err);
+      showToast({
+        title: "Credits unavailable",
+        message: "Could not refresh credits right now.",
+        type: "error",
+      });
+    }
+  }, []);
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await loadCredits();
+    } catch (err) {
+      console.warn("Profile: failed to refresh credits/achievements", err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCredits();
+    const unsub = creditService.subscribeToCreditUpdates(loadCredits);
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [loadCredits]);
 
   const accountItems = useMemo(
     () => [
@@ -138,6 +155,9 @@ export default function ProfileScreen({ navigation }: any) {
       headerRightIcon="settings-outline"
       onHeaderRightPress={() => navigation.navigate("Settings")}
       customEdges={["top"]}
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      stickyHeader
     >
       <ScrollView
         contentContainerStyle={[externalStyles.fullScrollContent]}
@@ -152,16 +172,16 @@ export default function ProfileScreen({ navigation }: any) {
               style={externalStyles.avatar}
             />
           </View>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text style={[TextStyles.h3, { marginBottom: Spacing.xs }]}>
-              {displayName}
-            </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={[TextStyles.h3, { marginBottom: Spacing.xs }]}>
+            {displayName}
+          </Text>
             {user?.authProvider && user?.authProvider == "google" && (
               <Image
                 source={require("@assets/google.png")}
@@ -174,8 +194,8 @@ export default function ProfileScreen({ navigation }: any) {
                 }}
               />
             )}
-          </View>
-          <Text style={TextStyles.bodyMedium}>{points} points</Text>
+        </View>
+          <Text style={TextStyles.bodyMedium}>{balance} points</Text>
         </View>
 
         {/* Quick actions (visual-only) */}
@@ -193,7 +213,7 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={styles.quickLabel}>{qa.label}</Text>
             </Pressable>
           ))}
-        </View>
+       </View>
 
         {/* Recent Achievements */}
         <View style={styles.sectionHeader}>
@@ -210,26 +230,32 @@ export default function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.achievementsGrid}>
-          {achievements.map((a) => (
-            <TouchableOpacity
-              key={a.label}
-              style={styles.achievementItem}
-              activeOpacity={0.7}
-              onPress={() => setSelectedAchievement(a)}
-            >
-              <Ionicons
-                name={a.icon as any}
-                size={26}
-                color="#FACC15"
-                style={styles.achievementIcon}
-              />
-              <Text style={styles.achievementLabel} numberOfLines={2}>
-                {a.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+       <View style={styles.achievementsGrid}>
+         {(() => {
+           if (!achievementsData.length) return [];
+           const earned = achievementsData.filter((a: any) => a.earned !== false);
+           const notEarned = achievementsData.filter((a: any) => a.earned === false);
+           const merged = [...earned, ...notEarned].slice(0, 6);
+           return merged;
+         })().map((a) => (
+           <TouchableOpacity
+             key={a.label}
+             style={styles.achievementItem}
+             activeOpacity={0.7}
+             onPress={() => setSelectedAchievement(a)}
+           >
+             <Ionicons
+               name={a.icon as any}
+               size={26}
+               color="#FACC15"
+               style={styles.achievementIcon}
+             />
+             <Text style={styles.achievementLabel} numberOfLines={2}>
+               {a.label}
+             </Text>
+           </TouchableOpacity>
+         ))}
+       </View>
 
         {/* Account Settings */}
         <Text style={[styles.sectionTitle, { marginTop: Spacing.md }]}>
@@ -348,6 +374,7 @@ export default function ProfileScreen({ navigation }: any) {
           </Text>
         )}
       </CustomModal>
+
     </Screen>
   );
 }
@@ -418,6 +445,58 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textPrimary,
     lineHeight: 16,
+  },
+  historyCard: {
+    marginHorizontal: Spacing.lg,
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  historyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#4B4B57",
+  },
+  historyTextWrap: {
+    flexShrink: 1,
+    paddingRight: Spacing.md,
+  },
+  historyTitle: {
+    color: Colors.textPrimary,
+    fontFamily: TextStyles.body.fontFamily,
+    fontSize: TextStyles.body.fontSize,
+  },
+  historyMeta: {
+    color: Colors.textSecondary,
+    fontFamily: TextStyles.body.fontFamily,
+    fontSize: 12,
+  },
+  historyPoints: {
+    color: Colors.purple200,
+    fontFamily: TextStyles.h4.fontFamily,
+    fontSize: TextStyles.h4.fontSize,
+    fontWeight: "700",
+  },
+  historyEmpty: {
+    color: Colors.textSecondary,
+    fontFamily: TextStyles.body.fontFamily,
+    fontSize: TextStyles.body.fontSize,
+  },
+  modalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#4B4B57",
+  },
+  modalTextWrap: {
+    flexShrink: 1,
+    paddingRight: Spacing.md,
   },
 
   // Settings card

@@ -78,15 +78,15 @@ class VideoService {
    */
   async getVideoDetail(courseId: string, videoId: string, userId?: string): Promise<VideoDetailResponse['data']> {
     try {      
-      const params: Record<string, string> = {};
+      const params: Record<string, string> = {
+        courseId,
+        videoId,
+      };
       if (userId) {
         params.userId = userId;
       }
 
-      const response = await apiService.get<VideoDetailResponse>(
-        `/courses/${courseId}/module/videos/${videoId}`,
-        params
-      );
+      const response = await apiService.get<VideoDetailResponse>(`/getVideoDetail`, params);
 
       if (!response.success || !response.data) {
         throw new Error(response.message || 'Failed to fetch video details');
@@ -110,7 +110,7 @@ class VideoService {
    */
   async updateProgress(courseId: string, request: UpdateVideoProgressRequest): Promise<UpdateVideoProgressResponse['data']> {
     try {
-      const endpoint = `/courses/${courseId}/module/videos/progress`;
+      const endpoint = `/updateVideoProgress`;
       console.log('🔵 API Call: POST', endpoint);
       console.log('📦 Request payload:', {
         courseId,

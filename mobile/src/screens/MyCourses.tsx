@@ -93,6 +93,7 @@ export default function MyCourses({ navigation }: any) {
         title="My Courses"
         navigation={navigation}
         headerLeftIcon="chevron-back"
+        stickyHeader
       >
         <View style={styles.centerContainer}>
           <Text style={TextStyles.body}>Please log in to view your courses</Text>
@@ -106,6 +107,7 @@ export default function MyCourses({ navigation }: any) {
       title="My Courses"
       navigation={navigation}
       headerLeftIcon="chevron-back"
+      stickyHeader
     >
       <View>
         {/* Continue Watching Section */}

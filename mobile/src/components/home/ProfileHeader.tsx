@@ -11,7 +11,6 @@ import type { User } from '../../types';
 import { getAvatarUri } from '@/utils/avatar';
 import { Images } from '../../../assets';
 import { ImageWithFallback } from '../common';
-import ScreenHeader from '../common/ScreenHeader';
 
 // User interface matching the API structure
 
@@ -32,26 +31,6 @@ export default function CombinedHeader({
 
   return (
     <View style={styles.container}>
-      <ScreenHeader
-        title=""
-        customStyles={{ backgroundColor: Colors.purple400 }}
-        headerLeftComponent={
-          <View style={styles.pointsContainer}>
-            <Text style={styles.pointsIcon}>⭐</Text>
-            <Text style={styles.pointsText}>{user.points || 0} pts</Text>
-          </View>
-        }
-        headerRightComponent={
-          <TouchableOpacity 
-            style={styles.notificationButton} 
-            onPress={onNotificationPress}
-          >
-            <Text style={styles.notificationIcon}>🔔</Text>
-            {hasNotifications && <View style={styles.notificationBadge} />}
-          </TouchableOpacity>
-        }
-      />
-
       {/* Welcome Section with Avatar */}
       <View style={styles.welcomeSection}>
         <View style={styles.avatarContainer}>
@@ -80,48 +59,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.lg,
   },
-  pointsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: 20,
-  },
-  pointsIcon: {
-    fontSize: 16,
-    marginRight: Spacing.xs,
-  },
-  pointsText: {
-    fontFamily: Typography.fontFamily.regular,
-    fontSize: 14,
-    color: Colors.black,
-  },
-  notificationButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.cardBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  notificationIcon: {
-    fontSize: 18,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.red,
-  },
   welcomeSection: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing['3xl'],
     paddingBottom: Spacing.base,
   },
   avatarContainer: {

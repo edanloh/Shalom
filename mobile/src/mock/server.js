@@ -5,6 +5,7 @@ const path = require("path");
 
 const app = express();
 const PORT = 3001;
+const eventsLogPath = path.join(__dirname, "events.log");
 
 // Enable CORS for React Native
 app.use(cors());
@@ -13,6 +14,9 @@ app.use(express.json());
 // Logging middleware to see what endpoints are being called
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`, req.params);
+  if (req.path.includes("/recommendations")) {
+    console.log("↳ recommendations mock hit");
+  }
   next();
 });
 
@@ -51,8 +55,61 @@ const endpointMap = {
       return db["user-reviews"][`${userId}_${courseId}`] || null;
     },
     "/dev/getAllUserInfo": () => db["all-users-info"].data,
+    "/recommendations": () => db.recommendations,
+    "/credits": () => ({
+      success: true,
+      data: {
+        balance: db.credits.balance,
+        lastUpdated: db.credits.lastUpdated,
+      },
+    }),
+    "/credits/history": () => ({
+      success: true,
+      data: db.credits.history || [],
+    }),
+    "/credits/achievements": () => ({
+      success: true,
+      data: db.credits.achievements || [],
+    }),
+    "/credits/goals": () => ({
+      success: true,
+      data: db.credits.goals || [],
+    }),
+    "/credits/certificates": () => ({
+      success: true,
+      data: db.credits.certificates || [],
+    }),
   },
   POST: {
+    "/credits/events": (params, body) => {
+      const event = {
+        id: `credit_${Date.now()}`,
+        userId: body.userId || body.user_id || "anon",
+        type: body.type || "generic",
+        title: body.title || "Credit event",
+        points: Number(body.points) || 0,
+        courseId: body.courseId || body.course_id || null,
+        timestamp: body.timestamp || new Date().toISOString(),
+      };
+
+      // Update in-memory balance and history
+      db.credits.balance = (db.credits.balance || 0) + event.points;
+      db.credits.history = [event, ...(db.credits.history || [])];
+
+      // Log to events.log for parity with recommendations
+      const line = JSON.stringify({ kind: "credit", ...event }) + "\n";
+      try {
+        fs.appendFileSync(eventsLogPath, line, "utf8");
+      } catch (err) {
+        console.warn("Failed to write credit event log", err);
+      }
+
+      return {
+        success: true,
+        message: "Credit event recorded",
+        data: { balance: db.credits.balance, event },
+      };
+    },
     "/courses/enrollment/:userId/wishlist": (params, body, query) => ({
       success: true,
       message: `Course ${
@@ -135,6 +192,62 @@ const endpointMap = {
           : "https://ui-avatars.com/api/?name=User+Name&size=40",
       },
     }),
+    "/recommendations/events": (params, body) => {
+      const event = {
+        userId: body.userId || body.user_id || "anon",
+        courseId: body.courseId || body.course_id || null,
+        eventType: body.eventType || body.event_type || "unknown",
+        placement: body.context?.placement || body.placement || "unknown",
+        context: body.context || {},
+        timestamp: new Date().toISOString(),
+      };
+      const line = JSON.stringify(event) + "\n";
+      try {
+        fs.appendFileSync(eventsLogPath, line, "utf8");
+      } catch (err) {
+        console.warn("Failed to write event log", err);
+      }
+      return {
+        success: true,
+        message: "Mock event recorded",
+      };
+    },
+  },
+  PUT: {
+    "/courses/:courseId/reviews": (params, body) => ({
+      success: true,
+      message: "Review updated successfully",
+      data: {
+        id: `review_${Date.now()}`,
+        rating: body.rating,
+        review: body.review,
+        createdAt: new Date().toISOString(),
+        reviewerName: body.isAnonymous ? "Anonymous" : "User Name",
+        reviewerAvatar: body.isAnonymous
+          ? null
+          : "https://ui-avatars.com/api/?name=User+Name&size=40",
+      },
+    }),
+    "/recommendations/events": (params, body) => {
+      const event = {
+        userId: body.userId || body.user_id || "anon",
+        courseId: body.courseId || body.course_id || null,
+        eventType: body.eventType || body.event_type || "unknown",
+        placement: body.context?.placement || body.placement || "unknown",
+        context: body.context || {},
+        timestamp: new Date().toISOString(),
+      };
+      const line = JSON.stringify(event) + "\n";
+      try {
+        fs.appendFileSync(eventsLogPath, line, "utf8");
+      } catch (err) {
+        console.warn("Failed to write event log", err);
+      }
+      return {
+        success: true,
+        message: "Mock event recorded",
+      };
+    },
   },
   DELETE: {
     "/courses/enrollment/:userId/wishlist": (params, body, query) => ({

@@ -11,6 +11,8 @@ function unwrap<T = any>(r: any): T {
   return (r && typeof r === 'object' && 'data' in r ? r.data : r) as T;
 }
 
+const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID || '550e8400-e29b-41d4-a716-446655440101';
+
 // Cache configuration
 const CACHE_CONFIG = {
   COURSES_KEY: 'cached_courses',
@@ -19,17 +21,20 @@ const CACHE_CONFIG = {
 
 // Course service endpoints
 const ENDPOINTS = {
-  COURSES: '/courses',
-  USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
+  COURSES: '/getAllCourse',
+  USER_ENROLLMENTS: (uid: string) =>
+    `/getUserEnrollment/${encodeURIComponent(uid)}?userId=${encodeURIComponent(uid)}`,
+  ENROLL: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`,
   COURSE_REVIEWS: (courseId: string) => `/courses/${encodeURIComponent(courseId)}/reviews`,
+  RECOMMENDATIONS: '/getRecommendations',
+  RECOMMENDATION_EVENT: '/postRecommendationEvent',
 };
 
-
-// Wishlist endpoints
+// Wishlist endpoints (Supabase function)
 const WISHLIST = {
-  BASE: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}/wishlist`,
+  BASE: (uid: string) => `/wishlistHandler/${encodeURIComponent(uid)}`,
   ITEM: (uid: string, courseId: string) =>
-    `/courses/enrollment/${encodeURIComponent(uid)}/wishlist/?courseId=${encodeURIComponent(courseId)}`,
+    `/wishlistHandler/${encodeURIComponent(uid)}?courseId=${encodeURIComponent(courseId)}`,
 };
 
 export interface CourseListParams {
@@ -353,8 +358,12 @@ class CourseService {
       // The response structure is: { courses: [...], pagination: {...}, filters: {...}, meta: {...} }
       // Check if courses array exists directly on response (parsed by apiService from data)
       let coursesArray;
-      if (response.courses && Array.isArray(response.courses)) {
+      if (Array.isArray(response)) {
+        coursesArray = response;
+      } else if (response.courses && Array.isArray(response.courses)) {
         coursesArray = response.courses;
+      } else if (response.data && Array.isArray(response.data)) {
+        coursesArray = response.data;
       } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
         coursesArray = response.data.courses;
       } else {
@@ -380,8 +389,7 @@ class CourseService {
    */
   async getUserEnrollments(userId: string): Promise<Course[]> {
     try {
-      // REMOVE LATER - Temporary override for testing
-      userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
+      userId = userId || DEFAULT_USER_ID;
       
       // For testing, skip cache and always fetch fresh data
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`;
@@ -462,44 +470,62 @@ class CourseService {
   }
 
   /**
-   * Get suggested courses (remaining courses after enrolled ones)
+   * Get recommended courses (remaining courses after enrolled ones)
    */
-  async getSuggestedCourses(): Promise<Course[]> {
+  async getRecommendedCourses(userId?: string): Promise<Course[]> {
     try {
-      // Check cache first
-      const cachedCourses = await CacheManager.get<Course[]>(`${CACHE_CONFIG.COURSES_KEY}_suggested`);
-      if (cachedCourses) {
-        return cachedCourses;
-      }
+      const uid = userId || '550e8400-e29b-41d4-a716-446655440101';
+      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_recommended_${uid}`;
 
-      // Get all courses and return remaining as suggested
-      const allCourses = await this.getCourses();
-      if (!allCourses || allCourses.length === 0) {
-        return [];
-      }
+      const resp = await apiService.get<any>(ENDPOINTS.RECOMMENDATIONS, {
+        userId: uid,
+        limit: '8',
+      });
 
-      // For demo: return courses starting from index 2
-      const suggestedCourses = allCourses.slice(2);
+      const recs =
+        (Array.isArray(resp?.data) ? resp?.data : null) ??
+        resp?.data?.recommendations ??
+        resp?.recommendations ??
+        [];
 
-      // Cache the filtered courses
-      await CacheManager.set(`${CACHE_CONFIG.COURSES_KEY}_suggested`, suggestedCourses);
+      const sorted = Array.isArray(recs)
+        ? [...recs].sort((a, b) => {
+            const sa = Number(a.score ?? a.recommendation_score ?? 0);
+            const sb = Number(b.score ?? b.recommendation_score ?? 0);
+            if (sb !== sa) return sb - sa;
+            const ra = Number(a.rank ?? a.recommendation_rank ?? Infinity);
+            const rb = Number(b.rank ?? b.recommendation_rank ?? Infinity);
+            return ra - rb;
+          })
+        : [];
 
-      return suggestedCourses;
+      const courses = sorted.map((item: any, idx: number) => {
+        const coursePayload = item.course || item;
+        const course = convertAWSCourseToAppCourse(coursePayload);
+        return {
+          ...course,
+          recommendationReason: item.reason || coursePayload.recommendation_reason,
+          recommendationScore: item.score || coursePayload.recommendation_score,
+          recommendationRank: item.rank ?? item.recommendation_rank ?? idx + 1,
+        };
+      });
+
+      await CacheManager.set(cacheKey, courses);
+      return courses;
     } catch (error) {
-      console.error('Error fetching suggested courses:', error);
-      throw error;
+      console.warn('Error fetching recommended courses, falling back to empty list:', error);
+      return [];
     }
   }
 
 async getWishlist(userId: string): Promise<Course[]> {
-  if (!userId) throw new Error('Missing userId');
+  if (!userId) userId = DEFAULT_USER_ID;
   const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`;
   const cached = await CacheManager.get<Course[]>(cacheKey);
   if (cached) return cached;
   // remove later - temporary override for testing
-  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
 
-  const resp = await apiService.get<any>(WISHLIST.BASE(userId));
+  const resp = await apiService.get<any>(WISHLIST.BASE(userId), { userId });
   const array = resp?.courses ?? resp?.data?.courses ?? [];
   const courses = array.map(convertAWSCourseToAppCourse);
   await CacheManager.set(cacheKey, courses);
@@ -507,17 +533,16 @@ async getWishlist(userId: string): Promise<Course[]> {
 }
 
 async addToWishlist(userId: string, courseId: string): Promise<void> {
-  if (!userId || !courseId) throw new Error('Missing userId/courseId');
-    // remove later - temporary override for testing
-  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
-  await apiService.post(WISHLIST.ITEM(userId , courseId));
+  if (!userId) userId = DEFAULT_USER_ID;
+  if (!courseId) throw new Error('Missing courseId');
+  await apiService.post(WISHLIST.ITEM(userId , courseId), { userId, courseId });
   await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
 }
 
 async removeFromWishlist(userId: string, courseId: string): Promise<void> {
-  if (!userId || !courseId) throw new Error('Missing userId/courseId');
-  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
-  await apiService.delete(WISHLIST.ITEM(userId, courseId));
+  if (!userId) userId = DEFAULT_USER_ID;
+  if (!courseId) throw new Error('Missing courseId');
+  await apiService.delete(WISHLIST.ITEM(userId, courseId), { params: { userId, courseId } } as any);
   await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
 }
 
@@ -573,14 +598,14 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
       await Promise.all([
         CacheManager.clear(CACHE_CONFIG.COURSES_KEY),
         CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
-        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_suggested`),
+        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_recommended`),
       ]);
       
       // Pre-load essential data
       await Promise.all([
         this.getCourses(),
         this.getMyCourses(),
-        this.getSuggestedCourses(),
+        this.getRecommendedCourses(),
       ]);
     } catch (error) {
       console.error('Error refreshing cache:', error);
@@ -593,18 +618,18 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
   async getCacheStatus(): Promise<{
     courses: boolean;
     myCourses: boolean;
-    suggestedCourses: boolean;
+    recommendedCourses: boolean;
   }> {
-    const [courses, myCourses, suggestedCourses] = await Promise.all([
+    const [courses, myCourses, recommendedCourses] = await Promise.all([
       CacheManager.get(CACHE_CONFIG.COURSES_KEY),
       CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_my`),
-      CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_suggested`),
+      CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_recommended`),
     ]);
 
     return {
       courses: courses !== null,
       myCourses: myCourses !== null,
-      suggestedCourses: suggestedCourses !== null,
+      recommendedCourses: recommendedCourses !== null,
     };
   }
 
@@ -629,11 +654,12 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    */
   async enrollInCourse(userId: string, courseId: string): Promise<{ firstModuleId?: string }> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
-    userId = '550e8400-e29b-41d4-a716-446655440102'; // Temporary override for testing
+    const uid = userId || DEFAULT_USER_ID;
 
-    const url = ENDPOINTS.USER_ENROLLMENTS(userId);
+    const url = ENDPOINTS.ENROLL(uid);
     const resp = await apiService.post<any>(url, {
       courseId,
+      // optional fields supported by the edge function
       initialProgress: 0,
       isCompleted: false,
       totalWatchTimeMinutes: 0,
@@ -718,6 +744,24 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
     });
     const data: any = (resp as any)?.data ?? (resp as any);
     return data?.data ?? data;
+  }
+
+  async recordRecommendationEvent(payload: {
+    userId?: string;
+    courseId?: string;
+    eventType: 'impression' | 'view' | 'click' | 'start' | 'complete' | 'dismiss' | 'save';
+    context?: Record<string, any>;
+    requestId?: string;
+  }): Promise<void> {
+    const body = {
+      userId: payload.userId || '550e8400-e29b-41d4-a716-446655440101',
+      courseId: payload.courseId ?? null,
+      eventType: payload.eventType,
+      context: payload.context || {},
+      requestId: payload.requestId,
+    };
+
+    await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
   }
 
 }

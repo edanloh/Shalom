@@ -4,15 +4,18 @@
  */
 
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse, PaginatedResponse } from '../types';
 
 // API Configuration
 const API_CONFIG = {
-  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://your-api-gateway-url.amazonaws.com',
+  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://cmtfxsntlfoxgcznanpe.supabase.co/functions/v1',
   TIMEOUT: 10000, // 10 seconds
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second
 };
+
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY;
 
 // Error types for better error handling
 export class ApiError extends Error {
@@ -127,11 +130,14 @@ class ApiService {
   // Authentication interceptor - adds JWT token to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
-      const token = await SecureStore.getItemAsync('authToken');
-      if (token) {
+      // const token = await SecureStore.getItemAsync('authToken');
+      const token = await AsyncStorage.getItem('authToken');
+      const bearer = token || SUPABASE_KEY;
+      if (bearer) {
         config.headers = {
           ...config.headers,
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${bearer}`,
+          ...(SUPABASE_KEY ? { apikey: SUPABASE_KEY } : {}),
         };
       }
       // Always add Content-Type header

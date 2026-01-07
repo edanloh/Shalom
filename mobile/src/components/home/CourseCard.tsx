@@ -40,6 +40,10 @@ export default function CourseCard({
 }: Props) {
   const { wishlist = [], toggleWishlist } = useCourses();
   const isWishlisted = !!wishlist?.some((c) => c.id === course.id);
+  const rankLabel =
+    course.recommendationRank || course.recommendationScore
+      ? `#${course.recommendationRank ?? "?"} • ${Number(course.recommendationScore ?? 0).toFixed(1)}`
+      : null;
 
   return (
     <TouchableOpacity
@@ -85,6 +89,11 @@ export default function CourseCard({
             />
           </TouchableOpacity>
         </View>
+        {rankLabel ? (
+          <View style={styles.rankBadge}>
+            <Text style={styles.rankText}>{rankLabel}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Text/content */}
@@ -93,6 +102,11 @@ export default function CourseCard({
           {course.title}
         </Text>
         <MetaRow rating={course.rating} modules={course.modules} />
+        {course.recommendationReason ? (
+          <Text style={styles.reason} numberOfLines={1}>
+            {course.recommendationReason}
+          </Text>
+        ) : null}
 
         {showInstructor && course.instructor?.name ? (
           <Text style={styles.instructor} numberOfLines={1}>
@@ -160,18 +174,16 @@ const styles = StyleSheet.create({
   badgeRow: {
     position: "absolute",
     top: Spacing.sm,
-    left: Spacing.sm,
     right: Spacing.sm,
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
   },
   levelBadge: {
     backgroundColor: Colors.purple400,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: 8,
-    marginRight: 8,
   },
   levelText: {
     fontFamily: Typography.fontFamily.medium,
@@ -182,6 +194,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 14,
     padding: 6,
+  },
+  rankBadge: {
+    position: "absolute",
+    left: Spacing.sm,
+    top: Spacing.sm,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  rankText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: Typography.fontFamily.medium,
   },
 
   content: {
@@ -201,6 +227,13 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 2,
     paddingTop: 6,
+  },
+  reason: {
+    color: Colors.purple200,
+    fontSize: 12,
+    paddingHorizontal: 2,
+    paddingTop: 4,
+    fontFamily: Typography.fontFamily.medium,
   },
   metaText: {
     color: Colors.textSecondary,

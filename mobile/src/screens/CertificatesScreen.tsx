@@ -1,11 +1,13 @@
-import { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Spacing, TextStyles, Colors, BorderRadius } from "../constants";
 import Screen from "../components/common/Screen";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { ActionButton, CustomTextInput } from "@/components";
 import CustomModal from "../components/common/CustomModal";
+import creditService from "../services/creditService";
+import { CertificateProgress } from "../types";
 
 type Certificate = {
   id: string;
@@ -16,63 +18,6 @@ type Certificate = {
   score?: number;
   duration: string;
 };
-
-const MOCK_CERTIFICATES: Certificate[] = [
-  {
-    id: "cert-001",
-    courseName: "Web Development Bootcamp",
-    instructor: "Dr. Angela Yu",
-    completedAt: new Date(2025, 11, 15).toISOString(), // Dec 15, 2025
-    credentialId: "WDB-2025-001-XY7K",
-    score: 98,
-    duration: "65 hours",
-  },
-  {
-    id: "cert-002",
-    courseName: "Python for Data Science and Machine Learning",
-    instructor: "Jose Portilla",
-    completedAt: new Date(2025, 10, 22).toISOString(), // Nov 22, 2025
-    credentialId: "PYDS-2025-002-M4NK",
-    score: 95,
-    duration: "45 hours",
-  },
-  {
-    id: "cert-003",
-    courseName: "React Native - The Practical Guide",
-    instructor: "Maximilian Schwarzmüller",
-    completedAt: new Date(2025, 9, 8).toISOString(), // Oct 8, 2025
-    credentialId: "RN-2025-003-P8QW",
-    score: 100,
-    duration: "32 hours",
-  },
-  {
-    id: "cert-004",
-    courseName: "AWS Certified Solutions Architect",
-    instructor: "Stephane Maarek",
-    completedAt: new Date(2025, 8, 14).toISOString(), // Sep 14, 2025
-    credentialId: "AWS-2025-004-T2ZL",
-    score: 92,
-    duration: "28 hours",
-  },
-  {
-    id: "cert-005",
-    courseName: "The Complete Node.js Developer Course",
-    instructor: "Andrew Mead",
-    completedAt: new Date(2025, 7, 5).toISOString(), // Aug 5, 2025
-    credentialId: "NODE-2025-005-R9VF",
-    score: 97,
-    duration: "38 hours",
-  },
-  {
-    id: "cert-006",
-    courseName: "Docker and Kubernetes: The Complete Guide",
-    instructor: "Stephen Grider",
-    completedAt: new Date(2025, 6, 18).toISOString(), // Jul 18, 2025
-    credentialId: "DK-2025-006-H5NC",
-    score: 94,
-    duration: "22 hours",
-  },
-];
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -87,10 +32,50 @@ export default function CertificatesScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [query, setQuery] = useState("");
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const certificates = useMemo(() => {
-    // Sort certificates by completion date, most recent first
-    const sorted = [...MOCK_CERTIFICATES].sort(
+  const mapFromProgress = (items: CertificateProgress[] = []): Certificate[] =>
+    items.map((c) => ({
+      id: c.id,
+      courseName: c.name,
+      instructor: "",
+      completedAt: new Date().toISOString(),
+      credentialId: c.id.toUpperCase(),
+      score: c.progressPercent,
+      duration: `${c.completedCourses}/${c.requiredCourses} courses`,
+    }));
+
+  const loadCerts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const remote = await creditService.getCertificates().catch((err: any) => {
+        const status = err?.status ?? err?.statusCode;
+        const msg = (err as any)?.message || "";
+        // Swallow missing function errors and treat as empty
+        if (status === 404 || msg.toLowerCase().includes("function was not found")) {
+          console.warn("Certificates endpoint not found; showing empty list.");
+          return [];
+        }
+        throw err;
+      });
+      const mapped = Array.isArray(remote) && remote.length ? mapFromProgress(remote) : [];
+      setCertificates(mapped);
+    } catch (err) {
+      console.warn("Certificates: failed to load", err);
+      setCertificates([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCerts();
+  }, [loadCerts]);
+
+  const filteredCertificates = useMemo(() => {
+    const base = certificates.length ? certificates : [];
+    const sorted = [...base].sort(
       (a, b) =>
         new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
     );
@@ -107,17 +92,16 @@ export default function CertificatesScreen({ navigation }: any) {
         cert.instructor.toLowerCase().includes(searchLower) ||
         cert.credentialId.toLowerCase().includes(searchLower)
     );
-  }, [query]);
+  }, [query, certificates]);
 
   const onRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      // TODO: call your real fetch here, e.g. await reloadCertificates();
-      await new Promise((r) => setTimeout(r, 800)); // demo delay
+      await loadCerts();
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [loadCerts]);
 
   return (
     <Screen
@@ -127,6 +111,7 @@ export default function CertificatesScreen({ navigation }: any) {
       onRefresh={onRefresh}
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
+      stickyHeader
     >
       <CustomTextInput
         placeholder="Search for certificates..."

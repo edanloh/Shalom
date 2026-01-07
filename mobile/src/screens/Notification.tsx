@@ -142,6 +142,7 @@ export default function NotificationsScreen({ navigation }: any) {
       onRefresh={onRefresh}
       headerRightIcon="settings-outline"
       onHeaderRightPress={() => navigation.navigate("Settings")}
+      stickyHeader
     >
       {sections.map((section, sectionIndex) => (
         <View key={section.title} style={{ marginBottom: Spacing.lg }}>

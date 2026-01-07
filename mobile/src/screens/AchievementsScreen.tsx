@@ -1,10 +1,12 @@
-import { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Spacing, TextStyles, Colors } from "../constants";
 import Screen from "../components/common/Screen";
 import { Ionicons } from "@expo/vector-icons";
 import CustomTextInput from "@/components/CustomTextInput";
 import CustomModal from "../components/common/CustomModal";
+import creditService from "../services/creditService";
+import { AchievementItem } from "../types";
 
 type Achievement = {
   id: string;
@@ -13,71 +15,8 @@ type Achievement = {
   subtitle: string;
   createdAt: string; // ISO date
   points?: number;
+  earned?: boolean;
 };
-
-const MOCK_ACHIEVEMENTS: Achievement[] = [
-  // Today
-  {
-    id: "t1",
-    icon: "medal-outline",
-    label: "Digital Literacy",
-    subtitle: "Completed digital literacy fundamentals course",
-    createdAt: new Date().toISOString(),
-    points: 50,
-  },
-  {
-    id: "t2",
-    icon: "trophy-outline",
-    label: "Perfect Scorer",
-    subtitle: "Scored 100% on Data Science quiz",
-    createdAt: new Date().toISOString(),
-    points: 75,
-  },
-
-  // Yesterday
-  {
-    id: "y1",
-    icon: "thumbs-up-outline",
-    label: "Review Master",
-    subtitle: "Left 10 helpful course reviews",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    points: 30,
-  },
-  {
-    id: "y2",
-    icon: "school-outline",
-    label: "Dedicated Learner",
-    subtitle: "Completed 5 courses this month",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    points: 100,
-  },
-
-  // Older
-  {
-    id: "o1",
-    icon: "checkmark-done-circle-outline",
-    label: "Knowledge Seeker",
-    subtitle: "Completed all quizzes in a course",
-    createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-    points: 40,
-  },
-  {
-    id: "o2",
-    icon: "play-circle-outline",
-    label: "Learning Champion",
-    subtitle: "Watched 20 hours of course videos",
-    createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-    points: 20,
-  },
-  {
-    id: "o3",
-    icon: "medal-outline",
-    label: "Digital Literacy",
-    subtitle: "Mastered digital literacy basics",
-    createdAt: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
-    points: 50,
-  },
-];
 
 const startOfDay = (d: Date) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -110,10 +49,47 @@ export default function AchievementsScreen({ navigation }: any) {
   const [query, setQuery] = useState("");
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const remote = await creditService.getAchievements().catch(() => []);
+      const iconFor = (a: any) => {
+        const byType: Record<string, string> = {
+          badge: "trophy-outline",
+          streak: "flame",
+          certificate: "ribbon-outline",
+          level: "ribbon-outline",
+        };
+        return byType[a.type] || byType[a.icon] || "trophy-outline";
+      };
+      const normalized: Achievement[] = (remote || []).map((a: AchievementItem) => ({
+        id: a.id,
+        icon: iconFor(a),
+        label: a.label || (a as any).name || "Achievement",
+        subtitle: (a as any).description || a.label || "",
+        createdAt: (a as any).createdAt || new Date().toISOString(),
+        points: (a as any).points ?? undefined,
+        earned: (a as any).earned ?? true,
+      }));
+      setAchievements(normalized);
+    } catch (err) {
+      console.warn("Achievements: failed to load", err);
+      setAchievements([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const sections = useMemo(() => {
     // Filter achievements based on search query
-    const filteredAchievements = MOCK_ACHIEVEMENTS.filter((achievement) => {
+    const filteredAchievements = achievements.filter((achievement) => {
       if (!query.trim()) return true;
       const searchTerm = query.toLowerCase();
       return (
@@ -154,19 +130,18 @@ export default function AchievementsScreen({ navigation }: any) {
     }
 
     return result;
-  }, [query]);
+  }, [query, achievements]);
 
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      // TODO: call your real fetch here, e.g. await reloadAchievements();
-      await new Promise((r) => setTimeout(r, 800)); // demo delay
+      await load();
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [load]);
 
   return (
     <Screen
@@ -176,6 +151,7 @@ export default function AchievementsScreen({ navigation }: any) {
       onRefresh={onRefresh}
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
+      stickyHeader
     >
       <CustomTextInput
         placeholder="Search for achievements..."
@@ -185,6 +161,18 @@ export default function AchievementsScreen({ navigation }: any) {
         leftIconName="search"
         returnKeyType="search"
       />
+
+      {loading ? (
+        <View style={{ paddingVertical: Spacing.lg, alignItems: "center" }}>
+          <ActivityIndicator size="large" color={Colors.secondary} />
+        </View>
+      ) : null}
+
+      {!loading && sections.length === 0 ? (
+        <Text style={[TextStyles.body, { color: Colors.textSecondary, marginTop: Spacing.md }]}>
+          No achievements found.
+        </Text>
+      ) : null}
 
       {sections.map((section, sectionIndex) => (
         <View key={section.title} style={{ marginBottom: Spacing.lg }}>

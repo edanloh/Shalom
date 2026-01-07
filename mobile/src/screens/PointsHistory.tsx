@@ -1,7 +1,9 @@
-import { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Colors, Spacing, TextStyles } from "../constants";
 import Screen from "../components/common/Screen";
+import creditService from "../services/creditService";
+import { CreditEvent } from "../types";
 
 type AppPointHistory = {
   id: string;
@@ -10,70 +12,6 @@ type AppPointHistory = {
   thumbnail: string;
   createdAt: string; // ISO date
 };
-
-const MOCK_POINTS_HISTORY: AppPointHistory[] = [
-  // Today
-  {
-    id: 't1',
-    pointsTitle: '+100 points',
-    subtitle: 'Quiz completed: Data Science Fundamentals',
-    thumbnail:
-      "https://plus.unsplash.com/premium_photo-1681487870238-4a2dfddc6bcb?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 't2',
-    pointsTitle: '+500 points',
-    subtitle: 'Course completed: Data Science Fundamentals',
-    thumbnail:
-      "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date().toISOString(),
-  },
-
-  // Yesterday
-  {
-    id: 'y1',
-    pointsTitle: '+100 points',
-    subtitle: 'Quiz completed: Data Science Fundamentals',
-    thumbnail:
-      "https://plus.unsplash.com/premium_photo-1681487870238-4a2dfddc6bcb?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'y2',
-   pointsTitle: '+500 points',
-    subtitle: 'Course completed: Data Science Fundamentals',
-    thumbnail:
-      "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
-
-  // Older
-  {
-    id: 'o1',
-    pointsTitle: '+100 points',
-    subtitle: 'Quiz completed: Data Science Fundamentals',
-    thumbnail:
-      "https://plus.unsplash.com/premium_photo-1681487870238-4a2dfddc6bcb?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "o2",
-    pointsTitle: '+500 points',
-    subtitle: 'Course completed: Data Science Fundamentals',
-    thumbnail:
-      "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "o3",
-    pointsTitle: '+100 points',
-    subtitle: 'Quiz completed: Data Science Fundamentals',
-    thumbnail:
-      "https://plus.unsplash.com/premium_photo-1681487870238-4a2dfddc6bcb?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
-  },
-];
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const isSameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
@@ -88,12 +26,14 @@ const isYesterday = (d: Date) => {
 const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function PointsHistoryScreen({ navigation }: any) {
+  const [history, setHistory] = useState<AppPointHistory[]>([]);
+  const [loading, setLoading] = useState(false);
   const sections = useMemo(() => {
     const today: AppPointHistory[] = [];
     const yesterday: AppPointHistory[] = [];
     const byDate: Record<string, AppPointHistory[]> = {};
 
-    for (const n of MOCK_POINTS_HISTORY) {
+    for (const n of history) {
       const dt = new Date(n.createdAt);
 
       if (isToday(dt)) {
@@ -120,19 +60,46 @@ export default function PointsHistoryScreen({ navigation }: any) {
     }
 
     return result;
-  }, []);
+  }, [history]);
 
   const [refreshing, setRefreshing] = useState(false);
+
+  const loadHistory = useCallback(async () => {
+    setLoading(true);
+    try {
+      const events: CreditEvent[] = await creditService.getCreditHistory();
+      const mapped: AppPointHistory[] = events.map((e) => ({
+        id: e.id,
+        pointsTitle: `+${e.points}`,
+        subtitle: e.title,
+        thumbnail: "https://images.unsplash.com/photo-1521791055366-0d553872125f?w=400&h=300&fit=crop",
+        createdAt: e.timestamp,
+      }));
+      setHistory(mapped);
+    } catch (err) {
+      console.warn("Failed to load credit history", err);
+      setHistory([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+    const unsub = creditService.subscribeToCreditUpdates(loadHistory);
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [loadHistory]);
 
   const onRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      // TODO: call your real fetch here, e.g. await reloadPointsHistory();
-      await new Promise((r) => setTimeout(r, 800)); // demo delay
+      await loadHistory();
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [loadHistory]);
 
   return (
     <Screen
@@ -142,7 +109,13 @@ export default function PointsHistoryScreen({ navigation }: any) {
       onRefresh={onRefresh}
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
+      stickyHeader
     >
+      {loading ? (
+        <View style={{ paddingVertical: Spacing.xl, alignItems: "center" }}>
+          <ActivityIndicator size="large" color={Colors.secondary} />
+        </View>
+      ) : null}
       {sections.map((section, sectionIndex) => (
         <View key={section.title} style={{ marginBottom: Spacing.lg }}>
           {/* Section Header */}

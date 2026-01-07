@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Course } from '../types';
-import courseService, { CourseListParams } from '../services/courseService';
+import courseService from '../services/courseService';
 import { useAuth } from './AuthContext';
 
 interface CourseContextType {
@@ -16,11 +16,11 @@ interface CourseContextType {
   myCoursesError: string | null;
   refreshMyCourses: () => Promise<void>;
   
-  // Suggested courses
-  suggestedCourses: Course[];
-  suggestedLoading: boolean;
-  suggestedError: string | null;
-  refreshSuggested: () => Promise<void>;
+  // Recommended courses
+  recommendedCourses: Course[];
+  recommendedLoading: boolean;
+  recommendedError: string | null;
+  refreshRecommended: () => Promise<void>;
   
   // Search and filter functions
   searchCourses: (query: string) => Course[];
@@ -47,9 +47,9 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   const [myCoursesLoading, setMyCoursesLoading] = useState(false);
   const [myCoursesError, setMyCoursesError] = useState<string | null>(null);
 
-  const [suggestedCourses, setSuggestedCourses] = useState<Course[]>([]);
-  const [suggestedLoading, setSuggestedLoading] = useState(false);
-  const [suggestedError, setSuggestedError] = useState<string | null>(null);
+  const [recommendedCourses, setRecommendedCourses] = useState<Course[]>([]);
+  const [recommendedLoading, setRecommendedLoading] = useState(false);
+  const [recommendedError, setRecommendedError] = useState<string | null>(null);
 
   const [wishlist, setWishlist] = useState<Course[]>([]);
   const [wishlistLoading, setWishlistLoading] = useState(false);
@@ -64,7 +64,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (user?.id) {
       loadMyCourses();
-      loadSuggestedCourses();
+      loadRecommendedCourses();
     }
   }, [user?.id]);
 
@@ -108,21 +108,21 @@ export default function CourseProvider({ children }: { children: React.ReactNode
     }
   };
 
-  const loadSuggestedCourses = async () => {
-    if (suggestedLoading) return;
+  const loadRecommendedCourses = async () => {
+    if (recommendedLoading) return;
     
-    setSuggestedLoading(true);
-    setSuggestedError(null);
+    setRecommendedLoading(true);
+    setRecommendedError(null);
     
     try {
-      console.log('CourseContext: Loading suggested courses...');
-      const suggestedData = await courseService.getSuggestedCourses();
-      setSuggestedCourses(suggestedData);
+      console.log('CourseContext: Loading recommended courses...');
+      const recommendedData = await courseService.getRecommendedCourses(user?.id);
+      setRecommendedCourses(recommendedData);
     } catch (err) {
-      console.error('CourseContext: Error loading suggested courses:', err);
-      setSuggestedError(err instanceof Error ? err.message : 'Failed to load suggested courses');
+      console.error('CourseContext: Error loading recommended courses:', err);
+      setRecommendedError(err instanceof Error ? err.message : 'Failed to load recommended courses');
     } finally {
-      setSuggestedLoading(false);
+      setRecommendedLoading(false);
     }
   };
 
@@ -134,8 +134,8 @@ export default function CourseProvider({ children }: { children: React.ReactNode
     await loadMyCourses();
   };
 
-  const refreshSuggested = async () => {
-    await loadSuggestedCourses();
+  const refreshRecommended = async () => {
+    await loadRecommendedCourses();
   };
 
   const searchCourses = (query: string): Course[] => {
@@ -181,7 +181,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   const setFlagInLists = (courseId: string, flag: boolean) => {
     setCourses(prev => prev.map(c => c.id === courseId ? { ...c, isWishlisted: flag } : c));
     setMyCourses(prev => prev.map(c => c.id === courseId ? { ...c, isWishlisted: flag } : c));
-    setSuggestedCourses(prev => prev.map(c => c.id === courseId ? { ...c, isWishlisted: flag } : c));
+    setRecommendedCourses(prev => prev.map(c => c.id === courseId ? { ...c, isWishlisted: flag } : c));
   };
 
   const toggleWishlist = async (course: Course) => {
@@ -229,10 +229,10 @@ export default function CourseProvider({ children }: { children: React.ReactNode
       myCoursesError,
       refreshMyCourses,
       
-      suggestedCourses,
-      suggestedLoading,
-      suggestedError,
-      refreshSuggested,
+      recommendedCourses,
+      recommendedLoading,
+      recommendedError,
+      refreshRecommended,
       
       searchCourses,
       getCoursesByCategory,

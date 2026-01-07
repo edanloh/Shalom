@@ -26,6 +26,9 @@ import CourseCard from '../components/home/CourseCard';
 // Import hooks and types
 import { useCourses } from '../contexts/CourseContext';
 import { useAuth } from '../contexts/AuthContext';
+import courseService from '../services/courseService';
+import creditService from '../services/creditService';
+import { showToast } from '@/components/common/Toast';
 
 // types
 import type { Course } from '../types';
@@ -59,7 +62,10 @@ type TabType = 'home' | 'courses' | 'search' | 'settings';
 export default function HomeScreen({ navigation, route }: any) {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { user, getSession } = useAuth();
+  const { user, login, register, getSession } = useAuth();
+  const [certCount, setCertCount] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
+  const [goalHours, setGoalHours] = useState<{ current: number; target: number }>({ current: 0, target: 10 });
 
   // const navigation = useNavigation<CompositeNavigationProp<
   //   StackNavigationProp<MainStackParamList>,
@@ -68,15 +74,20 @@ export default function HomeScreen({ navigation, route }: any) {
 
   // Use unified CourseContext for all course data
   const {
+    courses,
+    loading: coursesLoading,
+    error: coursesError,
+    refreshCourses,
+
     myCourses: myCoursesData,
     myCoursesLoading,
     myCoursesError,
     refreshMyCourses,
     
-    suggestedCourses: suggestedCoursesData,
-    suggestedLoading,
-    suggestedError,
-    refreshSuggested,
+    recommendedCourses,
+    recommendedLoading,
+    recommendedError,
+    refreshRecommended,
 
     wishlist,
     wishlistLoading,
@@ -98,13 +109,46 @@ export default function HomeScreen({ navigation, route }: any) {
     console.log('Session data on HomeScreen mount:', getSession());
   }, []);
 
+  const loadCreditMeta = React.useCallback(async () => {
+    try {
+      const [certs, goals] = await Promise.all([
+        creditService.getCertificates().catch(() => []),
+        creditService.getGoals().catch(() => []),
+      ]);
+      setCertCount(Array.isArray(certs) ? certs.length : 0);
+      const maxStreak = Array.isArray(goals)
+        ? goals.reduce((m, g) => Math.max(m, g.streakDays || 0), 0)
+        : 0;
+      setStreakDays(maxStreak);
+      const hoursGoal =
+        Array.isArray(goals) &&
+        goals.find((g) => g.targetHours && g.targetHours > 0);
+      if (hoursGoal) {
+        setGoalHours({
+          current: hoursGoal.currentHours || 0,
+          target: hoursGoal.targetHours || 0,
+        });
+      }
+    } catch (err) {
+      console.warn('Home: failed to load credit stats', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCreditMeta();
+    const unsub = creditService.subscribeToCreditUpdates(loadCreditMeta);
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [loadCreditMeta]);
+
   // Mock static data that doesn't require API calls
   const achievements: Achievement[] = [
     {
       id: '1',
       icon: 'flame',
       title: 'Day Streak',
-      value: 12,
+      value: streakDays || 0,
       color: Colors.streakCardBg,
       type: 'streak',
       navigationTarget: 'LearningGoalScreen',
@@ -113,7 +157,7 @@ export default function HomeScreen({ navigation, route }: any) {
       id: '2',
       icon: 'trophy',
       title: 'Certificates',  
-      value: 3,
+      value: certCount || 3,
       color: Colors.certificateCardBg,
       type: 'certificate',
       navigationTarget: 'CertificatesScreen',
@@ -134,8 +178,9 @@ export default function HomeScreen({ navigation, route }: any) {
     setIsRefreshing(true);
     try {
       await Promise.all([
+        refreshCourses?.(),
         refreshMyCourses(),
-        refreshSuggested(),
+        refreshRecommended(),
       ]);
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -166,10 +211,10 @@ export default function HomeScreen({ navigation, route }: any) {
   }, [myCoursesError]);
 
   useEffect(() => {
-    if (suggestedError) {
-      handleError(suggestedError, refreshSuggested, 'Suggested Courses');
+    if (recommendedError) {
+      handleError(recommendedError, refreshRecommended, 'Recommended Courses');
     }
-  }, [suggestedError]);
+  }, [recommendedError]);
 
   const handleTabPress = (tab: TabType) => {
     setActiveTab(tab);
@@ -193,6 +238,31 @@ export default function HomeScreen({ navigation, route }: any) {
   // Handle course actions for swipeable cards
   const handleCourseComplete = (courseId: string) => {
     console.log('Course marked as completed:', courseId);
+    if (user?.id) {
+      creditService
+        .recordCreditEvent({
+          userId: user.id,
+          type: 'course_completed',
+          title: 'Course completed',
+          points: 120,
+          courseId,
+        })
+        .then(() =>
+          showToast({
+            title: 'Credits earned',
+            message: '+120 for completing a course',
+            type: 'success',
+          })
+        )
+        .catch((err) => {
+          console.warn('Failed to record course credit', err);
+          showToast({
+            title: 'Unable to record credits',
+            message: 'Something unexpected happened. Please try again later.',
+            type: 'error',
+          });
+        });
+    }
     // TODO: Update course completion status via API
   };
 
@@ -200,6 +270,40 @@ export default function HomeScreen({ navigation, route }: any) {
     console.log('Course liked/continued:', courseId);
     // TODO: Update course like status or mark as in-progress via API
   };
+
+  const handleRecommendationClick = async (course: Course) => {
+    if (user?.id) {
+      courseService.recordRecommendationEvent({
+        userId: user.id,
+        courseId: course.id,
+        eventType: 'click',
+        context: { placement: 'home_recommended' },
+      }).catch((err) => console.warn('Failed to record rec click', err));
+    }
+    navigation.navigate('CourseDetail', { courseId: course.id });
+  };
+
+  // Build recommended list: prefer API recs, fallback to non-enrolled
+  const recommendedList = React.useMemo(() => {
+    if (recommendedCourses?.length) return recommendedCourses;
+    const enrolledIds = new Set((myCoursesData ?? []).map((c) => c.id));
+    return (courses ?? []).filter((c) => !enrolledIds.has(c.id)).slice(0, 8);
+  }, [courses, myCoursesData, recommendedCourses]);
+
+  const recommendedListLoading = recommendedLoading || coursesLoading;
+
+  useEffect(() => {
+    if (user?.id && recommendedList.length > 0) {
+      courseService.recordRecommendationEvent({
+        userId: user.id,
+        eventType: 'impression',
+        context: {
+          placement: 'home_recommended',
+          courseIds: recommendedList.map((c) => c.id),
+        },
+      }).catch((err) => console.warn('Failed to record rec impression', err));
+    }
+  }, [user?.id, recommendedList]);
 
   const getTop10Courses = (courses: Course[]): Course[] => {
     // Sort by percentage completed descending and return top 10
@@ -229,6 +333,8 @@ export default function HomeScreen({ navigation, route }: any) {
       noHeader
       widescreen
       customEdges={["top"]}
+      refreshing={isRefreshing}
+      onRefresh={handleRefresh}
     >
       {/* Combined Header with Profile, Welcome, and Notifications */}
       <ProfileHeader 
@@ -238,7 +344,12 @@ export default function HomeScreen({ navigation, route }: any) {
       />
 
       {/* Achievement Cards - Day Streak and Certificates */}
-      <ProgressSection achievements={achievements} currentHours={0} targetHours={10} navigation={navigation} />        
+      <ProgressSection
+        achievements={achievements}
+        currentHours={goalHours.current}
+        targetHours={goalHours.target || 10}
+        navigation={navigation}
+      />        
 
       {/* My Courses Section */}
       <View style={styles.section}>
@@ -342,19 +453,19 @@ export default function HomeScreen({ navigation, route }: any) {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={[TextStyles.h4]}>
-            Suggested for You
+            Recommended for You
           </Text>
         </View>
 
-        {suggestedLoading ? (
+        {recommendedListLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.purple400} />
             <Text style={styles.loadingText}>Loading suggestions...</Text>
           </View>
-        ) : suggestedError ? (
+        ) : recommendedError || coursesError ? (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{suggestedError}</Text>
-            <TouchableOpacity onPress={refreshSuggested} style={styles.retryButton}>
+            <Text style={styles.errorText}>{recommendedError || coursesError}</Text>
+            <TouchableOpacity onPress={refreshRecommended} style={styles.retryButton}>
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -364,13 +475,13 @@ export default function HomeScreen({ navigation, route }: any) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
           >
-            {suggestedCoursesData.map((course) => (
+            {recommendedList.map((course) => (
               <CourseCard
                 key={course.id}
                 course={course}
                 variant="compact"
                 showInstructor={false}
-                onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
+                onPress={(c) => handleRecommendationClick(c)}
               />
             ))}
           </ScrollView>
@@ -411,9 +522,10 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontFamily: TextStyles.body.fontFamily,
-    fontSize: TextStyles.body.fontSize,
-    color: Colors.purple200,
-    marginBottom: Spacing.md
+    fontSize: 13,
+    color: "#C4B5FD",
+    fontWeight: "600",
+    marginBottom: Spacing.sm,
   },
   loadingContainer: {
     flex: 1,

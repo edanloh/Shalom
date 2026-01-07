@@ -23,10 +23,12 @@ import { useAuth } from "@/contexts/AuthContext";
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const defaultUserId = user?.id || '550e8400-e29b-41d4-a716-446655440201';
 
   // State for API data
   const [courses, setCourses] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,22 +36,46 @@ const Index = () => {
     fetchDashboardData();
   }, [user]);
 
+  useEffect(() => {
+    if (recommendations.length > 0) {
+      courseService.recordRecommendationEvent({
+        userId: defaultUserId,
+        eventType: 'impression',
+        context: {
+          placement: 'web_dashboard_recs',
+          courseIds: recommendations.map((c) => c.id),
+        },
+      }).catch((err) => console.warn('Failed to record rec impression', err));
+    }
+  }, [recommendations, defaultUserId]);
+
+  const handleRecommendationClick = (course: any) => {
+    courseService.recordRecommendationEvent({
+      userId: defaultUserId,
+      courseId: course.id,
+      eventType: 'click',
+      context: { placement: 'web_dashboard_recs' },
+    }).catch((err) => console.warn('Failed to record rec click', err));
+  };
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
       // Get admin ID from user (fallback to mock for now)
-      const adminId = user?.id || '550e8400-e29b-41d4-a716-446655440201';
+      const adminId = defaultUserId;
 
       // Fetch courses and admin stats in parallel using courseService
-      const [coursesData, statsData] = await Promise.all([
+      const [coursesData, statsData, recs] = await Promise.all([
         courseService.getCourses({ sortBy: 'updated_at', sortOrder: 'desc' }),
-        courseService.getInstructorStats(adminId)
+        courseService.getInstructorStats(adminId),
+        courseService.getRecommendations(adminId, 4)
       ]);
 
       setCourses(coursesData);
       setStats(statsData);
+      setRecommendations(recs);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
@@ -126,6 +152,39 @@ const Index = () => {
 
         {/* Quick Actions */}
         <QuickActions />
+
+        {/* Recommendations */}
+        {recommendations.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">
+                  Recommended for Learners
+                </h2>
+                <p className="text-muted-foreground">
+                  Based on interests, level, and certificate goals
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {recommendations.map((course: any, index: number) => (
+                <div
+                  key={course.id ?? index}
+                  className="relative"
+                  onClick={() => handleRecommendationClick(course)}
+                >
+                  <CourseCard {...course} />
+                  {course.recommendationReason && (
+                    <div className="absolute top-2 left-2 bg-primary/80 text-white text-xs px-2 py-1 rounded">
+                      {course.recommendationReason}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Active Courses Section */}
         <section className="space-y-4">

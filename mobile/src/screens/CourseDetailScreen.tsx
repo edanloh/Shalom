@@ -20,10 +20,12 @@ import { ImageWithFallback } from '../components/common';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { courseService } from '../services/courseService';
+import creditService from '../services/creditService';
 import { moduleService, ModuleDetailResponse, UserProgress, CourseSection } from '../services/moduleService';
 import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../components/common/Screen';
 import ActionButton from '@/components/ActionButton';
+import { showToast } from '@/components/common/Toast';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -240,6 +242,35 @@ export default function CourseDetailScreen({
       setIsEnrolling(true);
       const { firstModuleId } = await courseService.enrollInCourse(userId, courseId);
 
+      // Mark as enrolled immediately so UI updates
+      setIsEnrolled(true);
+      // Refresh detail in background to pick up any progress/enrollment metadata
+      loadCourseDetail?.();
+
+      creditService
+        .recordCreditEvent({
+          userId,
+          type: 'course_enrolled',
+          title: courseDetail?.title || 'Enrolled in course',
+          points: 20,
+          courseId,
+        })
+        .then(() =>
+          showToast({
+            title: 'Enrolled',
+            message: 'Earned +20 credits for enrolling',
+            type: 'success',
+          })
+        )
+        .catch((err) => {
+          console.warn('Failed to record credit for enrollment', err);
+          showToast({
+            title: 'Unable to record credits',
+            message: 'Something unexpected happened. Please try again later.',
+            type: 'error',
+          });
+        });
+
       // If you want to immediately take them somewhere after enroll, keep this:
       // navigation.replace(
       //   'CourseOutline',
@@ -280,7 +311,8 @@ export default function CourseDetailScreen({
       title=""
       noHeader
       widescreen
-      customEdges={["bottom"]}
+      // Include top inset so back button isn't under the notch
+      customEdges={["top", "bottom"]}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -464,7 +496,7 @@ const styles = StyleSheet.create({
   },
   header: {
     position: 'absolute',
-    top: Spacing.lg*2,
+    top: Spacing.lg,
     left: 0,
     right: 0,
     zIndex: 1,
