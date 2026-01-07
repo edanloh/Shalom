@@ -48,15 +48,6 @@ interface Achievement {
   navigationTarget?: string;
 }
 
-interface WeeklyGoalData {
-  id: string;
-  userId: string;
-  targetHours: number;
-  currentHours: number;
-  weekStartDate: string;
-  weekEndDate: string;
-}
-
 type TabType = 'home' | 'courses' | 'search' | 'settings';
 
 export default function HomeScreen({ navigation, route }: any) {
@@ -65,7 +56,12 @@ export default function HomeScreen({ navigation, route }: any) {
   const { user, login, register, getSession } = useAuth();
   const [certCount, setCertCount] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
-  const [goalHours, setGoalHours] = useState<{ current: number; target: number }>({ current: 0, target: 10 });
+  const [goalProgress, setGoalProgress] = useState<{
+    current: number;
+    target: number;
+    unit: "hours" | "courses" | "points";
+    label: string;
+  }>({ current: 0, target: 10, unit: "hours", label: "Weekly Goal" });
 
   // const navigation = useNavigation<CompositeNavigationProp<
   //   StackNavigationProp<MainStackParamList>,
@@ -115,24 +111,55 @@ export default function HomeScreen({ navigation, route }: any) {
         creditService.getCertificates().catch(() => []),
         creditService.getGoals().catch(() => []),
       ]);
+      creditService.recordGoalMilestones(goals, user?.id);
       setCertCount(Array.isArray(certs) ? certs.length : 0);
       const maxStreak = Array.isArray(goals)
         ? goals.reduce((m, g) => Math.max(m, g.streakDays || 0), 0)
         : 0;
       setStreakDays(maxStreak);
-      const hoursGoal =
-        Array.isArray(goals) &&
-        goals.find((g) => g.targetHours && g.targetHours > 0);
-      if (hoursGoal) {
-        setGoalHours({
-          current: hoursGoal.currentHours || 0,
-          target: hoursGoal.targetHours || 0,
-        });
+      if (Array.isArray(goals)) {
+        const goal =
+          goals.find(
+            (g) =>
+              Number(g.targetHours || 0) > 0 ||
+              Number(g.currentHours || 0) > 0 ||
+              /study|time/i.test(g.label || "")
+          ) || goals[0];
+
+        if (goal) {
+          const targetPoints = Number(goal.targetPoints ?? 0);
+          const targetCourses = Number(goal.targetCourses ?? 0);
+          const targetHours = Number(goal.targetHours ?? 0);
+          const currentPoints = Number(goal.currentPoints ?? 0);
+          const currentCourses = Number(goal.currentCourses ?? 0);
+          const currentHours = Number(goal.currentHours ?? 0);
+          const label = goal.label || "Weekly Goal";
+
+          let unit: "hours" | "courses" | "points" = "hours";
+          if (targetPoints > 0 || currentPoints > 0) unit = "points";
+          else if (targetCourses > 0 || currentCourses > 0) unit = "courses";
+          else if (targetHours > 0 || currentHours > 0) unit = "hours";
+          else if (/course/i.test(label)) unit = "courses";
+          else if (/point/i.test(label)) unit = "points";
+          else if (/time|study/i.test(label)) unit = "hours";
+
+          const target =
+            unit === "points" ? targetPoints : unit === "courses" ? targetCourses : targetHours;
+          const current =
+            unit === "points" ? currentPoints : unit === "courses" ? currentCourses : currentHours;
+
+          setGoalProgress({
+            current,
+            target,
+            unit,
+            label,
+          });
+        }
       }
     } catch (err) {
       console.warn('Home: failed to load credit stats', err);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     loadCreditMeta();
@@ -163,15 +190,6 @@ export default function HomeScreen({ navigation, route }: any) {
       navigationTarget: 'CertificatesScreen',
     },
   ];
-
-  const weeklyGoal: WeeklyGoalData = {
-    id: '1',
-    userId: '550e8400-e29b-41d4-a716-446655440101',
-    targetHours: 7,
-    currentHours: 5.8,
-    weekStartDate: '2024-12-02T00:00:00Z',
-    weekEndDate: '2024-12-08T23:59:59Z',
-  };
 
   // Handle refresh for all data
   const handleRefresh = async () => {
@@ -346,8 +364,10 @@ export default function HomeScreen({ navigation, route }: any) {
       {/* Achievement Cards - Day Streak and Certificates */}
       <ProgressSection
         achievements={achievements}
-        currentHours={goalHours.current}
-        targetHours={goalHours.target || 10}
+        current={goalProgress.current}
+        target={goalProgress.target || 10}
+        unit={goalProgress.unit}
+        label={goalProgress.label}
         navigation={navigation}
       />        
 

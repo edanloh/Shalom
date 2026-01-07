@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { Screen } from "@/components";
 import { Colors, Spacing, TextStyles } from "../constants";
@@ -6,19 +6,10 @@ import { Ionicons } from "@expo/vector-icons";
 import externalStyles from "@styles/styles";
 import creditService from "../services/creditService";
 import { LearningGoal } from "../types";
+import { useAuth } from "../contexts/AuthContext";
 
 const CARD_BG = "#3A3A45";
 const TILE_BG = "#5B38E3";
-
-const STATS = [
-  {
-    icon: "checkmark-circle",
-    color: Colors.secondary,
-    value: "12",
-    label: "Courses Completed",
-  },
-  { icon: "timer", color: "#60A5FA", value: "24h", label: "Total Study Time" },
-];
 
 const GoalCard = ({ goal }: any) => (
   <View style={styles.goalCard}>
@@ -65,12 +56,21 @@ const StatTile = ({ stat }: any) => (
 );
 
 export default function LearningGoalScreen({ navigation }: any) {
+  const { user } = useAuth();
   const [goals, setGoals] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [streakDays, setStreakDays] = useState<number>(0);
+  const [completedCourses, setCompletedCourses] = useState<number>(0);
+  const [studyHours, setStudyHours] = useState<number>(0);
 
   const mapGoals = (raw: LearningGoal[]): any[] =>
     (raw || []).map((g) => {
+      const targetPoints = Number(g.targetPoints ?? 0);
+      const targetCourses = Number(g.targetCourses ?? 0);
+      const targetHours = Number(g.targetHours ?? 0);
+      const currentPoints = Number(g.currentPoints ?? 0);
+      const currentCourses = Number(g.currentCourses ?? 0);
+      const currentHours = Number(g.currentHours ?? 0);
       const icon = g.label.toLowerCase().includes("time")
         ? "time-outline"
         : g.label.toLowerCase().includes("course")
@@ -78,11 +78,26 @@ export default function LearningGoalScreen({ navigation }: any) {
         : "trophy-outline";
       const color =
         icon === "time-outline" ? "#60A5FA" : icon === "school-outline" ? "#34D399" : Colors.yellow;
+      let metric: "points" | "courses" | "hours" = "hours";
+      if (targetPoints > 0 || currentPoints > 0) metric = "points";
+      else if (targetCourses > 0 || currentCourses > 0) metric = "courses";
+      else if (targetHours > 0 || currentHours > 0) metric = "hours";
+      else if (g.label.toLowerCase().includes("course")) metric = "courses";
+      else if (g.label.toLowerCase().includes("point")) metric = "points";
+      else if (g.label.toLowerCase().includes("time")) metric = "hours";
+
       const target =
-        g.targetPoints ?? g.targetCourses ?? g.targetHours ?? 0;
+        metric === "points"
+          ? targetPoints
+          : metric === "courses"
+          ? targetCourses
+          : targetHours;
       const current =
-        g.currentPoints ?? g.currentCourses ?? g.currentHours ?? 0;
-      const streak = g.streakDays || 0;
+        metric === "points"
+          ? currentPoints
+          : metric === "courses"
+          ? currentCourses
+          : currentHours;
       return {
         id: g.id,
         icon,
@@ -91,33 +106,55 @@ export default function LearningGoalScreen({ navigation }: any) {
         subtitle: g.deadline ? `Ends ${new Date(g.deadline).toLocaleDateString()}` : "",
         current,
         target,
-        unit:
-          g.targetPoints != null
-            ? "points"
-            : g.targetCourses != null
-            ? "courses"
-            : "hours",
+        unit: metric,
       };
     });
 
   const loadGoals = useCallback(async () => {
     setLoading(true);
     try {
-      const remote = await creditService.getGoals();
-      const raw = Array.isArray(remote) ? remote : [];
+      const { goals: raw, completedCourses: completed } =
+        await creditService.getGoalsWithProgress(user?.id);
+      creditService.recordGoalMilestones(raw, user?.id);
       const mapped = mapGoals(raw);
       const maxStreak =
         raw.reduce((max, g) => Math.max(max, g.streakDays || 0), 0);
+      const totalStudy = raw.reduce(
+        (sum, g) => sum + Number(g.currentHours || 0),
+        0
+      );
       setGoals(mapped);
       setStreakDays(maxStreak);
+      setCompletedCourses(completed);
+      setStudyHours(totalStudy);
     } catch (err) {
       console.warn("LearningGoal: failed to load goals", err);
       setGoals([]);
       setStreakDays(0);
+      setCompletedCourses(0);
+      setStudyHours(0);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
+
+  const stats = useMemo(
+    () => [
+      {
+        icon: "checkmark-circle",
+        color: Colors.secondary,
+        value: String(completedCourses),
+        label: "Courses Completed",
+      },
+      {
+        icon: "timer",
+        color: "#60A5FA",
+        value: `${Math.round(studyHours * 10) / 10}h`,
+        label: "Total Study Time",
+      },
+    ],
+    [completedCourses, studyHours]
+  );
 
   useEffect(() => {
     loadGoals();
@@ -163,7 +200,7 @@ export default function LearningGoalScreen({ navigation }: any) {
           Your Progress
         </Text>
         <View style={styles.statsGrid}>
-          {STATS.map((stat, i) => (
+          {stats.map((stat, i) => (
             <StatTile key={i} stat={stat} />
           ))}
         </View>

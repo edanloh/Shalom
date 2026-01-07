@@ -61,6 +61,7 @@ export interface CreditEventPayload {
   points: number;
   courseId?: string;
   timestamp?: string;
+  referenceKey?: string;
 }
 
 export interface AchievementItem {
