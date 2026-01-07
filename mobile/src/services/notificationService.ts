@@ -7,10 +7,13 @@ import apiService from "./apiService";
 export const notificationService = {
   /**
    * Register push notification token for a user
+   * Endpoint: POST /pushNotificationHandler
+   * Maps to pushNotificationHandler.mjs Lambda function
    */
   async registerPushToken(userId: string, pushToken: string) {
     try {
-      const response = await apiService.post("/notifications/register", {
+      const response = await apiService.post("/pushNotificationHandler", {
+        action: "register",
         userId,
         pushToken,
         platform: "expo",
@@ -24,10 +27,13 @@ export const notificationService = {
 
   /**
    * Remove push notification token (on logout)
+   * Endpoint: POST /pushNotificationHandler
+   * Maps to pushNotificationHandler.mjs Lambda function
    */
   async removePushToken(userId: string, pushToken: string) {
     try {
-      const response = await apiService.post("/notifications/unregister", {
+      const response = await apiService.post("/pushNotificationHandler", {
+        action: "unregister",
         userId,
         pushToken,
       });

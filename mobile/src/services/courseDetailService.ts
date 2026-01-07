@@ -112,11 +112,25 @@ export interface ProcessedCourseDetail {
 }
 
 class CourseDetailService {
+  /**
+   * Get course detail
+   * Endpoint: GET /getModuleDetail/{courseId}
+   * Maps to getModuleDetail.mjs Lambda function
+   */
   async getCourseDetail(courseId: string): Promise<ProcessedCourseDetail> {
     try {
       console.log(`Fetching course details for: ${courseId}`);
       
-      const response = await apiService.get<CourseDetailResponse>(`/courses/${courseId}`);
+      const response = await apiService.get<CourseDetailResponse>(`/getModuleDetail/${courseId}`);
+      
+      console.log('=== Course Detail API Response ===');
+      console.log('Response keys:', Object.keys(response || {}));
+      console.log('response.success:', response?.success);
+      console.log('response.data exists:', !!response?.data);
+      console.log('response.data keys:', Object.keys(response?.data || {}));
+      console.log('response.data.sections:', response?.data?.sections);
+      console.log('Full response:', JSON.stringify(response, null, 2).slice(0, 1000));
+      console.log('================================');
       
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch course details');
@@ -130,10 +144,10 @@ class CourseDetailService {
   }
 
   private processCourseDetail(data: CourseDetailResponse['data']): ProcessedCourseDetail {
-    const { course, reviews, statistics } = data;
+    const { course, reviews = [], statistics } = data;
 
     // Process modules - only use actual sections from API
-    const modules: CourseModule[] = data.sections.map((section: any, index: number) => ({
+    const modules: CourseModule[] = (data.sections || []).map((section: any, index: number) => ({
       id: section.id,
       title: section.title || `Module ${index + 1}`,
       description: section.description,
@@ -144,12 +158,12 @@ class CourseDetailService {
 
     // Generate rating breakdown (fallback if not in API)
     const ratingBreakdown = this.generateRatingBreakdown(
-      parseFloat(course.rating),
-      course.total_ratings
+      parseFloat(course.rating || '0'),
+      course.total_ratings || 0
     );
 
     // Process reviews
-    const processedReviews = reviews.map(review => ({
+    const processedReviews = (reviews || []).map(review => ({
       rating: review.rating,
       review: review.review,
       reviewerName: review.reviewer_name,
@@ -163,25 +177,25 @@ class CourseDetailService {
       description: course.description,
       image: course.thumbnail_url,
       instructor: {
-        name: course.instructor_name,
-        avatar: course.instructor_avatar,
-        bio: course.instructor_bio,
-        rating: parseFloat(course.instructor_rating),
-        studentsCount: course.instructor_total_students,
-        expertise: course.instructor_expertise,
+        name: course.instructor_name || 'Unknown',
+        avatar: course.instructor_avatar || '',
+        bio: course.instructor_bio || '',
+        rating: parseFloat(course.instructor_rating || '0'),
+        studentsCount: course.instructor_total_students || 0,
+        expertise: course.instructor_expertise || [],
       },
-      rating: parseFloat(course.rating),
-      totalRatings: course.total_ratings,
-      studentCount: course.student_count,
-      duration: this.formatDuration(course.duration_hours),
+      rating: parseFloat(course.rating || '0'),
+      totalRatings: course.total_ratings || 0,
+      studentCount: course.student_count || 0,
+      duration: this.formatDuration(course.duration_hours || 0),
       level: course.level,
-      category: course.category_name,
-      tags: course.tags,
+      category: course.category_name || 'Uncategorized',
+      tags: course.tags || [],
       modules,
       reviews: processedReviews,
       ratingBreakdown,
-      requirements: course.requirements,
-      outcomes: course.outcomes,
+      requirements: course.requirements || [],
+      outcomes: course.outcomes || [],
     };
   }
 

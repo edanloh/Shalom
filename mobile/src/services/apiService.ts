@@ -8,7 +8,10 @@ import { ApiResponse, PaginatedResponse } from '../types';
 
 // API Configuration
 const API_CONFIG = {
-  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://your-api-gateway-url.amazonaws.com',
+  BASE_URL: process.env.VITE_SUPABASE_URL 
+    ? `${process.env.VITE_SUPABASE_URL}/functions/v1` 
+    : 'https://cmtfxsntlfoxgcznanpe.supabase.co/functions/v1',
+  SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_bwjUUwC-IlqND-F2-7t9yg_OWb4angZ',
   TIMEOUT: 10000, // 10 seconds
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second
@@ -124,9 +127,10 @@ class ApiService {
     this.responseInterceptors.push(interceptor);
   }
 
-  // Authentication interceptor - adds JWT token to requests
+  // Authentication interceptor - adds JWT token and Supabase API key to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
+<<<<<<< HEAD
       const token = await SecureStore.getItemAsync('authToken');
       if (token) {
         config.headers = {
@@ -135,16 +139,32 @@ class ApiService {
         };
       }
       // Always add Content-Type header
+=======
+      const token = await AsyncStorage.getItem('authToken');
+      
+      // Add Supabase API key and Content-Type headers
+>>>>>>> 1ab944d ([MOBILE] feat: integrate Supabase Edge function)
       config.headers = {
         ...config.headers,
         'Content-Type': 'application/json',
+        'apikey': API_CONFIG.SUPABASE_ANON_KEY,
       };
+      
+      // Add Authorization if we have a token
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        // Use Supabase anon key as fallback Authorization
+        config.headers['Authorization'] = `Bearer ${API_CONFIG.SUPABASE_ANON_KEY}`;
+      }
     } catch (error) {
       console.warn('Failed to retrieve auth token:', error);
-      // Even if auth fails, add Content-Type header
+      // Even if auth fails, add required headers
       config.headers = {
         ...config.headers,
         'Content-Type': 'application/json',
+        'apikey': API_CONFIG.SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${API_CONFIG.SUPABASE_ANON_KEY}`,
       };
     }
     return config;
@@ -205,8 +225,50 @@ class ApiService {
       throw err;
     }
 
+<<<<<<< HEAD
     return response; // ok → let makeRequest() parse the body
   };
+=======
+    // Prefer server's message if present
+    const serverMsg =
+      (errorData && (errorData.message || errorData.error || errorData.reason)) ||
+      (typeof errorData === 'string' ? errorData : undefined);
+
+    // Capture useful IDs for Supabase correlation
+    const hdrs = {
+      'x-request-id': response.headers.get('x-request-id'),
+      'x-supabase-trace-id': response.headers.get('x-supabase-trace-id'),
+    };
+
+    const status = response.status;
+    const codeMap: Record<number, string> = {
+      400: 'BAD_REQUEST',
+      401: 'UNAUTHORIZED',
+      403: 'FORBIDDEN',
+      404: 'NOT_FOUND',
+      409: 'CONFLICT',
+      429: 'RATE_LIMIT',
+      500: 'SERVER_ERROR',
+      502: 'BAD_GATEWAY',
+      503: 'SERVICE_UNAVAILABLE',
+    };
+
+    const err = new ApiError(
+      serverMsg || `HTTP ${status}`,
+      status,
+      codeMap[status] || 'HTTP_ERROR',
+      errorData,
+      hdrs
+    );
+
+    // helpful console for debugging
+    console.log('[HTTP ✖]', response.url, status, hdrs, errorData);
+    throw err;
+  }
+
+  return response; // ok → let makeRequest() parse the body
+};
+>>>>>>> 1ab944d ([MOBILE] feat: integrate Supabase Edge function)
 
 
   // Build query string from parameters
