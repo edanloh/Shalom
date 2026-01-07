@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "@/constants";
 import styles from "@/styles/styles";
 import ScreenHeader from "./ScreenHeader";
+import ToastHost from "./Toast";
 
 interface ScreenProps {
   title: string;
@@ -30,6 +31,7 @@ interface ScreenProps {
   noHeader?: boolean;
   widescreen?: boolean;
   scrollEnabled?: boolean;
+  stickyHeader?: boolean;
 }
 
 export default function Screen({
@@ -50,19 +52,24 @@ export default function Screen({
   noHeader,
   widescreen,
   scrollEnabled = true,
+  stickyHeader = false,
 }: ScreenProps) {
   const header = (
-    <ScreenHeader
-      title={title}
-      subtitle={subtitle}
-      headerLeftIcon={headerLeftIcon}
-      headerLeftComponent={headerLeftComponent}
-      headerRightIcon={headerRightIcon}
-      headerRightComponent={headerRightComponent}
-      onHeaderLeftPress={onHeaderLeftPress || (() => navigation?.goBack())}
-      onHeaderRightPress={onHeaderRightPress}
-    />
+    <View style={{ backgroundColor: Colors.primary }}>
+      <ScreenHeader
+        title={title}
+        subtitle={subtitle}
+        headerLeftIcon={headerLeftIcon}
+        headerLeftComponent={headerLeftComponent}
+        headerRightIcon={headerRightIcon}
+        headerRightComponent={headerRightComponent}
+        onHeaderLeftPress={onHeaderLeftPress || (() => navigation?.goBack())}
+        onHeaderRightPress={onHeaderRightPress}
+      />
+    </View>
   );
+
+  const headerElement = !noHeader ? header : null;
 
   return (
     <SafeAreaView
@@ -78,6 +85,7 @@ export default function Screen({
         <ScrollView
           contentContainerStyle={[styles.fullScrollContent, customScreenStyle]}
           nestedScrollEnabled={true}
+          stickyHeaderIndices={!noHeader && stickyHeader ? [0] : undefined}
           refreshControl={
             onRefresh ? (
               <RefreshControl
@@ -88,14 +96,14 @@ export default function Screen({
               />
             ) : undefined
           }
-          alwaysBounceVertical={true} // iOS
-          overScrollMode="always" // Android
+          alwaysBounceVertical={true}
+          overScrollMode="always"
           scrollEnabled={scrollEnabled}
         >
-          {/* Header */}
-          {!noHeader && header}
+          {headerElement}
           <View style={widescreen ? styles.fullScrollContent : styles.scrollContent}>{children}</View>
         </ScrollView>
+        <ToastHost />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

@@ -111,15 +111,12 @@ class ModuleService {
    */
   async getModuleDetail(courseId: string, userId?: string): Promise<ModuleDetailResponse['data']> {
     try {      
-      const params: Record<string, string> = {};
+      const params: Record<string, string> = { courseId };
       if (userId) {
         params.userId = userId;
       }
 
-      const response = await apiService.get<ModuleDetailResponse>(
-        `/courses/${courseId}/module`,
-        params
-      );
+      const response = await apiService.get<ModuleDetailResponse>(`/getModuleDetail`, params);
 
       if (!response.success || !response.data) {
         throw new Error(response.message || 'Failed to fetch module details');

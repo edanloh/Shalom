@@ -149,13 +149,16 @@ class QuizService {
    */
   async getQuizDetail(courseId: string, quizId: string, userId?: string): Promise<QuizDetailResponse['data']> {
     try {      
-      const params: Record<string, string> = {};
+      const params: Record<string, string> = {
+        courseId,
+        quizId,
+      };
       if (userId) {
         params.userId = userId;
       }
 
       const backendResponse = await apiService.get<BackendQuizDetailResponse>(
-        `/courses/${courseId}/module/quizzes/${quizId}`,
+        `/getQuizDetail`,
         params
       );
 
@@ -183,7 +186,7 @@ class QuizService {
   async submitQuiz(courseId: string, quizId: string, request: SubmitQuizRequest): Promise<SubmitQuizResponse['data']> {
     try {
       const response = await apiService.post<SubmitQuizResponse>(
-        `/courses/${courseId}/module/quizzes/${quizId}`,
+        `/submitQuiz`,
         request
       );
 

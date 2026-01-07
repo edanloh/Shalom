@@ -206,12 +206,13 @@ export const useMyCourses = (): UseMyCOursesReturn => {
 };
 
 /**
- * Hook for fetching suggested courses
+ * Hook for fetching recommended courses
  */
-export const useSuggestedCourses = () => {
+export const useRecommendedCourses = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   
   const isMountedRef = useRef(true);
 
@@ -221,35 +222,35 @@ export const useSuggestedCourses = () => {
     };
   }, []);
 
-  const fetchSuggestedCourses = useCallback(async () => {
+  const fetchRecommendedCourses = useCallback(async () => {
     try {
-      console.log('Fetching suggested courses...');
-      const coursesData = await courseService.getSuggestedCourses();
+      console.log('Fetching recommended courses...');
+      const coursesData = await courseService.getRecommendedCourses(user?.id);
       
       if (!isMountedRef.current) return;
       
-      console.log('Fetched suggested courses:', coursesData.length);
+      console.log('Fetched recommended courses:', coursesData.length);
       setCourses(coursesData);
       setError(null);
     } catch (err) {
       if (!isMountedRef.current) return;
       const errorMessage = getErrorMessage(err);
       setError(errorMessage);
-      console.error('Error fetching suggested courses:', err);
+      console.error('Error fetching recommended courses:', err);
     }
-  }, []);
+  }, [user?.id]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    await fetchSuggestedCourses();
+    await fetchRecommendedCourses();
     setLoading(false);
-  }, [fetchSuggestedCourses]);
+  }, [fetchRecommendedCourses]);
 
   // Initial load
   useEffect(() => {
     setLoading(true);
-    fetchSuggestedCourses().finally(() => setLoading(false));
-  }, [fetchSuggestedCourses]);
+    fetchRecommendedCourses().finally(() => setLoading(false));
+  }, [fetchRecommendedCourses]);
 
   return {
     courses,

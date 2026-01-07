@@ -115,8 +115,9 @@ class CourseDetailService {
   async getCourseDetail(courseId: string): Promise<ProcessedCourseDetail> {
     try {
       console.log(`Fetching course details for: ${courseId}`);
-      
-      const response = await apiService.get<CourseDetailResponse>(`/courses/${courseId}`);
+      const response = await apiService.get<CourseDetailResponse>(`/getCourseDetails`, {
+        courseId,
+      });
       
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch course details');

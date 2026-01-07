@@ -98,6 +98,7 @@ export default function ChangePasswordScreen({ navigation }: any) {
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
       customEdges={["top", "bottom"]}
+      stickyHeader
     >
       <View style={{ paddingVertical: Spacing.base }}>
         <Text

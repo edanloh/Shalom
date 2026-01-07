@@ -20,7 +20,7 @@
       "@constants/*": ["./src/constants/*"]
     }
   },
-  "include": ["src", "env.d.ts", "../web/src/pages/CoursePreview.tsx", "../web/src/pages/LessonDetail.tsx", "../web/src/pages/Notification.tsx", "../web/src/pages/QuizTaking.tsx"],
+  "include": ["src", "env.d.ts"],
   "exclude": ["node_modules"],
   "extends": "expo/tsconfig.base"
 }

@@ -1,41 +1,14 @@
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { Screen } from "@/components";
 import { Colors, Spacing, TextStyles } from "../constants";
 import { Ionicons } from "@expo/vector-icons";
 import externalStyles from "@styles/styles";
+import creditService from "../services/creditService";
+import { LearningGoal } from "../types";
 
 const CARD_BG = "#3A3A45";
 const TILE_BG = "#5B38E3";
-
-const GOALS = [
-  {
-    icon: "trophy-outline",
-    color: Colors.yellow,
-    title: "Weekly Points Goal",
-    subtitle: "Earn points by learning",
-    current: 300,
-    target: 500,
-    unit: "points",
-  },
-  {
-    icon: "time-outline",
-    color: "#60A5FA",
-    title: "Weekly Study Time",
-    subtitle: "3 hours per week",
-    current: 145,
-    target: 180,
-    unit: "minutes",
-  },
-  {
-    icon: "school-outline",
-    color: "#34D399",
-    title: "Monthly Course Goal",
-    subtitle: "Complete courses this month",
-    current: 1,
-    target: 3,
-    unit: "courses",
-  },
-];
 
 const STATS = [
   {
@@ -92,6 +65,64 @@ const StatTile = ({ stat }: any) => (
 );
 
 export default function LearningGoalScreen({ navigation }: any) {
+  const [goals, setGoals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [streakDays, setStreakDays] = useState<number>(0);
+
+  const mapGoals = (raw: LearningGoal[]): any[] =>
+    (raw || []).map((g) => {
+      const icon = g.label.toLowerCase().includes("time")
+        ? "time-outline"
+        : g.label.toLowerCase().includes("course")
+        ? "school-outline"
+        : "trophy-outline";
+      const color =
+        icon === "time-outline" ? "#60A5FA" : icon === "school-outline" ? "#34D399" : Colors.yellow;
+      const target =
+        g.targetPoints ?? g.targetCourses ?? g.targetHours ?? 0;
+      const current =
+        g.currentPoints ?? g.currentCourses ?? g.currentHours ?? 0;
+      const streak = g.streakDays || 0;
+      return {
+        id: g.id,
+        icon,
+        color,
+        title: g.label,
+        subtitle: g.deadline ? `Ends ${new Date(g.deadline).toLocaleDateString()}` : "",
+        current,
+        target,
+        unit:
+          g.targetPoints != null
+            ? "points"
+            : g.targetCourses != null
+            ? "courses"
+            : "hours",
+      };
+    });
+
+  const loadGoals = useCallback(async () => {
+    setLoading(true);
+    try {
+      const remote = await creditService.getGoals();
+      const raw = Array.isArray(remote) ? remote : [];
+      const mapped = mapGoals(raw);
+      const maxStreak =
+        raw.reduce((max, g) => Math.max(max, g.streakDays || 0), 0);
+      setGoals(mapped);
+      setStreakDays(maxStreak);
+    } catch (err) {
+      console.warn("LearningGoal: failed to load goals", err);
+      setGoals([]);
+      setStreakDays(0);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadGoals();
+  }, [loadGoals]);
+
   return (
     <Screen
       title="Learning Goals"
@@ -99,24 +130,29 @@ export default function LearningGoalScreen({ navigation }: any) {
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
       customEdges={["top", "bottom"]}
+      stickyHeader
     >
-      <ScrollView
-        contentContainerStyle={externalStyles.fullScrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={externalStyles.fullScrollContent} showsVerticalScrollIndicator={false}>
+        {loading ? (
+          <View style={{ paddingVertical: Spacing.lg, alignItems: "center" }}>
+            <ActivityIndicator size="large" color={Colors.secondary} />
+          </View>
+        ) : null}
+
         <View style={styles.streakCard}>
           <Ionicons name="flame" size={48} color="#FF6B35" />
-          <Text style={styles.streakNumber}>7</Text>
+          <Text style={styles.streakNumber}>{streakDays}</Text>
           <Text style={styles.streakLabel}>Day Streak</Text>
           <Text style={styles.streakSubtitle}>Keep learning every day! 🎯</Text>
         </View>
 
-        <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>
-          Active Goals
-        </Text>
-        {GOALS.map((goal, i) => (
-          <GoalCard key={i} goal={goal} />
+        <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>Active Goals</Text>
+        {(goals.length ? goals : []).map((goal, i) => (
+          <GoalCard key={goal.id || i} goal={goal} />
         ))}
+        {goals.length === 0 && !loading ? (
+          <Text style={[TextStyles.body, { color: Colors.textSecondary }]}>No goals yet.</Text>
+        ) : null}
 
         <Text
           style={[

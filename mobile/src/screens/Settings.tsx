@@ -189,6 +189,7 @@ export default function SettingsScreen({ navigation }: any) {
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
       customEdges={["top", "bottom"]}
+      stickyHeader
     >
       <>
         {/* Notification Settings */}

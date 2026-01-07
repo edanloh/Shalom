@@ -76,6 +76,40 @@ Resources:
       #  SecurityGroupIds: [sg-xxx]
       #  SubnetIds: [subnet-xxx, subnet-yyy]
 
+  GetRecommendationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "shalom-getRecommendations-${Environment}"
+      Description: "Personalized course recommendations"
+      CodeUri: ./
+      Handler: getRecommendations.handler
+      Runtime: nodejs22.x
+      Layers:
+        - !Ref NodeDependencyLayer
+      Events:
+        ApiGetRecommendations:
+          Type: Api
+          Properties:
+            Path: /recommendations
+            Method: GET
+
+  TrackRecommendationEventFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "shalom-trackRecommendationEvent-${Environment}"
+      Description: "Record recommendation impressions/clicks/etc."
+      CodeUri: ./
+      Handler: trackRecommendationEvent.handler
+      Runtime: nodejs22.x
+      Layers:
+        - !Ref NodeDependencyLayer
+      Events:
+        ApiTrackRecommendationEvent:
+          Type: Api
+          Properties:
+            Path: /recommendations/events
+            Method: POST
+
 Outputs:
   GetAllCourseFunctionName:
     Description: "Function name"

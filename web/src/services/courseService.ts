@@ -20,6 +20,8 @@ const ENDPOINTS = {
   DELETE_COURSE: (courseId: string) => `/courses/${courseId}`,
   ENROLL_STUDENT: (courseId: string) => `/courses/${courseId}/enroll`,
   INSTRUCTOR_STATS: (adminId: string) => `/admin/${adminId}/stats`,
+  RECOMMENDATIONS: '/recommendations',
+  RECOMMENDATION_EVENT: '/recommendations/events',
 };
 
 export interface CourseListParams {
@@ -51,6 +53,8 @@ export interface Course {
   lastUpdated: string;
   level?: string;
   tags?: string[];
+  recommendationReason?: string;
+  recommendationScore?: number;
 }
 
 export interface Module {
@@ -156,6 +160,8 @@ const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course =
     lastUpdated: awsCourse.updated_at ? new Date(awsCourse.updated_at).toLocaleDateString() : 'N/A',
     level: awsCourse.level || 'beginner',
     tags: Array.isArray(awsCourse.tags) ? awsCourse.tags : [],
+    recommendationReason: awsCourse.recommendation_reason,
+    recommendationScore: awsCourse.recommendation_score,
   };
 };
 
@@ -447,6 +453,46 @@ class CourseService {
       console.error('Error searching courses:', error);
       throw error;
     }
+  }
+
+  /**
+   * Get personalized recommendations
+   */
+  async getRecommendations(userId: string, limit = 6): Promise<Course[]> {
+    const uid = userId || '550e8400-e29b-41d4-a716-446655440201';
+    const response = await apiService.get<any>(ENDPOINTS.RECOMMENDATIONS, {
+      userId: uid,
+      limit: String(limit),
+    });
+
+    const recs = response?.data?.recommendations ?? response?.recommendations ?? [];
+    return recs.map((item: any) => {
+      const coursePayload = item.course || item;
+      const course = convertAWSCourseToWebCourse(coursePayload, coursePayload.statistics);
+      return {
+        ...course,
+        recommendationReason: item.reason || coursePayload.recommendation_reason,
+        recommendationScore: item.score || coursePayload.recommendation_score,
+      };
+    });
+  }
+
+  async recordRecommendationEvent(payload: {
+    userId?: string;
+    courseId?: string;
+    eventType: 'impression' | 'view' | 'click' | 'start' | 'complete' | 'dismiss' | 'save';
+    context?: Record<string, any>;
+    requestId?: string;
+  }): Promise<void> {
+    const body = {
+      userId: payload.userId || '550e8400-e29b-41d4-a716-446655440201',
+      courseId: payload.courseId ?? null,
+      eventType: payload.eventType,
+      context: payload.context || {},
+      requestId: payload.requestId,
+    };
+
+    await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
   }
 
   /**

@@ -21,6 +21,58 @@ export interface User {
   };
 }
 
+export interface CreditBalance {
+  balance: number;
+  lastUpdated: string;
+}
+
+export interface CreditEvent {
+  id: string;
+  type: string;
+  title: string;
+  points: number;
+  courseId?: string;
+  timestamp: string;
+}
+
+export interface CreditEventPayload {
+  userId?: string;
+  type: string;
+  title: string;
+  points: number;
+  courseId?: string;
+  timestamp?: string;
+}
+
+export interface AchievementItem {
+  id: string;
+  icon: string;
+  label: string;
+}
+
+export interface LearningGoal {
+  id: string;
+  label: string;
+  targetHours: number;
+  currentHours: number;
+  streakDays?: number;
+  deadline?: string;
+  targetPoints?: number;
+  currentPoints?: number;
+  targetCourses?: number;
+  currentCourses?: number;
+}
+
+export interface CertificateProgress {
+  id: string;
+  name: string;
+  requiredPoints: number;
+  earnedPoints: number;
+  requiredCourses: number;
+  completedCourses: number;
+  progressPercent: number;
+}
+
 export interface Achievement {
   id: string;
   icon: string;
@@ -70,6 +122,9 @@ export interface Course {
   createdAt: string;
   updatedAt: string;
   isWishlisted?: boolean;
+  recommendationReason?: string;
+  recommendationScore?: number;
+  recommendationRank?: number;
 }
 
 export interface WeeklyGoal {

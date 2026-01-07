@@ -84,6 +84,7 @@ export default function WishlistScreen() {
         title="Wishlist"
         navigation={navigation}
         headerLeftIcon="chevron-back"
+        stickyHeader
       >
         <View style={[styles.centerContainer, { flex: 1 }]}>
           <ActivityIndicator size="large" color={Colors.secondary} />
@@ -100,6 +101,7 @@ export default function WishlistScreen() {
         title="Wishlist"
         navigation={navigation}
         headerLeftIcon="chevron-back"
+        stickyHeader
       >
         <View>
           <Text style={styles.errorMessage}>Error: {wishlistError}</Text>
@@ -117,6 +119,7 @@ export default function WishlistScreen() {
       title="Wishlist"
       navigation={navigation}
       headerLeftIcon="chevron-back"
+      stickyHeader
     >
       <FlatList
         data={wishlist}

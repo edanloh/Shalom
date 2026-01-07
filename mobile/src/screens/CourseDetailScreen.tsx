@@ -20,10 +20,12 @@ import { ImageWithFallback } from '../components/common';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { courseService } from '../services/courseService';
+import creditService from '../services/creditService';
 import { moduleService, ModuleDetailResponse, UserProgress, CourseSection } from '../services/moduleService';
 import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../components/common/Screen';
 import ActionButton from '@/components/ActionButton';
+import { showToast } from '@/components/common/Toast';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -239,6 +241,30 @@ export default function CourseDetailScreen({
     try {
       setIsEnrolling(true);
       const { firstModuleId } = await courseService.enrollInCourse(userId, courseId);
+
+      creditService
+        .recordCreditEvent({
+          userId,
+          type: 'course_enrolled',
+          title: courseDetail?.title || 'Enrolled in course',
+          points: 20,
+          courseId,
+        })
+        .then(() =>
+          showToast({
+            title: 'Enrolled',
+            message: 'Earned +20 credits for enrolling',
+            type: 'success',
+          })
+        )
+        .catch((err) => {
+          console.warn('Failed to record credit for enrollment', err);
+          showToast({
+            title: 'Unable to record credits',
+            message: 'Something unexpected happened. Please try again later.',
+            type: 'error',
+          });
+        });
 
       // If you want to immediately take them somewhere after enroll, keep this:
       // navigation.replace(

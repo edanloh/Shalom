@@ -76,6 +76,7 @@ export default function EditProfileScreen({ navigation }: any) {
       }
       onHeaderLeftPress={() => navigation.goBack()}
       customEdges={["top", "bottom"]}
+      stickyHeader
     >
       {/* Avatar */}
       <View style={styles.avatarSection}>

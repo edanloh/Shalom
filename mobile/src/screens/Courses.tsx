@@ -12,7 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useCourses } from "../contexts/CourseContext";
 import { useUser } from "../contexts/UserContext";
-import { Colors, Spacing, TextStyles } from "../constants";
+import { Colors, Spacing, TextStyles, Typography } from "../constants";
 import type { Course } from "../types";
 import { ImageWithFallback } from "@components/common";
 import { Images } from "../../assets";
@@ -49,8 +49,11 @@ function progressFrom(course: Course): number {
 export default function CoursesScreen({ navigation }: any) {
   const {
     courses = [],
+    recommendedCourses = [],
     loading,
+    recommendedLoading,
     refreshCourses,
+    refreshRecommended,
     wishlist = [],
     toggleWishlist,
   } = useCourses();
@@ -97,9 +100,9 @@ export default function CoursesScreen({ navigation }: any) {
 
   const recommended = useMemo(() => {
     if (query) return [];
-    // simple: first few not-enrolled
+    if (recommendedCourses.length) return recommendedCourses;
     return courses.filter((c) => !enrolledIds.has(c.id)).slice(0, 10);
-  }, [courses, enrolledIds, query]);
+  }, [courses, enrolledIds, query, recommendedCourses]);
 
   const popular = useMemo(() => {
     // Not enrolled, filtered by tag and query
@@ -142,11 +145,14 @@ export default function CoursesScreen({ navigation }: any) {
     if (!refreshCourses) return;
     try {
       setRefreshing(true);
-      await refreshCourses();
+      await Promise.all([
+        refreshCourses?.(),
+        refreshRecommended?.(),
+      ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refreshCourses]);
+  }, [refreshCourses, refreshRecommended]);
 
   const BadgeHeartRow = ({ item }: { item: Course }) => (
     <View style={styles.badgeRow}>
@@ -181,7 +187,16 @@ export default function CoursesScreen({ navigation }: any) {
   }: {
     item: Course;
     withProgress?: boolean;
-  }) => (
+  }) => {
+    const rankLabel =
+      item.recommendationRank || item.recommendationScore
+        ? `#${item.recommendationRank ?? "?"} • ${Number(
+            item.recommendationScore ?? 0
+          ).toFixed(1)}`
+        : null;
+    const reason = item.recommendationReason || "Recommended for you";
+
+    return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
@@ -194,11 +209,21 @@ export default function CoursesScreen({ navigation }: any) {
           style={styles.hImage}
         />
         <BadgeHeartRow item={item} />
+        {rankLabel ? (
+          <View style={styles.rankBadge}>
+            <Text style={styles.rankText}>{rankLabel}</Text>
+          </View>
+        ) : null}
       </View>
       <Text style={styles.hTitle} numberOfLines={2}>
         {item.title}
       </Text>
       <MetaRow rating={item.rating} modules={item.modules} />
+      {reason ? (
+        <Text style={styles.reason} numberOfLines={1}>
+          {reason}
+        </Text>
+      ) : null}
       {withProgress ? (
         <View style={{ marginTop: 8 }}>
           <ProgressBar value={progressFrom(item)} />
@@ -208,7 +233,8 @@ export default function CoursesScreen({ navigation }: any) {
         </View>
       ) : null}
     </TouchableOpacity>
-  );
+    );
+  };
 
   const GCard = ({ item }: { item: Course }) => (
     <TouchableOpacity
@@ -290,7 +316,7 @@ export default function CoursesScreen({ navigation }: any) {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsRow}
-          style={{ maxHeight: 48, marginTop: Spacing.sm }}
+          style={styles.chipsList}
         />
 
         {/* Jump Back In */}
@@ -329,6 +355,7 @@ export default function CoursesScreen({ navigation }: any) {
                 horizontal
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.hRow}
+                style={styles.hList}
                 extraData={wishlist}
               />
             ) : (
@@ -376,6 +403,15 @@ const styles = StyleSheet.create({
   // Chips
   chipsRow: {
     paddingBottom: Spacing.sm,
+  },
+  chipsList: {
+    maxHeight: 48,
+    marginTop: Spacing.sm,
+    marginHorizontal: -Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+  },
+  hList: {
+    marginHorizontal: -Spacing.xl,
   },
   chip: {
     paddingHorizontal: 14,
@@ -442,7 +478,10 @@ const styles = StyleSheet.create({
   },
 
   // Horizontal cards
-  hRow: { paddingBottom: Spacing.sm },
+  hRow: {
+    paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+  },
   hCard: {
     width: Math.min(width * 0.72, 300),
     marginRight: 12,
@@ -476,6 +515,20 @@ const styles = StyleSheet.create({
     fontFamily: TextStyles.body.fontFamily,
   },
   metaDot: { color: Colors.textSecondary, marginHorizontal: 4 },
+  rankBadge: {
+    position: "absolute",
+    left: Spacing.sm,
+    top: Spacing.sm,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  rankText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: Typography.fontFamily.medium,
+  },
 
   // Progress
   progressWrap: {
@@ -552,5 +605,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 14,
     padding: 6,
+  },
+  reason: {
+    color: Colors.purple200,
+    fontSize: 12,
+    marginTop: 4,
+    paddingHorizontal: 2,
+    fontFamily: TextStyles.body.fontFamily,
   },
 });

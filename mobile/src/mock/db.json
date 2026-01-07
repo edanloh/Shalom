@@ -3,6 +3,153 @@
     "status": "healthy",
     "timestamp": "2025-01-11T10:00:00Z"
   },
+  "credits": {
+    "balance": 200,
+    "lastUpdated": "2026-01-07T07:25:44Z",
+    "history": [
+      {
+        "id": "evt-101",
+        "type": "course_enrolled",
+        "title": "Enrolled in Web Dev Bootcamp",
+        "points": 20,
+        "courseId": "550e8400-e29b-41d4-a716-446655440401",
+        "timestamp": "2026-01-07T07:26:00Z"
+      },
+      {
+        "id": "evt-102",
+        "type": "course_completed",
+        "title": "Completed React Native Fundamentals",
+        "points": 120,
+        "courseId": "550e8400-e29b-41d4-a716-446655440401",
+        "timestamp": "2026-01-07T06:10:00Z"
+      },
+      {
+        "id": "evt-103",
+        "type": "quiz_passed",
+        "title": "Perfect score on Module 2 Quiz",
+        "points": 50,
+        "courseId": "550e8400-e29b-41d4-a716-446655440401",
+        "timestamp": "2026-01-06T12:00:00Z"
+      },
+      {
+        "id": "evt-104",
+        "type": "streak",
+        "title": "7-day learning streak",
+        "points": 30,
+        "timestamp": "2026-01-05T08:15:00Z"
+      }
+    ],
+    "achievements": [
+      { "id": "550e8400-e29b-41d4-a716-446655441401", "icon": "trophy-outline", "label": "First Steps", "earned": true },
+      { "id": "550e8400-e29b-41d4-a716-446655441402", "icon": "flame", "label": "Learning Streak", "earned": true },
+      { "id": "550e8400-e29b-41d4-a716-446655441403", "icon": "ribbon-outline", "label": "Course Completion", "earned": false },
+      { "id": "550e8400-e29b-41d4-a716-446655441404", "icon": "ribbon-outline", "label": "Knowledge Seeker", "earned": false },
+      { "id": "550e8400-e29b-41d4-a716-446655441405", "icon": "trophy-outline", "label": "Quick Learner", "earned": false },
+      { "id": "550e8400-e29b-41d4-a716-446655441406", "icon": "trophy-outline", "label": "Perfect Score", "earned": false }
+    ],
+    "goals": [
+      {
+        "id": "goal-weekly-1",
+        "label": "Weekly Points Goal",
+        "targetHours": 0,
+        "currentHours": 0,
+        "targetPoints": 500,
+        "currentPoints": 320,
+        "streakDays": 6,
+        "deadline": "2026-01-12T23:59:59Z"
+      },
+      {
+        "id": "goal-weekly-2",
+        "label": "Weekly Study Time",
+        "targetHours": 10,
+        "currentHours": 6,
+        "streakDays": 4,
+        "deadline": "2026-01-12T23:59:59Z"
+      },
+      {
+        "id": "goal-monthly-1",
+        "label": "Monthly Course Goal",
+        "targetHours": 0,
+        "currentHours": 0,
+        "targetCourses": 3,
+        "currentCourses": 1,
+        "deadline": "2026-01-31T23:59:59Z"
+      }
+    ],
+    "certificates": [
+      {
+        "id": "c1111111-1111-4111-8111-111111111111",
+        "name": "Course Completion",
+        "requiredPoints": 500,
+        "earnedPoints": 500,
+        "requiredCourses": 1,
+        "completedCourses": 1,
+        "progressPercent": 100,
+        "issuedAt": "2026-01-07T07:25:44.436872+00:00",
+        "credentialUrl": "https://example.com/cred/CC-2025-001"
+      },
+      {
+        "id": "c2222222-2222-4222-8222-222222222222",
+        "name": "Fullstack Path",
+        "requiredPoints": 1200,
+        "earnedPoints": 800,
+        "requiredCourses": 6,
+        "completedCourses": 4,
+        "progressPercent": 66,
+        "issuedAt": "2026-01-07T07:25:44.436872+00:00",
+        "credentialUrl": "https://example.com/cred/LP-2025-010"
+      },
+      {
+        "id": "c3333333-3333-4333-8333-333333333333",
+        "name": "Cloud Specialization",
+        "requiredPoints": 900,
+        "earnedPoints": 450,
+        "requiredCourses": 5,
+        "completedCourses": 2,
+        "progressPercent": 50,
+        "issuedAt": "2026-01-07T07:25:44.436872+00:00",
+        "credentialUrl": "https://example.com/cred/CLD-2025-055"
+      }
+    ]
+  },
+  "recommendations": {
+    "success": true,
+    "message": "Mock recommendations",
+    "data": [
+      {
+        "id": "rec_1",
+        "rank": 1,
+        "score": 9.8,
+        "reason": "Similar to your interests",
+        "course": {
+          "id": "550e8400-e29b-41d4-a716-446655440401",
+          "title": "React Native Fundamentals",
+          "description": "Learn the basics of React Native development with hands-on projects and real-world applications.",
+          "level": "intermediate",
+          "rating": 4.5,
+          "duration_hours": 12,
+          "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+          "tags": ["react-native", "mobile", "javascript"]
+        }
+      },
+      {
+        "id": "rec_2",
+        "rank": 2,
+        "score": 8.9,
+        "reason": "Trending in your category",
+        "course": {
+          "id": "550e8400-e29b-41d4-a716-446655440404",
+          "title": "Cloud Architecture with AWS",
+          "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
+          "level": "intermediate",
+          "rating": 4.5,
+          "duration_hours": 20,
+          "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
+          "tags": ["aws", "cloud", "architecture"]
+        }
+      }
+    ]
+  },
   "courses": {
     "success": true,
     "message": "Courses retrieved successfully",
