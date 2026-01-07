@@ -15,7 +15,7 @@ import { Colors, ContainerStyles, Spacing, Typography, TextStyles } from '../con
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import { Screen } from '@/components';
+import { ActionButton, Screen } from '@/components';
 
 // components (values)
 import ProfileHeader from '../components/home/ProfileHeader';
@@ -35,8 +35,6 @@ import type { Course } from '../types';
 import type { MainStackParamList, TabParamList } from '../types/navigation';
 import CourseCarousel from '@/components/home/CourseCarousel';
 
-import { Session } from '@supabase/supabase-js'
-
 // Types for API-ready data structures
 interface Achievement {
   id: string;
@@ -53,7 +51,7 @@ type TabType = 'home' | 'courses' | 'search' | 'settings';
 export default function HomeScreen({ navigation, route }: any) {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { user, login, register, getSession } = useAuth();
+  const { user, login, register } = useAuth();
   const [certCount, setCertCount] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [goalProgress, setGoalProgress] = useState<{
@@ -100,10 +98,6 @@ export default function HomeScreen({ navigation, route }: any) {
       console.log('HomeScreen - User ID for enrollment fetch:', user.id);
     }
   }, [user]);
-
-  useEffect(() => {
-    console.log('Session data on HomeScreen mount:', getSession());
-  }, []);
 
   const loadCreditMeta = React.useCallback(async () => {
     try {

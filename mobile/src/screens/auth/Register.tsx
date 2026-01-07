@@ -15,7 +15,7 @@ import { useAuth } from "@contexts/AuthContext";
 import * as WebBrowser from "expo-web-browser";
 import styles from "@/styles/styles";
 import { Colors, Spacing, TextStyles } from "../../constants";
-import { validatePassword } from "@/utils/validatePassword";
+import { validatePassword } from "@/utils/authUtils";
 WebBrowser.maybeCompleteAuthSession();
 
 export default function RegisterScreen({ navigation }: any) {

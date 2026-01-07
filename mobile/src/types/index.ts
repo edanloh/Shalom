@@ -1,22 +1,25 @@
 // API-ready data types for the application
 
-import { Session, AuthChangeEvent } from '@supabase/supabase-js';
+import { Tokens } from '@/contexts/AuthContext';
+import { Session, AuthChangeEvent, AuthResponse } from '@supabase/supabase-js';
 
 export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  resetState: AuthChangeEvent | null;
+  isResettingPassword: boolean;
+  session: Session | null;
   login: ( email: string, password: string ) => Promise<{ success: boolean; error?: string }>;
   register: ( email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ data: any; error: any; }>;
-  confirmPasswordReset: ( newPassword: string ) => Promise<{ success: boolean; error?: string }>;
+  requestResetPassword: (email: string) => Promise<{ data: any; error: any; }>;
+  resetPassword: ( newPassword: string ) => Promise<{ success: boolean; error?: string }>;
   // loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   changePassword: ( currentPassword: string, newPassword: string ) => Promise<{ success: boolean; error?: string }>;
   fetchEmail: (email: string) => Promise<any>;
-  getSession: () => Session | null;
+  loginWithToken: (credentials: Tokens) => Promise<void>;
+  setIsResettingPassword: (value: boolean) => void;
 }
 
 export interface User {
@@ -293,6 +296,7 @@ export type MainStackParamList = {
   UserConfig?: undefined;
   MyCourses?: undefined;
   Auth?: undefined;
+  ResetPassword?: undefined;
 };
 
 export type AuthStackParamList = {

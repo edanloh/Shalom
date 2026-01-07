@@ -7,7 +7,9 @@ import { supabase } from '@/lib/supabase';
 import { AppState } from 'react-native';
 import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { User, AuthContextType } from '@/types';
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation } from '@react-navigation/native';
+import * as Linking from 'expo-linking';
+import { parseSupabaseUrl } from '@/utils/authUtils';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -17,116 +19,203 @@ export interface AuthTokens {
   refresh_token?: string;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export type Tokens = {
+  access_token: string;
+  refresh_token: string;
+};
 
-// Tells Supabase Auth to continuously refresh the session automatically if
-// the app is in the foreground. When this is added, you will continue to receive
-// `onAuthStateChange` events with the `TOKEN_REFRESHED` or `SIGNED_OUT` event
-// if the user's session is terminated. This should only be registered once.
-AppState.addEventListener('change', (state) => {
-  if (state === 'active') {
-    supabase.auth.startAutoRefresh();
-  } else {
-    supabase.auth.stopAutoRefresh();
-  }
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const prefix = Linking.createURL('/');
+
+// // Tells Supabase Auth to continuously refresh the session automatically if
+// // the app is in the foreground. When this is added, you will continue to receive
+// // `onAuthStateChange` events with the `TOKEN_REFRESHED` or `SIGNED_OUT` event
+// // if the user's session is terminated. This should only be registered once.
+// AppState.addEventListener('change', (state) => {
+//   if (state === 'active') {
+//     supabase.auth.startAutoRefresh();
+//   } else {
+//     supabase.auth.stopAutoRefresh();
+//   }
+// });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [resetState , setResetState] = useState<AuthChangeEvent | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
-  const getSession = () => session;
+  // Set the below to skip auth during development
+  // const [user, setUser] = useState<User | null>({
+  //   id: "550e8400-e29b-41d4-a716-446655440101",
+  //   email: "shalomfyp@gmail.com",
+  //   username: "shalomfyp",
+  //   name: "Shalom FYP",
+  //   role: "learner",
+  //   avatar:
+  //     "https://ui-avatars.com/api/?name=Shalom+FYP&size=50&background=6366F1&color=fff",
+  //   bio: "Learning enthusiast exploring various courses",
+  //   location: "Singapore",
+  //   phone: "+65 9123 4567",
+  //   authProvider: "google",
+  // });
+  // const [isAuthenticated, setIsAuthenticated] = useState(true);
 
-  useEffect(() => {
-    // On mount, get the current session and subscribe to auth state changes
-    const getSessionAndSubscribe = async () => {
-      setIsLoading(true);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session && session.user) {
-        let provider: 'email' | 'google' = 'email';
-        if (session.user.app_metadata?.provider === 'google')
-          provider = 'google';
-        const userData: User = {
-          id: session.user.id,
-          email: session.user.email || '',
-          name: session.user.user_metadata?.first_name,
-          authProvider: provider,
-          accessToken: session.access_token,
-        };
-        setUser(userData);
-        setSession(session);
-        // Initial save to userService
-        import('../services/userService').then(({ updateUserProfile }) => {
-          updateUserProfile(userData.id, {
-            id: userData.id,
-            email: userData.email,
-            name: userData.name,
-            // Add more fields if needed
-          }).catch(() => {});
-        });
-      } else {
-        setUser(null);
-        setSession(null);
-      }
-      setIsLoading(false);
+  const loginWithToken = async ({ access_token, refresh_token }: Tokens) => {
+    console.log('[DeepLink] loginWithToken called', {
+      access_token,
+      refresh_token,
+    });
+    const signIn = async () => {
+      await supabase.auth.setSession({
+        access_token,
+        refresh_token,
+      });
+      return await supabase.auth.refreshSession();
     };
-    getSessionAndSubscribe();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          setResetState(event);
-          console.log('session is now', session)
-          const navigation = useNavigation<any>();
-          console.log('Navigate to forgot password from callback');
-          navigation.navigate('ForgotPassword');
-        } else if (session && session.user) {
-          let provider: 'email' | 'google' = 'email';
-          if (session.user.app_metadata?.provider === 'google')
-            provider = 'google';
-          const userData: User = {
-            id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.first_name,
-            authProvider: provider,
-            accessToken: session.access_token,
-          };
-          setUser(userData);
-          setSession(session);
-          // Initial save to userService
-          import('../services/userService').then(({ updateUserProfile }) => {
-            updateUserProfile(userData.id, {
-              id: userData.id,
-              email: userData.email,
-              name: userData.name,
-              // Add more fields if needed
-            }).catch(() => {});
-          });
-        } else {
-          setUser(null);
-          setSession(null);
-        }
-      }
-    );
-    return () => {
-      listener?.subscription.unsubscribe();
-    };
-  }, []);
+    const {
+      data: { user: supabaseUser, session: supabaseSession },
+    } = await signIn();
+
+    console.log('[DeepLink] Supabase user after setSession:', supabaseUser);
+    setIsResettingPassword(true);
+    setUser({
+      id: supabaseUser?.id || '',
+      email: supabaseUser?.email || '',
+      name: supabaseUser?.user_metadata?.first_name || '',
+    });
+    setSession(supabaseSession || null);
+  };
+
+  //   // --- Deep linking config ---
+  // const getInitialURL = async () => {
+  //   const url = await Linking.getInitialURL();
+  //   if (url !== null) {
+  //     return parseSupabaseUrl(url);
+  //   }
+  //   return url;
+  // };
+
+  // const subscribe = (listener: (url: string) => void) => {
+  //   const onReceiveURL = ({ url }: { url: string }) => {
+  //     console.log('Received deep link URL:', url);
+  //     const transformedUrl = parseSupabaseUrl(url);
+  //     console.log('Transformed URL:', transformedUrl);
+  //     const parsedUrl = Linking.parse(transformedUrl);
+  //     console.log('Parsed URL:', parsedUrl);
+  //     const access_token = parsedUrl.queryParams?.access_token;
+  //     const refresh_token = parsedUrl.queryParams?.refresh_token;
+  //     if (parsedUrl.path === 'ResetPassword') {
+  //       console.log('Setting isResettingPassword to true from deep link');
+  //       setIsResettingPassword(true);
+  //     }
+  //     if (
+  //       typeof access_token === 'string' &&
+  //       typeof refresh_token === 'string'
+  //     ) {
+  //       void loginWithToken({ access_token, refresh_token });
+  //     }
+  //     listener(transformedUrl);
+  //   };
+  //   const subscription = Linking.addEventListener('url', onReceiveURL);
+  //   return () => {
+  //     subscription.remove();
+  //   };
+  // };
+
+  // const linking = {
+  //   prefixes: [prefix],
+  //   config: {
+  //     screens: {
+  //       ResetPassword: '/ResetPassword',
+  //       // Add other screens as needed
+  //     },
+  //   },
+  //   getInitialURL,
+  //   subscribe,
+  // };
+
+  // useEffect(() => {
+  //   subscribe;
+  //   // On mount, get the current session and subscribe to auth state changes
+  //   const getSessionAndSubscribe = async () => {
+  //     setIsLoading(true);
+  //     const {
+  //       data: { session },
+  //     } = await supabase.auth.getSession();
+  //     if (session && session.user && !isResettingPassword) {
+  //       let provider: 'email' | 'google' = 'email';
+  //       if (session.user.app_metadata?.provider === 'google')
+  //         provider = 'google';
+  //       const userData: User = {
+  //         id: session.user.id,
+  //         email: session.user.email || '',
+  //         name: session.user.user_metadata?.first_name,
+  //         authProvider: provider,
+  //         accessToken: session.access_token,
+  //       };
+  //       setUser(userData);
+  //       setSession(session);
+  //       // Initial save to userService
+  //       import('../services/userService').then(({ updateUserProfile }) => {
+  //         updateUserProfile(userData.id, {
+  //           id: userData.id,
+  //           email: userData.email,
+  //           name: userData.name,
+  //           // Add more fields if needed
+  //         }).catch(() => {});
+  //       });
+  //     } else {
+  //       setUser(null);
+  //       setSession(null);
+  //     }
+  //     setIsLoading(false);
+  //   };
+  //   getSessionAndSubscribe();
+
+  //   const { data: listener } = supabase.auth.onAuthStateChange(
+  //     async (event, session) => {
+  //       if (session && session.user && !isResettingPassword) {
+  //         let provider: 'email' | 'google' = 'email';
+  //         if (session.user.app_metadata?.provider === 'google')
+  //           provider = 'google';
+  //         const userData: User = {
+  //           id: session.user.id,
+  //           email: session.user.email || '',
+  //           name: session.user.user_metadata?.first_name,
+  //           authProvider: provider,
+  //           accessToken: session.access_token,
+  //         };
+  //         setUser(userData);
+  //         setSession(session);
+  //         // Initial save to userService
+  //         import('../services/userService').then(({ updateUserProfile }) => {
+  //           updateUserProfile(userData.id, {
+  //             id: userData.id,
+  //             email: userData.email,
+  //             name: userData.name,
+  //             // Add more fields if needed
+  //           }).catch(() => {});
+  //         });
+  //       } else {
+  //         setUser(null);
+  //         setSession(null);
+  //       }
+  //     }
+  //   );
+  //   return () => {
+  //     listener?.subscription.unsubscribe();
+  //   };
+  // }, []);
 
   const backdoor = () => {
     // Only enable for web or development
     // const mockSession: Session = {
-      
     //   }
     // } as any;
-
     // const mockUser: User = {
     // };
-
     // setUser(mockUser);
     // setSession(mockSession);
   };
@@ -140,14 +229,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // }, [session, user]);
 
   const login = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
-    return {
-      success: !error,
-      error: error?.message,
-    };
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+      if (!error) {
+        setSession(data.session);
+        setUser({
+          id: data.user.id,
+          email: data.user.email || '',
+          name: data.user.user_metadata?.first_name,
+        });
+        setIsResettingPassword(false);
+      }
+      return {
+        success: !error,
+        error: error?.message,
+      };
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const register = async (email: string, password: string, name: string) => {
@@ -172,19 +275,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
   };
 
-  const resetPassword = async (email: string) => {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+  const requestResetPassword = async (email: string) => {
+    const resetPasswordURL = Linking.createURL('/ResetPassword');
+
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: resetPasswordURL,
+    });
+
     return { data, error };
   };
 
-  const confirmPasswordReset = async (newPassword: string) => {
-    const { data, error } = await supabase.auth.updateUser({ password: newPassword })
-    if (data) alert("Password updated successfully!")
-    if (error) alert("There was an error updating your password.")
-    return {
-      success: !error,
-      error: error?.message,
-    };
+  const resetPassword = async (newPassword: string) => {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (data) alert('Password updated successfully!');
+      if (error) alert('There was an error updating your password.');
+      if (!error) setIsResettingPassword(false);
+      return {
+        success: !error,
+        error: error?.message,
+      };
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const loginWithGoogle = () => {
@@ -290,17 +405,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       value={{
         user,
         isLoading,
-        resetState,
+        session,
         login,
         register,
         logout,
+        requestResetPassword,
         resetPassword,
-        confirmPasswordReset,
         loginWithGoogle,
         updateProfile,
         changePassword,
         fetchEmail,
-        getSession,
+        loginWithToken,
+        isResettingPassword,
+        setIsResettingPassword,
       }}
     >
       {children}

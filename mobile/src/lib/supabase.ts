@@ -57,7 +57,7 @@ import {
 
 export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
-    // storage: new LargeSecureStore(), // Disable this to work on web
+    storage: new LargeSecureStore(), // Disable this to work on web
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

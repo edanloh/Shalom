@@ -20,3 +20,12 @@ export const validatePassword = (pwd: string) => {
   ];
   return rules.find((r) => !r.test)?.msg || "";
 };
+
+// --- Deep linking and Supabase password reset flow ---
+export const parseSupabaseUrl = (url: string) => {
+  let parsedUrl = url;
+  if (url.includes('#')) {
+    parsedUrl = url.replace('#', '?');
+  }
+  return parsedUrl;
+};

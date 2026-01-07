@@ -5,7 +5,7 @@ import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import Screen from "@/components/common/Screen";
-import { validatePassword } from "@/utils/validatePassword";
+import { validatePassword } from "@/utils/authUtils";
 
 export default function ChangePasswordScreen({ navigation }: any) {
   const { changePassword } = useAuth();
