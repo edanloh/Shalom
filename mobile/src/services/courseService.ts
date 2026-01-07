@@ -24,7 +24,7 @@ const ENDPOINTS = {
   COURSES: '/getAllCourse',
   USER_ENROLLMENTS: (uid: string) =>
     `/getUserEnrollment/${encodeURIComponent(uid)}?userId=${encodeURIComponent(uid)}`,
-  ENROLL: '/postUserEnrollment',
+  ENROLL: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`,
   COURSE_REVIEWS: (courseId: string) => `/courses/${encodeURIComponent(courseId)}/reviews`,
   RECOMMENDATIONS: '/getRecommendations',
   RECOMMENDATION_EVENT: '/postRecommendationEvent',
@@ -32,9 +32,9 @@ const ENDPOINTS = {
 
 // Wishlist endpoints (Supabase function)
 const WISHLIST = {
-  BASE: (uid: string) => `/wishlistHandler?userId=${encodeURIComponent(uid)}`,
+  BASE: (uid: string) => `/wishlistHandler/${encodeURIComponent(uid)}`,
   ITEM: (uid: string, courseId: string) =>
-    `/wishlistHandler?userId=${encodeURIComponent(uid)}&courseId=${encodeURIComponent(courseId)}`,
+    `/wishlistHandler/${encodeURIComponent(uid)}?courseId=${encodeURIComponent(courseId)}`,
 };
 
 export interface CourseListParams {
@@ -654,12 +654,12 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    */
   async enrollInCourse(userId: string, courseId: string): Promise<{ firstModuleId?: string }> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
-    userId = userId || DEFAULT_USER_ID;
+    const uid = userId || DEFAULT_USER_ID;
 
-    const url = ENDPOINTS.ENROLL;
+    const url = ENDPOINTS.ENROLL(uid);
     const resp = await apiService.post<any>(url, {
       courseId,
-      userId,
+      // optional fields supported by the edge function
       initialProgress: 0,
       isCompleted: false,
       totalWatchTimeMinutes: 0,

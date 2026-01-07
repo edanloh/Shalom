@@ -112,18 +112,27 @@ export interface ProcessedCourseDetail {
 }
 
 class CourseDetailService {
-  async getCourseDetail(courseId: string): Promise<ProcessedCourseDetail> {
+  async getCourseDetail(courseId: string, userId?: string): Promise<ProcessedCourseDetail> {
     try {
       console.log(`Fetching course details for: ${courseId}`);
-      const response = await apiService.get<CourseDetailResponse>(`/getCourseDetails`, {
-        courseId,
-      });
-      
-      if (!response.success || !response.data) {
+      const uid =
+        userId ||
+        process.env.EXPO_PUBLIC_DEFAULT_USER_ID ||
+        "550e8400-e29b-41d4-a716-446655440101";
+
+      // Use module detail edge function, which returns course + sections.
+      const url = `/getModuleDetail/${encodeURIComponent(
+        courseId
+      )}?userId=${encodeURIComponent(uid)}`;
+
+      const response = await apiService.get<any>(url);
+
+      const data = (response as any)?.data ?? (response as any);
+      if (!response?.success || !data) {
         throw new Error('Failed to fetch course details');
       }
 
-      return this.processCourseDetail(response.data);
+      return this.processCourseDetail(data);
     } catch (error) {
       console.error('Error fetching course details:', error);
       throw error;
@@ -131,16 +140,18 @@ class CourseDetailService {
   }
 
   private processCourseDetail(data: CourseDetailResponse['data']): ProcessedCourseDetail {
-    const { course, reviews, statistics } = data;
+    const { course, reviews = [], statistics } = data;
 
-    // Process modules - only use actual sections from API
-    const modules: CourseModule[] = data.sections.map((section: any, index: number) => ({
+    const sections = Array.isArray(data.sections) ? data.sections : [];
+
+    // Process modules - map sections from module detail response
+    const modules: CourseModule[] = sections.map((section: any, index: number) => ({
       id: section.id,
       title: section.title || `Module ${index + 1}`,
       description: section.description,
-      order: section.order || index + 1,
-      isCompleted: false, // TODO: Get from user progress
-      duration: section.estimated_duration || undefined,
+      order: section.order_index || section.order || index + 1,
+      isCompleted: section.module_is_completed || false,
+      duration: section.duration_minutes || section.estimated_duration || undefined,
     }));
 
     // Generate rating breakdown (fallback if not in API)
@@ -150,7 +161,7 @@ class CourseDetailService {
     );
 
     // Process reviews
-    const processedReviews = reviews.map(review => ({
+    const processedReviews = (reviews || []).map((review: any) => ({
       rating: review.rating,
       review: review.review,
       reviewerName: review.reviewer_name,

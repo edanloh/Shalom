@@ -242,6 +242,11 @@ export default function CourseDetailScreen({
       setIsEnrolling(true);
       const { firstModuleId } = await courseService.enrollInCourse(userId, courseId);
 
+      // Mark as enrolled immediately so UI updates
+      setIsEnrolled(true);
+      // Refresh detail in background to pick up any progress/enrollment metadata
+      loadCourseDetail?.();
+
       creditService
         .recordCreditEvent({
           userId,
@@ -306,7 +311,8 @@ export default function CourseDetailScreen({
       title=""
       noHeader
       widescreen
-      customEdges={["bottom"]}
+      // Include top inset so back button isn't under the notch
+      customEdges={["top", "bottom"]}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -490,7 +496,7 @@ const styles = StyleSheet.create({
   },
   header: {
     position: 'absolute',
-    top: Spacing.lg*2,
+    top: Spacing.lg,
     left: 0,
     right: 0,
     zIndex: 1,
