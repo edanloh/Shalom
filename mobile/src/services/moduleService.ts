@@ -107,7 +107,8 @@ export interface ModuleDetailResponse {
 class ModuleService {
   /**
    * Get course module content with sections, videos, quizzes, and user progress
-   * Endpoint: GET /courses/{courseId}/module?userId={userId}
+   * Endpoint: GET /getModuleDetail/{courseId}?userId={userId}
+   * Maps to getModuleDetail.mjs Lambda function
    */
   async getModuleDetail(courseId: string, userId?: string): Promise<ModuleDetailResponse['data']> {
     try {      
@@ -117,7 +118,7 @@ class ModuleService {
       }
 
       const response = await apiService.get<ModuleDetailResponse>(
-        `/courses/${courseId}/module`,
+        `/getModuleDetail/${courseId}`,
         params
       );
 

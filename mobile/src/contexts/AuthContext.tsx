@@ -1,15 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
-import {
-  CognitoIdentityProviderClient,
-  InitiateAuthCommand,
-  SignUpCommand,
-  ConfirmSignUpCommand,
-  ForgotPasswordCommand,
-  ConfirmForgotPasswordCommand,
-  GetUserCommand,
-} from "@aws-sdk/client-cognito-identity-provider";
+// Temporarily commented out AWS Cognito - switching to Supabase Auth
+// import {
+//   CognitoIdentityProviderClient,
+//   InitiateAuthCommand,
+//   SignUpCommand,
+//   ConfirmSignUpCommand,
+//   ForgotPasswordCommand,
+//   ConfirmForgotPasswordCommand,
+//   GetUserCommand,
+// } from "@aws-sdk/client-cognito-identity-provider";
 import {
   COGNITO_POOL_ID,
   COGNITO_CLIENT_ID,
@@ -66,6 +67,8 @@ interface AuthContextType {
 }
 
 const USER_STORAGE_KEY = "shalom_user";
+// Temporarily commented out AWS Cognito - switching to Supabase Auth
+/*
 if (!COGNITO_POOL_ID || !COGNITO_CLIENT_ID) {
   throw new Error("Missing Cognito configuration");
 }
@@ -73,6 +76,7 @@ if (!COGNITO_POOL_ID || !COGNITO_CLIENT_ID) {
 const cognitoClient = new CognitoIdentityProviderClient({
   region: "ap-southeast-1",
 });
+*/
 
 const getAuthErrorMessage = (error: any): string => {
   const errorMessages: Record<string, string> = {

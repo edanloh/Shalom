@@ -8,7 +8,10 @@ import { ApiResponse, PaginatedResponse } from '../types';
 
 // API Configuration
 const API_CONFIG = {
-  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://your-api-gateway-url.amazonaws.com',
+  BASE_URL: process.env.VITE_SUPABASE_URL 
+    ? `${process.env.VITE_SUPABASE_URL}/functions/v1` 
+    : 'https://cmtfxsntlfoxgcznanpe.supabase.co/functions/v1',
+  SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_bwjUUwC-IlqND-F2-7t9yg_OWb4angZ',
   TIMEOUT: 10000, // 10 seconds
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second
@@ -124,27 +127,33 @@ class ApiService {
     this.responseInterceptors.push(interceptor);
   }
 
-  // Authentication interceptor - adds JWT token to requests
+  // Authentication interceptor - adds JWT token and Supabase API key to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      if (token) {
-        config.headers = {
-          ...config.headers,
-          'Authorization': `Bearer ${token}`,
-        };
-      }
-      // Always add Content-Type header
+      
+      // Add Supabase API key and Content-Type headers
       config.headers = {
         ...config.headers,
         'Content-Type': 'application/json',
+        'apikey': API_CONFIG.SUPABASE_ANON_KEY,
       };
+      
+      // Add Authorization if we have a token
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        // Use Supabase anon key as fallback Authorization
+        config.headers['Authorization'] = `Bearer ${API_CONFIG.SUPABASE_ANON_KEY}`;
+      }
     } catch (error) {
       console.warn('Failed to retrieve auth token:', error);
-      // Even if auth fails, add Content-Type header
+      // Even if auth fails, add required headers
       config.headers = {
         ...config.headers,
         'Content-Type': 'application/json',
+        'apikey': API_CONFIG.SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${API_CONFIG.SUPABASE_ANON_KEY}`,
       };
     }
     return config;
@@ -170,13 +179,10 @@ private errorInterceptor: ResponseInterceptor = async (response) => {
       (errorData && (errorData.message || errorData.error || errorData.reason)) ||
       (typeof errorData === 'string' ? errorData : undefined);
 
-    // Capture useful IDs for CloudWatch correlation
+    // Capture useful IDs for Supabase correlation
     const hdrs = {
-      'apigw-requestid': response.headers.get('apigw-requestid'),
-      'x-amzn-requestid': response.headers.get('x-amzn-requestid'),
-      'x-lambda-fn': response.headers.get('x-lambda-fn'),
-      'x-lambda-ver': response.headers.get('x-lambda-ver'),
-      'x-lambda-req': response.headers.get('x-lambda-req'),
+      'x-request-id': response.headers.get('x-request-id'),
+      'x-supabase-trace-id': response.headers.get('x-supabase-trace-id'),
     };
 
     const status = response.status;

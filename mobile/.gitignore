@@ -5,7 +5,7 @@ node_modules/
 .pnp.js
 
 # Expo
-.expo/
+.expo
 .expo-shared/
 dist/
 web-build/
@@ -17,13 +17,7 @@ web-build/
 .env.*.local
 
 # Native builds
-android/app/build/
-android/build/
-android/.gradle/
-android/.idea/
-android/local.properties
-android/app/release/
-android/app/debug/
+android
 ios/Pods/
 ios/build/
 ios/**/*.mode1v3
