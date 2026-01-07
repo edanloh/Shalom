@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 import styles from "@/styles/styles";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import { validatePassword } from "@/utils/validatePassword";
+import { supabase } from "@/lib/supabase";
 
 export default function ForgotPasswordScreen({ navigation }: any) {
   const [step, setStep] = useState(1); // 1: request, 2: confirm
@@ -26,7 +27,14 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordWarning, setPasswordWarning] = useState("");
-  const { resetPassword, confirmPasswordReset } = useAuth();
+  const { resetPassword, confirmPasswordReset, resetState } = useAuth();
+
+  useEffect(() => {
+    console.log("Reset state changed:", resetState);
+    if (resetState === "PASSWORD_RECOVERY") {
+      setStep(2);
+    }
+  }, [resetState])
 
   const handleRequestReset = async () => {
     if (!email) {
@@ -34,10 +42,9 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       return;
     }
     setLoading(true);
-    const ok = await resetPassword(email);
+    const response = await resetPassword(email);
     setLoading(false);
-    if (ok) {
-      setStep(2);
+    if (response.error != null) {
       setWarningText("");
     } else {
       setWarningText("Failed to send reset email");
@@ -46,17 +53,17 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 
   const handleConfirmReset = async () => {
     if (!code || !newPassword) {
-      setWarningText("Please enter the code and new password");
+      setWarningText("Please enter the new password");
       return;
     }
     setLoading(true);
-    const ok = await confirmPasswordReset(email, code, newPassword);
+    const response = await confirmPasswordReset(newPassword);
     setLoading(false);
-    if (ok) {
+    if (response.success) {
       setSuccess(true);
       setWarningText("");
     } else {
-      setWarningText("Invalid code or password. Please try again");
+      setWarningText(response.error || "Failed to reset password");
     }
   };
 
@@ -92,8 +99,8 @@ export default function ForgotPasswordScreen({ navigation }: any) {
             {success
               ? "You can now sign in with your new password."
               : step === 1
-              ? "Enter your email to receive a password reset code."
-              : "Enter the code sent to your email and your new password."}
+              ? "Enter your email to receive a password reset link."
+              : "Enter your new password."}
           </Text>
           {warningText ? (
             <Text style={{ color: Colors.textWarning, marginBottom: 8 }}>
@@ -117,7 +124,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                     onPress={handleRequestReset}
                     disabled={loading}
                     loading={loading}
-                    text={loading ? "Sending..." : "Send Reset Code"}
+                    text={loading ? "Sending..." : "Send Reset Link"}
                   />
                   <View style={[styles.loginContainer, { marginTop: 16 }]}>
                     <Text style={styles.loginText}>Back to </Text>

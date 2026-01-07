@@ -1,11 +1,30 @@
 // API-ready data types for the application
 
+import { Session, AuthChangeEvent } from '@supabase/supabase-js';
+
+export interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  resetState: AuthChangeEvent | null;
+  login: ( email: string, password: string ) => Promise<{ success: boolean; error?: string }>;
+  register: ( email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ data: any; error: any; }>;
+  confirmPasswordReset: ( newPassword: string ) => Promise<{ success: boolean; error?: string }>;
+  // loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  changePassword: ( currentPassword: string, newPassword: string ) => Promise<{ success: boolean; error?: string }>;
+  fetchEmail: (email: string) => Promise<any>;
+  getSession: () => Session | null;
+}
+
 export interface User {
   id: string;
   email: string;
   username?: string;
   name: string;
-  role?: "learner" | "instructor";
+  role?: 'learner' | 'instructor';
   avatar?: string;
   bio?: string;
   location?: string;

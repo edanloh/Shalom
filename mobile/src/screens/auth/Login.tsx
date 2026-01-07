@@ -23,6 +23,7 @@ import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import externalStyles from "@styles/styles";
+import { useEffect } from "react";
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
@@ -43,7 +44,7 @@ export default function LoginScreen({ navigation }: any) {
     if (!result.success) {
       setLoginWarning(result.error || "Login failed. Please try again");
     }
-    // Navigation will happen automatically when isAuthenticated changes
+    // Navigation will happen automatically when Supabase session state changes
   };
 
   // const handleGoogleLogin = async () => {

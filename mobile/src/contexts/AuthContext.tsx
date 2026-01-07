@@ -1,38 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import * as SecureStore from "expo-secure-store";
-import * as WebBrowser from "expo-web-browser";
-import {
-  CognitoIdentityProviderClient,
-  InitiateAuthCommand,
-  SignUpCommand,
-  ConfirmSignUpCommand,
-  ForgotPasswordCommand,
-  ConfirmForgotPasswordCommand,
-  GetUserCommand,
-  ChangePasswordCommand,
-} from "@aws-sdk/client-cognito-identity-provider";
-import {
-  COGNITO_POOL_ID,
-  COGNITO_CLIENT_ID,
-  API_BASE_URL,
-} from "react-native-dotenv";
-import { handleLogoutCleanup } from "./NotificationContext";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
+import { API_BASE_URL } from 'react-native-dotenv';
+import { handleLogoutCleanup } from './NotificationContext';
+import { supabase } from '@/lib/supabase';
+import { AppState } from 'react-native';
+import { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { User, AuthContextType } from '@/types';
+import { useNavigation } from "@react-navigation/native";
 
 WebBrowser.maybeCompleteAuthSession();
-
-export interface User {
-  id: string;
-  email: string;
-  username: string;
-  name: string;
-  role: "learner" | "instructor";
-  avatar?: string;
-  bio?: string;
-  location?: string;
-  phone?: string;
-  authProvider: "google" | "email";
-  accessToken?: string;
-}
 
 export interface AuthTokens {
   access_token: string;
@@ -40,80 +17,25 @@ export interface AuthTokens {
   refresh_token?: string;
 }
 
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (
-    email: string,
-    password: string
-  ) => Promise<{ success: boolean; error?: string }>;
-  register: (
-    email: string,
-    password: string,
-    name: string,
-    role: string
-  ) => Promise<boolean>;
-  logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<boolean>;
-  confirmPasswordReset: (
-    email: string,
-    code: string,
-    newPassword: string
-  ) => Promise<boolean>;
-  confirmSignUp: (email: string, code: string) => Promise<boolean>;
-  // loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  updateProfile: (data: Partial<User>) => Promise<void>;
-  changePassword: (
-    currentPassword: string,
-    newPassword: string
-  ) => Promise<{ success: boolean; error?: string }>;
-  fetchEmail: (email: string) => Promise<any>;
-}
-
-const USER_STORAGE_KEY = "shalom_user";
-if (!COGNITO_POOL_ID || !COGNITO_CLIENT_ID) {
-  throw new Error("Missing Cognito configuration");
-}
-
-const cognitoClient = new CognitoIdentityProviderClient({
-  region: "ap-southeast-1",
-});
-
-const getAuthErrorMessage = (error: any): string => {
-  const errorMessages: Record<string, string> = {
-    NotAuthorizedException: "Invalid email or password",
-    UserNotConfirmedException: "Please verify your email address",
-    UserNotFoundException: "User not found",
-    TooManyRequestsException: "Too many requests. Please try again later",
-    InvalidParameterException: "Invalid parameters provided",
-  };
-  return errorMessages[error.name] || error.message || "Authentication failed";
-};
-
-const extractUserFromAttributes = (
-  attributes: any[],
-  username: string,
-  email: string
-) => {
-  const nameAttr = attributes.find((attr) => attr.Name === "name");
-  const roleAttr = attributes.find((attr) => attr.Name === "custom:role");
-  return {
-    id: username || email,
-    email,
-    username: username || email,
-    name: nameAttr?.Value || email.split("@")[0],
-    role: (roleAttr?.Value as "learner" | "instructor") || "learner",
-  };
-};
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Tells Supabase Auth to continuously refresh the session automatically if
+// the app is in the foreground. When this is added, you will continue to receive
+// `onAuthStateChange` events with the `TOKEN_REFRESHED` or `SIGNED_OUT` event
+// if the user's session is terminated. This should only be registered once.
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') {
+    supabase.auth.startAutoRefresh();
+  } else {
+    supabase.auth.stopAutoRefresh();
+  }
+});
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [resetState , setResetState] = useState<AuthChangeEvent | null>(null);
 
   // Set the below to skip auth during development
   // const [user, setUser] = useState<User | null>({
@@ -131,163 +53,136 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // });
   // const [isAuthenticated, setIsAuthenticated] = useState(true);
 
+  const getSession = () => session;
+
   useEffect(() => {
-    loadStoredAuth();
+    // On mount, get the current session and subscribe to auth state changes
+    const getSessionAndSubscribe = async () => {
+      setIsLoading(true);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session && session.user) {
+        let provider: 'email' | 'google' = 'email';
+        if (session.user.app_metadata?.provider === 'google')
+          provider = 'google';
+        const userData: User = {
+          id: session.user.id,
+          email: session.user.email || '',
+          name: session.user.user_metadata?.first_name,
+          authProvider: provider,
+          accessToken: session.access_token,
+        };
+        setUser(userData);
+        setSession(session);
+        // Initial save to userService
+        import('../services/userService').then(({ updateUserProfile }) => {
+          updateUserProfile(userData.id, {
+            id: userData.id,
+            email: userData.email,
+            name: userData.name,
+            // Add more fields if needed
+          }).catch(() => {});
+        });
+      } else {
+        setUser(null);
+        setSession(null);
+      }
+      setIsLoading(false);
+    };
+    getSessionAndSubscribe();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setResetState(event);
+          console.log('session is now', session)
+          const navigation = useNavigation<any>();
+          console.log('Navigate to forgot password from callback');
+          navigation.navigate('ForgotPassword');
+        } else if (session && session.user) {
+          let provider: 'email' | 'google' = 'email';
+          if (session.user.app_metadata?.provider === 'google')
+            provider = 'google';
+          const userData: User = {
+            id: session.user.id,
+            email: session.user.email || '',
+            name: session.user.user_metadata?.first_name,
+            authProvider: provider,
+            accessToken: session.access_token,
+          };
+          setUser(userData);
+          setSession(session);
+          // Initial save to userService
+          import('../services/userService').then(({ updateUserProfile }) => {
+            updateUserProfile(userData.id, {
+              id: userData.id,
+              email: userData.email,
+              name: userData.name,
+              // Add more fields if needed
+            }).catch(() => {});
+          });
+        } else {
+          setUser(null);
+          setSession(null);
+        }
+      }
+    );
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
   }, []);
 
-  const loadStoredAuth = async () => {
-    try {
-      const storedUser = await SecureStore.getItemAsync(USER_STORAGE_KEY);
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        setIsAuthenticated(true);
-      }
-    } catch (error) {
-      await SecureStore.deleteItemAsync(USER_STORAGE_KEY);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const persistUser = async (userData: User) => {
-    await SecureStore.setItemAsync(USER_STORAGE_KEY, JSON.stringify(userData));
-    setUser(userData);
-    setIsAuthenticated(true);
-  };
-
   const login = async (email: string, password: string) => {
-    try {
-      const authResponse = await cognitoClient.send(
-        new InitiateAuthCommand({
-          AuthFlow: "USER_PASSWORD_AUTH",
-          ClientId: COGNITO_CLIENT_ID,
-          AuthParameters: { USERNAME: email, PASSWORD: password },
-        })
-      );
-
-      if (!authResponse.AuthenticationResult?.AccessToken) {
-        return { success: false, error: "Authentication failed" };
-      }
-
-      const userResponse = await cognitoClient.send(
-        new GetUserCommand({
-          AccessToken: authResponse.AuthenticationResult.AccessToken,
-        })
-      );
-
-      const baseUser = extractUserFromAttributes(
-        userResponse.UserAttributes || [],
-        userResponse.Username || email,
-        email
-      );
-
-      const userData: User = {
-        ...baseUser,
-        authProvider: "email",
-        accessToken: authResponse.AuthenticationResult.AccessToken,
-      };
-
-      await persistUser(userData);
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: getAuthErrorMessage(error) };
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+    return {
+      success: !error,
+      error: error?.message,
+    };
   };
 
-  const register = async (
-    email: string,
-    password: string,
-    name: string,
-    role: string
-  ) => {
-    try {
-      await cognitoClient.send(
-        new SignUpCommand({
-          ClientId: COGNITO_CLIENT_ID,
-          Username: email,
-          Password: password,
-          UserAttributes: [
-            { Name: "name", Value: name },
-            { Name: "custom:role", Value: role },
-          ],
-        })
-      );
-      return true;
-    } catch {
-      return false;
-    }
+  const register = async (email: string, password: string, name: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email: email,
+      password: password,
+      options: {
+        data: {
+          first_name: name,
+          role: 'learner',
+        },
+      },
+    });
+    return {
+      success: !error,
+      error: error?.message,
+    };
   };
 
   const logout = async () => {
-    // Remove push token from backend before logging out
-    if (user?.id) {
-      try {
-        const pushToken = await SecureStore.getItemAsync("@expo_push_token");
-        if (pushToken) {
-          await handleLogoutCleanup(user.id, pushToken);
-        }
-      } catch (error) {
-        console.error("Error cleaning up push token:", error);
-      }
-    }
-
-    await SecureStore.deleteItemAsync(USER_STORAGE_KEY);
+    supabase.auth.signOut();
     setUser(null);
-    setIsAuthenticated(false);
   };
 
   const resetPassword = async (email: string) => {
-    try {
-      await cognitoClient.send(
-        new ForgotPasswordCommand({
-          ClientId: COGNITO_CLIENT_ID,
-          Username: email,
-        })
-      );
-      return true;
-    } catch {
-      return false;
-    }
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+    return { data, error };
   };
 
-  const confirmPasswordReset = async (
-    email: string,
-    code: string,
-    newPassword: string
-  ) => {
-    try {
-      await cognitoClient.send(
-        new ConfirmForgotPasswordCommand({
-          ClientId: COGNITO_CLIENT_ID,
-          Username: email,
-          ConfirmationCode: code,
-          Password: newPassword,
-        })
-      );
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const confirmSignUp = async (email: string, code: string) => {
-    try {
-      await cognitoClient.send(
-        new ConfirmSignUpCommand({
-          ClientId: COGNITO_CLIENT_ID,
-          Username: email,
-          ConfirmationCode: code,
-        })
-      );
-      return true;
-    } catch {
-      return false;
-    }
+  const confirmPasswordReset = async (newPassword: string) => {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword })
+    if (data) alert("Password updated successfully!")
+    if (error) alert("There was an error updating your password.")
+    return {
+      success: !error,
+      error: error?.message,
+    };
   };
 
   const loginWithGoogle = () => {
-    console.log("Google login is currently disabled.");
+    console.log('Google login is currently disabled.');
     return Promise.resolve();
   };
 
@@ -296,16 +191,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const response = await fetch(
         `${API_BASE_URL}/dev/getUserInfo?email=${email}`,
         {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
         }
       );
       if (!response.ok) {
-        throw new Error("Failed to fetch user info from API Gateway");
+        throw new Error('Failed to fetch user info from API Gateway');
       }
       return await response.json();
     } catch (error) {
-      console.error("Error fetching email:", error);
+      console.error('Error fetching email:', error);
       throw error;
     }
   };
@@ -357,7 +252,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const updateProfile = async (data: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...data };
-      await persistUser(updatedUser);
+      // await persistUser(updatedUser);
     }
   };
 
@@ -365,40 +260,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     currentPassword: string,
     newPassword: string
   ) => {
-    try {
-      if (!user?.accessToken) {
-        return { success: false, error: "Not authenticated" };
-      }
+    return { success: true };
+    // try {
+    //   if (!user?.accessToken) {
+    //     return { success: false, error: 'Not authenticated' };
+    //   }
 
-      await cognitoClient.send(
-        new ChangePasswordCommand({
-          AccessToken: user.accessToken,
-          PreviousPassword: currentPassword,
-          ProposedPassword: newPassword,
-        })
-      );
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: getAuthErrorMessage(error) };
-    }
+    //   await cognitoClient.send(
+    //     new ChangePasswordCommand({
+    //       AccessToken: user.accessToken,
+    //       PreviousPassword: currentPassword,
+    //       ProposedPassword: newPassword,
+    //     })
+    //   );
+    //   return { success: true };
+    // } catch (error: any) {
+    //   return { success: false, error: getAuthErrorMessage(error) };
+    // }
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated,
         isLoading,
+        resetState,
         login,
         register,
         logout,
         resetPassword,
         confirmPasswordReset,
-        confirmSignUp,
         loginWithGoogle,
         updateProfile,
         changePassword,
         fetchEmail,
+        getSession,
       }}
     >
       {children}
@@ -409,7 +305,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };

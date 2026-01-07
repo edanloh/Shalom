@@ -46,7 +46,7 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
 
 // Navigation component that checks auth state
 const AppNavigator = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { getSession, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -66,7 +66,7 @@ const AppNavigator = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
+        {getSession() ? (
           <Stack.Screen
             name="Main"
             component={MainNavigator}

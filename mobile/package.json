@@ -26,7 +26,9 @@
     "@react-navigation/native": "^7.1.17",
     "@react-navigation/native-stack": "^7.3.25",
     "@react-navigation/stack": "^7.4.8",
+    "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-query": "^5.87.4",
+    "aes-js": "^3.1.2",
     "amazon-cognito-identity-js": "^6.3.15",
     "aws-amplify": "^6.15.5",
     "concurrently": "^9.2.1",
@@ -43,6 +45,7 @@
     "expo-linear-gradient": "~15.0.7",
     "expo-modules-autolinking": "~3.0.17",
     "expo-notifications": "^0.32.15",
+    "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.8",
     "expo-video": "^3.0.15",
     "expo-web-browser": "~15.0.9",
@@ -70,11 +73,11 @@
     "readable-stream": "^4.7.0",
     "rn-nodeify": "^10.3.0",
     "stream-browserify": "^3.0.0",
-    "text-encoding": "^0.7.0",
-    "expo-secure-store": "~15.0.8"
+    "text-encoding": "^0.7.0"
   },
   "devDependencies": {
     "@react-native-community/cli": "^20.0.1",
+    "@types/aes-js": "^3.1.4",
     "@types/node": "^24.3.1",
     "@types/react": "~19.1.10",
     "@types/react-dom": "~19.1.7",

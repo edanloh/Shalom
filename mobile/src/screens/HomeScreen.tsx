@@ -32,6 +32,8 @@ import type { Course } from '../types';
 import type { MainStackParamList, TabParamList } from '../types/navigation';
 import CourseCarousel from '@/components/home/CourseCarousel';
 
+import { Session } from '@supabase/supabase-js'
+
 // Types for API-ready data structures
 interface Achievement {
   id: string;
@@ -57,7 +59,7 @@ type TabType = 'home' | 'courses' | 'search' | 'settings';
 export default function HomeScreen({ navigation, route }: any) {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { user, login, register } = useAuth();
+  const { user, getSession } = useAuth();
 
   // const navigation = useNavigation<CompositeNavigationProp<
   //   StackNavigationProp<MainStackParamList>,
@@ -91,6 +93,10 @@ export default function HomeScreen({ navigation, route }: any) {
       console.log('HomeScreen - User ID for enrollment fetch:', user.id);
     }
   }, [user]);
+
+  useEffect(() => {
+    console.log('Session data on HomeScreen mount:', getSession());
+  }, []);
 
   // Mock static data that doesn't require API calls
   const achievements: Achievement[] = [
