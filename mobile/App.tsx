@@ -1,7 +1,7 @@
 import "./polyfills";
 import "react-native-url-polyfill/auto";
 import "react-native-gesture-handler";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import * as Font from "expo-font";
 import { LinkingOptions, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -19,12 +19,11 @@ import { NotificationProvider } from "./src/contexts/NotificationContext";
 import SplashScreen from "./src/screens/SplashScreen";
 import type { MainStackParamList } from "./src/types";
 import * as Linking from "expo-linking";
-import { useRef } from "react";
 import { parseSupabaseUrl } from "./src/utils/authUtils";
 import { supabase } from "./src/lib/supabase";
 import { Colors } from "./src/constants";
-import { useNavigation } from "@react-navigation/native";
 import * as Screens from "./src/screens";
+import { AppState } from 'react-native';
 
 // Fix for web scrolling - override root height
 if (Platform.OS === "web") {
@@ -49,14 +48,24 @@ if (Platform.OS === "web") {
   document.head.appendChild(style);
 }
 
+// // Tells Supabase Auth to continuously refresh the session automatically if
+// // the app is in the foreground. When this is added, you will continue to receive
+// // `onAuthStateChange` events with the `TOKEN_REFRESHED` or `SIGNED_OUT` event
+// // if the user's session is terminated. This should only be registered once.
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') {
+    supabase.auth.startAutoRefresh();
+  } else {
+    supabase.auth.stopAutoRefresh();
+  }
+});
+
 const Root = createNativeStackNavigator<MainStackParamList>();
-const prefix = Linking.createURL("/");
 
 // Navigation component that checks auth state
 const AppNavigator = () => {
-  const { session, isLoading, loginWithToken, setIsResettingPassword, user } =
+  const { session, isLoading, loginWithToken, user } =
     useAuth();
-  const isLoggedIn = user !== null;
 
   // --- Deep link handling ---
   const getInitialURL = async () => {
@@ -68,7 +77,7 @@ const AppNavigator = () => {
   };
 
   // Handle initial URL on mount (cold start or resume)
-  React.useEffect(() => {
+  useEffect(() => {
     (async () => {
       const url = await getInitialURL();
       console.log("[DeepLink] Initial URL:", url);
@@ -113,17 +122,6 @@ const AppNavigator = () => {
     return () => {
       subscription.remove();
     };
-  };
-
-  const linking: LinkingOptions<MainStackParamList> = {
-    prefixes: [prefix],
-    config: {
-      screens: {
-        ResetPassword: "/ResetPassword",
-      },
-    },
-    getInitialURL,
-    subscribe,
   };
 
   if (isLoading) {
