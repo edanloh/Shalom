@@ -1,0 +1,552 @@
+// supabase/functions/updateCourse/index.ts
+/**
+ * Supabase Edge Function: updateCourse
+ * Purpose: Update existing course details with dynamic field updates and category management
+ * Endpoint: PUT /updateCourse/{courseId}
+ * Database: PostgreSQL (Supabase compatible)
+ */
+
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'PUT,OPTIONS',
+};
+
+serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Create Supabase client with service role key
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const url = new URL(req.url);
+    
+    // Extract courseId from path: /updateCourse/{courseId}
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const courseId = pathParts[pathParts.length - 1];
+
+    if (!courseId || courseId === 'updateCourse') {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Course ID is required"
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const body = await req.json();
+    console.log('Update course request:', courseId);
+
+    // Extract modules, outcomes, requirements for separate handling
+    const { modules, outcomes, requirements, ...courseFields } = body;
+
+    // Build update object for course fields
+    const updateData: any = {};
+
+    if (courseFields.title !== undefined) updateData.title = courseFields.title;
+    if (courseFields.description !== undefined) updateData.description = courseFields.description;
+    if (courseFields.level !== undefined) updateData.level = courseFields.level;
+    if (courseFields.instructorName !== undefined) updateData.instructor_name = courseFields.instructorName;
+    if (courseFields.thumbnailUrl !== undefined) updateData.thumbnail_url = courseFields.thumbnailUrl;
+    if (courseFields.durationHours !== undefined) updateData.duration_hours = courseFields.durationHours;
+    if (courseFields.tags !== undefined) updateData.tags = courseFields.tags;
+    if (courseFields.isPublished !== undefined) updateData.is_published = courseFields.isPublished;
+
+    // Handle category update
+    if (courseFields.category) {
+      // Check if category exists
+      const { data: existingCategory } = await supabaseClient
+        .from('categories')
+        .select('id')
+        .eq('name', courseFields.category)
+        .single();
+
+      let categoryId;
+      if (existingCategory) {
+        categoryId = existingCategory.id;
+      } else {
+        // Create new category
+        const { data: newCategory, error: categoryError } = await supabaseClient
+          .from('categories')
+          .insert({
+            name: courseFields.category,
+            description: `${courseFields.category} courses`,
+            color: '#6366F1'
+          })
+          .select('id')
+          .single();
+
+        if (categoryError) throw categoryError;
+        categoryId = newCategory.id;
+      }
+      updateData.category_id = categoryId;
+    }
+
+    // Update course if there are fields to update
+    let course;
+    if (Object.keys(updateData).length > 0) {
+      updateData.updated_at = new Date().toISOString();
+
+      const { data: updatedCourse, error: updateError } = await supabaseClient
+        .from('courses')
+        .update(updateData)
+        .eq('id', courseId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      if (!updatedCourse) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Course not found"
+          }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      course = updatedCourse;
+    } else {
+      // Just fetch existing course if no updates
+      const { data: existingCourse, error: fetchError } = await supabaseClient
+        .from('courses')
+        .select()
+        .eq('id', courseId)
+        .single();
+
+      if (fetchError || !existingCourse) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Course not found"
+          }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      course = existingCourse;
+    }
+
+    // Update modules if provided - PRESERVE STUDENT PROGRESS
+    if (modules && Array.isArray(modules)) {
+      // Get existing section IDs for this course
+      const { data: existingSections } = await supabaseClient
+        .from('course_sections')
+        .select('id')
+        .eq('course_id', courseId);
+
+      const existingSectionIds = (existingSections || []).map((s: any) => s.id);
+      const processedSectionIds: string[] = [];
+
+      // Process each module (section)
+      for (let i = 0; i < modules.length; i++) {
+        const module = modules[i];
+        let sectionId;
+
+        if (module.id && existingSectionIds.includes(module.id)) {
+          // UPDATE existing section - preserves user_module_progress
+          await supabaseClient
+            .from('course_sections')
+            .update({
+              title: module.title,
+              description: module.description || '',
+              order_index: i
+            })
+            .eq('id', module.id);
+
+          sectionId = module.id;
+        } else {
+          // INSERT new section
+          const { data: newSection, error: sectionError } = await supabaseClient
+            .from('course_sections')
+            .insert({
+              course_id: courseId,
+              title: module.title,
+              description: module.description || '',
+              order_index: i
+            })
+            .select('id')
+            .single();
+
+          if (sectionError) throw sectionError;
+          sectionId = newSection.id;
+        }
+
+        processedSectionIds.push(sectionId);
+
+        // Handle lessons (videos) for this section
+        const { data: existingVideos } = await supabaseClient
+          .from('course_videos')
+          .select('id')
+          .eq('section_id', sectionId);
+
+        const existingVideoIds = (existingVideos || []).map((v: any) => v.id);
+        const processedVideoIds: string[] = [];
+
+        const lessons = module.lessons || [];
+        for (let j = 0; j < lessons.length; j++) {
+          const lesson = lessons[j];
+
+          if (lesson.id && existingVideoIds.includes(lesson.id)) {
+            // UPDATE existing video - preserves user video progress
+            await supabaseClient
+              .from('course_videos')
+              .update({
+                title: lesson.title,
+                description: lesson.content || '',
+                video_url: lesson.videoUrl || '',
+                duration_seconds: (lesson.durationMinutes || 0) * 60,
+                order_index: lesson.order ?? j,
+                is_preview: lesson.isPreview || false,
+                thumbnail_url: lesson.thumbnailUrl || null
+              })
+              .eq('id', lesson.id);
+
+            processedVideoIds.push(lesson.id);
+          } else {
+            // INSERT new video
+            const { data: newVideo, error: videoError } = await supabaseClient
+              .from('course_videos')
+              .insert({
+                course_id: courseId,
+                section_id: sectionId,
+                title: lesson.title,
+                description: lesson.content || '',
+                video_url: lesson.videoUrl || '',
+                duration_seconds: (lesson.durationMinutes || 0) * 60,
+                order_index: lesson.order ?? j,
+                is_preview: lesson.isPreview || false,
+                thumbnail_url: lesson.thumbnailUrl || null
+              })
+              .select('id')
+              .single();
+
+            if (videoError) throw videoError;
+            processedVideoIds.push(newVideo.id);
+          }
+        }
+
+        // Delete videos that were removed from this section
+        const videosToDelete = existingVideoIds.filter(id => !processedVideoIds.includes(id));
+        if (videosToDelete.length > 0) {
+          await supabaseClient
+            .from('course_videos')
+            .delete()
+            .in('id', videosToDelete);
+        }
+
+        // Handle quizzes for this section
+        const { data: existingQuizzes } = await supabaseClient
+          .from('course_quizzes')
+          .select('id')
+          .eq('section_id', sectionId);
+
+        const existingQuizIds = (existingQuizzes || []).map((q: any) => q.id);
+        const processedQuizIds: string[] = [];
+
+        const quizzes = module.quizzes || [];
+        for (let k = 0; k < quizzes.length; k++) {
+          const quiz = quizzes[k];
+          let quizId;
+
+          if (quiz.id && existingQuizIds.includes(quiz.id)) {
+            // UPDATE existing quiz - preserves user_quiz_attempts
+            await supabaseClient
+              .from('course_quizzes')
+              .update({
+                title: quiz.title,
+                description: quiz.description || '',
+                passing_score: quiz.passingScore || 70,
+                order_index: quiz.order ?? k,
+                time_limit_minutes: quiz.timeLimitMinutes || 30,
+                max_attempts: quiz.maxAttempts || 3
+              })
+              .eq('id', quiz.id);
+
+            quizId = quiz.id;
+          } else {
+            // INSERT new quiz
+            const { data: newQuiz, error: quizError } = await supabaseClient
+              .from('course_quizzes')
+              .insert({
+                course_id: courseId,
+                section_id: sectionId,
+                title: quiz.title,
+                description: quiz.description || '',
+                passing_score: quiz.passingScore || 70,
+                order_index: quiz.order ?? k,
+                time_limit_minutes: quiz.timeLimitMinutes || 30,
+                max_attempts: quiz.maxAttempts || 3
+              })
+              .select('id')
+              .single();
+
+            if (quizError) throw quizError;
+            quizId = newQuiz.id;
+          }
+
+          processedQuizIds.push(quizId);
+
+          // Handle quiz questions
+          const { data: existingQuestions } = await supabaseClient
+            .from('quiz_questions')
+            .select('id')
+            .eq('quiz_id', quizId);
+
+          const existingQuestionIds = (existingQuestions || []).map((q: any) => q.id);
+          const processedQuestionIds: string[] = [];
+
+          const questions = quiz.questions || [];
+          for (let q = 0; q < questions.length; q++) {
+            const question = questions[q];
+
+            // Normalize question type
+            let questionType = question.type || 'multiple-choice';
+            if (questionType === 'multiple-correct') {
+              questionType = 'multiple-choice';
+            } else if (questionType === 'short-answer') {
+              questionType = 'text';
+            } else if (questionType === 'matching') {
+              questionType = 'text';
+            }
+
+            if (question.id && existingQuestionIds.includes(question.id)) {
+              // UPDATE existing question
+              await supabaseClient
+                .from('quiz_questions')
+                .update({
+                  question: question.text || question.question || '',
+                  question_type: questionType,
+                  options: question.options || [],
+                  correct_answer: String(question.correctAnswer || question.correct_answer || ''),
+                  explanation: question.explanation || question.sampleAnswer || '',
+                  points: question.points || 1,
+                  order_index: q
+                })
+                .eq('id', question.id);
+
+              processedQuestionIds.push(question.id);
+            } else {
+              // INSERT new question
+              const { data: newQuestion, error: questionError } = await supabaseClient
+                .from('quiz_questions')
+                .insert({
+                  quiz_id: quizId,
+                  question: question.text || question.question || '',
+                  question_type: questionType,
+                  options: question.options || [],
+                  correct_answer: String(question.correctAnswer || question.correct_answer || ''),
+                  explanation: question.explanation || question.sampleAnswer || '',
+                  points: question.points || 1,
+                  order_index: q
+                })
+                .select('id')
+                .single();
+
+              if (questionError) throw questionError;
+              processedQuestionIds.push(newQuestion.id);
+            }
+          }
+
+          // Delete questions that were removed
+          const questionsToDelete = existingQuestionIds.filter(id => !processedQuestionIds.includes(id));
+          if (questionsToDelete.length > 0) {
+            await supabaseClient
+              .from('quiz_questions')
+              .delete()
+              .in('id', questionsToDelete);
+          }
+        }
+
+        // Delete quizzes that were removed from this section
+        const quizzesToDelete = existingQuizIds.filter(id => !processedQuizIds.includes(id));
+        if (quizzesToDelete.length > 0) {
+          // Delete quiz attempts for removed quizzes
+          await supabaseClient
+            .from('quiz_attempts')
+            .delete()
+            .in('quiz_id', quizzesToDelete);
+
+          await supabaseClient
+            .from('course_quizzes')
+            .delete()
+            .in('id', quizzesToDelete);
+        }
+      }
+
+      // Delete sections that were completely removed
+      const sectionsToDelete = existingSectionIds.filter(id => !processedSectionIds.includes(id));
+      if (sectionsToDelete.length > 0) {
+        // Cascade will handle videos and quizzes
+        await supabaseClient
+          .from('course_sections')
+          .delete()
+          .in('id', sectionsToDelete);
+      }
+    }
+
+    // Update outcomes if provided
+    if (outcomes && Array.isArray(outcomes)) {
+      await supabaseClient
+        .from('course_outcomes')
+        .delete()
+        .eq('course_id', courseId);
+
+      for (let i = 0; i < outcomes.length; i++) {
+        await supabaseClient
+          .from('course_outcomes')
+          .insert({
+            course_id: courseId,
+            outcome: outcomes[i],
+            order_index: i
+          });
+      }
+    }
+
+    // Update requirements if provided
+    if (requirements && Array.isArray(requirements)) {
+      await supabaseClient
+        .from('course_requirements')
+        .delete()
+        .eq('course_id', courseId);
+
+      for (let i = 0; i < requirements.length; i++) {
+        await supabaseClient
+          .from('course_requirements')
+          .insert({
+            course_id: courseId,
+            requirement: requirements[i],
+            order_index: i
+          });
+      }
+    }
+
+    // Get category details
+    const enrichedCourse: any = {
+      ...course,
+      courseid: course.id
+    };
+
+    if (course.category_id) {
+      const { data: categoryDetails } = await supabaseClient
+        .from('categories')
+        .select('name, color')
+        .eq('id', course.category_id)
+        .single();
+
+      if (categoryDetails) {
+        enrichedCourse.category_name = categoryDetails.name;
+        enrichedCourse.category_color = categoryDetails.color;
+      }
+    }
+
+    // Get updated modules if they were updated
+    if (modules) {
+      const { data: sectionsData } = await supabaseClient
+        .from('course_sections')
+        .select(`
+          id,
+          title,
+          description,
+          order_index,
+          course_videos (
+            id,
+            title,
+            description,
+            video_url,
+            order_index,
+            duration_seconds,
+            is_preview
+          ),
+          course_quizzes (
+            id,
+            title,
+            passing_score,
+            order_index
+          )
+        `)
+        .eq('course_id', courseId)
+        .order('order_index', { ascending: true });
+
+      enrichedCourse.modules = (sectionsData || []).map((section: any) => ({
+        id: section.id,
+        title: section.title,
+        description: section.description,
+        section_order: section.order_index,
+        lessons: (section.course_videos || []).map((video: any) => ({
+          id: video.id,
+          title: video.title,
+          content: video.description,
+          videoUrl: video.video_url,
+          order: video.order_index,
+          durationMinutes: Math.floor(video.duration_seconds / 60),
+          isPreview: video.is_preview
+        })),
+        quizzes: (section.course_quizzes || []).map((quiz: any) => ({
+          id: quiz.id,
+          title: quiz.title,
+          passingScore: quiz.passing_score,
+          order: quiz.order_index
+        }))
+      }));
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Course updated successfully",
+        data: {
+          course: enrichedCourse
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
+          modulesUpdated: modules ? modules.length : 0
+        }
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+
+  } catch (error) {
+    console.error("Error updating course:", error);
+
+    return new Response(
+      JSON.stringify({
+        success: false,
+        message: "Failed to update course",
+        error: error.message,
+        meta: {
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID()
+        }
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+});

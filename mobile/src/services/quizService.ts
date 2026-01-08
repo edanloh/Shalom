@@ -181,14 +181,18 @@ class QuizService {
 
   /**
    * Submit quiz answers and get results
-   * Endpoint: POST /submitQuiz
-   * Maps to submitQuiz.mjs Lambda function
+   * Endpoint: POST /submitQuiz/{quizId}
+   * Maps to submitQuiz Supabase Edge Function
    */
   async submitQuiz(courseId: string, quizId: string, request: SubmitQuizRequest): Promise<SubmitQuizResponse['data']> {
     try {
       const response = await apiService.post<SubmitQuizResponse>(
-        `/submitQuiz`,
-        { ...request, courseId } // Include courseId in the body
+        `/submitQuiz/${quizId}`,
+        { 
+          userId: request.userId,
+          answers: request.answers,
+          timeTakenMinutes: request.timeTakenMinutes
+        }
       );
 
       if (!response.success || !response.data) {

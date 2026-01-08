@@ -68,7 +68,7 @@ export default function CourseCarousel({
         decelerationRate="fast"
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingHorizontal: (screenWidth - CARD_WIDTH) / 2 },
+          { paddingRight: (screenWidth - CARD_WIDTH) / 2, paddingLeft: Spacing["3xl"]},
         ]}
       >
         {courses.map((course, index) => {
@@ -200,7 +200,7 @@ function CourseCardItem({
           {/* Progress Section */}
           <Text style={[TextStyles.bodySmall, { marginVertical: Spacing.sm }]}>
             {course.progress?.completed || 0} of{" "}
-            {course.progress?.total || course.modules || 0} modules completed
+            {course.progress?.total || course.modules || 0} items completed
           </Text>
 
           <View style={styles.progressBarContainer}>

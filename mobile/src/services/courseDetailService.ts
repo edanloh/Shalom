@@ -156,12 +156,6 @@ class CourseDetailService {
       duration: section.estimated_duration || undefined,
     }));
 
-    // Generate rating breakdown (fallback if not in API)
-    const ratingBreakdown = this.generateRatingBreakdown(
-      parseFloat(course.rating || '0'),
-      course.total_ratings || 0
-    );
-
     // Process reviews
     const processedReviews = (reviews || []).map(review => ({
       rating: review.rating,
@@ -170,6 +164,9 @@ class CourseDetailService {
       reviewerAvatar: review.reviewer_avatar,
       createdAt: review.created_at,
     }));
+
+    // Calculate actual rating breakdown from reviews
+    const ratingBreakdown = this.calculateRatingBreakdown(processedReviews);
 
     return {
       id: course.id,
@@ -199,17 +196,31 @@ class CourseDetailService {
     };
   }
 
-  private generateRatingBreakdown(rating: number, totalRatings: number): Record<number, number> {
-    // Generate realistic rating distribution based on overall rating
-    if (rating >= 4.5) {
-      return { 5: 60, 4: 25, 3: 10, 2: 3, 1: 2 };
-    } else if (rating >= 4.0) {
-      return { 5: 45, 4: 35, 3: 15, 2: 3, 1: 2 };
-    } else if (rating >= 3.5) {
-      return { 5: 30, 4: 35, 3: 25, 2: 7, 1: 3 };
-    } else {
-      return { 5: 20, 4: 25, 3: 30, 2: 15, 1: 10 };
+  private calculateRatingBreakdown(reviews: Array<{ rating: number }>): Record<number, number> {
+    // Initialize counts for each star rating
+    const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    
+    // Count actual ratings from reviews
+    reviews.forEach(review => {
+      const rating = Math.round(review.rating);
+      if (rating >= 1 && rating <= 5) {
+        counts[rating as keyof typeof counts]++;
+      }
+    });
+    
+    // Calculate percentages
+    const total = reviews.length;
+    if (total === 0) {
+      return { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     }
+    
+    return {
+      5: Math.round((counts[5] / total) * 100),
+      4: Math.round((counts[4] / total) * 100),
+      3: Math.round((counts[3] / total) * 100),
+      2: Math.round((counts[2] / total) * 100),
+      1: Math.round((counts[1] / total) * 100),
+    };
   }
 
   private formatDuration(hours: number): string {

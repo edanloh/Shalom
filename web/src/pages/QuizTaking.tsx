@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -8,14 +8,39 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { ChevronLeft, Clock, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { moduleService } from "@/services/moduleService";
+import apiService from "@/services/apiService";
+
+interface CourseSection {
+  id: string;
+  title: string;
+  description?: string;
+  order_index: number;
+  items: ModuleItem[];
+}
+
+interface ModuleItem {
+  id: string;
+  type: 'video' | 'quiz';
+  title: string;
+  description?: string;
+  order_index: number;
+  duration_seconds?: number;
+  video_url?: string;
+  thumbnail_url?: string;
+}
 
 const QuizTaking = () => {
   const { courseId, moduleId, quizId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [timeRemaining, setTimeRemaining] = useState(1800); // 30 minutes
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
 
   const quiz = {
     id: quizId,
@@ -63,6 +88,66 @@ const QuizTaking = () => {
   const currentQ = quiz.questions[currentQuestion];
   const progress = ((currentQuestion + 1) / quiz.totalQuestions) * 100;
 
+  // Fetch course sections on mount to enable navigation
+  useEffect(() => {
+    const fetchCourseSections = async () => {
+      if (!courseId || !user?.sub) return;
+      
+      try {
+        const response = await apiService.get(`/getModuleDetail/${courseId}?userId=${user.sub}`);
+        if (response?.data?.sections) {
+          setCourseSections(response.data.sections);
+        }
+      } catch (error) {
+        console.error('Error fetching course sections:', error);
+      }
+    };
+
+    fetchCourseSections();
+  }, [courseId, user?.sub]);
+
+  const findNextItemAcrossModules = (): { item: ModuleItem; sectionId: string } | null => {
+    if (!moduleId || courseSections.length === 0) return null;
+
+    // Find current section
+    const currentSectionIndex = courseSections.findIndex(
+      (section) => section.id === moduleId
+    );
+
+    if (currentSectionIndex === -1) return null;
+
+    const currentSection = courseSections[currentSectionIndex];
+    
+    // First, try to find next item in CURRENT module
+    if (currentSection.items && currentSection.items.length > 0) {
+      const currentItemIndex = currentSection.items.findIndex(
+        (item) => item.id === quizId && item.type === 'quiz'
+      );
+      
+      // If current quiz found and there's a next item in this module
+      if (currentItemIndex !== -1 && currentItemIndex < currentSection.items.length - 1) {
+        return {
+          item: currentSection.items[currentItemIndex + 1],
+          sectionId: currentSection.id,
+        };
+      }
+    }
+
+    // If no next item in current module, look through remaining sections
+    for (let i = currentSectionIndex + 1; i < courseSections.length; i++) {
+      const section = courseSections[i];
+      if (section.items && section.items.length > 0) {
+        // Return the first item (video or quiz) in the next module
+        return {
+          item: section.items[0],
+          sectionId: section.id,
+        };
+      }
+    }
+
+    return null;
+  };
+
   const handleNext = () => {
     if (currentQuestion < quiz.questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
@@ -75,12 +160,93 @@ const QuizTaking = () => {
     }
   };
 
-  const handleSubmit = () => {
-    toast({
-      title: "Quiz Submitted",
-      description: "Your answers have been submitted for grading",
-    });
-    navigate(`/course/${courseId}`);
+  const handleSubmit = async () => {
+    if (!user?.sub || !quizId) {
+      toast({
+        title: "Error",
+        description: "User information or quiz ID is missing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Transform answers from { [index]: value } to [{ questionId, answer }]
+      const answersArray = Object.entries(answers).map(([index, answer]) => ({
+        questionId: quiz.questions[parseInt(index)].id.toString(),
+        answer: answer
+      }));
+
+      // Calculate time taken in minutes
+      const timeTakenMinutes = Math.floor((1800 - timeRemaining) / 60);
+
+      const result = await moduleService.submitQuiz(
+        quizId,
+        user.sub,
+        answersArray,
+        timeTakenMinutes
+      );
+
+      toast({
+        title: "Quiz Submitted Successfully",
+        description: `You scored ${result.data.score}% (${result.data.correctAnswers}/${result.data.totalQuestions} correct)`,
+        variant: result.data.isPassed ? "default" : "destructive",
+      });
+
+      // Only navigate to next item if user passed the quiz
+      if (result.data.isPassed) {
+        // Find next item to navigate to
+        const nextItem = findNextItemAcrossModules();
+        
+        console.log('🎯 Quiz passed! Finding next item...', {
+          currentQuizId: quizId,
+          currentModuleId: moduleId,
+          nextItem: nextItem ? {
+            id: nextItem.item.id,
+            type: nextItem.item.type,
+            title: nextItem.item.title
+          } : null
+        });
+        
+        if (nextItem) {
+          // Navigate to next item (video or quiz)
+          if (nextItem.item.type === 'video') {
+            navigate(`/course/${courseId}/module/${nextItem.sectionId}/lesson/${nextItem.item.id}`);
+          } else if (nextItem.item.type === 'quiz') {
+            navigate(`/course/${courseId}/module/${nextItem.sectionId}/quiz/${nextItem.item.id}`);
+          }
+        } else {
+          // No next item, navigate back to course with state to trigger refresh
+          navigate(`/course/${courseId}`, { 
+            state: { 
+              quizCompleted: true, 
+              quizId,
+              isPassed: true 
+            } 
+          });
+        }
+      } else {
+        // Quiz failed, navigate back to course detail
+        navigate(`/course/${courseId}`, { 
+          state: { 
+            quizCompleted: true, 
+            quizId,
+            isPassed: false 
+          } 
+        });
+      }
+    } catch (error: any) {
+      console.error('Error submitting quiz:', error);
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Failed to submit quiz. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -197,8 +363,12 @@ const QuizTaking = () => {
                 <ChevronLeft className="h-4 w-4 ml-2 rotate-180" />
               </Button>
             ) : (
-              <Button onClick={handleSubmit} className="bg-success hover:bg-success/90">
-                Submit Quiz
+              <Button 
+                onClick={handleSubmit} 
+                className="bg-success hover:bg-success/90"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Submitting..." : "Submit Quiz"}
               </Button>
             )}
           </div>

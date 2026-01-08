@@ -15,12 +15,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { MainStackParamList } from "@/types/navigation";
-import { quizService } from "@/services";
+import { quizService, moduleService } from "@/services";
 import { Images } from "../../assets";
 import type {
   QuizQuestion,
   QuizDetailResponse,
   SubmitQuizResponse,
+  CourseSection,
+  ModuleItem,
 } from "@/services";
 import Screen from "@/components/common/Screen";
 import ActionButton from "@/components/ActionButton";
@@ -53,9 +55,11 @@ const QuizScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
+  const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
 
   useEffect(() => {
     fetchQuizDetail();
+    fetchCourseSections();
   }, [quizId]);
 
   useEffect(() => {
@@ -106,6 +110,57 @@ const QuizScreen = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchCourseSections = async () => {
+    try {
+      const moduleDetail = await moduleService.getModuleDetail(courseId, userId);
+      setCourseSections(moduleDetail.sections);
+    } catch (err) {
+      console.error('Error fetching course sections:', err);
+    }
+  };
+
+  const findNextItemAcrossModules = (): { item: ModuleItem; sectionId: string } | null => {
+    if (!sectionId || courseSections.length === 0) return null;
+
+    // Find current section
+    const currentSectionIndex = courseSections.findIndex(
+      (section) => section.id === sectionId
+    );
+
+    if (currentSectionIndex === -1) return null;
+
+    const currentSection = courseSections[currentSectionIndex];
+    
+    // First, try to find next item in CURRENT module
+    if (currentSection.items && currentSection.items.length > 0) {
+      const currentItemIndex = currentSection.items.findIndex(
+        (item) => item.id === quizId && item.type === 'quiz'
+      );
+      
+      // If current quiz found and there's a next item in this module
+      if (currentItemIndex !== -1 && currentItemIndex < currentSection.items.length - 1) {
+        return {
+          item: currentSection.items[currentItemIndex + 1],
+          sectionId: currentSection.id,
+        };
+      }
+    }
+
+    // If no next item in current module, look through remaining sections
+    for (let i = currentSectionIndex + 1; i < courseSections.length; i++) {
+      const section = courseSections[i];
+      if (section.items && section.items.length > 0) {
+        // Return the first item (video or quiz) in the next module
+        return {
+          item: section.items[0],
+          sectionId: section.id,
+        };
+      }
+    }
+
+    return null;
   };
 
   const handleAnswerSelect = (questionId: string, optionText: string) => {
@@ -214,8 +269,47 @@ const QuizScreen = () => {
   };
 
   const handleComplete = () => {
-    // Navigate back to the module screen
-    navigation.goBack();
+    // Only auto-navigate if quiz was passed
+    if (quizResult && quizResult.isPassed) {
+      const nextItem = findNextItemAcrossModules();
+      
+      console.log('🎯 Quiz passed! Finding next item...', {
+        currentQuizId: quizId,
+        currentSectionId: sectionId,
+        nextItem: nextItem ? {
+          id: nextItem.item.id,
+          type: nextItem.item.type,
+          title: nextItem.item.title
+        } : null
+      });
+      
+      if (nextItem) {
+        // Navigate to next item (video or quiz)
+        if (nextItem.item.type === 'video') {
+          navigation.replace('LessonPlayer', {
+            videoId: nextItem.item.id,
+            courseId,
+            sectionId: nextItem.sectionId,
+            userId,
+          });
+        } else if (nextItem.item.type === 'quiz') {
+          navigation.replace('QuizScreen', {
+            quizId: nextItem.item.id,
+            courseId,
+            sectionId: nextItem.sectionId,
+            userId,
+          });
+        }
+        return;
+      }
+    }
+    
+    // Default: Navigate back with state to refresh CourseDetail
+    navigation.navigate('CourseDetail', {
+      courseId,
+      quizCompleted: true,
+      quizId,
+    } as any);
   };
 
   const formatTime = (seconds: number) => {
@@ -320,7 +414,7 @@ const QuizScreen = () => {
 
           {/* Action Buttons */}
           <View style={styles.resultActions}>
-            {quizResult.attemptsRemaining > 0 && !isPassed && (
+            {quizResult.attemptsRemaining > 0 && !isPassed ? (
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={handleRetry}
@@ -332,19 +426,19 @@ const QuizScreen = () => {
                 />
                 <Text style={styles.actionButtonText}>Retry</Text>
               </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleReview}
+              >
+                <Image 
+                  source={Images.quizReview} 
+                  style={styles.actionButtonIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.actionButtonText}>Review</Text>
+              </TouchableOpacity>
             )}
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleReview}
-            >
-              <Image 
-                source={Images.quizReview} 
-                style={styles.actionButtonIcon}
-                resizeMode="contain"
-              />
-              <Text style={styles.actionButtonText}>Review</Text>
-            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.actionButton}
