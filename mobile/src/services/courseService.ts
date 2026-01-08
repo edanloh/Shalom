@@ -23,7 +23,7 @@ const ENDPOINTS = {
   USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, // Maps to getUserEnrollment.mjs
   COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, // Maps to getModuleDetail.mjs
   COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, // Maps to courseReviewHandler
-  POST_ENROLLMENT: '/postUserEnrollment', // Maps to postUserEnrollment.mjs
+  POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, // Maps to postUserEnrollment.mjs
 };
 
 
@@ -651,11 +651,10 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    */
   async enrollInCourse(userId: string, courseId: string): Promise<{ firstModuleId?: string }> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
-    userId = '550e8400-e29b-41d4-a716-446655440102'; // Temporary override for testing
+    userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing (same as reviews)
 
-    const url = ENDPOINTS.POST_ENROLLMENT;
+    const url = ENDPOINTS.POST_ENROLLMENT(userId);
     const resp = await apiService.post<any>(url, {
-      userId,
       courseId,
       initialProgress: 0,
       isCompleted: false,

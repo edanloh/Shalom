@@ -286,12 +286,36 @@ export default function CourseDetailScreen({
       setIsEnrolling(true);
       const { firstModuleId } = await courseService.enrollInCourse(userId, courseId);
 
-      // If you want to immediately take them somewhere after enroll, keep this:
-      // navigation.replace(
-      //   'CourseOutline',
-      //   firstModuleId ? { courseId, startAt: firstModuleId } : { courseId }
-      // );
-      // Otherwise, do nothing and let the screen re-render as enrolled.
+      // Update enrolled state and reload course data
+      setIsEnrolled(true);
+      
+      // Reload course detail to fetch updated progress
+      await loadCourseDetail();
+
+      // Show success message
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        'Enrollment Successful!',
+        'You have been successfully enrolled in this course. Start learning now!',
+        [
+          {
+            text: 'Start Learning',
+            onPress: () => {
+              if (firstModuleId && courseContent) {
+                const firstSection = courseContent.sections[0];
+                if (firstSection) {
+                  navigation.navigate('ModuleDetail', {
+                    courseId: courseId,
+                    sectionId: firstSection.id,
+                    userId: userId,
+                  });
+                }
+              }
+            }
+          },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
     } catch (e: any) {
       const status = e?.statusCode ?? e?.response?.status;
       console.log('[Enroll] error', { status, code: e?.code, msg: e?.message, details: e?.details });
