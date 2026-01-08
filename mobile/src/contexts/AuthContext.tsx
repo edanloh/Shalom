@@ -125,13 +125,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       password: password,
       options: {
         data: {
-          name: name,
+          first_name: name,
         },
       },
     });
     return {
-      success: !error,
-      error: error?.message,
+      success: data.session != null && data.user != null,
+      error: error?.message || (data.session == null || data.user == null ? "Registration failed" : undefined),
     };
   };
 

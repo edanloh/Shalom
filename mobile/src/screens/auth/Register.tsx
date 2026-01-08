@@ -64,11 +64,11 @@ export default function RegisterScreen({ navigation }: any) {
     }
     setPasswordWarning("");
     setLoading(true);
-    const success = await register(email, password, name);
+    const res = await register(email, password, name);
     setLoading(false);
 
-    if (!success) {
-      Alert.alert("Error", "Registration failed");
+    if (!res.success) {
+      Alert.alert("Error", res.error || "Registration failed");
     } else {
       navigation.navigate("ConfirmSignUp", { email });
     }
