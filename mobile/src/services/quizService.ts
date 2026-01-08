@@ -145,20 +145,20 @@ class QuizService {
 
   /**
    * Get quiz details with questions and user's previous attempts
-   * Endpoint: GET /courses/{courseId}/module/quizzes/{quizId}?userId={userId}
+   * Endpoint: GET /getQuizDetail/{quizId}?userId={userId}&courseId={courseId}
+   * Maps to getQuizDetail.mjs Lambda function
    */
   async getQuizDetail(courseId: string, quizId: string, userId?: string): Promise<QuizDetailResponse['data']> {
     try {      
       const params: Record<string, string> = {
-        courseId,
-        quizId,
+        courseId: courseId,
       };
       if (userId) {
         params.userId = userId;
       }
 
       const backendResponse = await apiService.get<BackendQuizDetailResponse>(
-        `/getQuizDetail`,
+        `/getQuizDetail/${quizId}`,
         params
       );
 
@@ -181,13 +181,14 @@ class QuizService {
 
   /**
    * Submit quiz answers and get results
-   * Endpoint: POST /courses/{courseId}/module/quizzes/{quizId}
+   * Endpoint: POST /submitQuiz
+   * Maps to submitQuiz.mjs Lambda function
    */
   async submitQuiz(courseId: string, quizId: string, request: SubmitQuizRequest): Promise<SubmitQuizResponse['data']> {
     try {
       const response = await apiService.post<SubmitQuizResponse>(
         `/submitQuiz`,
-        request
+        { ...request, courseId } // Include courseId in the body
       );
 
       if (!response.success || !response.data) {

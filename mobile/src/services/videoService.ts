@@ -74,19 +74,22 @@ export interface UpdateVideoProgressResponse {
 class VideoService {
   /**
    * Get video details with navigation and user progress
-   * Endpoint: GET /courses/{courseId}/module/videos/{videoId}?userId={userId}
+   * Endpoint: GET /getVideoDetail/{videoId}?userId={userId}&courseId={courseId}
+   * Maps to getVideoDetail.mjs Lambda function
    */
   async getVideoDetail(courseId: string, videoId: string, userId?: string): Promise<VideoDetailResponse['data']> {
     try {      
       const params: Record<string, string> = {
-        courseId,
-        videoId,
+        courseId: courseId,
       };
       if (userId) {
         params.userId = userId;
       }
 
-      const response = await apiService.get<VideoDetailResponse>(`/getVideoDetail`, params);
+      const response = await apiService.get<VideoDetailResponse>(
+        `/getVideoDetail/${videoId}`,
+        params
+      );
 
       if (!response.success || !response.data) {
         throw new Error(response.message || 'Failed to fetch video details');
@@ -101,7 +104,8 @@ class VideoService {
 
   /**
    * Update video watch progress
-   * Endpoint: POST /courses/{courseId}/module/videos/progress
+   * Endpoint: POST /updateVideoProgress
+   * Maps to updateVideoProgress.mjs Lambda function
    * 
    * This should be called:
    * - Every 10 seconds during playback
@@ -123,7 +127,7 @@ class VideoService {
 
       const response = await apiService.post<UpdateVideoProgressResponse>(
         endpoint,
-        request
+        { ...request, courseId } // Include courseId in the body
       );
 
       console.log('🟢 API Response received:', {

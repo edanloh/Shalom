@@ -1,4 +1,5 @@
-import "./polyfills";
+// Temporarily commented out AWS Cognito polyfills - switching to Supabase Auth
+// import "./polyfills";
 import "react-native-url-polyfill/auto";
 import "react-native-gesture-handler";
 import React, { useEffect, useState } from "react";

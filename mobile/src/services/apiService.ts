@@ -8,7 +8,10 @@ import { ApiResponse, PaginatedResponse } from '../types';
 
 // API Configuration
 const API_CONFIG = {
-  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://cmtfxsntlfoxgcznanpe.supabase.co/functions/v1',
+  BASE_URL: process.env.VITE_SUPABASE_URL 
+    ? `${process.env.VITE_SUPABASE_URL}/functions/v1` 
+    : 'https://cmtfxsntlfoxgcznanpe.supabase.co/functions/v1',
+  SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_bwjUUwC-IlqND-F2-7t9yg_OWb4angZ',
   TIMEOUT: 10000, // 10 seconds
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second
@@ -108,10 +111,10 @@ class ApiService {
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
     this.defaultTimeout = API_CONFIG.TIMEOUT;
-    
+
     // Add default request interceptor for authentication
     this.addRequestInterceptor(this.authInterceptor);
-    
+
     // Add default response interceptor for error handling
     this.addResponseInterceptor(this.errorInterceptor);
   }
@@ -126,91 +129,93 @@ class ApiService {
     this.responseInterceptors.push(interceptor);
   }
 
-  // Authentication interceptor - adds JWT token to requests
+  // Authentication interceptor - adds JWT token and Supabase API key to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      const bearer = token || SUPABASE_KEY;
-      if (bearer) {
-        config.headers = {
-          ...config.headers,
-          'Authorization': `Bearer ${bearer}`,
-          ...(SUPABASE_KEY ? { apikey: SUPABASE_KEY } : {}),
-        };
-      }
-      // Always add Content-Type header
+      
+      // Add Supabase API key and Content-Type headers
       config.headers = {
         ...config.headers,
         'Content-Type': 'application/json',
+        'apikey': API_CONFIG.SUPABASE_ANON_KEY,
       };
+      
+      // Add Authorization if we have a token
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        // Use Supabase anon key as fallback Authorization
+        config.headers['Authorization'] = `Bearer ${API_CONFIG.SUPABASE_ANON_KEY}`;
+      }
     } catch (error) {
       console.warn('Failed to retrieve auth token:', error);
-      // Even if auth fails, add Content-Type header
+      // Even if auth fails, add required headers
       config.headers = {
         ...config.headers,
         'Content-Type': 'application/json',
+        'apikey': API_CONFIG.SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${API_CONFIG.SUPABASE_ANON_KEY}`,
       };
     }
     return config;
   };
 
   // Error handling interceptor
-private errorInterceptor: ResponseInterceptor = async (response) => {
-  if (!response.ok) {
-    // Clone so we can safely read the body
-    const clone = response.clone();
+  private errorInterceptor: ResponseInterceptor = async (response) => {
+    if (!response.ok) {
+      // Clone so we can safely read the body
+      const clone = response.clone();
 
-    let errorData: any = {};
-    try {
-      errorData = isJsonResponse(clone)
-        ? await safeParseJson(clone)
-        : { body: await clone.text() };
-    } catch {
-      // leave errorData minimal
+      let errorData: any = {};
+      try {
+        errorData = isJsonResponse(clone)
+          ? await safeParseJson(clone)
+          : { body: await clone.text() };
+      } catch {
+        // leave errorData minimal
+      }
+
+      // Prefer server's message if present
+      const serverMsg =
+        (errorData && (errorData.message || errorData.error || errorData.reason)) ||
+        (typeof errorData === 'string' ? errorData : undefined);
+
+      // Capture useful IDs for Supabase correlation
+      const hdrs = {
+        'x-request-id': response.headers.get('x-request-id'),
+        'x-supabase-trace-id': response.headers.get('x-supabase-trace-id'),
+      };
+
+      const status = response.status;
+      const codeMap: Record<number, string> = {
+        400: 'BAD_REQUEST',
+        401: 'UNAUTHORIZED',
+        403: 'FORBIDDEN',
+        404: 'NOT_FOUND',
+        409: 'CONFLICT',
+        429: 'RATE_LIMIT',
+        500: 'SERVER_ERROR',
+        502: 'BAD_GATEWAY',
+        503: 'SERVICE_UNAVAILABLE',
+      };
+
+      const err = new ApiError(
+        serverMsg || `HTTP ${status}`,
+        status,
+        codeMap[status] || 'HTTP_ERROR',
+        errorData,
+        hdrs
+      );
+
+      // helpful console for debugging
+      console.log('[HTTP ✖]', response.url, status, hdrs, errorData);
+      throw err;
     }
 
-    // Prefer server's message if present
-    const serverMsg =
-      (errorData && (errorData.message || errorData.error || errorData.reason)) ||
-      (typeof errorData === 'string' ? errorData : undefined);
+    return response; // ok → let makeRequest() parse the body
+  };
 
-    // Capture useful IDs for CloudWatch correlation
-    const hdrs = {
-      'apigw-requestid': response.headers.get('apigw-requestid'),
-      'x-amzn-requestid': response.headers.get('x-amzn-requestid'),
-      'x-lambda-fn': response.headers.get('x-lambda-fn'),
-      'x-lambda-ver': response.headers.get('x-lambda-ver'),
-      'x-lambda-req': response.headers.get('x-lambda-req'),
-    };
-
-    const status = response.status;
-    const codeMap: Record<number, string> = {
-      400: 'BAD_REQUEST',
-      401: 'UNAUTHORIZED',
-      403: 'FORBIDDEN',
-      404: 'NOT_FOUND',
-      409: 'CONFLICT',
-      429: 'RATE_LIMIT',
-      500: 'SERVER_ERROR',
-      502: 'BAD_GATEWAY',
-      503: 'SERVICE_UNAVAILABLE',
-    };
-
-    const err = new ApiError(
-      serverMsg || `HTTP ${status}`,
-      status,
-      codeMap[status] || 'HTTP_ERROR',
-      errorData,
-      hdrs
-    );
-
-    // helpful console for debugging
-    console.log('[HTTP ✖]', response.url, status, hdrs, errorData);
-    throw err;
-  }
-
-  return response; // ok → let makeRequest() parse the body
-};
 
 
   // Build query string from parameters

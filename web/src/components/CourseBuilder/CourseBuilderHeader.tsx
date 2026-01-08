@@ -27,8 +27,18 @@ export const CourseBuilderHeader = () => {
       showCancel: true,
       onConfirm: async () => {
         const result = await saveCourse();
-        if (!result.success) {
-          console.error('Save failed:', result.message);
+        if (result.success && result.courseId) {
+          // Navigate to course detail page after successful save
+          navigate(`/course/${result.courseId}`);
+        } else if (!result.success) {
+          // Show error dialog to user
+          showModal({
+            title: 'Save Failed',
+            message: result.message || 'Failed to save course. Please try again.',
+            type: 'error',
+            confirmText: 'OK',
+            showCancel: false,
+          });
         }
       },
     });
@@ -74,18 +84,21 @@ export const CourseBuilderHeader = () => {
       </div>
       
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-6 text-sm" style={{ color: Colors.textPrimary }}>
+        <div className="flex items-center gap-6 text-base" style={{ color: Colors.textPrimary }}>
           <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4" style={{ color: Colors.yellow }} />
+            <Clock className="h-5 w-5" style={{ color: Colors.yellow }} />
             <span>{modules.length} modules</span>
           </div>
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4" style={{ color: Colors.green }} />
+            <Users className="h-5 w-5" style={{ color: Colors.green }} />
             <span>{totalLessons} lessons</span>
           </div>
           <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" style={{ color: Colors.accent }} />
-            <span>{totalQuizzes} quizzes ({totalPoints} points)</span>
+            <BarChart3 className="h-5 w-5" style={{ color: Colors.streakFire }} />
+            <div className="flex flex-col leading-tight">
+              <span>{totalQuizzes} quizzes</span>
+              <span className="text-xs" style={{ color: Colors.textSecondary }}>Total: {totalPoints} points</span>
+            </div>
           </div>
         </div>
         

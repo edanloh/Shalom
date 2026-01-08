@@ -2,13 +2,25 @@ import React, { useState } from "react";
 import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Video, FileText, Users, Star, Award, Clock, CheckCircle2 } from "lucide-react";
 import { useCourseBuilder } from './CourseBuilderContext';
 import { Badge } from "../ui/badge";
+import { DEFAULT_COURSE_THUMBNAIL } from "@/constants/images";
 
-const DEFAULT_COURSE_THUMBNAIL = "https://via.placeholder.com/400x250";
+// Import the course thumbnail cache from RightSidebar
+// This is a workaround to access the file - ideally would be in context
+const getCourseThumbnailFile = (): File | null => {
+  try {
+    // Access the module-level cache from RightSidebar
+    // This works because both components are loaded in the same module context
+    return (window as any).__courseThumbnailFile || null;
+  } catch {
+    return null;
+  }
+};
 
 export const CoursePreview = () => {
   const {
     courseName,
     courseDescription,
+    courseThumbnailUrl,
     setPreviewMode,
     modules,
   } = useCourseBuilder();
@@ -30,6 +42,37 @@ export const CoursePreview = () => {
     const lessonDuration = m.lessons.reduce((lSum, l) => lSum + (l.durationSeconds || 0), 0);
     return sum + lessonDuration;
   }, 0);
+
+  // Get course thumbnail: prioritize course thumbnail → first lesson thumbnail → placeholder
+  const displayThumbnail = (() => {
+    // First check if there's a course-level thumbnail
+    if (courseThumbnailUrl && courseThumbnailUrl.trim() !== '') {
+      // Check if it's a local file
+      if (courseThumbnailUrl.startsWith('[LOCAL_FILE:')) {
+        const localFile = getCourseThumbnailFile();
+        if (localFile) {
+          return URL.createObjectURL(localFile);
+        }
+      } else {
+        // It's a URL
+        return courseThumbnailUrl;
+      }
+    }
+    
+    // Otherwise, find first lesson with a valid thumbnail
+    for (const module of modules) {
+      for (const lesson of module.lessons) {
+        if (lesson.thumbnailUrl && 
+            lesson.thumbnailUrl.trim() !== '' && 
+            !lesson.thumbnailUrl.startsWith('[LOCAL_FILE:')) {
+          return lesson.thumbnailUrl;
+        }
+      }
+    }
+    
+    // Finally, use placeholder
+    return DEFAULT_COURSE_THUMBNAIL;
+  })();
 
   // Format module items for display
   const modulesList = modules.map((module) => ({
@@ -79,9 +122,12 @@ export const CoursePreview = () => {
         <div className="gradient-card border border-border rounded-xl p-8 mb-6">
           <div className="flex gap-8">
             <img
-              src={DEFAULT_COURSE_THUMBNAIL}
+              src={displayThumbnail}
               alt={courseName}
               className="w-64 h-48 object-cover rounded-lg"
+              onError={(e) => {
+                e.currentTarget.src = DEFAULT_COURSE_THUMBNAIL;
+              }}
             />
             <div className="flex-1">
               <div className="flex items-start justify-between mb-4">
@@ -208,6 +254,13 @@ export const CoursePreview = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
+             {/* Preview Note */}
+            <div className="gradient-card border border-blue-500/50 rounded-xl p-6 bg-blue-500/10">
+              <h3 className="font-semibold mb-2 text-blue-400">Preview Mode</h3>
+              <p className="text-sm text-muted-foreground">
+                This is how your course will appear to students. Save your changes to publish the course.
+              </p>
+            </div>
             {/* Course Stats */}
             <div className="gradient-card border border-border rounded-xl p-6">
               <h3 className="font-semibold mb-4">Course Overview</h3>
@@ -231,13 +284,7 @@ export const CoursePreview = () => {
               </div>
             </div>
 
-            {/* Preview Note */}
-            <div className="gradient-card border border-blue-500/50 rounded-xl p-6 bg-blue-500/10">
-              <h3 className="font-semibold mb-2 text-blue-400">Preview Mode</h3>
-              <p className="text-sm text-muted-foreground">
-                This is how your course will appear to students. Save your changes to publish the course.
-              </p>
-            </div>
+           
           </div>
         </div>
       </main>

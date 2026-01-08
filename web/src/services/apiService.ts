@@ -3,7 +3,7 @@
  * Web version matching mobile implementation
  */
 
-import { API_BASE_URL } from '@/env';
+import { API_BASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/env';
 
 // Error types for better error handling
 export class ApiError extends Error {
@@ -34,7 +34,8 @@ export class TimeoutError extends ApiError {
 
 // API Configuration
 const API_CONFIG = {
-  BASE_URL: API_BASE_URL || 'https://your-api-gateway-url.amazonaws.com',
+  // BASE_URL: API_BASE_URL || 'https://your-api-gateway-url.amazonaws.com',
+  BASE_URL: SUPABASE_URL + '/functions/v1' || 'https://your-supabase-url.supabase.co/rest/v1',
   TIMEOUT: 10000, // 10 seconds
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second
@@ -107,18 +108,20 @@ class ApiService {
   // Authentication interceptor - adds JWT token to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
-      const authData = localStorage.getItem('shalom_auth');
-      let token = null;
+      // const authData = localStorage.getItem('shalom_auth');
+      // let token = null;
       
-      if (authData) {
-        const parsed = JSON.parse(authData);
-        token = parsed.IdToken || parsed.AccessToken;
-      }
+      // if (authData) {
+      //   const parsed = JSON.parse(authData);
+      //   token = parsed.IdToken || parsed.AccessToken;
+      // }
       
-      if (token) {
+      if (SUPABASE_ANON_KEY) {
         config.headers = {
           ...config.headers,
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          // supabase specific
+          'apikey': SUPABASE_ANON_KEY,
         };
       }
       

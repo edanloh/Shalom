@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import {
   CognitoIdentityProviderClient,
@@ -62,15 +62,19 @@ interface AuthContextType {
     newPassword: string
   ) => Promise<boolean>;
   confirmSignUp: (email: string, code: string) => Promise<boolean>;
-  loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
+  // loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   changePassword: (
     currentPassword: string,
     newPassword: string
   ) => Promise<{ success: boolean; error?: string }>;
+  fetchEmail: (email: string) => Promise<any>;
 }
 
 const USER_STORAGE_KEY = "shalom_user";
+// Temporarily commented out AWS Cognito - switching to Supabase Auth
+/*
 if (!COGNITO_POOL_ID || !COGNITO_CLIENT_ID) {
   throw new Error("Missing Cognito configuration");
 }
@@ -78,6 +82,7 @@ if (!COGNITO_POOL_ID || !COGNITO_CLIENT_ID) {
 const cognitoClient = new CognitoIdentityProviderClient({
   region: "ap-southeast-1",
 });
+*/
 
 const getAuthErrorMessage = (error: any): string => {
   const errorMessages: Record<string, string> = {
@@ -109,11 +114,8 @@ const extractUserFromAttributes = (
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  // const [user, setUser] = useState<User | null>(null);
-  // const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  // Set the below to skip auth during development
+  // TEMPORARY: Auto-login for development/testing - comment out for production
+  const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>({
     id: "550e8400-e29b-41d4-a716-446655440101",
     email: "shalomfyp@gmail.com",
@@ -129,27 +131,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
   const [isAuthenticated, setIsAuthenticated] = useState(true);
 
+  // Original auth state (uncomment for production):
+  // const [isLoading, setIsLoading] = useState(true);
+  // const [user, setUser] = useState<User | null>(null);
+  // const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   useEffect(() => {
     loadStoredAuth();
   }, []);
 
   const loadStoredAuth = async () => {
     try {
-      const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
+      const storedUser = await SecureStore.getItemAsync(USER_STORAGE_KEY);
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
         setIsAuthenticated(true);
       }
     } catch (error) {
-      await AsyncStorage.removeItem(USER_STORAGE_KEY);
+      await SecureStore.deleteItemAsync(USER_STORAGE_KEY);
     } finally {
       setIsLoading(false);
     }
   };
 
   const persistUser = async (userData: User) => {
-    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+    await SecureStore.setItemAsync(USER_STORAGE_KEY, JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
   };
@@ -221,7 +228,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Remove push token from backend before logging out
     if (user?.id) {
       try {
-        const pushToken = await AsyncStorage.getItem("@expo_push_token");
+        const pushToken = await SecureStore.getItemAsync("@expo_push_token");
         if (pushToken) {
           await handleLogoutCleanup(user.id, pushToken);
         }
@@ -230,7 +237,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
-    await AsyncStorage.removeItem(USER_STORAGE_KEY);
+    await SecureStore.deleteItemAsync(USER_STORAGE_KEY);
     setUser(null);
     setIsAuthenticated(false);
   };
@@ -284,49 +291,73 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const loginWithGoogle = async (tokens: AuthTokens) => {
+  const loginWithGoogle = () => {
+    console.log("Google login is currently disabled.");
+    return Promise.resolve();
+  };
+
+  const fetchEmail = async (email: string) => {
     try {
-      const googlePayload = tokens.id_token
-        ? JSON.parse(atob(tokens.id_token.split(".")[1]))
-        : null;
-
-      if (!googlePayload?.sub) {
-        throw new Error("Invalid Google token");
-      }
-
       const response = await fetch(
-        `${API_BASE_URL}/dev/getUserInfo?username=${encodeURIComponent(
-          googlePayload.sub
-        )}`,
-        { method: "GET", headers: { "Content-Type": "application/json" } }
+        `${API_BASE_URL}/dev/getUserInfo?email=${email}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
       );
-
-      if (!response.ok) throw new Error("Failed to fetch user info");
-
-      const result = await response.json();
-      const userInfo = result.attributes || result.body?.attributes || {};
-
-      const userData: User = {
-        id: userInfo.sub || userInfo.email || googlePayload.sub,
-        email: userInfo.email,
-        username: userInfo.username || userInfo.email,
-        name:
-          userInfo.name ||
-          (userInfo.email ? userInfo.email.split("@")[0] : "GoogleUser"),
-        role: userInfo["custom:role"] || "learner",
-        avatar: userInfo.picture,
-        phone: userInfo.phone_number,
-        bio: userInfo.bio,
-        location: userInfo.locale || userInfo.location,
-        authProvider: "google",
-        accessToken: tokens.access_token,
-      };
-
-      await persistUser(userData);
+      if (!response.ok) {
+        throw new Error("Failed to fetch user info from API Gateway");
+      }
+      return await response.json();
     } catch (error) {
+      console.error("Error fetching email:", error);
       throw error;
     }
   };
+
+  // const loginWithGoogle = async (tokens: AuthTokens) => {
+  //   try {
+  //     const googlePayload = tokens.id_token
+  //       ? JSON.parse(atob(tokens.id_token.split(".")[1]))
+  //       : null;
+
+  //     if (!googlePayload?.sub) {
+  //       throw new Error("Invalid Google token");
+  //     }
+
+  //     const response = await fetch(
+  //       `${API_BASE_URL}/dev/getUserInfo?username=${encodeURIComponent(
+  //         googlePayload.sub
+  //       )}`,
+  //       { method: "GET", headers: { "Content-Type": "application/json" } }
+  //     );
+
+  //     if (!response.ok) throw new Error("Failed to fetch user info");
+
+  //     const result = await response.json();
+  //     const userInfo = result.attributes || result.body?.attributes || {};
+
+  //     const userData: User = {
+  //       id: userInfo.sub || userInfo.email || googlePayload.sub,
+  //       email: userInfo.email,
+  //       username: userInfo.username || userInfo.email,
+  //       name:
+  //         userInfo.name ||
+  //         (userInfo.email ? userInfo.email.split("@")[0] : "GoogleUser"),
+  //       role: userInfo["custom:role"] || "learner",
+  //       avatar: userInfo.picture,
+  //       phone: userInfo.phone_number,
+  //       bio: userInfo.bio,
+  //       location: userInfo.locale || userInfo.location,
+  //       authProvider: "google",
+  //       accessToken: tokens.access_token,
+  //     };
+
+  //     await persistUser(userData);
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // };
 
   const updateProfile = async (data: Partial<User>) => {
     if (user) {
@@ -372,6 +403,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loginWithGoogle,
         updateProfile,
         changePassword,
+        fetchEmail,
       }}
     >
       {children}

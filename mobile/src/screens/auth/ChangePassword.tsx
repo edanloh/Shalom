@@ -5,6 +5,7 @@ import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import Screen from "@/components/common/Screen";
+import { validatePassword } from "@/utils/validatePassword";
 
 export default function ChangePasswordScreen({ navigation }: any) {
   const { changePassword } = useAuth();
@@ -24,29 +25,6 @@ export default function ChangePasswordScreen({ navigation }: any) {
     confirm: "",
   });
   const [loading, setLoading] = useState(false);
-
-  const validatePassword = (pwd: string) => {
-    const rules = [
-      { test: pwd.length >= 8, msg: "Password must be at least 8 characters" },
-      {
-        test: /[0-9]/.test(pwd),
-        msg: "Password must contain at least 1 number",
-      },
-      {
-        test: /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
-        msg: "Password must contain at least 1 special character",
-      },
-      {
-        test: /[A-Z]/.test(pwd),
-        msg: "Password must contain at least 1 uppercase letter",
-      },
-      {
-        test: /[a-z]/.test(pwd),
-        msg: "Password must contain at least 1 lowercase letter",
-      },
-    ];
-    return rules.find((r) => !r.test)?.msg || "";
-  };
 
   const handleChangePassword = async () => {
     setWarnings({ current: "", new: "", confirm: "" });

@@ -6,6 +6,7 @@ export const useContentManagement = () => {
     modules,
     setModules,
     showToast,
+    setSelectedItem,
   } = useCourseBuilder();
 
   const { updateContentNumbering } = useDragAndDrop();
@@ -13,16 +14,20 @@ export const useContentManagement = () => {
   // Module functions
   const addModule = () => {
     const moduleNumber = modules.length + 1;
+    const newModuleId = `m${Date.now()}`;
     const newModule: Module = {
-      id: `m${Date.now()}`,
+      id: newModuleId,
       title: `Module ${moduleNumber}: New Module`,
       description: "Add a description for this module...",
-      status: "draft",
+      status: "published",
       expanded: true,
       lessons: [],
       quizzes: [],
     };
     setModules([...modules, newModule]);
+    
+    // Auto-select the newly created module
+    setSelectedItem({ type: 'module', id: newModuleId });
   };
 
   const deleteModule = (moduleId: string) => {
@@ -44,6 +49,7 @@ export const useContentManagement = () => {
 
   // Lesson functions
   const addLesson = (moduleId: string) => {
+    const newLessonId = `l${Date.now()}`;
     let updatedModules = modules.map((m) => {
       if (m.id === moduleId) {
         return {
@@ -51,7 +57,7 @@ export const useContentManagement = () => {
           lessons: [
             ...m.lessons,
             {
-              id: `l${Date.now()}`,
+              id: newLessonId,
               title: `New Lesson`, // Will be updated by numbering
               baseTitle: "New Lesson",
               type: "video",
@@ -68,6 +74,9 @@ export const useContentManagement = () => {
     // Update numbering after adding
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    
+    // Auto-select the newly created lesson
+    setSelectedItem({ type: 'lesson', id: newLessonId });
   };
 
   const deleteLesson = (moduleId: string, lessonId: string) => {
@@ -81,27 +90,30 @@ export const useContentManagement = () => {
   };
 
   const updateLesson = (moduleId: string, lessonId: string, updates: Partial<Lesson>) => {
-    let updatedModules = modules.map((m) =>
-      m.id === moduleId
-        ? {
-            ...m,
-            lessons: m.lessons.map((l) =>
-              l.id === lessonId ? { ...l, ...updates } : l
-            ),
-          }
-        : m
-    );
-    
-    // If updating baseTitle, regenerate numbering
-    if ('baseTitle' in updates) {
-      updatedModules = updateContentNumbering(updatedModules);
-    }
-    
-    setModules(updatedModules);
+    setModules((prevModules) => {
+      let updatedModules = prevModules.map((m) =>
+        m.id === moduleId
+          ? {
+              ...m,
+              lessons: m.lessons.map((l) =>
+                l.id === lessonId ? { ...l, ...updates } : l
+              ),
+            }
+          : m
+      );
+      
+      // If updating baseTitle, regenerate numbering
+      if ('baseTitle' in updates) {
+        updatedModules = updateContentNumbering(updatedModules);
+      }
+      
+      return updatedModules;
+    });
   };
 
   // Quiz functions
   const addQuiz = (moduleId: string) => {
+    const newQuizId = `q${Date.now()}`;
     let updatedModules = modules.map((m) => {
       if (m.id === moduleId) {
         return {
@@ -109,12 +121,22 @@ export const useContentManagement = () => {
           quizzes: [
             ...m.quizzes,
             {
-              id: `q${Date.now()}`,
+              id: newQuizId,
               title: `New Quiz`, // Will be updated by numbering
               baseTitle: "New Quiz",
               status: "draft",
               passingScore: 70,
-              questions: [],
+              questions: [
+                {
+                  id: `qq${Date.now()}`,
+                  text: "New question",
+                  type: "multiple-choice",
+                  options: ["Option 1", "Option 2"],
+                  correctAnswer: 0,
+                  imageUrl: null,
+                  points: 1,
+                },
+              ],
             },
           ],
         };
@@ -125,6 +147,9 @@ export const useContentManagement = () => {
     // Update numbering after adding
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    
+    // Auto-select the newly created quiz
+    setSelectedItem({ type: 'quiz', id: newQuizId });
   };
 
   const deleteQuiz = (moduleId: string, quizId: string) => {

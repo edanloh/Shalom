@@ -4,22 +4,27 @@
  */
 
 import apiService from './apiService';
+import { supabaseService } from './supabaseService';
 import { DEFAULT_COURSE_THUMBNAIL } from '@/constants/images';
 
 // Course service endpoints matching Lambda functions
 const ENDPOINTS = {
   COURSES: '/courses',
   COURSE_BY_ID: (courseId: string) => `/courses/${courseId}`,
-  COURSE_STUDENTS: (courseId: string) => `/courses/${courseId}/students`,
-  AVAILABLE_STUDENTS: (courseId: string) => `/courses/${courseId}/availableStudents`,
-  ALL_STUDENTS: '/students',
+  // COURSE_STUDENTS: (courseId: string) => `/courses/${courseId}/students`,
+  // AVAILABLE_STUDENTS: (courseId: string) => `/courses/${courseId}/availableStudents`,
+  COURSE_STUDENTS: (courseId: string) => `/getCourseStudents/${courseId}`,
+  AVAILABLE_STUDENTS: (courseId: string) => `/getAvailableStudents/${courseId}`,
+  // ALL_STUDENTS: '/students',
+  ALL_STUDENTS: '/getAllStudents',
   COURSE_REVIEWS: (courseId: string) => `/courses/${courseId}/reviews`,
   USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
   CREATE_COURSE: '/courses',
   UPDATE_COURSE: (courseId: string) => `/courses/${courseId}`,
   DELETE_COURSE: (courseId: string) => `/courses/${courseId}`,
   ENROLL_STUDENT: (courseId: string) => `/courses/${courseId}/enroll`,
-  INSTRUCTOR_STATS: (adminId: string) => `/admin/${adminId}/stats`,
+  // INSTRUCTOR_STATS: (adminId: string) => `/admin/${adminId}/stats`,
+    INSTRUCTOR_STATS: (adminId: string) => `/getInstructorStats/${adminId}`,
   RECOMMENDATIONS: '/recommendations',
   RECOMMENDATION_EVENT: '/recommendations/events',
 };
@@ -171,20 +176,25 @@ class CourseService {
    */
   async getCourses(params?: CourseListParams): Promise<Course[]> {
     try {
-      const queryParams: Record<string, string> = {};
-      if (params?.limit) queryParams.limit = params.limit.toString();
-      if (params?.category) queryParams.category = params.category;
-      if (params?.level) queryParams.level = params.level;
-      if (params?.sortBy) queryParams.sortBy = params.sortBy;
-      if (params?.sortOrder) queryParams.sortOrder = params.sortOrder;
+      // Use Supabase Edge Function instead of AWS API Gateway
+      const queryParams = new URLSearchParams();
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      if (params?.category) queryParams.append('filterField', 'category_name');
+      if (params?.category) queryParams.append('filterValue', params.category);
+      if (params?.level) queryParams.append('filterField', 'level');
+      if (params?.level) queryParams.append('filterValue', params.level);
+      if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
-      const response = await apiService.get<any>(
-        ENDPOINTS.COURSES,
-        queryParams
+      // Call Supabase Edge Function (getAllCourse)
+      const response = await supabaseService.get<any>(
+        `getAllCourse?${queryParams.toString()}`
       );
 
       let coursesArray;
-      if (response.courses && Array.isArray(response.courses)) {
+      if (response.data && Array.isArray(response.data)) {
+        coursesArray = response.data;
+      } else if (response.courses && Array.isArray(response.courses)) {
         coursesArray = response.courses;
       } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
         coursesArray = response.data.courses;
@@ -385,6 +395,36 @@ class CourseService {
       return convertAWSCourseToWebCourse(response.data.course);
     } catch (error) {
       console.error('Error creating course:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new course with full module structure
+   */
+  async createCourseWithModules(courseData: {
+    title: string;
+    category: string;
+    description: string;
+    thumbnailUrl?: string | null;
+    level: string;
+    instructorId: string;
+    instructorName: string;
+    modules: any[];
+    outcomes: any[];
+    requirements: any[];
+  }): Promise<{ courseId: string }> {
+    try {
+      const response = await apiService.post<any>('/createCourse', courseData);
+      const courseId = response.data?.course?.id || response.data?.id || response.id;
+      
+      if (!courseId) {
+        throw new Error('Failed to get course ID from response');
+      }
+
+      return { courseId };
+    } catch (error) {
+      console.error('Error creating course with modules:', error);
       throw error;
     }
   }

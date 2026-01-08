@@ -107,21 +107,20 @@ export interface ModuleDetailResponse {
 class ModuleService {
   /**
    * Get course module content with sections, videos, quizzes, and user progress
-   * Endpoint: GET /courses/{courseId}/module?userId={userId}
+   * Endpoint: GET /getModuleDetail/{courseId}?userId={userId}
+   * Maps to getModuleDetail.mjs Lambda function
    */
   async getModuleDetail(courseId: string, userId?: string): Promise<ModuleDetailResponse['data']> {
     try {      
-      const uid =
-        userId ||
-        process.env.EXPO_PUBLIC_DEFAULT_USER_ID ||
-        "550e8400-e29b-41d4-a716-446655440101";
+      const params: Record<string, string> = {};
+      if (userId) {
+        params.userId = userId;
+      }
 
-      // Some edge functions expect identifiers in the path; include both to satisfy either parsing.
-      const url = `/getModuleDetail/${encodeURIComponent(
-        courseId
-      )}?userId=${encodeURIComponent(uid)}`;
-
-      const response = await apiService.get<ModuleDetailResponse>(url);
+      const response = await apiService.get<ModuleDetailResponse>(
+        `/getModuleDetail/${courseId}`,
+        params
+      );
 
       if (!response.success || !response.data) {
         throw new Error(response.message || 'Failed to fetch module details');

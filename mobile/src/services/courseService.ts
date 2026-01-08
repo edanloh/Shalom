@@ -5,7 +5,7 @@
 
 import { Course, AWSApiResponse, AWSCoursesResponse, AWSCourse } from '../types';
 import apiService from './apiService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 function unwrap<T = any>(r: any): T {
   return (r && typeof r === 'object' && 'data' in r ? r.data : r) as T;
@@ -19,20 +19,19 @@ const CACHE_CONFIG = {
   CACHE_DURATION: 5 * 60 * 1000, // 5 minutes in milliseconds
 };
 
-// Course service endpoints
+// Course service endpoints - Supabase Edge Functions
 const ENDPOINTS = {
-  COURSES: '/getAllCourse',
-  USER_ENROLLMENTS: (uid: string) =>
-    `/getUserEnrollment/${encodeURIComponent(uid)}?userId=${encodeURIComponent(uid)}`,
-  ENROLL: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`,
-  COURSE_REVIEWS: (courseId: string) => `/courses/${encodeURIComponent(courseId)}/reviews`,
-  RECOMMENDATIONS: '/getRecommendations',
-  RECOMMENDATION_EVENT: '/postRecommendationEvent',
+  COURSES: '/getAllCourse', // Maps to getAllCourse.mjs
+  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, // Maps to getUserEnrollment.mjs
+  COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, // Maps to getModuleDetail.mjs
+  COURSE_REVIEWS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}/reviews`,
+  POST_ENROLLMENT: '/postUserEnrollment', // Maps to postUserEnrollment.mjs
 };
 
-// Wishlist endpoints (Supabase function)
+
+// Wishlist endpoints - Supabase Edge Functions
 const WISHLIST = {
-  BASE: (uid: string) => `/wishlistHandler/${encodeURIComponent(uid)}`,
+  BASE: (uid: string) => `/wishlistHandler/${encodeURIComponent(uid)}`, // Maps to wishlistHandler.mjs
   ITEM: (uid: string, courseId: string) =>
     `/wishlistHandler/${encodeURIComponent(uid)}?courseId=${encodeURIComponent(courseId)}`,
 };
@@ -169,7 +168,7 @@ export interface UpdateReviewPayload {
 class CacheManager {
   static async get<T>(key: string): Promise<T | null> {
     try {
-      const cachedData = await AsyncStorage.getItem(key);
+      const cachedData = await SecureStore.getItemAsync(key);
       if (!cachedData) return null;
 
       const { data, timestamp } = JSON.parse(cachedData);
@@ -177,7 +176,7 @@ class CacheManager {
 
       // Check if cache is still valid
       if (now - timestamp > CACHE_CONFIG.CACHE_DURATION) {
-        await AsyncStorage.removeItem(key);
+        await SecureStore.deleteItemAsync(key);
         return null;
       }
 
@@ -194,7 +193,7 @@ class CacheManager {
         data,
         timestamp: Date.now(),
       };
-      await AsyncStorage.setItem(key, JSON.stringify(cacheData));
+      await SecureStore.setItemAsync(key, JSON.stringify(cacheData));
     } catch (error) {
       console.warn(`Cache write error for key ${key}:`, error);
     }
@@ -202,7 +201,7 @@ class CacheManager {
 
   static async clear(key: string): Promise<void> {
     try {
-      await AsyncStorage.removeItem(key);
+      await SecureStore.deleteItemAsync(key);
     } catch (error) {
       console.warn(`Cache clear error for key ${key}:`, error);
     }
@@ -355,19 +354,23 @@ class CourseService {
         throw new Error('No response received from API');
       }
 
-      // The response structure is: { courses: [...], pagination: {...}, filters: {...}, meta: {...} }
-      // Check if courses array exists directly on response (parsed by apiService from data)
+      // The API response structure is: { success: true, data: [...], pagination: {...} }
+      // Where data is the array of courses directly
       let coursesArray;
-      if (Array.isArray(response)) {
-        coursesArray = response;
-      } else if (response.courses && Array.isArray(response.courses)) {
-        coursesArray = response.courses;
-      } else if (response.data && Array.isArray(response.data)) {
+      if (Array.isArray(response.data)) {
+        // Format: { success: true, data: [...] }
         coursesArray = response.data;
       } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
+        // Nested format: { success: true, data: { courses: [...] } }
         coursesArray = response.data.courses;
+      } else if (response.courses && Array.isArray(response.courses)) {
+        // Direct format: { courses: [...] }
+        coursesArray = response.courses;
+      } else if (Array.isArray(response)) {
+        // Array format: [...]
+        coursesArray = response;
       } else {
-        console.error('Invalid API response structure:', response);
+        console.error('Invalid API response structure:', JSON.stringify(response).slice(0, 500));
         throw new Error('Invalid API response: courses array not found');
       }
 
@@ -649,15 +652,17 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
 
   /**
    * Enroll user in course (free courses).
-   * POST /courses/enrollment  with { userId, courseId }
+   * POST /postUserEnrollment with { userId, courseId }
+   * Maps to postUserEnrollment.mjs Lambda function
    * Expects idempotent server (409 if already enrolled).
    */
   async enrollInCourse(userId: string, courseId: string): Promise<{ firstModuleId?: string }> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
     const uid = userId || DEFAULT_USER_ID;
 
-    const url = ENDPOINTS.ENROLL(uid);
+    const url = ENDPOINTS.POST_ENROLLMENT;
     const resp = await apiService.post<any>(url, {
+      userId,
       courseId,
       // optional fields supported by the edge function
       initialProgress: 0,

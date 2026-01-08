@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { courseService, moduleService, Course, Module, Review, Student } from "@/services";
+import { supabaseService } from "@/services/supabaseService";
 
 const CourseDetail = () => {
   const { courseId } = useParams();
@@ -71,8 +72,13 @@ const CourseDetail = () => {
       // Use instructor endpoint to get full course details
       // TODO: Get actual admin ID from auth context
       const adminId = '550e8400-e29b-41d4-a716-446655440101';
-      const fullResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/admin/${adminId}/${courseId}`);
-      const fullData = await fullResponse.json();
+      
+      // Call Supabase Edge Function with path parameters
+      const fullData = await supabaseService.post<{
+        success: boolean;
+        data?: { course: any; totalSections?: number; totalVideos?: number; totalQuizzes?: number };
+        message?: string;
+      }>(`getModuleDetailInstructor/${adminId}/${courseId}`, {});
       
       if (!fullData.success || !fullData.data) {
         throw new Error(fullData.message || 'Course not found');
@@ -154,35 +160,41 @@ const CourseDetail = () => {
   };
 
   // Transform API sections to UI-friendly format
-  const modulesList = modules.length > 0 ? modules.map((section: any) => ({
-    id: section.id,
-    title: section.title,
-    lessons: section.videos?.length || 0,
-    quizzes: section.quizzes?.length || 0,
-    duration: section.total_duration_seconds 
-      ? `${Math.floor(section.total_duration_seconds / 60)} min`
-      : section.duration_minutes
-      ? `${section.duration_minutes} min`
-      : 'N/A',
-    isCompleted: false,
-    completedAt: null,
-    items: [
-      ...(section.videos || []).map((video: any) => ({
-        id: video.id,
-        type: 'lesson' as const,
-        title: video.title,
-        duration: video.duration_seconds 
-          ? `${Math.floor(video.duration_seconds / 60)} min`
-          : 'N/A',
-      })),
-      ...(section.quizzes || []).map((quiz: any) => ({
-        id: quiz.id,
-        type: 'quiz' as const,
-        title: quiz.title,
-        questions: quiz.question_count || 0,
-      })),
-    ],
-  })) : [
+  const modulesList = modules.length > 0 ? modules.map((section: any) => {
+    const items = section.items || [];
+    const videos = items.filter((item: any) => item.type === 'video');
+    const quizzes = items.filter((item: any) => item.type === 'quiz');
+    
+    return {
+      id: section.id,
+      title: section.title,
+      lessons: videos.length,
+      quizzes: quizzes.length,
+      duration: section.total_duration_seconds 
+        ? `${Math.floor(section.total_duration_seconds / 60)} min`
+        : section.duration_minutes
+        ? `${section.duration_minutes} min`
+        : 'N/A',
+      isCompleted: false,
+      completedAt: null,
+      items: [
+        ...videos.map((video: any) => ({
+          id: video.id,
+          type: 'lesson' as const,
+          title: video.title,
+          duration: video.duration_seconds 
+            ? `${Math.floor(video.duration_seconds / 60)} min`
+            : 'N/A',
+        })),
+        ...quizzes.map((quiz: any) => ({
+          id: quiz.id,
+          type: 'quiz' as const,
+          title: quiz.title,
+          questions: quiz.questions?.length || 0,
+        })),
+      ],
+    };
+  }) : [
     {
       id: 1,
       title: "Introduction to Data Science",
@@ -384,23 +396,23 @@ const CourseDetail = () => {
             <div className="flex-1">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-[32px] font-bold">{course.title}</h1>
-                    <Badge className={course.status === 'published' ? "status-badge-published" : "status-badge-draft"}>
-                      {course.status.toUpperCase()}
-                    </Badge>
-                  </div>
+                  <h1 className="text-[32px] font-bold pr-2">{course.title}</h1>
                   <p className="text-muted-foreground mb-2">
                     by {course.instructor}
                   </p>
-                  <Badge variant="outline" className="mr-2">
+                  <Badge variant="outline" className="my-2 py-2 px-2">
                     {course.category}
                   </Badge>
                 </div>
-                <Button onClick={() => navigate(`/course-builder/${courseId}`)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Course
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Badge className={course.status === 'published' ? "status-badge-published" : "status-badge-draft"}>
+                    {course.status.toUpperCase()}
+                  </Badge>
+                  <Button onClick={() => navigate(`/course-builder/${courseId}`)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Course
+                  </Button>
+                </div>
               </div>
 
               <p className="text-foreground mb-6">{course.description}</p>
@@ -718,9 +730,11 @@ const CourseDetail = () => {
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={() => navigate(`/students?course=${courseId}`)}
+                  onClick={() => navigate(`/course/${courseId}/students`, { 
+                    state: { courseName: course.title } 
+                  })}
                 >
-                  View All Students
+                View Enrolled Students
                 </Button>
               </div>
             </div>
