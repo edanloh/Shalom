@@ -246,23 +246,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     currentPassword: string,
     newPassword: string
   ) => {
+    if (!user?.email) {
+      return { success: false, error: 'User email not found' };
+    }
+    // Step 1: Re-authenticate user with current password
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+    if (signInError) {
+      return { success: false, error: 'Current password is incorrect' };
+    }
+    // Step 2: Update password
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
     return { success: true };
-    // try {
-    //   if (!user?.accessToken) {
-    //     return { success: false, error: 'Not authenticated' };
-    //   }
-
-    //   await cognitoClient.send(
-    //     new ChangePasswordCommand({
-    //       AccessToken: user.accessToken,
-    //       PreviousPassword: currentPassword,
-    //       ProposedPassword: newPassword,
-    //     })
-    //   );
-    //   return { success: true };
-    // } catch (error: any) {
-    //   return { success: false, error: getAuthErrorMessage(error) };
-    // }
   };
 
   return (
