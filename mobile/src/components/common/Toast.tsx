@@ -55,6 +55,7 @@ export default function ToastHost() {
           }),
         ]).start(() => setToast(null));
       }, payload.durationMs ?? 2200);
+
     });
 
     return () => {
@@ -71,16 +72,17 @@ export default function ToastHost() {
       : toast.type === "error"
       ? "#ef4444"
       : Colors.textSecondary;
+  const borderTint = "#22c55e";
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.overlay]}>
       <Animated.View
         style={[
           styles.toast,
           {
             transform: [{ translateY }],
             opacity,
-            borderColor: tint,
+            borderColor: borderTint,
           },
         ]}
       >
@@ -96,11 +98,15 @@ export default function ToastHost() {
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    zIndex: 9999,
+    elevation: 9999,
+  },
   toast: {
     position: "absolute",
-    left: Spacing.md,
-    right: Spacing.md,
-    top: Spacing["4xl"],
+    left: Spacing.xl,
+    right: Spacing.xl,
+    top: Spacing["2xl"],
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     backgroundColor: "#1f1f25",

@@ -14,8 +14,9 @@ export interface CourseDetailResponse {
       duration_hours: number;
       thumbnail_url: string;
       video_preview_url: string | null;
-      rating: string;
-      total_ratings: number;
+      rating: string | number;
+      total_ratings?: number;
+      totalRatings?: number;
       student_count: number;
       is_published: boolean;
       is_featured: boolean;
@@ -42,6 +43,18 @@ export interface CourseDetailResponse {
       total_duration_seconds: number;
       requirements: string[];
       outcomes: string[];
+      ratingBreakdown?: Record<number, number>;
+      reviews?: Array<{
+        rating: number;
+        review: string;
+        created_at?: string;
+        createdAt?: string;
+        reviewer_name?: string;
+        reviewerName?: string;
+        reviewer_avatar?: string | null;
+        reviewerAvatar?: string | null;
+        is_anonymous?: boolean;
+      }>;
     };
     sections: any[];
     videos: any[];
@@ -132,11 +145,11 @@ class CourseDetailService {
       console.log('Full response:', JSON.stringify(response, null, 2).slice(0, 1000));
       console.log('================================');
       
-      if (!response.success || !response.data) {
+      if (!response?.success || !response?.data) {
         throw new Error('Failed to fetch course details');
       }
 
-      return this.processCourseDetail(data);
+      return this.processCourseDetail(response.data);
     } catch (error) {
       console.error('Error fetching course details:', error);
       throw error;
@@ -144,7 +157,11 @@ class CourseDetailService {
   }
 
   private processCourseDetail(data: CourseDetailResponse['data']): ProcessedCourseDetail {
-    const { course, reviews = [], statistics } = data;
+    const { course } = data;
+    const reviewsSource =
+      (data as any)?.reviews ??
+      (course as any)?.reviews ??
+      [];
 
     // Process modules - only use actual sections from API
     const modules: CourseModule[] = (data.sections || []).map((section: any, index: number) => ({
@@ -157,12 +174,12 @@ class CourseDetailService {
     }));
 
     // Process reviews
-    const processedReviews = (reviews || []).map(review => ({
+    const processedReviews = (reviewsSource || []).map((review: any) => ({
       rating: review.rating,
       review: review.review,
-      reviewerName: review.reviewer_name,
-      reviewerAvatar: review.reviewer_avatar,
-      createdAt: review.created_at,
+      reviewerName: review.reviewer_name ?? review.reviewerName ?? "Anonymous",
+      reviewerAvatar: review.reviewer_avatar ?? review.reviewerAvatar ?? null,
+      createdAt: review.created_at ?? review.createdAt ?? new Date().toISOString(),
     }));
 
     // Calculate actual rating breakdown from reviews
@@ -181,8 +198,10 @@ class CourseDetailService {
         studentsCount: course.instructor_total_students || 0,
         expertise: course.instructor_expertise || [],
       },
-      rating: parseFloat(course.rating || '0'),
-      totalRatings: course.total_ratings || 0,
+      rating: parseFloat(String(course.rating || 0)),
+      totalRatings: Number(
+        ((course as any).total_ratings ?? (course as any).totalRatings ?? processedReviews.length) || 0
+      ),
       studentCount: course.student_count || 0,
       duration: this.formatDuration(course.duration_hours || 0),
       level: course.level,
@@ -190,7 +209,7 @@ class CourseDetailService {
       tags: course.tags || [],
       modules,
       reviews: processedReviews,
-      ratingBreakdown,
+      ratingBreakdown: (course as any).ratingBreakdown ?? ratingBreakdown,
       requirements: course.requirements || [],
       outcomes: course.outcomes || [],
     };

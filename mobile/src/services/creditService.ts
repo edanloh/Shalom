@@ -114,8 +114,8 @@ export async function recordGoalMilestones(goals: LearningGoal[], userId?: strin
   const snapshot: GoalSnapshot[] = raw.map((g, idx) => {
     const target = Number(g.targetPoints ?? g.targetCourses ?? g.targetHours ?? 0);
     const current = Number(g.currentPoints ?? g.currentCourses ?? g.currentHours ?? 0);
-    const label = g.label || g.title || 'Goal';
-    const id = String(g.id || g.goalId || label || `goal_${idx}`);
+    const label = g.label || 'Goal';
+    const id = String(g.id || label || `goal_${idx}`);
     return { id, current, target, label };
   });
   const maxStreak = raw.reduce((max, g) => Math.max(max, Number(g.streakDays || 0)), 0);

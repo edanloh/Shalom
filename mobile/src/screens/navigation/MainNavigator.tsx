@@ -1,14 +1,14 @@
-import { View, StyleSheet, Platform, Dimensions } from "react-native";
+import { View, StyleSheet, Platform, Dimensions, DeviceEventEmitter } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { BottomTabBar, createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Animated, {
   useAnimatedStyle,
-  withSpring,
   useSharedValue,
-  runOnJS,
+  withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { useNavigationState } from "@react-navigation/native";
 
@@ -24,6 +24,8 @@ const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
 
 const tabBarBottomOffset = Platform.OS === "android" ? 50 : 20;
+const TAB_BAR_HEIGHT = 74;
+const TAB_BAR_HIDE_TRANSLATE = tabBarBottomOffset + TAB_BAR_HEIGHT + 20;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // Tab routes mapping to indices
@@ -32,6 +34,7 @@ const TAB_ROUTES = ["Home", "Courses", "Notifications", "Profile"];
 function TabNavigator() {
   const { user } = useAuth();
   const activeTabIndex = useSharedValue(0);
+  const tabBarTranslateY = useSharedValue(0);
 
   // Get the current route index from navigation state
   const currentTabIndex = useNavigationState((state) => {
@@ -47,6 +50,16 @@ function TabNavigator() {
     activeTabIndex.value = currentTabIndex;
   }, [currentTabIndex]);
 
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("tabbar:toggle", (payload: { visible: boolean }) => {
+      if (typeof payload?.visible !== "boolean") return;
+      tabBarTranslateY.value = withTiming(payload.visible ? 0 : TAB_BAR_HIDE_TRANSLATE, {
+        duration: 220,
+      });
+    });
+    return () => sub.remove();
+  }, []);
+
   // Calculate the position for the sliding white circle
   const tabWidth = (SCREEN_WIDTH - 20) / 4 - 0.3; // 4 tabs, minus margins
 
@@ -60,6 +73,12 @@ function TabNavigator() {
           }),
         },
       ],
+    };
+  });
+
+  const tabBarAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: tabBarTranslateY.value }],
     };
   });
 
@@ -148,7 +167,7 @@ function TabNavigator() {
           bottom: tabBarBottomOffset,
           elevation: 1,
           borderRadius: 40,
-          height: 74,
+          height: TAB_BAR_HEIGHT,
           paddingBottom: 0,
           paddingTop: 10,
           borderWidth: 0,
@@ -156,6 +175,11 @@ function TabNavigator() {
         },
         tabBarLabelPosition: "below-icon",
       })}
+      tabBar={(props) => (
+        <Animated.View style={[props.style as any, tabBarAnimatedStyle]}>
+          <BottomTabBar {...props} />
+        </Animated.View>
+      )}
     >
       <Tab.Screen name="Home" component={Screens.HomeScreen} />
       <Tab.Screen name="Courses" component={Screens.CoursesScreen} />

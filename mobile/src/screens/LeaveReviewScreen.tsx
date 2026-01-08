@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { Spacing, TextStyles } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { courseService } from '../services/courseService';
+import creditService from '../services/creditService';
 import type { MainStackParamList } from '../types/navigation';
 import Screen from '../components/common/Screen';
 import { ActionButton, CustomTextInput } from '@/components';
@@ -68,6 +69,19 @@ export default function LeaveReviewScreen() {
       Alert.alert(isEditing ? '✅ Review updated!' : '✅ Review submitted!', msg);
       navigation.goBack();
     };
+    const awardReviewCredit = async () => {
+      try {
+        await creditService.recordCreditEvent({
+          userId,
+          type: 'course_reviewed',
+          title: 'Review submitted',
+          points: 10,
+          courseId,
+        });
+      } catch (err) {
+        console.warn('Failed to record credit for review', err);
+      }
+    };
 
     try {
       // If already in edit mode → PUT; else try POST first
@@ -77,6 +91,7 @@ export default function LeaveReviewScreen() {
       }
 
       await courseService.postCourseReview(courseId, payload);
+      await awardReviewCredit();
       return doSuccess();
     } catch (e: any) {
       const status = e?.status ?? e?.statusCode;
@@ -118,6 +133,7 @@ export default function LeaveReviewScreen() {
         // You tried to edit but no row exists → fall back to create
         try {
           await courseService.postCourseReview(courseId, payload);
+          await awardReviewCredit();
           return doSuccess();
         } catch (err2: any) {
           const m =

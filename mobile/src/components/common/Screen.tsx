@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
   ScrollView,
@@ -6,6 +6,7 @@ import {
   Platform,
   StatusBar,
   RefreshControl,
+  DeviceEventEmitter,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "@/constants";
@@ -54,6 +55,9 @@ export default function Screen({
   scrollEnabled = true,
   stickyHeader = false,
 }: ScreenProps) {
+  const lastScrollY = useRef(0);
+  const tabHidden = useRef(false);
+
   const header = (
     <View style={{ backgroundColor: Colors.primary }}>
       <ScreenHeader
@@ -99,6 +103,22 @@ export default function Screen({
           alwaysBounceVertical={true}
           overScrollMode="always"
           scrollEnabled={scrollEnabled}
+          scrollEventThrottle={16}
+          onScroll={(e) => {
+            const y = e.nativeEvent.contentOffset.y;
+            const dy = y - lastScrollY.current;
+            if (Math.abs(dy) < 8) return;
+
+            if (dy > 0 && y > 40 && !tabHidden.current) {
+              tabHidden.current = true;
+              DeviceEventEmitter.emit("tabbar:toggle", { visible: false });
+            } else if (dy < 0 && tabHidden.current) {
+              tabHidden.current = false;
+              DeviceEventEmitter.emit("tabbar:toggle", { visible: true });
+            }
+
+            lastScrollY.current = y;
+          }}
         >
           {headerElement}
           <View style={widescreen ? styles.fullScrollContent : styles.scrollContent}>{children}</View>

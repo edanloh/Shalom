@@ -45,6 +45,9 @@ export default function CourseDetailScreen({
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const userId = user?.id;
+  const fallbackUserId =
+    process.env.EXPO_PUBLIC_DEFAULT_USER_ID || "550e8400-e29b-41d4-a716-446655440101";
+  const effectiveUserId = userId || fallbackUserId;
 
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
@@ -63,15 +66,15 @@ export default function CourseDetailScreen({
 
   useEffect(() => {
     (async () => {
-      if (!userId) return;          // user must be logged in
+      if (!effectiveUserId) return;
       try {
-        const enrolled = await courseService.isUserEnrolledInCourse(userId, courseId);
+        const enrolled = await courseService.isUserEnrolledInCourse(effectiveUserId, courseId);
         setIsEnrolled(enrolled);
       } catch (e) {
         console.log('Enroll status check failed:', e);
       }
     })();
-  }, [courseId, userId]);
+  }, [courseId, effectiveUserId]);
   const calculateCourseProgress = (): number => {
     if (!courseContent || !courseContent.userProgress) return 0;
     
@@ -108,7 +111,7 @@ export default function CourseDetailScreen({
       // Fetch both course detail and module detail with user progress
       const [detail, moduleData] = await Promise.all([
         courseDetailService.getCourseDetail(courseId),
-        moduleService.getModuleDetail(courseId, userId || '') // Use actual user ID from auth context
+        moduleService.getModuleDetail(courseId, effectiveUserId)
       ]);
       
       setCourseDetail(detail);
@@ -277,7 +280,7 @@ export default function CourseDetailScreen({
 
   const handleEnroll = async () => {
     if (isEnrolling) return;
-    if (!userId) {
+    if (!effectiveUserId) {
       Alert.alert('Sign in required', 'Please sign in to enroll.');
       return;
     }
@@ -286,36 +289,34 @@ export default function CourseDetailScreen({
 
     try {
       setIsEnrolling(true);
-      const { firstModuleId } = await courseService.enrollInCourse(userId, courseId);
+      const { firstModuleId } = await courseService.enrollInCourse(effectiveUserId, courseId);
 
       // Mark as enrolled immediately so UI updates
       setIsEnrolled(true);
       // Refresh detail in background to pick up any progress/enrollment metadata
       loadCourseDetail?.();
 
-      creditService
-        .recordCreditEvent({
-          userId,
+      try {
+        await creditService.recordCreditEvent({
+          userId: effectiveUserId,
           type: 'course_enrolled',
           title: courseDetail?.title || 'Enrolled in course',
           points: 20,
           courseId,
-        })
-        .then(() =>
-          showToast({
-            title: 'Enrolled',
-            message: 'Earned +20 credits for enrolling',
-            type: 'success',
-          })
-        )
-        .catch((err) => {
-          console.warn('Failed to record credit for enrollment', err);
-          showToast({
-            title: 'Unable to record credits',
-            message: 'Something unexpected happened. Please try again later.',
-            type: 'error',
-          });
         });
+        showToast({
+          title: 'Enrolled',
+          message: 'Earned +20 credits for enrolling',
+          type: 'success',
+        });
+      } catch (err) {
+        console.warn('Failed to record credit for enrollment', err);
+        showToast({
+          title: 'Unable to record credits',
+          message: 'Something unexpected happened. Please try again later.',
+          type: 'error',
+        });
+      }
 
       // If you want to immediately take them somewhere after enroll, keep this:
       // navigation.replace(
@@ -334,21 +335,25 @@ export default function CourseDetailScreen({
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.purple400} />
-        <Text style={styles.loadingText}>Loading course details...</Text>
-      </SafeAreaView>
+      <Screen title="" noHeader customEdges={["top", "bottom"]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.purple400} />
+          <Text style={styles.loadingText}>Loading course details...</Text>
+        </View>
+      </Screen>
     );
   }
 
   if (error || !courseDetail) {
     return (
-      <SafeAreaView style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error || 'Course not found'}</Text>
-        <Pressable style={styles.retryButton} onPress={loadCourseDetail}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </SafeAreaView>
+      <Screen title="" noHeader customEdges={["top", "bottom"]}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'Course not found'}</Text>
+          <Pressable style={styles.retryButton} onPress={loadCourseDetail}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+        </View>
+      </Screen>
     );
   }
 
@@ -490,13 +495,13 @@ export default function CourseDetailScreen({
             {/* Left: summary + button */}
             <View style={styles.reviewsSummaryCol}>
               <Text style={styles.ratingNumber}>
-                {courseContent?.course?.reviews?.length > 0 ? courseContent.course.rating.toFixed(1) : '0.0'}
+                {courseDetail?.reviews?.length ? courseDetail.rating.toFixed(1) : '0.0'}
               </Text>
               <View style={styles.starsContainer}>
-                {renderStarRating(courseContent?.course?.reviews?.length > 0 ? courseContent.course.rating : 0)}
+                {renderStarRating(courseDetail?.reviews?.length ? courseDetail.rating : 0)}
               </View>
               <Text style={styles.reviewCount}>
-                {courseContent?.course?.reviews?.length || 0} {courseContent?.course?.reviews?.length === 1 ? 'review' : 'reviews'}
+                {courseDetail?.reviews?.length || 0} {courseDetail?.reviews?.length === 1 ? 'review' : 'reviews'}
               </Text>
 
               {isEnrolled && calculateCourseProgress() === 100 && (
@@ -509,16 +514,16 @@ export default function CourseDetailScreen({
             </View>
 
             {/* Right: rating breakdown */}
-            {courseContent?.course?.ratingBreakdown && renderRatingBreakdown(courseContent.course.ratingBreakdown)}
+            {courseDetail?.ratingBreakdown && renderRatingBreakdown(courseDetail.ratingBreakdown)}
           </View>
 
           {/* Divider */}
-          {courseContent?.course?.reviews?.length > 0 && <View style={styles.reviewsDivider} />}
+          {courseDetail?.reviews?.length ? <View style={styles.reviewsDivider} /> : null}
 
           {/* Reviews list or empty state */}
           <View style={styles.reviewsListTight}>
-            {courseContent?.course?.reviews?.length > 0 ? (
-              courseContent.course.reviews.map(renderReview)
+            {courseDetail?.reviews?.length ? (
+              courseDetail.reviews.map(renderReview)
             ) : (
               <View style={styles.noReviewsContainer}>
                 <Ionicons name="star-outline" size={48} color={Colors.textSecondary} />

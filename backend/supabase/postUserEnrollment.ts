@@ -169,23 +169,55 @@ serve(async (req) => {
       .single();
 
     if (existing && !existingError) {
+      let enrollment = existing;
+      let restored = false;
+      if (!existing.enrollment_date) {
+        const { data: revived, error: reviveError } = await supabaseClient
+          .from('course_enrollments')
+          .update({
+            enrollment_date: enrollmentDate || new Date().toISOString(),
+            progress_percentage: progressNum,
+            is_completed: !!isCompleted,
+            total_watch_time_minutes: watchMinsNum
+          })
+          .eq('id', existing.id)
+          .select(`
+            id,
+            user_id,
+            course_id,
+            enrollment_date,
+            completion_date,
+            progress_percentage,
+            is_completed,
+            total_watch_time_minutes
+          `)
+          .single();
+        if (reviveError) throw reviveError;
+        enrollment = revived;
+        restored = true;
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
-          message: "User already enrolled; returning existing record",
+          message: restored
+            ? "Enrollment restored"
+            : "User already enrolled; returning existing record",
           data: {
             enrollment: {
-              enrollment_id: existing.id,
-              user_id: existing.user_id,
-              course_id: existing.course_id,
-              enrollment_date: existing.enrollment_date,
-              completion_date: existing.completion_date,
-              progress_percentage: existing.progress_percentage,
-              is_completed: existing.is_completed,
-              total_watch_time_minutes: existing.total_watch_time_minutes,
-              enrollment_date_formatted: new Date(existing.enrollment_date).toISOString(),
-              completion_date_formatted: existing.completion_date
-                ? new Date(existing.completion_date).toISOString()
+              enrollment_id: enrollment.id,
+              user_id: enrollment.user_id,
+              course_id: enrollment.course_id,
+              enrollment_date: enrollment.enrollment_date,
+              completion_date: enrollment.completion_date,
+              progress_percentage: enrollment.progress_percentage,
+              is_completed: enrollment.is_completed,
+              total_watch_time_minutes: enrollment.total_watch_time_minutes,
+              enrollment_date_formatted: enrollment.enrollment_date
+                ? new Date(enrollment.enrollment_date).toISOString()
+                : null,
+              completion_date_formatted: enrollment.completion_date
+                ? new Date(enrollment.completion_date).toISOString()
                 : null
             },
             course: {

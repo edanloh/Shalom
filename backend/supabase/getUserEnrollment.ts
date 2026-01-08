@@ -91,6 +91,7 @@ serve(async (req) => {
         )
       `, { count: 'exact' })
       .eq('user_id', userId)
+      .not('enrollment_date', 'is', null)
       .range(offset, offset + limit - 1)
       .order(safeSortBy, { ascending });
 
@@ -246,7 +247,9 @@ serve(async (req) => {
           video_progress_percent: Math.round(videoProgressPercent * 100) / 100,
           quiz_progress_percent: Math.round(quizProgressPercent * 100) / 100,
           estimated_time_remaining_minutes: estimatedTimeRemaining,
-          enrollment_date_formatted: new Date(enrollment.enrollment_date).toISOString(),
+          enrollment_date_formatted: enrollment.enrollment_date
+            ? new Date(enrollment.enrollment_date).toISOString()
+            : null,
           completion_date_formatted: enrollment.completion_date
             ? new Date(enrollment.completion_date).toISOString()
             : null

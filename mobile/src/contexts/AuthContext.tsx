@@ -73,16 +73,9 @@ interface AuthContextType {
 }
 
 const USER_STORAGE_KEY = "shalom_user";
-// Temporarily commented out AWS Cognito - switching to Supabase Auth
-/*
-if (!COGNITO_POOL_ID || !COGNITO_CLIENT_ID) {
-  throw new Error("Missing Cognito configuration");
-}
-
 const cognitoClient = new CognitoIdentityProviderClient({
   region: "ap-southeast-1",
 });
-*/
 
 const getAuthErrorMessage = (error: any): string => {
   const errorMessages: Record<string, string> = {

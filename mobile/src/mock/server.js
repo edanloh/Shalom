@@ -48,11 +48,16 @@ const endpointMap = {
       const quizId = params.quizId;
       return db["quiz-details"][quizId] || db["quiz-details"]["quiz_1"];
     },
-    "/courses/:courseId/reviews": (params, body, query) => {
+    "/courseReviewHandler/:courseId": (params, body, query) => {
       const courseId = params.courseId;
       const userId = query.userId;
-      // Return user's review if exists
-      return db["user-reviews"][`${userId}_${courseId}`] || null;
+      if (userId) {
+        // Return user's review if exists
+        return db["user-reviews"][`${userId}_${courseId}`] || null;
+      } else {
+        // Return all reviews for the course
+        return Object.values(db["user-reviews"] || {}).filter(review => review.courseId === courseId);
+      }
     },
     "/dev/getAllUserInfo": () => db["all-users-info"].data,
     "/recommendations": () => db.recommendations,
@@ -267,9 +272,37 @@ const endpointMap = {
           : "https://ui-avatars.com/api/?name=User+Name&size=40",
       },
     }),
+    "/courseReviewHandler/:courseId": (params, body) => ({
+      success: true,
+      message: "Review posted successfully",
+      data: {
+        id: `review_${Date.now()}`,
+        rating: body.rating,
+        review: body.review,
+        createdAt: new Date().toISOString(),
+        reviewerName: body.isAnonymous ? "Anonymous" : "User Name",
+        reviewerAvatar: body.isAnonymous
+          ? null
+          : "https://ui-avatars.com/api/?name=User+Name&size=40",
+      },
+    }),
   },
   PUT: {
     "/courses/:courseId/reviews": (params, body) => ({
+      success: true,
+      message: "Review updated successfully",
+      data: {
+        id: `review_${Date.now()}`,
+        rating: body.rating,
+        review: body.review,
+        createdAt: new Date().toISOString(),
+        reviewerName: body.isAnonymous ? "Anonymous" : "User Name",
+        reviewerAvatar: body.isAnonymous
+          ? null
+          : "https://ui-avatars.com/api/?name=User+Name&size=40",
+      },
+    }),
+    "/courseReviewHandler/:courseId": (params, body) => ({
       success: true,
       message: "Review updated successfully",
       data: {

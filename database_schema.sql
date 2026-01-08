@@ -40,6 +40,7 @@ DROP TABLE IF EXISTS user_achievements CASCADE;
 DROP TABLE IF EXISTS achievements CASCADE;
 DROP TABLE IF EXISTS course_enrollments CASCADE;
 DROP TABLE IF EXISTS course_ratings CASCADE;
+DROP TABLE IF EXISTS credit_events CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -61,6 +62,18 @@ CREATE TABLE users (
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Credit Events Table
+CREATE TABLE credit_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    points INTEGER NOT NULL,
+    course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
+    reference_key VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Categories Table

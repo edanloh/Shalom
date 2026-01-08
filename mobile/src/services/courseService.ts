@@ -25,7 +25,9 @@ const ENDPOINTS = {
   USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, // Maps to getUserEnrollment.mjs
   COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, // Maps to getModuleDetail.mjs
   COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, // Maps to courseReviewHandler
-  POST_ENROLLMENT: '/postUserEnrollment', // Maps to postUserEnrollment.mjs
+  POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, // Maps to postUserEnrollment.mjs
+  RECOMMENDATIONS: '/getRecommendations',
+  RECOMMENDATION_EVENT: '/postRecommendationEvent',
 };
 
 
@@ -257,7 +259,10 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
     },
     duration: durationStr,
     rating: parseFloat(awsCourse.rating || '4.0'),
-    image: awsCourse.thumbnail_url || 'https://via.placeholder.com/400x250',
+    image:
+      awsCourse.thumbnail_url ||
+      awsCourse.image ||
+      'https://via.placeholder.com/400x250',
     category: awsCourse.category_name || 'General',
     level: mapLevel(awsCourse.level),
     modules: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
@@ -434,9 +439,9 @@ class CourseService {
         (payload as EnrollmentResponse)?.data?.enrollments ??
         (payload as any)?.enrollments ??
         [];
-      
+
       console.log('[getUserEnrollments] Raw enrollmentsData sample:', enrollmentsData[0]);
-      
+
       if (!Array.isArray(enrollmentsData)) {
         console.error('getUserEnrollments - Invalid enrollment response structure:', response);
         throw new Error('Invalid enrollment response: enrollments array not found');
@@ -514,6 +519,7 @@ class CourseService {
 
       const recs =
         (Array.isArray(resp?.data) ? resp?.data : null) ??
+        resp?.data?.data?.recommendations ??
         resp?.data?.recommendations ??
         resp?.recommendations ??
         [];
@@ -529,16 +535,33 @@ class CourseService {
           })
         : [];
 
-      const courses = sorted.map((item: any, idx: number) => {
-        const coursePayload = item.course || item;
-        const course = convertAWSCourseToAppCourse(coursePayload);
-        return {
-          ...course,
-          recommendationReason: item.reason || coursePayload.recommendation_reason,
-          recommendationScore: item.score || coursePayload.recommendation_score,
-          recommendationRank: item.rank ?? item.recommendation_rank ?? idx + 1,
-        };
-      });
+      const courses = sorted
+        .map((item: any, idx: number) => {
+          let coursePayload: any = item.course || item;
+          if (typeof coursePayload === 'string') {
+            try {
+              coursePayload = JSON.parse(coursePayload);
+            } catch {
+              coursePayload = null;
+            }
+          }
+          if (!coursePayload || typeof coursePayload !== 'object') {
+            return null;
+          }
+          try {
+            const course = convertAWSCourseToAppCourse(coursePayload);
+            return {
+              ...course,
+              recommendationReason: item.reason || coursePayload.recommendation_reason,
+              recommendationScore: item.score || coursePayload.recommendation_score,
+              recommendationRank: item.rank ?? item.recommendation_rank ?? idx + 1,
+            };
+          } catch (err) {
+            console.warn('Failed to map recommendation item', err);
+            return null;
+          }
+        })
+        .filter(Boolean) as Course[];
 
       await CacheManager.set(cacheKey, courses);
       return courses;
@@ -572,7 +595,7 @@ async addToWishlist(userId: string, courseId: string): Promise<void> {
 async removeFromWishlist(userId: string, courseId: string): Promise<void> {
   if (!userId) userId = DEFAULT_USER_ID;
   if (!courseId) throw new Error('Missing courseId');
-  await apiService.delete(WISHLIST.ITEM(userId, courseId), { params: { userId, courseId } } as any);
+  await apiService.delete(WISHLIST.ITEM(userId, courseId));
   await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
 }
 
@@ -670,10 +693,10 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    */
   async isUserEnrolledInCourse(userId: string, courseId: string): Promise<boolean> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
-    userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
 
     // Reuse the enrollments fetch (it already maps to Course[])
-    const enrolledCourses = await this.getUserEnrollments(userId);
+    const uid = userId || DEFAULT_USER_ID;
+    const enrolledCourses = await this.getUserEnrollments(uid);
     return enrolledCourses.some(c => String(c.id) === String(courseId));
   }
 
@@ -687,9 +710,9 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
     const uid = userId || DEFAULT_USER_ID;
 
-    const url = ENDPOINTS.POST_ENROLLMENT;
+    const url = ENDPOINTS.POST_ENROLLMENT(uid);
     const resp = await apiService.post<any>(url, {
-      userId,
+      userId: uid,
       courseId,
       // optional fields supported by the edge function
       initialProgress: 0,
@@ -698,7 +721,7 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
     });
 
     await Promise.all([
-      CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`),
+      CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_enrollments_${uid}`),
       CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
     ]);
 
