@@ -11,7 +11,7 @@ import {
 import { Alert } from "react-native";
 import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRoute, useNavigation } from "@react-navigation/native";
+import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import type { StackNavigationProp } from "@react-navigation/stack";
@@ -63,9 +63,13 @@ const ModuleDetailScreen = () => {
     return () => { mounted = false; };
   }, [courseId, userId]);
 
-  useEffect(() => {
-    fetchCourseContent();
-  }, [courseId]);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (userId) {
+        fetchCourseContent();
+      }
+    }, [courseId, userId])
+  );
 
   const fetchCourseContent = async () => {
     try {
@@ -180,6 +184,11 @@ const ModuleDetailScreen = () => {
       item.type === "video"
         ? (progress as any)?.is_completed
         : (progress as any)?.is_passed;
+
+    // Debug: Log duration values
+    if (item.type === "video") {
+      console.log(`Video: ${item.title}, duration_seconds: ${item.duration_seconds}, formatted: ${formatDuration(item.duration_seconds)}`);
+    }
 
     return (
       <TouchableOpacity
@@ -375,7 +384,7 @@ const ModuleDetailScreen = () => {
               color={Colors.purple400}
             />
             <Text style={styles.statText}>
-              {currentSection.duration_minutes} min
+              {currentSection.duration_minutes || 0} min
             </Text>
           </View>
         </View>
@@ -425,8 +434,21 @@ const ModuleDetailScreen = () => {
       {/* Content Items */}
       <View style={styles.contentSection}>
         <Text style={styles.contentTitle}>Lessons</Text>
-        {currentSection.items.map((item: ModuleItem, index: number) =>
-          renderItem(item, index)
+        {currentSection.items && currentSection.items.length > 0 ? (
+          currentSection.items.map((item: ModuleItem, index: number) =>
+            renderItem(item, index)
+          )
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons
+              name="folder-open-outline"
+              size={48}
+              color={Colors.textSecondary}
+            />
+            <Text style={styles.emptyStateText}>
+              No lessons available in this module yet
+            </Text>
+          </View>
         )}
       </View>
 
@@ -664,6 +686,19 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.textPrimary,
     marginBottom: Spacing.md,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.xl * 2,
+    backgroundColor: Colors.textInputBg,
+    borderRadius: 12,
+  },
+  emptyStateText: {
+    fontSize: TextStyles.body.fontSize,
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
+    textAlign: "center",
   },
   itemCard: {
     flexDirection: "row",

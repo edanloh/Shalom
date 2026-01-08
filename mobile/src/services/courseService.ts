@@ -24,7 +24,7 @@ const ENDPOINTS = {
   COURSES: '/getAllCourse', // Maps to getAllCourse.mjs
   USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, // Maps to getUserEnrollment.mjs
   COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, // Maps to getModuleDetail.mjs
-  COURSE_REVIEWS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}/reviews`,
+  COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, // Maps to courseReviewHandler
   POST_ENROLLMENT: '/postUserEnrollment', // Maps to postUserEnrollment.mjs
 };
 
@@ -74,6 +74,8 @@ export interface EnrollmentCourse {
   video_watch_time_seconds: string;
   total_quizzes: string;
   passed_quizzes: string;
+  total_sections: number;
+  completed_sections: number;
   video_progress_percent: number;
   quiz_progress_percent: number;
   estimated_time_remaining_minutes: number;
@@ -270,6 +272,29 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
 
 // Helper function to convert enrollment data to Course format
 const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
+  // Use section counts if available (after backend redeploy), otherwise calculate from items
+  const totalSections = enrollment.total_sections || 0;
+  const completedSections = enrollment.completed_sections || 0;
+  
+  // Calculate from video/quiz data for accurate item-level tracking
+  const totalVideos = parseInt(enrollment.total_videos) || 0;
+  const completedVideos = parseInt(enrollment.completed_videos) || 0;
+  const totalQuizzes = parseInt(enrollment.total_quizzes) || 0;
+  const passedQuizzes = parseInt(enrollment.passed_quizzes) || 0;
+  
+  const totalItems = totalVideos + totalQuizzes;
+  const completedItems = completedVideos + passedQuizzes;
+  
+  // Calculate progress percentage from actual completion data
+  // Don't trust the API's progress_percentage as it may be stale
+  const calculatedPercentage = totalItems > 0 
+    ? Math.round((completedItems / totalItems) * 100) 
+    : 0;
+  
+  // For display counts, use section counts if available, otherwise use item counts
+  const progressTotal = totalSections > 0 ? totalSections : totalItems;
+  const progressCompleted = totalSections > 0 ? completedSections : completedItems;
+  
   // Generate avatar from instructor name
   const generateAvatar = (name: string): string => {
     if (!name) return 'https://via.placeholder.com/50x50';
@@ -286,10 +311,6 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     }
   };
 
-  // Calculate modules from duration
-  const totalModules = Math.floor(enrollment.duration_hours / 2) || 10;
-  const completedModules = Math.floor((totalModules * parseFloat(enrollment.progress_percentage)) / 100);
-
   return {
     id: enrollment.course_id,
     title: enrollment.title,
@@ -303,9 +324,9 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
       bio: `Expert ${enrollment.category_name} instructor`,
     },
     progress: {
-      completed: completedModules,
-      total: totalModules,
-      percentage: Math.round(parseFloat(enrollment.progress_percentage)),
+      completed: progressCompleted,
+      total: progressTotal,
+      percentage: calculatedPercentage,
       lastAccessed: enrollment.last_accessed,
     },
     duration: `${enrollment.duration_hours}h`,
@@ -313,7 +334,7 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     image: enrollment.thumbnail_url,
     category: enrollment.category_name,
     level: mapLevel(enrollment.level),
-    modules: totalModules,
+    modules: progressTotal,
     tags: enrollment.tags || [],
     prerequisites: [],
     outcomes: [],
@@ -414,6 +435,8 @@ class CourseService {
         (payload as any)?.enrollments ??
         [];
       
+      console.log('[getUserEnrollments] Raw enrollmentsData sample:', enrollmentsData[0]);
+      
       if (!Array.isArray(enrollmentsData)) {
         console.error('getUserEnrollments - Invalid enrollment response structure:', response);
         throw new Error('Invalid enrollment response: enrollments array not found');
@@ -421,7 +444,11 @@ class CourseService {
 
       // Convert enrollment format to our app Course format
       const courses = enrollmentsData.map(convertEnrollmentToAppCourse);
-      console.log('getUserEnrollments - Course titles:', courses.map(c => c.title));
+      console.log('getUserEnrollments - Converted courses sample:', {
+        title: courses[0]?.title,
+        progress: courses[0]?.progress,
+        modules: courses[0]?.modules
+      });
 
       // Cache the response
       await CacheManager.set(cacheKey, courses);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,8 @@ import { supabaseService } from "@/services/supabaseService";
 const CourseDetail = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as { quizCompleted?: boolean; quizId?: string; isPassed?: boolean } | null;
   const { toast } = useToast();
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -61,6 +63,27 @@ const CourseDetail = () => {
       fetchCourseData();
     }
   }, [courseId]);
+
+  // Refresh data when returning from quiz
+  useEffect(() => {
+    if (locationState?.quizCompleted && courseId) {
+      console.log('Quiz completed, refreshing course data...');
+      // Clear the location state to prevent refetching on subsequent renders
+      window.history.replaceState({}, document.title);
+      // Refetch course data to get updated progress
+      fetchCourseData();
+    }
+  }, [locationState?.quizCompleted]);
+
+  // Refresh data when returning from quiz
+  useEffect(() => {
+    if (locationState?.quizCompleted && courseId) {
+      // Clear the location state to prevent refetching on subsequent renders
+      window.history.replaceState({}, document.title);
+      // Refetch course data to get updated progress
+      fetchCourseData();
+    }
+  }, [locationState?.quizCompleted, courseId]);
 
   const fetchCourseData = async () => {
     if (!courseId) return;

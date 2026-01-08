@@ -23,6 +23,7 @@ import { courseService } from '../services/courseService';
 import creditService from '../services/creditService';
 import { moduleService, ModuleDetailResponse, UserProgress, CourseSection } from '../services/moduleService';
 import { useFocusEffect } from '@react-navigation/native';
+import { useCourses } from '../contexts/CourseContext';
 import Screen from '../components/common/Screen';
 import ActionButton from '@/components/ActionButton';
 import { showToast } from '@/components/common/Toast';
@@ -47,11 +48,17 @@ export default function CourseDetailScreen({
 
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  
+  // Wishlist functionality
+  const { toggleWishlist, isWishlisted } = useCourses();
+  const wishlisted = isWishlisted(courseId);
 
   useFocusEffect(
     React.useCallback(() => {
-      loadCourseDetail();
-    }, [courseId])
+      if (userId) {
+        loadCourseDetail();
+      }
+    }, [courseId, userId])
   );
 
   useEffect(() => {
@@ -77,6 +84,14 @@ export default function CourseDetailScreen({
       ).length;
     }, 0);
     
+    console.log('[CourseDetailScreen] Progress calculation:', {
+      completedItems,
+      totalItems,
+      percentage: Math.round((completedItems / totalItems) * 100),
+      sections: courseContent.sections.length,
+      completedSections: courseContent.sections.filter(s => s.module_is_completed).length
+    });
+    
     return Math.round((completedItems / totalItems) * 100);
   };
 
@@ -93,7 +108,7 @@ export default function CourseDetailScreen({
       // Fetch both course detail and module detail with user progress
       const [detail, moduleData] = await Promise.all([
         courseDetailService.getCourseDetail(courseId),
-        moduleService.getModuleDetail(courseId, '550e8400-e29b-41d4-a716-446655440101') // TODO: Replace with actual user ID from auth context
+        moduleService.getModuleDetail(courseId, userId || '') // Use actual user ID from auth context
       ]);
       
       setCourseDetail(detail);
@@ -124,28 +139,34 @@ export default function CourseDetailScreen({
   };
 
   const renderRatingBreakdown = (breakdown: Record<number, number>) => {
+    const totalReviews = Object.values(breakdown).reduce((sum, count) => sum + count, 0);
+    
     return (
       <View style={styles.ratingBreakdown}>
-        {[5, 4, 3, 2, 1].map((star) => (
-          <View key={star} style={styles.ratingRow}>
-            <Text style={styles.starNumber}>{star}</Text>
-            <View style={styles.ratingBar}>
-              <View 
-                style={[
-                  styles.ratingBarFill, 
-                  { width: `${breakdown[star] || 0}%` }
-                ]} 
-              />
+        {[5, 4, 3, 2, 1].map((star) => {
+          const count = breakdown[star] || 0;
+          const percentage = totalReviews > 0 ? (count / totalReviews) * 100 : 0;
+          
+          return (
+            <View key={star} style={styles.ratingRow}>
+              <Text style={styles.starNumber}>{star}</Text>
+              <View style={styles.ratingBar}>
+                <View 
+                  style={[
+                    styles.ratingBarFill, 
+                    { width: `${percentage}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.ratingPercentage}>{count}</Text>
             </View>
-            <Text style={styles.ratingPercentage}>{breakdown[star] || 0}%</Text>
-          </View>
-        ))}
+          );
+        })}
       </View>
     );
   };
 
-  const renderModule = (module: CourseModule, index: number) => {
-    const section = courseContent?.sections.find(s => s.id === module.id);
+  const renderModule = (section: CourseSection, index: number) => {
     const isCompleted = section?.module_is_completed || false;
     const completedAt = section?.module_completed_at;
 
@@ -163,19 +184,19 @@ export default function CourseDetailScreen({
       }
       navigation.navigate('ModuleDetail', {
         courseId: route.params.courseId,
-        sectionId: module.id,
+        sectionId: section.id,
         userId: userId ?? '',
       });
     };
 
     return (
-      <Pressable key={module.id} style={styles.moduleItem} onPress={onOpen}>
+      <Pressable key={section.id} style={styles.moduleItem} onPress={onOpen}>
         <View style={styles.moduleIcon}>
           <Ionicons name="book-outline" size={20} color={Colors.purple400} />
         </View>
         <View style={styles.moduleContent}>
           <View style={styles.moduleTitleRow}>
-            <Text style={styles.moduleTitle}>{module.title}</Text>
+            <Text style={styles.moduleTitle}>{section.title}</Text>
             {isCompleted && (
               <View style={styles.completedBadge}>
                 <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
@@ -183,8 +204,8 @@ export default function CourseDetailScreen({
               </View>
             )}
           </View>
-          {!!module.description && (
-            <Text style={styles.moduleDescription}>{module.description}</Text>
+          {!!section.description && (
+            <Text style={styles.moduleDescription}>{section.description}</Text>
           )}
           {isCompleted && completedAt && (
             <Text style={styles.completedDate}>
@@ -226,6 +247,31 @@ export default function CourseDetailScreen({
       Alert.alert('Sign in required', 'Please sign in to leave a review.');
       return;
     }
+    
+    // Check if user is enrolled
+    if (!isEnrolled) {
+      Alert.alert(
+        'Enrollment Required',
+        'You must enroll in this course before leaving a review.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Enroll Now', onPress: handleEnroll },
+        ]
+      );
+      return;
+    }
+    
+    // Check if course is completed
+    const courseProgress = calculateCourseProgress();
+    if (courseProgress < 100) {
+      Alert.alert(
+        'Complete the Course First',
+        'You must complete all modules in this course before leaving a review.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
     navigation.navigate('LeaveReview', { courseId });
   };
 
@@ -319,6 +365,33 @@ export default function CourseDetailScreen({
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
         </Pressable>
+        
+        {/* Wishlist Button */}
+        {courseDetail && (
+          <Pressable 
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              toggleWishlist({ 
+                id: courseDetail.id,
+                title: courseDetail.title,
+                description: courseDetail.description,
+                image: courseDetail.image,
+                instructor: courseDetail.instructor,
+                rating: courseDetail.rating,
+                duration: courseDetail.duration,
+                level: courseDetail.level,
+                category: courseDetail.category,
+              } as any);
+            }} 
+            style={styles.wishlistButton}
+          >
+            <Ionicons 
+              name={wishlisted ? "heart" : "heart-outline"} 
+              size={20} 
+              color={Colors.white} 
+            />
+          </Pressable>
+        )}
       </View>
 
       {/* Hero Image */}
@@ -360,7 +433,7 @@ export default function CourseDetailScreen({
               </View>
               <View style={styles.progressStats}>
                 <Text style={styles.progressStatsText}>
-                  {getCompletedModulesCount()} of {courseDetail.modules.length} modules completed
+                  {getCompletedModulesCount()} of {courseContent?.sections.length || 0} modules completed
                 </Text>
                 {/* {calculateCourseProgress() === 100 && (
                   <View style={styles.completedBadge}>
@@ -376,7 +449,7 @@ export default function CourseDetailScreen({
         {/* Modules Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Modules</Text>
-          {courseContent && getCompletedModulesCount() === courseDetail.modules.length && courseDetail.modules.length > 0 && (
+          {courseContent && getCompletedModulesCount() === courseContent.sections.length && courseContent.sections.length > 0 && (
             <View style={styles.completedBadge}>
               <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
               <Text style={styles.completedBadgeText}>All Completed</Text>
@@ -384,8 +457,8 @@ export default function CourseDetailScreen({
           )}
         </View>
         <View style={styles.modulesList}>
-          {courseDetail.modules.length > 0 ? (
-            courseDetail.modules.map(renderModule)
+          {courseContent && courseContent.sections.length > 0 ? (
+            courseContent.sections.map(renderModule)
           ) : (
             <View style={styles.noModulesContainer}>
               <Text style={styles.noModulesText}>No modules available</Text>
@@ -416,31 +489,45 @@ export default function CourseDetailScreen({
           <View style={styles.reviewsTopRow}>
             {/* Left: summary + button */}
             <View style={styles.reviewsSummaryCol}>
-              <Text style={styles.ratingNumber}>{courseDetail.rating.toFixed(1)}</Text>
+              <Text style={styles.ratingNumber}>
+                {courseContent?.course?.reviews?.length > 0 ? courseContent.course.rating.toFixed(1) : '0.0'}
+              </Text>
               <View style={styles.starsContainer}>
-                {renderStarRating(courseDetail.rating)}
+                {renderStarRating(courseContent?.course?.reviews?.length > 0 ? courseContent.course.rating : 0)}
               </View>
               <Text style={styles.reviewCount}>
-                {courseDetail.totalRatings} ratings · {courseDetail.reviews.length} reviews
+                {courseContent?.course?.reviews?.length || 0} {courseContent?.course?.reviews?.length === 1 ? 'review' : 'reviews'}
               </Text>
 
-              <ActionButton
-                onPress={handleLeaveReview}
-                text={'Leave a Review'}
-                style={{height: 42, padding: 12, paddingTop: 9, marginTop: Spacing.md, marginBottom: Spacing.xs}}
-              />
+              {isEnrolled && calculateCourseProgress() === 100 && (
+                <ActionButton
+                  onPress={handleLeaveReview}
+                  text={'Leave a Review'}
+                  style={{height: 42, padding: 12, paddingTop: 9, marginTop: Spacing.md, marginBottom: Spacing.xs}}
+                />
+              )}
             </View>
 
-            {/* Right: rating breakdown (kept as-is) */}
-            {renderRatingBreakdown(courseDetail.ratingBreakdown)}
+            {/* Right: rating breakdown */}
+            {courseContent?.course?.ratingBreakdown && renderRatingBreakdown(courseContent.course.ratingBreakdown)}
           </View>
 
           {/* Divider */}
-          <View style={styles.reviewsDivider} />
+          {courseContent?.course?.reviews?.length > 0 && <View style={styles.reviewsDivider} />}
 
-          {/* Reviews list (rows feel part of same section) */}
+          {/* Reviews list or empty state */}
           <View style={styles.reviewsListTight}>
-            {courseDetail.reviews.map(renderReview)}
+            {courseContent?.course?.reviews?.length > 0 ? (
+              courseContent.course.reviews.map(renderReview)
+            ) : (
+              <View style={styles.noReviewsContainer}>
+                <Ionicons name="star-outline" size={48} color={Colors.textSecondary} />
+                <Text style={styles.noReviewsTitle}>No reviews yet</Text>
+                <Text style={styles.noReviewsText}>
+                  Be the first to share your experience with this course!
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -501,6 +588,9 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 1,
     paddingHorizontal: Spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   backButton: {
     width: 40,
@@ -509,6 +599,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  wishlistButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 6,
   },
   scrollView: {
     flex: 1,
@@ -827,5 +926,23 @@ const styles = StyleSheet.create({
     fontSize: TextStyles.body.fontSize,
     color: Colors.textSecondary,
     fontStyle: 'italic',
+  },
+  noReviewsContainer: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xl * 1.5,
+    paddingHorizontal: Spacing.lg,
+  },
+  noReviewsTitle: {
+    fontSize: TextStyles.h4.fontSize,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  noReviewsText: {
+    fontSize: TextStyles.body.fontSize,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

@@ -48,8 +48,8 @@ export default function ScreenHeader({
       <View
         style={{
           position: "absolute",
-          left: 56,
-          right: 56,
+          left: 50,
+          right: 50,
           alignItems: "center",
           justifyContent: "center",
         }}

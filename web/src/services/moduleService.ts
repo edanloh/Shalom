@@ -207,6 +207,32 @@ class ModuleService {
       throw error;
     }
   }
+
+  /**
+   * Submit quiz answers for grading
+   * @param quizId - The quiz ID
+   * @param userId - The user ID submitting the quiz
+   * @param answers - Array of answers: [{ questionId: string, answer: string }]
+   * @param timeTakenMinutes - Optional time taken to complete the quiz
+   */
+  async submitQuiz(
+    quizId: string,
+    userId: string,
+    answers: Array<{ questionId: string; answer: string }>,
+    timeTakenMinutes?: number
+  ): Promise<any> {
+    try {
+      const response = await apiService.post(`/submitQuiz/${quizId}`, {
+        userId,
+        answers,
+        timeTakenMinutes
+      });
+      return response;
+    } catch (error) {
+      console.error(`Error submitting quiz ${quizId}:`, error);
+      throw error;
+    }
+  }
 }
 
 export const moduleService = new ModuleService();
