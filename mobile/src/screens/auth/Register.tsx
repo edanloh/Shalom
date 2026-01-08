@@ -12,19 +12,11 @@ import {
 import CustomTextInput from "@components/CustomTextInput";
 import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
-import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import styles from "@/styles/styles";
 import { Colors, Spacing, TextStyles } from "../../constants";
+import { validatePassword } from "@/utils/validatePassword";
 WebBrowser.maybeCompleteAuthSession();
-
-import {
-  COGNITO_DOMAIN,
-  COGNITO_CLIENT_ID,
-  API_BASE_URL,
-} from "react-native-dotenv";
-
-const REDIRECT_URI = makeRedirectUri();
 
 export default function RegisterScreen({ navigation }: any) {
   const [name, setName] = useState("");
@@ -33,41 +25,12 @@ export default function RegisterScreen({ navigation }: any) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [passwordWarning, setPasswordWarning] = useState("");
-  const { register, loginWithGoogle } = useAuth();
-
-  const validatePassword = (pwd: string) => {
-    if (pwd.length < 8) {
-      return "Password must be at least 8 characters";
-    }
-    if (!/[0-9]/.test(pwd)) {
-      return "Password must contain at least 1 number";
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) {
-      return "Password must contain at least 1 special character";
-    }
-    if (!/[A-Z]/.test(pwd)) {
-      return "Password must contain at least 1 uppercase letter";
-    }
-    if (!/[a-z]/.test(pwd)) {
-      return "Password must contain at least 1 lowercase letter";
-    }
-    return "";
-  };
+  const { register, loginWithGoogle, fetchEmail } = useAuth();
 
   const checkEmail = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/dev/getUserInfo?email=${email}`,
-        {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch user info from API Gateway");
-      }
-      const result = await response.json();
+      const result = await fetchEmail(email);
       if (result) {
         if (result.found == true) {
           setPasswordWarning("Email is already registered");
@@ -105,60 +68,6 @@ export default function RegisterScreen({ navigation }: any) {
       Alert.alert("Error", "Registration failed");
     } else {
       navigation.navigate("ConfirmSignUp", { email });
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    const cognitoAuthUrl =
-      `${COGNITO_DOMAIN}/oauth2/authorize?` +
-      `identity_provider=Google` +
-      `&client_id=${COGNITO_CLIENT_ID}` +
-      `&response_type=code` +
-      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-      `&scope=email%20openid%20phone`;
-    const result = await WebBrowser.openAuthSessionAsync(
-      cognitoAuthUrl,
-      REDIRECT_URI
-    );
-    if (result.type === "success") {
-      if (result.url) {
-        const urlParams = new URLSearchParams(result.url.split("?")[1]);
-        const authCode = urlParams.get("code");
-        if (authCode) {
-          // Exchange code for tokens
-          try {
-            const tokenResponse = await fetch(
-              `${COGNITO_DOMAIN}/oauth2/token`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: `grant_type=authorization_code&client_id=${COGNITO_CLIENT_ID}&code=${authCode}&redirect_uri=${encodeURIComponent(
-                  REDIRECT_URI
-                )}`,
-              }
-            );
-            const tokens = await tokenResponse.json();
-            if (tokens.id_token) {
-              // Call AuthContext to set user as authenticated
-              if (typeof loginWithGoogle === "function") {
-                await loginWithGoogle(tokens);
-              }
-              // Navigation will happen automatically when isAuthenticated changes
-            } else {
-              Alert.alert("Error", "Failed to retrieve tokens from Cognito");
-            }
-          } catch (err) {
-            console.error("Error exchanging code for tokens:", err);
-            Alert.alert("Error", "Google login failed");
-          }
-        }
-      }
-    } else if (result.type === "dismiss") {
-      console.log("Google sign-in was cancelled");
-    } else {
-      console.log("Cognito sign-in failed");
     }
   };
 
@@ -264,7 +173,7 @@ export default function RegisterScreen({ navigation }: any) {
             style={{ alignItems: "center", marginBottom: 16, marginTop: 16 }}
           >
             <TouchableOpacity
-              onPress={handleGoogleLogin}
+              onPress={loginWithGoogle}
               disabled={loading}
               style={[
                 {

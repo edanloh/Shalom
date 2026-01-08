@@ -266,6 +266,16 @@ export default function MainNavigator() {
         component={Screens.PDFView}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="LearningGoalScreen"
+        component={Screens.LearningGoalScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ChangePassword"
+        component={Screens.ChangePassword}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

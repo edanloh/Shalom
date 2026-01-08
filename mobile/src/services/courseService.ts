@@ -5,7 +5,7 @@
 
 import { Course, AWSApiResponse, AWSCoursesResponse, AWSCourse } from '../types';
 import apiService from './apiService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 function unwrap<T = any>(r: any): T {
   return (r && typeof r === 'object' && 'data' in r ? r.data : r) as T;
@@ -166,7 +166,7 @@ export interface UpdateReviewPayload {
 class CacheManager {
   static async get<T>(key: string): Promise<T | null> {
     try {
-      const cachedData = await AsyncStorage.getItem(key);
+      const cachedData = await SecureStore.getItemAsync(key);
       if (!cachedData) return null;
 
       const { data, timestamp } = JSON.parse(cachedData);
@@ -174,7 +174,7 @@ class CacheManager {
 
       // Check if cache is still valid
       if (now - timestamp > CACHE_CONFIG.CACHE_DURATION) {
-        await AsyncStorage.removeItem(key);
+        await SecureStore.deleteItemAsync(key);
         return null;
       }
 
@@ -191,7 +191,7 @@ class CacheManager {
         data,
         timestamp: Date.now(),
       };
-      await AsyncStorage.setItem(key, JSON.stringify(cacheData));
+      await SecureStore.setItemAsync(key, JSON.stringify(cacheData));
     } catch (error) {
       console.warn(`Cache write error for key ${key}:`, error);
     }
@@ -199,7 +199,7 @@ class CacheManager {
 
   static async clear(key: string): Promise<void> {
     try {
-      await AsyncStorage.removeItem(key);
+      await SecureStore.deleteItemAsync(key);
     } catch (error) {
       console.warn(`Cache clear error for key ${key}:`, error);
     }

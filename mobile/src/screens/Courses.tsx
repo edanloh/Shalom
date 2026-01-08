@@ -498,15 +498,14 @@ const styles = StyleSheet.create({
 
   // Grid cards (Popular)
   gCard: {
-    width: (width - Spacing.lg * 2 - 32) / 2,
+    width: (width - Spacing.lg * 2 - Spacing.lg) / 2,
     backgroundColor: "transparent",
     borderRadius: 16,
     marginBottom: Spacing.lg,
-    marginRight: Spacing.base, 
   },
   gImage: {
     width: "100%",
-    height: 110,
+    height: (width - Spacing.lg * 2 - Spacing.lg) / 5,
     backgroundColor: CARD_BG,
   },
   gTitle: {

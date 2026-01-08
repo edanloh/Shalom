@@ -19,6 +19,7 @@ export { default as UserProfile } from "./UserProfile";
 export { default as WishlistScreen } from "./WishlistScreen";
 export { default as CertificatesScreen } from "./CertificatesScreen";
 export { default as PDFView } from "./PDFView";
+export { default as LearningGoalScreen } from "./LearningGoalScreen";
 
 // Re-export from subdirectories
 export * from "./auth/index";

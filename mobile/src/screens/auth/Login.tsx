@@ -46,59 +46,59 @@ export default function LoginScreen({ navigation }: any) {
     // Navigation will happen automatically when isAuthenticated changes
   };
 
-  const handleGoogleLogin = async () => {
-    const cognitoAuthUrl =
-      `${COGNITO_DOMAIN}/oauth2/authorize?` +
-      `identity_provider=Google` +
-      `&client_id=${COGNITO_CLIENT_ID}` +
-      `&response_type=code` +
-      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-      `&scope=email%20openid%20phone`;
-    const result = await WebBrowser.openAuthSessionAsync(
-      cognitoAuthUrl,
-      REDIRECT_URI
-    );
-    if (result.type === "success") {
-      if (result.url) {
-        const urlParams = new URLSearchParams(result.url.split("?")[1]);
-        const authCode = urlParams.get("code");
-        if (authCode) {
-          // Exchange code for tokens
-          try {
-            const tokenResponse = await fetch(
-              `${COGNITO_DOMAIN}/oauth2/token`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: `grant_type=authorization_code&client_id=${COGNITO_CLIENT_ID}&code=${authCode}&redirect_uri=${encodeURIComponent(
-                  REDIRECT_URI
-                )}`,
-              }
-            );
-            const tokens = await tokenResponse.json();
-            if (tokens.id_token) {
-              // Call AuthContext to set user as authenticated
-              if (typeof loginWithGoogle === "function") {
-                await loginWithGoogle(tokens);
-              }
-              // Navigation will happen automatically when isAuthenticated changes
-            } else {
-              Alert.alert("Error", "Failed to retrieve tokens from Cognito");
-            }
-          } catch (err) {
-            console.error("Error exchanging code for tokens:", err);
-            Alert.alert("Error", "Google login failed");
-          }
-        }
-      }
-    } else if (result.type === "dismiss") {
-      console.log("Google sign-in was cancelled");
-    } else {
-      console.log("Cognito sign-in failed");
-    }
-  };
+  // const handleGoogleLogin = async () => {
+  //   const cognitoAuthUrl =
+  //     `${COGNITO_DOMAIN}/oauth2/authorize?` +
+  //     `identity_provider=Google` +
+  //     `&client_id=${COGNITO_CLIENT_ID}` +
+  //     `&response_type=code` +
+  //     `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+  //     `&scope=email%20openid%20phone`;
+  //   const result = await WebBrowser.openAuthSessionAsync(
+  //     cognitoAuthUrl,
+  //     REDIRECT_URI
+  //   );
+  //   if (result.type === "success") {
+  //     if (result.url) {
+  //       const urlParams = new URLSearchParams(result.url.split("?")[1]);
+  //       const authCode = urlParams.get("code");
+  //       if (authCode) {
+  //         // Exchange code for tokens
+  //         try {
+  //           const tokenResponse = await fetch(
+  //             `${COGNITO_DOMAIN}/oauth2/token`,
+  //             {
+  //               method: "POST",
+  //               headers: {
+  //                 "Content-Type": "application/x-www-form-urlencoded",
+  //               },
+  //               body: `grant_type=authorization_code&client_id=${COGNITO_CLIENT_ID}&code=${authCode}&redirect_uri=${encodeURIComponent(
+  //                 REDIRECT_URI
+  //               )}`,
+  //             }
+  //           );
+  //           const tokens = await tokenResponse.json();
+  //           if (tokens.id_token) {
+  //             // Call AuthContext to set user as authenticated
+  //             if (typeof loginWithGoogle === "function") {
+  //               await loginWithGoogle(tokens);
+  //             }
+  //             // Navigation will happen automatically when isAuthenticated changes
+  //           } else {
+  //             Alert.alert("Error", "Failed to retrieve tokens from Cognito");
+  //           }
+  //         } catch (err) {
+  //           console.error("Error exchanging code for tokens:", err);
+  //           Alert.alert("Error", "Google login failed");
+  //         }
+  //       }
+  //     }
+  //   } else if (result.type === "dismiss") {
+  //     console.log("Google sign-in was cancelled");
+  //   } else {
+  //     console.log("Cognito sign-in failed");
+  //   }
+  // };
 
   return (
     <KeyboardAvoidingView
@@ -206,7 +206,7 @@ export default function LoginScreen({ navigation }: any) {
             style={{ alignItems: "center", marginBottom: 16, marginTop: 16 }}
           >
             <TouchableOpacity
-              onPress={handleGoogleLogin}
+              onPress={loginWithGoogle}
               disabled={loading}
               style={[
                 {

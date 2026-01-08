@@ -20,6 +20,8 @@ export type MainStackParamList = {
   // NotificationSettings: undefined;
   AchievementsScreen: undefined;
   CertificatesScreen: undefined;
+  LearningGoalScreen: undefined;
+  ChangePassword: undefined;
 };
 
 export type TabParamList = {

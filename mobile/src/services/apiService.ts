@@ -109,10 +109,10 @@ class ApiService {
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
     this.defaultTimeout = API_CONFIG.TIMEOUT;
-    
+
     // Add default request interceptor for authentication
     this.addRequestInterceptor(this.authInterceptor);
-    
+
     // Add default response interceptor for error handling
     this.addResponseInterceptor(this.errorInterceptor);
   }
@@ -160,59 +160,60 @@ class ApiService {
   };
 
   // Error handling interceptor
-private errorInterceptor: ResponseInterceptor = async (response) => {
-  if (!response.ok) {
-    // Clone so we can safely read the body
-    const clone = response.clone();
+  private errorInterceptor: ResponseInterceptor = async (response) => {
+    if (!response.ok) {
+      // Clone so we can safely read the body
+      const clone = response.clone();
 
-    let errorData: any = {};
-    try {
-      errorData = isJsonResponse(clone)
-        ? await safeParseJson(clone)
-        : { body: await clone.text() };
-    } catch {
-      // leave errorData minimal
+      let errorData: any = {};
+      try {
+        errorData = isJsonResponse(clone)
+          ? await safeParseJson(clone)
+          : { body: await clone.text() };
+      } catch {
+        // leave errorData minimal
+      }
+
+      // Prefer server's message if present
+      const serverMsg =
+        (errorData && (errorData.message || errorData.error || errorData.reason)) ||
+        (typeof errorData === 'string' ? errorData : undefined);
+
+      // Capture useful IDs for Supabase correlation
+      const hdrs = {
+        'x-request-id': response.headers.get('x-request-id'),
+        'x-supabase-trace-id': response.headers.get('x-supabase-trace-id'),
+      };
+
+      const status = response.status;
+      const codeMap: Record<number, string> = {
+        400: 'BAD_REQUEST',
+        401: 'UNAUTHORIZED',
+        403: 'FORBIDDEN',
+        404: 'NOT_FOUND',
+        409: 'CONFLICT',
+        429: 'RATE_LIMIT',
+        500: 'SERVER_ERROR',
+        502: 'BAD_GATEWAY',
+        503: 'SERVICE_UNAVAILABLE',
+      };
+
+      const err = new ApiError(
+        serverMsg || `HTTP ${status}`,
+        status,
+        codeMap[status] || 'HTTP_ERROR',
+        errorData,
+        hdrs
+      );
+
+      // helpful console for debugging
+      console.log('[HTTP ✖]', response.url, status, hdrs, errorData);
+      throw err;
     }
 
-    // Prefer server's message if present
-    const serverMsg =
-      (errorData && (errorData.message || errorData.error || errorData.reason)) ||
-      (typeof errorData === 'string' ? errorData : undefined);
+    return response; // ok → let makeRequest() parse the body
+  };
 
-    // Capture useful IDs for Supabase correlation
-    const hdrs = {
-      'x-request-id': response.headers.get('x-request-id'),
-      'x-supabase-trace-id': response.headers.get('x-supabase-trace-id'),
-    };
-
-    const status = response.status;
-    const codeMap: Record<number, string> = {
-      400: 'BAD_REQUEST',
-      401: 'UNAUTHORIZED',
-      403: 'FORBIDDEN',
-      404: 'NOT_FOUND',
-      409: 'CONFLICT',
-      429: 'RATE_LIMIT',
-      500: 'SERVER_ERROR',
-      502: 'BAD_GATEWAY',
-      503: 'SERVICE_UNAVAILABLE',
-    };
-
-    const err = new ApiError(
-      serverMsg || `HTTP ${status}`,
-      status,
-      codeMap[status] || 'HTTP_ERROR',
-      errorData,
-      hdrs
-    );
-
-    // helpful console for debugging
-    console.log('[HTTP ✖]', response.url, status, hdrs, errorData);
-    throw err;
-  }
-
-  return response; // ok → let makeRequest() parse the body
-};
 
 
   // Build query string from parameters
