@@ -22,7 +22,7 @@ const ENDPOINTS = {
   COURSES: '/getAllCourse', // Maps to getAllCourse.mjs
   USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, // Maps to getUserEnrollment.mjs
   COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, // Maps to getModuleDetail.mjs
-  COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler?courseId=${encodeURIComponent(courseId)}`, // Maps to courseReviewHandler
+  COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, // Maps to courseReviewHandler
   POST_ENROLLMENT: '/postUserEnrollment', // Maps to postUserEnrollment.mjs
 };
 
