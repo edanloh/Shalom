@@ -91,7 +91,7 @@ const AppNavigator = () => {
           typeof refresh_token === "string"
         ) {
           console.log("[DeepLink] Found tokens in initial URL");
-          void loginWithToken({ access_token, refresh_token });
+          void loginWithToken({ access_token, refresh_token, path: parsedUrl.path});
         }
       }
     })();

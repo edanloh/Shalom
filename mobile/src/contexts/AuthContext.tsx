@@ -9,6 +9,7 @@ import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { User, AuthContextType } from '@/types';
 import { useNavigation } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -47,7 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // });
   // const [isAuthenticated, setIsAuthenticated] = useState(true);
 
-  const loginWithToken = async ({ access_token, refresh_token }: Tokens) => {
+  const loginWithToken = async ({ access_token, refresh_token, path }: Tokens & { path?: string }) => {
     console.log('[DeepLink] loginWithToken called', {
       access_token,
       refresh_token,
@@ -65,15 +66,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } = await signIn();
 
     console.log('[DeepLink] Supabase user after setSession:', supabaseUser);
-    setIsResettingPassword(true);
-    setUser({
-      id: supabaseUser?.id || '',
-      email: supabaseUser?.email || '',
-      name: supabaseUser?.user_metadata?.first_name || '',
-      joined_at: supabaseUser?.created_at || '',
-      last_login: supabaseUser?.last_sign_in_at || '',
-      auth_provider: supabaseUser?.app_metadata?.provider || 'email',
-    });
+    if (path === 'ResetPassword') {
+      setIsResettingPassword(true);
+      setUser({
+        id: supabaseUser?.id || '',
+        email: supabaseUser?.email || '',
+        name: supabaseUser?.user_metadata?.first_name || '',
+        joined_at: supabaseUser?.created_at || '',
+        last_login: supabaseUser?.last_sign_in_at || '',
+        auth_provider: supabaseUser?.app_metadata?.provider || 'email',
+      });
+    } else {
+      // Google login
+      setUser({
+        id: supabaseUser?.id || '',
+        email: supabaseUser?.email || '',
+        name: supabaseUser?.user_metadata?.name || '',
+        joined_at: supabaseUser?.created_at || '',
+        last_login: supabaseUser?.last_sign_in_at || '',
+          auth_provider: supabaseUser?.app_metadata?.provider || 'email',
+      });
+    }
     setSession(supabaseSession || null);
   };
 
@@ -131,7 +144,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     return {
       success: data.session != null && data.user != null,
-      error: error?.message || (data.session == null || data.user == null ? "Registration failed" : undefined),
+      error:
+        error?.message ||
+        (data.session == null || data.user == null
+          ? 'Registration failed'
+          : undefined),
     };
   };
 
@@ -167,9 +184,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const loginWithGoogle = () => {
-    console.log('Google login is currently disabled.');
-    return Promise.resolve();
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      console.log(Platform.OS);
+      if (Platform.OS === 'web') {
+        // Web: Use Supabase OAuth with HTTPS redirect
+        const { error, data } = await supabase.auth.signInWithOAuth({
+          provider: 'google'
+        });
+        console.log(data);
+        if (error) throw error;
+        // Supabase will handle redirect and session
+      } else {
+        // Mobile: Use Expo AuthSession with exp:// redirect
+        const redirectUri = Linking.createURL('/');
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google'
+        });
+        if (error) throw error;
+        // Supabase will handle redirect and session
+      }
+    } catch (err) {
+      alert('Google sign-in failed: ' + err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const fetchEmail = async (email: string) => {

@@ -18,7 +18,7 @@ export interface AuthContextType {
   updateProfile: (data: Partial<User>) => Promise<void>;
   changePassword: ( currentPassword: string, newPassword: string ) => Promise<{ success: boolean; error?: string }>;
   fetchEmail: (email: string) => Promise<any>;
-  loginWithToken: (credentials: Tokens) => Promise<void>;
+  loginWithToken: (credentials: Tokens, path: string) => Promise<void>;
   setIsResettingPassword: (value: boolean) => void;
 }
 
