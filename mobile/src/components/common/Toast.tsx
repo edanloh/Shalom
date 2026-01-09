@@ -20,10 +20,12 @@ export default function ToastHost() {
   const translateY = useRef(new Animated.Value(-80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const queueRef = useRef<ToastPayload[]>([]);
+  const showingRef = useRef(false);
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(CHANNEL, (payload: ToastPayload) => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    const showNext = (payload: ToastPayload) => {
+      showingRef.current = true;
       setToast(payload);
 
       Animated.parallel([
@@ -53,9 +55,22 @@ export default function ToastHost() {
             duration: 160,
             useNativeDriver: true,
           }),
-        ]).start(() => setToast(null));
+        ]).start(() => {
+          setToast(null);
+          showingRef.current = false;
+          const next = queueRef.current.shift();
+          if (next) showNext(next);
+        });
       }, payload.durationMs ?? 2200);
+    };
 
+    const sub = DeviceEventEmitter.addListener(CHANNEL, (payload: ToastPayload) => {
+      if (showingRef.current) {
+        queueRef.current.push(payload);
+        return;
+      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      showNext(payload);
     });
 
     return () => {

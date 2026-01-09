@@ -1,5 +1,6 @@
 import { DeviceEventEmitter } from 'react-native';
 import apiService from './apiService';
+import { showToast } from '../components/common/Toast';
 import { AchievementItem, CertificateProgress, CreditBalance, CreditEvent, CreditEventPayload, LearningGoal } from '../types';
 
 const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID || '550e8400-e29b-41d4-a716-446655440101';
@@ -96,6 +97,26 @@ export async function recordCreditEvent(payload: CreditEventPayload) {
       points: body.points,
       courseId: body.courseId,
     });
+    const data = resp?.data ?? resp;
+    const awarded = data?.awardedAchievements ?? [];
+    if (Array.isArray(awarded) && awarded.length > 0) {
+      const first = awarded[0];
+      const title = awarded.length > 1 ? 'Achievements unlocked' : 'Achievement unlocked';
+      const message =
+        typeof first?.name === 'string' && awarded.length === 1
+          ? first.name
+          : typeof first?.name === 'string'
+          ? `${first.name} +${awarded.length - 1} more`
+          : awarded.length > 1
+          ? `${awarded.length} new achievements`
+          : 'New achievement unlocked';
+      showToast({
+        type: 'success',
+        title,
+        message,
+        durationMs: 2600,
+      });
+    }
     emitCreditUpdate();
     return resp?.data ?? resp;
   } catch (err) {

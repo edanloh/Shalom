@@ -414,7 +414,11 @@ INSERT INTO achievements (id, name, description, icon, type, criteria, points, c
 ('550e8400-e29b-41d4-a716-446655441403', 'Course Completion', 'Complete your first course', 'certificate', 'certificate', '{"type": "courses_completed", "count": 1}', 500, '#8b5cf6', true),
 ('550e8400-e29b-41d4-a716-446655441404', 'Knowledge Seeker', 'Complete 5 courses', 'level', 'level', '{"type": "courses_completed", "count": 5}', 1000, '#3b82f6', true),
 ('550e8400-e29b-41d4-a716-446655441405', 'Quick Learner', 'Complete a course in under 7 days', 'badge', 'badge', '{"type": "course_completion_time", "days": 7}', 300, '#ef4444', true),
-('550e8400-e29b-41d4-a716-446655441406', 'Perfect Score', 'Get 100% on a quiz', 'badge', 'badge', '{"type": "quiz_score", "score": 100}', 150, '#10b981', true);
+('550e8400-e29b-41d4-a716-446655441406', 'Perfect Score', 'Get 100% on a quiz', 'badge', 'badge', '{"type": "quiz_score", "score": 100}', 150, '#10b981', true),
+('550e8400-e29b-41d4-a716-446655441407', 'Credit Collector', 'Earn 500 total credits', 'badge', 'badge', '{"type": "total_credits", "count": 500}', 200, '#22c55e', true),
+('550e8400-e29b-41d4-a716-446655441408', 'Credit Master', 'Earn 1000 total credits', 'level', 'level', '{"type": "total_credits", "count": 1000}', 400, '#14b8a6', true),
+('550e8400-e29b-41d4-a716-446655441409', 'Goal Getter', 'Hit 1 learning goal', 'badge', 'badge', '{"type": "goal_hits", "count": 1}', 150, '#f97316', true),
+('550e8400-e29b-41d4-a716-446655441410', 'Goal Streak', 'Hit 5 learning goals', 'level', 'level', '{"type": "goal_hits", "count": 5}', 350, '#f59e0b', true);
 
 -- Insert User Achievements
 INSERT INTO user_achievements (id, user_id, achievement_id, earned_at, value) VALUES
