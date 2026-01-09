@@ -1,11 +1,3 @@
-// supabase/functions/getCreditHistory/index.ts
-/**
- * Supabase Edge Function: getCreditHistory
- * Purpose: Get user's credit event history
- * Endpoint: GET /getCreditHistory?userId={userId}
- * Database: PostgreSQL (Supabase compatible)
- */
-
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -29,7 +21,8 @@ const fail = (message: string, status = 500, extra: Record<string, unknown> = {}
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const url = new URL(req.url);
-  const userId = url.searchParams.get("userId") || "anon";
+  const userId = url.searchParams.get("userId");
+  if (!userId) return fail("userId is required", 400);
 
   try {
     const { data, error } = await supabase

@@ -28,6 +28,7 @@ serve(async (req) => {
       .from("courses")
       .select("id, title, description, level, rating, duration_hours, thumbnail_url, tags")
       .eq("is_published", true)
+      .order("rating", { ascending: false, nullsFirst: false })
       .limit(MAX_CANDIDATES);
 
     if (coursesErr) throw coursesErr;
@@ -50,11 +51,14 @@ serve(async (req) => {
 
     // Recent events for behavior signals
     const since = new Date(Date.now() - EVENT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    const { data: events } = await supabase
+    let eventsQuery = supabase
       .from("recommendation_events")
       .select("course_id, event_type, timestamp")
-      .gte("timestamp", since)
-      .eq(userId ? "user_id" : "user_id", userId || undefined);
+      .gte("timestamp", since);
+    if (userId) {
+      eventsQuery = eventsQuery.eq("user_id", userId);
+    }
+    const { data: events } = await eventsQuery;
 
     // Aggregate behavior
     const behavior = new Map<string, { impressions: number; clicks: number; recency: number }>();
