@@ -10,5 +10,3 @@ node_modules/
 
 #Ignore misc files
 .DS_Store
-
-/google-services.json
