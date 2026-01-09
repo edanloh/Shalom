@@ -24,6 +24,13 @@ const isYesterday = (d: Date) => {
 };
 
 const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
+const formatTime = (iso: string) => {
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return "";
+  return timeFmt.format(dt);
+};
 
 export default function PointsHistoryScreen({ navigation }: any) {
   const [history, setHistory] = useState<AppPointHistory[]>([]);
@@ -126,14 +133,15 @@ export default function PointsHistoryScreen({ navigation }: any) {
             <View key={item.id}>
               <TouchableOpacity activeOpacity={0.8} style={styles.row}>
                 <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
-                <View style={{ flex: 1 }}>
+                <View style={styles.textBlock}>
                   <Text style={TextStyles.body} numberOfLines={1}>
                     {item.pointsTitle}
                   </Text>
-                  <Text style={TextStyles.captionSmall}>
+                  <Text style={TextStyles.captionSmall} numberOfLines={1} ellipsizeMode="tail">
                     {item.subtitle}
                   </Text>
                 </View>
+                <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
               </TouchableOpacity>
               {/* Item Separator */}
               {itemIndex < section.data.length - 1 && (
@@ -161,5 +169,14 @@ const styles = StyleSheet.create({
     height: THUMB,
     borderRadius: 12,
     marginRight: Spacing.md,
+  },
+  textBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  timeText: {
+    ...TextStyles.captionSmall,
+    color: Colors.textSecondary,
+    marginLeft: Spacing.sm,
   },
 });
