@@ -127,7 +127,7 @@ export const NotificationProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const [expoPushToken, setExpoPushToken] = useState("");
   const [notification, setNotification] = useState<
     Notifications.Notification | undefined
@@ -136,14 +136,13 @@ export const NotificationProvider = ({
   // Register token with backend when user is authenticated and token is available
   useEffect(() => {
     if (
-      isAuthenticated &&
       user &&
       expoPushToken &&
       !expoPushToken.includes("error")
     ) {
       registerTokenWithBackend();
     }
-  }, [isAuthenticated, user, expoPushToken]);
+  }, [user, expoPushToken]);
 
   // Register for push notifications
   useEffect(() => {
