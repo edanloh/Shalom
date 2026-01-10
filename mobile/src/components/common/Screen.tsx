@@ -33,6 +33,8 @@ interface ScreenProps {
   widescreen?: boolean;
   scrollEnabled?: boolean;
   stickyHeader?: boolean;
+  stickyHeaderIndices?: number[];
+  disableChildrenWrapper?: boolean;
 }
 
 export default function Screen({
@@ -54,6 +56,8 @@ export default function Screen({
   widescreen,
   scrollEnabled = true,
   stickyHeader = false,
+  stickyHeaderIndices,
+  disableChildrenWrapper = false,
 }: ScreenProps) {
   const lastScrollY = useRef(0);
   const tabHidden = useRef(false);
@@ -75,6 +79,13 @@ export default function Screen({
 
   const headerElement = !noHeader ? header : null;
 
+  const resolvedStickyHeaders =
+    typeof stickyHeaderIndices !== "undefined"
+      ? stickyHeaderIndices
+      : !noHeader && stickyHeader
+      ? [0]
+      : undefined;
+
   return (
     <SafeAreaView
       style={styles.container}
@@ -89,7 +100,7 @@ export default function Screen({
         <ScrollView
           contentContainerStyle={[styles.fullScrollContent, customScreenStyle]}
           nestedScrollEnabled={true}
-          stickyHeaderIndices={!noHeader && stickyHeader ? [0] : undefined}
+          stickyHeaderIndices={resolvedStickyHeaders}
           refreshControl={
             onRefresh ? (
               <RefreshControl
@@ -121,7 +132,13 @@ export default function Screen({
           }}
         >
           {headerElement}
-          <View style={widescreen ? styles.fullScrollContent : styles.scrollContent}>{children}</View>
+          {disableChildrenWrapper ? (
+            children
+          ) : (
+            <View style={widescreen ? styles.fullScrollContent : styles.scrollContent}>
+              {children}
+            </View>
+          )}
         </ScrollView>
         <ToastHost />
       </KeyboardAvoidingView>

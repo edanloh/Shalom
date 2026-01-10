@@ -1,79 +1,12 @@
 import { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Pressable, Animated } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Swipeable } from "react-native-gesture-handler";
+import { useFocusEffect } from "@react-navigation/native";
 import { Colors, Spacing, TextStyles } from "../constants";
 import Screen from "../components/common/Screen";
-
-type AppNotification = {
-  id: string;
-  courseTitle: string;
-  subtitle: string;
-  thumbnail: string;
-  createdAt: string; // ISO date
-};
-
-const MOCK_NOTIFICATIONS: AppNotification[] = [
-  // Today
-  {
-    id: 't1',
-    courseTitle: 'Data Science Fundamentals',
-    subtitle: 'New content added to your course',
-    thumbnail:
-      "https://images.unsplash.com/photo-1666875753105-c63a6f3bdc86?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 't2',
-    courseTitle: 'Machine Learning Basics',
-    subtitle: 'Deadline approaching for your assignment',
-    thumbnail:
-      "https://images.unsplash.com/photo-1526378722484-bd91ca387e72?w=200&q=60",
-    createdAt: new Date().toISOString(),
-  },
-
-  // Yesterday
-  {
-    id: 'y1',
-    courseTitle: 'Data Science Fundamentals',
-    subtitle: 'New content added to your course',
-    thumbnail:
-      "https://images.unsplash.com/photo-1666875753105-c63a6f3bdc86?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'y2',
-    courseTitle: 'Machine Learning Basics',
-    subtitle: 'Deadline approaching for your assignment',
-    thumbnail:
-      "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?w=200&q=60",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
-
-  // Older
-  {
-    id: 'o1',
-    courseTitle: 'Data Science Fundamentals',
-    subtitle: 'New content added to your course',
-    thumbnail:
-      "https://images.unsplash.com/photo-1666875753105-c63a6f3bdc86?q=80&w=1473&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "o2",
-    courseTitle: "Machine Learning Basics",
-    subtitle: "Deadline approaching for your assignment",
-    thumbnail:
-      "https://images.unsplash.com/photo-1526378722484-bd91ca387e72?w=200&q=60",
-    createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "o3",
-    courseTitle: "Introduction to Python",
-    subtitle: "Your course has been updated",
-    thumbnail:
-      "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=200&q=60",
-    createdAt: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
-  },
-];
+import { useNotification } from "../contexts/NotificationContext";
+import type { Notification as InAppNotification } from "../types";
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const isSameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
@@ -88,12 +21,25 @@ const isYesterday = (d: Date) => {
 const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function NotificationsScreen({ navigation }: any) {
-  const sections = useMemo(() => {
-    const today: AppNotification[] = [];
-    const yesterday: AppNotification[] = [];
-    const byDate: Record<string, AppNotification[]> = {};
+  const {
+    inAppNotifications,
+    reloadNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    clearNotifications,
+    deleteNotification,
+  } = useNotification();
+  const [menuOpen, setMenuOpen] = useState(false);
 
-    for (const n of MOCK_NOTIFICATIONS) {
+  const sections = useMemo(() => {
+    const today: InAppNotification[] = [];
+    const yesterday: InAppNotification[] = [];
+    const byDate: Record<string, InAppNotification[]> = {};
+    const ordered = [...inAppNotifications].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    for (const n of ordered) {
       const dt = new Date(n.createdAt);
 
       if (isToday(dt)) {
@@ -107,7 +53,7 @@ export default function NotificationsScreen({ navigation }: any) {
       }
     }
 
-    const result: Array<{ title: string; data: AppNotification[] }> = [];
+    const result: Array<{ title: string; data: InAppNotification[] }> = [];
     if (today.length) result.push({ title: 'Today', data: today });
     if (yesterday.length) result.push({ title: 'Yesterday', data: yesterday });
 
@@ -120,19 +66,140 @@ export default function NotificationsScreen({ navigation }: any) {
     }
 
     return result;
-  }, []);
+  }, [inAppNotifications]);
 
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      // TODO: call your real fetch here, e.g. await reloadNotifications();
-      await new Promise((r) => setTimeout(r, 800)); // demo delay
+      setMenuOpen(false);
+      await reloadNotifications();
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [reloadNotifications]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => setMenuOpen(false);
+    }, [])
+  );
+
+
+  const hasNotifications = inAppNotifications.length > 0;
+  const hasUnread = inAppNotifications.some((item) => !item.read);
+
+  const onMarkAllRead = useCallback(() => {
+    if (!hasUnread) return;
+    setMenuOpen(false);
+    markAllNotificationsRead();
+  }, [hasUnread, markAllNotificationsRead]);
+
+  const onClearAll = useCallback(() => {
+    if (!hasNotifications) return;
+    setMenuOpen(false);
+    Alert.alert(
+      "Clear all notifications?",
+      "This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => clearNotifications(),
+        },
+      ]
+    );
+  }, [clearNotifications, hasNotifications]);
+
+  const renderRow = (item: InAppNotification) => {
+    const icon =
+      item.type === "achievement"
+        ? { name: "trophy-outline", color: Colors.yellow }
+        : item.type === "course"
+        ? { name: "book-outline", color: Colors.blue }
+        : item.type === "reminder"
+        ? { name: "alarm-outline", color: Colors.red }
+        : { name: "notifications-outline", color: Colors.textSecondary };
+
+    const renderRightActions = (
+      progress: Animated.AnimatedInterpolation<number>
+    ) => {
+      const translateX = progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [64, 0],
+        extrapolate: "clamp",
+      });
+      return (
+        <Animated.View style={[styles.swipeActionContainer, { transform: [{ translateX }] }]}>
+          <TouchableOpacity
+            onPress={() =>
+              Alert.alert(
+                "Delete notification?",
+                "This action cannot be undone.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => deleteNotification(item.id),
+                  },
+                ]
+              )
+            }
+            style={styles.swipeDelete}
+          >
+            <Ionicons name="trash-outline" size={20} color={Colors.white} />
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    };
+
+    return (
+      <Swipeable
+        renderRightActions={renderRightActions}
+        overshootRight={false}
+        friction={2}
+        rightThreshold={40}
+      >
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[
+          styles.row,
+          !item.read ? styles.rowUnread : null,
+          item.read ? styles.rowRead : null,
+        ]}
+        onPress={() => markNotificationRead(item.id)}
+      >
+        <View style={[styles.iconBadge, { borderColor: icon.color }]}>
+          <Ionicons name={icon.name as any} size={22} color={icon.color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={[
+              TextStyles.body,
+              item.read ? styles.titleRead : styles.titleUnread,
+            ]}
+            numberOfLines={1}
+          >
+            {item.title}
+          </Text>
+          <Text
+            style={[
+              TextStyles.captionSmall,
+              item.read ? styles.messageRead : styles.messageUnread,
+            ]}
+            numberOfLines={2}
+          >
+            {item.message}
+          </Text>
+        </View>
+        {!item.read ? <View style={styles.unreadDot} /> : null}
+      </TouchableOpacity>
+      </Swipeable>
+    );
+  };
 
   return (
     <Screen
@@ -140,11 +207,65 @@ export default function NotificationsScreen({ navigation }: any) {
       customEdges={["top"]}
       refreshing={refreshing}
       onRefresh={onRefresh}
+      headerLeftComponent={
+        <View style={styles.menuAnchor}>
+          <TouchableOpacity
+            onPress={() => setMenuOpen((prev) => !prev)}
+            style={styles.menuButton}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color={Colors.white} />
+          </TouchableOpacity>
+          {menuOpen ? (
+            <View style={styles.menu}>
+              <Pressable
+                onPress={onMarkAllRead}
+                style={[styles.menuItem, !hasUnread ? styles.menuItemDisabled : null]}
+                disabled={!hasUnread}
+              >
+                <Text style={[styles.menuText, !hasUnread ? styles.menuTextDisabled : null]}>
+                  Mark all as read
+                </Text>
+              </Pressable>
+              <View style={styles.menuDivider} />
+              <Pressable
+                onPress={onClearAll}
+                style={[styles.menuItem, !hasNotifications ? styles.menuItemDisabled : null]}
+                disabled={!hasNotifications}
+              >
+                <Text
+                  style={[
+                    styles.menuText,
+                    styles.menuDanger,
+                    !hasNotifications ? styles.menuTextDisabled : null,
+                  ]}
+                >
+                  Clear all
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      }
       headerRightIcon="settings-outline"
       onHeaderRightPress={() => navigation.navigate("Settings")}
       stickyHeader
     >
-      {sections.map((section, sectionIndex) => (
+      {sections.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons
+            name="notifications-outline"
+            size={36}
+            color={Colors.textSecondary}
+          />
+          <Text style={[TextStyles.body, styles.emptyTitle]}>
+            No notifications yet
+          </Text>
+          <Text style={[TextStyles.captionSmall, styles.emptySubtitle]}>
+            Toast updates will appear here automatically.
+          </Text>
+        </View>
+      ) : null}
+      {sections.map((section) => (
         <View key={section.title} style={{ marginBottom: Spacing.lg }}>
           {/* Section Header */}
           <Text style={TextStyles.h5}>{section.title}</Text>
@@ -152,20 +273,10 @@ export default function NotificationsScreen({ navigation }: any) {
           {/* Section Items */}
           {section.data.map((item, itemIndex) => (
             <View key={item.id}>
-              <TouchableOpacity activeOpacity={0.8} style={styles.row}>
-                <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
-                <View style={{ flex: 1 }}>
-                  <Text style={TextStyles.body} numberOfLines={1}>
-                    {item.courseTitle}
-                  </Text>
-                  <Text style={TextStyles.captionSmall}>
-                    {item.subtitle}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+              {renderRow(item)}
               {/* Item Separator */}
               {itemIndex < section.data.length - 1 && (
-                <View style={{ height: Spacing.md }} />
+                <View style={{ height: 0 }} />
               )}
             </View>
           ))}
@@ -183,12 +294,120 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: Spacing.sm,
+    marginBottom: 0,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    alignSelf: "stretch",
   },
-  thumb: {
+  rowUnread: {
+    backgroundColor: Colors.cardDark,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    paddingHorizontal: Spacing.md,
+    marginHorizontal: -Spacing.xs,
+  },
+  rowRead: {
+    opacity: 0.65,
+  },
+  iconBadge: {
     width: THUMB,
     height: THUMB,
     borderRadius: 12,
     marginRight: Spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 0.8,
+    backgroundColor: Colors.backgroundGray,
+  },
+  titleUnread: {
+    fontWeight: "700",
+    color: Colors.white,
+  },
+  titleRead: {
+    color: Colors.textSecondary,
+  },
+  messageUnread: {
+    color: Colors.textSecondary,
+  },
+  messageRead: {
+    color: Colors.textMuted,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.notificationRed,
+    marginLeft: Spacing.sm,
+  },
+  swipeDelete: {
+    backgroundColor: Colors.notificationRed,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 72,
+    height: "100%",
+    alignSelf: "stretch",
+  },
+  swipeActionContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingRight: Spacing.xs,
+    alignSelf: "stretch",
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: Spacing.xl,
+  },
+  emptyTitle: {
+    marginTop: Spacing.sm,
+  },
+  emptySubtitle: {
+    marginTop: Spacing.xs,
+  },
+  menuAnchor: {
+    position: "relative",
+    zIndex: 30,
+  },
+  menuButton: {
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs,
+  },
+  menu: {
+    position: "absolute",
+    top: 30,
+    left: 0,
+    minWidth: 170,
+    backgroundColor: "rgba(20, 20, 24, 0.95)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    paddingVertical: Spacing.xs,
+    zIndex: 40,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  menuItem: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  menuText: {
+    color: Colors.white,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  menuTextDisabled: {
+    color: Colors.textMuted,
+  },
+  menuItemDisabled: {
+    opacity: 0.6,
+  },
+  menuDanger: {
+    color: Colors.notificationRed,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
   },
 });

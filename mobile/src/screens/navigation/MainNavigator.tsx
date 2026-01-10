@@ -16,6 +16,7 @@ import { useNavigationState } from "@react-navigation/native";
 import * as Screens from "../index";
 
 import { useAuth } from "../../contexts/AuthContext";
+import { useNotification } from "../../contexts/NotificationContext";
 import type { TabParamList, MainStackParamList } from "@/types/navigation";
 import { ADMIN_EMAIL, Colors } from "../../constants";
 import { BlurView } from "expo-blur";
@@ -33,8 +34,10 @@ const TAB_ROUTES = ["Home", "Courses", "Notifications", "Profile"];
 
 function TabNavigator() {
   const { user } = useAuth();
+  const { inAppNotifications } = useNotification();
   const activeTabIndex = useSharedValue(0);
   const tabBarTranslateY = useSharedValue(0);
+  const hasUnread = inAppNotifications.some((item) => !item.read);
 
   // Get the current route index from navigation state
   const currentTabIndex = useNavigationState((state) => {
@@ -119,6 +122,9 @@ function TabNavigator() {
                 size={iconSize}
                 color={focused ? Colors.secondary : Colors.white}
               />
+              {route.name === "Notifications" && hasUnread ? (
+                <View style={styles.unreadDot} />
+              ) : null}
             </View>
           );
         },
@@ -319,6 +325,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 10,
+  },
+  unreadDot: {
+    position: "absolute",
+    top: 4,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.notificationRed,
+    borderWidth: 1,
+    borderColor: Colors.primary,
   },
   inactiveIconCircle: {
     backgroundColor: "rgba(58, 51, 159, 0.4)",

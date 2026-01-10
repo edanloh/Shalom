@@ -2,17 +2,17 @@ import React, { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, View, Text, Easing, DeviceEventEmitter } from "react-native";
 import { Colors, Spacing, TextStyles } from "@/constants";
 
-type ToastPayload = {
+export type ToastPayload = {
   message: string;
   title?: string;
   type?: "success" | "error" | "info";
   durationMs?: number;
 };
 
-const CHANNEL = "toast:show";
+export const TOAST_CHANNEL = "toast:show";
 
 export function showToast(payload: ToastPayload) {
-  DeviceEventEmitter.emit(CHANNEL, payload);
+  DeviceEventEmitter.emit(TOAST_CHANNEL, payload);
 }
 
 export default function ToastHost() {
@@ -64,7 +64,7 @@ export default function ToastHost() {
       }, payload.durationMs ?? 2200);
     };
 
-    const sub = DeviceEventEmitter.addListener(CHANNEL, (payload: ToastPayload) => {
+    const sub = DeviceEventEmitter.addListener(TOAST_CHANNEL, (payload: ToastPayload) => {
       if (showingRef.current) {
         queueRef.current.push(payload);
         return;

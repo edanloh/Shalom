@@ -282,7 +282,11 @@ export default function CoursesScreen({ navigation }: any) {
       refreshing={refreshing}
       onRefresh={onRefresh}
       customEdges={["top"]}
+      stickyHeader
+      stickyHeaderIndices={[0, 1]}
+      disableChildrenWrapper
     >
+      <View style={styles.stickyControls}>
         {/* Search */}
         <CustomTextInput
           placeholder="Search for courses"
@@ -318,7 +322,9 @@ export default function CoursesScreen({ navigation }: any) {
           contentContainerStyle={styles.chipsRow}
           style={styles.chipsList}
         />
+      </View>
 
+      <View style={styles.contentWrap}>
         {/* Jump Back In */}
         {jumpBackIn.length > 0 && (
           <>
@@ -395,6 +401,7 @@ export default function CoursesScreen({ navigation }: any) {
           />
         )}
         <View style={{ height: 120 }} />
+      </View>
     </Screen>
   );
 }
@@ -409,6 +416,15 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     marginHorizontal: -Spacing.xl,
     paddingHorizontal: Spacing.xl,
+  },
+  stickyControls: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.sm,
+  },
+  contentWrap: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
   },
   hList: {
     marginHorizontal: -Spacing.xl,

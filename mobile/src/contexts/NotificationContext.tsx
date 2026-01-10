@@ -1,11 +1,12 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
-import { Platform, Alert } from "react-native";
+import { Platform, Alert, DeviceEventEmitter } from "react-native";
 import * as SecureStore from "expo-secure-store";
-import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { useAuth } from "./AuthContext";
 import notificationService from "../services/notificationService";
+import { TOAST_CHANNEL, type ToastPayload } from "../components/common/Toast";
+import type { Notification as InAppNotification } from "../types";
 
 // Set notification handler
 Notifications.setNotificationHandler({
@@ -20,6 +21,8 @@ Notifications.setNotificationHandler({
 function handleRegistrationError(errorMessage: string) {
   console.warn(errorMessage);
 }
+
+const MAX_IN_APP_NOTIFICATIONS = 200;
 
 async function registerForPushNotificationsAsync(skipPrompt: boolean = false) {
   // Android: Set up notification channel
@@ -113,6 +116,16 @@ interface NotificationContextType {
   notification: Notifications.Notification | undefined;
   registerTokenWithBackend: () => Promise<void>;
   removeTokenFromBackend: () => Promise<void>;
+  inAppNotifications: InAppNotification[];
+  reloadNotifications: () => Promise<void>;
+  pushInAppNotification: (
+    input: Omit<InAppNotification, "id" | "userId" | "createdAt"> &
+      Partial<Pick<InAppNotification, "createdAt">>
+  ) => void;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => Promise<void>;
+  clearNotifications: () => Promise<void>;
+  deleteNotification: (id: string) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -120,6 +133,13 @@ const NotificationContext = createContext<NotificationContextType>({
   notification: undefined,
   registerTokenWithBackend: async () => {},
   removeTokenFromBackend: async () => {},
+  inAppNotifications: [],
+  reloadNotifications: async () => {},
+  pushInAppNotification: () => {},
+  markNotificationRead: () => {},
+  markAllNotificationsRead: async () => {},
+  clearNotifications: async () => {},
+  deleteNotification: () => {},
 });
 
 export const NotificationProvider = ({
@@ -132,6 +152,9 @@ export const NotificationProvider = ({
   const [notification, setNotification] = useState<
     Notifications.Notification | undefined
   >(undefined);
+  const [inAppNotifications, setInAppNotifications] = useState<
+    InAppNotification[]
+  >([]);
 
   // Register token with backend when user is authenticated and token is available
   useEffect(() => {
@@ -144,6 +167,26 @@ export const NotificationProvider = ({
       registerTokenWithBackend();
     }
   }, [isAuthenticated, user, expoPushToken]);
+
+  const reloadNotifications = async () => {
+    if (!user?.id) {
+      setInAppNotifications([]);
+      return;
+    }
+    try {
+      const items = await notificationService.getNotifications(
+        user.id,
+        MAX_IN_APP_NOTIFICATIONS
+      );
+      setInAppNotifications(items);
+    } catch (error) {
+      console.warn("Failed to load notifications:", error);
+    }
+  };
+
+  useEffect(() => {
+    reloadNotifications();
+  }, [user?.id]);
 
   // Register for push notifications
   useEffect(() => {
@@ -174,6 +217,78 @@ export const NotificationProvider = ({
     };
   }, []);
 
+  const pushInAppNotification = (
+    input: Omit<InAppNotification, "id" | "userId" | "createdAt"> &
+      Partial<Pick<InAppNotification, "createdAt">>
+  ) => {
+    if (!input?.message || !input?.title || !user?.id) return;
+    const userId = user.id;
+    const optimistic: InAppNotification = {
+      id: `local_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      userId,
+      title: input.title,
+      message: input.message,
+      type: input.type,
+      read: input.read ?? false,
+      createdAt: input.createdAt || new Date().toISOString(),
+      actionUrl: input.actionUrl,
+    };
+    setInAppNotifications((prev) => [
+      optimistic,
+      ...prev,
+    ].slice(0, MAX_IN_APP_NOTIFICATIONS));
+    notificationService
+      .createNotification({
+        userId,
+        title: input.title,
+        message: input.message,
+        type: input.type,
+        actionUrl: input.actionUrl,
+        createdAt: input.createdAt,
+      })
+      .then((created) => {
+        if (!created) return;
+        setInAppNotifications((prev) =>
+          prev.map((item) => (item.id === optimistic.id ? created : item))
+        );
+      })
+      .catch((error) => {
+        console.warn("Failed to create notification:", error);
+        setInAppNotifications((prev) =>
+          prev.filter((item) => item.id !== optimistic.id)
+        );
+      });
+  };
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      TOAST_CHANNEL,
+      (payload: ToastPayload) => {
+        if (!payload?.message) return;
+        const type =
+          payload.type === "success"
+            ? "achievement"
+            : payload.type === "error"
+            ? "system"
+            : "system";
+        const title =
+          payload.title ||
+          (payload.type === "success"
+            ? "Success"
+            : payload.type === "error"
+            ? "Error"
+            : "Update");
+        pushInAppNotification({
+          title,
+          message: payload.message,
+          type,
+        });
+      }
+    );
+
+    return () => sub.remove();
+  }, [user?.id]);
+
   const registerTokenWithBackend = async () => {
     if (!user?.id || !expoPushToken) return;
 
@@ -196,6 +311,56 @@ export const NotificationProvider = ({
     }
   };
 
+  const markNotificationRead = (id: string) => {
+    if (!user?.id) return;
+    const userId = user.id;
+    setInAppNotifications((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, read: true } : item))
+    );
+    notificationService
+      .markNotificationRead(userId, id)
+      .catch((error) =>
+        console.warn("Failed to mark notification read:", error)
+      );
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (!user?.id) return;
+    const userId = user.id;
+    setInAppNotifications((prev) =>
+      prev.map((item) => (item.read ? item : { ...item, read: true }))
+    );
+    try {
+      await notificationService.markAllNotificationsRead(userId);
+    } catch (error) {
+      console.warn("Failed to mark all notifications read:", error);
+      reloadNotifications();
+    }
+  };
+
+  const clearNotifications = async () => {
+    if (!user?.id) return;
+    const userId = user.id;
+    setInAppNotifications([]);
+    try {
+      await notificationService.clearNotifications(userId);
+    } catch (error) {
+      console.warn("Failed to clear notifications:", error);
+      reloadNotifications();
+    }
+  };
+
+  const deleteNotification = (id: string) => {
+    if (!user?.id) return;
+    const userId = user.id;
+    setInAppNotifications((prev) => prev.filter((item) => item.id !== id));
+    if (id.startsWith("local_")) return;
+    notificationService.deleteNotification(userId, id).catch((error) => {
+      console.warn("Failed to delete notification:", error);
+      reloadNotifications();
+    });
+  };
+
   return (
     <NotificationContext.Provider
       value={{
@@ -203,6 +368,13 @@ export const NotificationProvider = ({
         notification,
         registerTokenWithBackend,
         removeTokenFromBackend,
+        inAppNotifications,
+        reloadNotifications,
+        pushInAppNotification,
+        markNotificationRead,
+        markAllNotificationsRead,
+        clearNotifications,
+        deleteNotification,
       }}
     >
       {children}
