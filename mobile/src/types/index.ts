@@ -1,24 +1,47 @@
 // API-ready data types for the application
 
+import { Tokens } from '@/contexts/AuthContext';
+import { Session, AuthChangeEvent, AuthResponse } from '@supabase/supabase-js';
+
+export interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  isResettingPassword: boolean;
+  session: Session | null;
+  login: ( email: string, password: string ) => Promise<{ success: boolean; error?: string }>;
+  register: ( email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  requestResetPassword: (email: string) => Promise<{ data: any; error: any; }>;
+  resetPassword: ( newPassword: string ) => Promise<{ success: boolean; error?: string }>;
+  // loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  changePassword: ( currentPassword: string, newPassword: string ) => Promise<{ success: boolean; error?: string }>;
+  fetchEmail: (email: string) => Promise<any>;
+  loginWithToken: (credentials: Tokens, path: string) => Promise<void>;
+  setIsResettingPassword: (value: boolean) => void;
+}
+
 export interface User {
   id: string;
   email: string;
-  username?: string;
   name: string;
-  role?: "learner" | "instructor";
-  avatar?: string;
-  bio?: string;
-  location?: string;
-  phone?: string;
-  authProvider?: string; // e.g., 'google', 'email'
-  accessToken?: string; // Store access token if needed
+  avatar_url?: string;
   points?: number; // For gamification features
-  joinedAt?: string; // ISO date string
-  profile?: {
-    bio?: string;
-    location?: string;
-    interests?: string[];
-  };
+  joined_at?: string; // ISO date string
+  last_login?: string; // ISO date string
+  is_active?: boolean;
+  auth_provider: string; // e.g., 'google', 'email'
+  // id uuid not null default gen_random_uuid (),
+  // email character varying(255) not null,
+  // name character varying(255) not null,
+  // avatar_url text null,
+  // points integer null default 0,
+  // joined_at timestamp with time zone null default CURRENT_TIMESTAMP,
+  // last_login timestamp with time zone null,
+  // is_active boolean null default true,
+  // created_at timestamp with time zone null default CURRENT_TIMESTAMP,
+  // updated_at timestamp with time zone null default CURRENT_TIMESTAMP,
 }
 
 export interface CreditBalance {
@@ -274,6 +297,7 @@ export type MainStackParamList = {
   UserConfig?: undefined;
   MyCourses?: undefined;
   Auth?: undefined;
+  ResetPassword?: undefined;
 };
 
 export type AuthStackParamList = {

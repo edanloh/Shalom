@@ -15,7 +15,7 @@ import { useAuth } from "@contexts/AuthContext";
 import * as WebBrowser from "expo-web-browser";
 import styles from "@/styles/styles";
 import { Colors, Spacing, TextStyles } from "../../constants";
-import { validatePassword } from "@/utils/validatePassword";
+import { validatePassword } from "@/utils/authUtils";
 WebBrowser.maybeCompleteAuthSession();
 
 export default function RegisterScreen({ navigation }: any) {
@@ -27,27 +27,30 @@ export default function RegisterScreen({ navigation }: any) {
   const [passwordWarning, setPasswordWarning] = useState("");
   const { register, loginWithGoogle, fetchEmail } = useAuth();
 
-  const checkEmail = async () => {
-    setLoading(true);
-    try {
-      const result = await fetchEmail(email);
-      if (result) {
-        if (result.found == true) {
-          setPasswordWarning("Email is already registered");
-          console.log("Email already registered:", result.user);
-        } else {
-          setPasswordWarning("");
-          console.log("Email not registered, proceeding to register");
-          handleRegister();
-        }
-      }
-    } catch (err: any) {
-      setPasswordWarning("Error checking email");
-      console.error("Error checking email:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const checkEmail = async () => {
+  //   // Skip checking for now
+  //   handleRegister();
+  //   return;
+  //   setLoading(true);
+  //   try {
+  //     const result = await fetchEmail(email);
+  //     if (result) {
+  //       if (result.found == true) {
+  //         setPasswordWarning("Email is already registered");
+  //         console.log("Email already registered:", result.user);
+  //       } else {
+  //         setPasswordWarning("");
+  //         console.log("Email not registered, proceeding to register");
+  //         handleRegister();
+  //       }
+  //     }
+  //   } catch (err: any) {
+  //     setPasswordWarning("Error checking email");
+  //     console.error("Error checking email:", err);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
@@ -61,11 +64,11 @@ export default function RegisterScreen({ navigation }: any) {
     }
     setPasswordWarning("");
     setLoading(true);
-    const success = await register(email, password, name, "learner");
+    const res = await register(email, password, name);
     setLoading(false);
 
-    if (!success) {
-      Alert.alert("Error", "Registration failed");
+    if (!res.success) {
+      Alert.alert("Error", res.error || "Registration failed");
     } else {
       navigation.navigate("ConfirmSignUp", { email });
     }
@@ -137,7 +140,7 @@ export default function RegisterScreen({ navigation }: any) {
 
           {/* Sign Up Button */}
           <ActionButton
-            onPress={checkEmail}
+            onPress={handleRegister}
             disabled={loading}
             loading={loading}
             text={loading ? "Signing Up..." : "Sign Up"}

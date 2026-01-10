@@ -15,7 +15,7 @@ import { Colors, ContainerStyles, Spacing, Typography, TextStyles } from '../con
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import { Screen } from '@/components';
+import { ActionButton, Screen } from '@/components';
 
 // components (values)
 import ProfileHeader from '../components/home/ProfileHeader';

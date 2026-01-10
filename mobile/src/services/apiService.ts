@@ -3,6 +3,7 @@
  * Industry-standard HTTP client with proper error handling, retries, and interceptors
  */
 
+import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse, PaginatedResponse } from '../types';
 
@@ -132,9 +133,17 @@ class ApiService {
   // Authentication interceptor - adds JWT token and Supabase API key to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
+      // const token = await SecureStore.getItemAsync('authToken');
       const token = await AsyncStorage.getItem('authToken');
-      
-      // Add Supabase API key and Content-Type headers
+      const bearer = token || SUPABASE_KEY;
+      if (bearer) {
+        config.headers = {
+          ...config.headers,
+          'Authorization': `Bearer ${bearer}`,
+          ...(SUPABASE_KEY ? { apikey: SUPABASE_KEY } : {}),
+        };
+      }
+      // Always add Content-Type header
       config.headers = {
         ...config.headers,
         'Content-Type': 'application/json',

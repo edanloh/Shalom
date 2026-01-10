@@ -58,18 +58,7 @@ package-lock.json
 
 # OS
 .DS_Store
-Thumbs.db
-*.swp
-*.swo
-*~
 
-# IDE
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-
-# Temporary files
-*.tmp
-tmp/
-temp/
+/android
+/ios
+/google-services.json

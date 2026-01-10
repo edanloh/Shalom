@@ -3,3 +3,4 @@ export { default as Register } from "./Register";
 export { default as ConfirmSignUp } from "./ConfirmSignUp";
 export { default as ForgotPassword } from "./ForgotPassword";
 export { default as ChangePassword } from "./ChangePassword";
+export { default as ResetPassword } from "./ResetPassword";

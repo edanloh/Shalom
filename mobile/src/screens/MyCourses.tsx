@@ -1,5 +1,5 @@
 import { useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMyCourses } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
@@ -246,6 +246,7 @@ export default function MyCourses({ navigation }: any) {
 };
 
 const CARD_RADIUS = BorderRadius.lg;
+const w = Dimensions.get("window").width;
 
 const styles = StyleSheet.create({
   container: {
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
 
   // Continue Watching (horizontal)
   cwCard: {
-    width: '120%',
+    width: Math.min(w * 0.72, 300),
     gap: Spacing.sm
   },
   cwThumbWrapper: {
@@ -310,6 +311,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     overflow: 'hidden',
     minHeight: 100,
+    maxHeight: 150,
   },
   ipLeft: {
     flex: 1,
@@ -327,8 +329,7 @@ const styles = StyleSheet.create({
   },
   ipImage: {
     flex: 1,
-    width: undefined,
-    height: undefined,
+    width: 150,
     resizeMode: 'cover',
   },
   ipTitle: {

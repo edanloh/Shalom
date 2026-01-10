@@ -3,7 +3,8 @@
     "name": "Shalom",
     "slug": "Shalom",
     "scheme": [
-      "shalom"
+      "shalom",
+      "com.shalom"
     ],
     "version": "1.0.0",
     "orientation": "portrait",
@@ -23,28 +24,40 @@
     "plugins": [
       "expo-font",
       "expo-web-browser",
-      "expo-secure-store"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#564beb",
+          "sounds": [],
+          "mode": "development"
+        }
+      ]
     ],
     "sdkVersion": "54.0.0",
     "extra": {
       "eas": {
-        "projectId": "01c94c15-cac1-4d10-bf20-3f472f2fceb2"
+        "projectId": "65501d2b-f413-4930-bdac-abafafbeb317"
       }
     },
     "ios": {
-      "bundleIdentifier": "com.jasmine02.Shalom",
+      "bundleIdentifier": "com.jasmine02.shalom",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
-      "package": "com.jasmine02.Shalom"
+      "package": "com.jasmine02.shalom",
+      "permissions": ["POST_NOTIFICATIONS"],
+      "googleServicesFile": "./google-services.json"
     },
     "cli": {
       "appVersionSource": "remote"
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "owner": "zaiqin"
   }
 }

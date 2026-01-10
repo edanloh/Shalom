@@ -199,8 +199,12 @@ function TabNavigator() {
 }
 
 export default function MainNavigator() {
+  const { isResettingPassword } = useAuth();
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      initialRouteName={isResettingPassword ? "ResetPassword" : "MainTabs"}
+      screenOptions={{ headerShown: false }}
+    >
       <Stack.Screen
         name="MainTabs"
         component={TabNavigator}
@@ -304,6 +308,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="ChangePassword"
         component={Screens.ChangePassword}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ResetPassword"
+        component={Screens.ResetPassword}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

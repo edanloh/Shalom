@@ -124,29 +124,41 @@ export default function ProfileScreen({ navigation }: any) {
     };
   }, [loadCredits]);
 
-  const accountItems = useMemo(
-    () => [
+  type AccountItemIcon =
+    | "person-outline"
+    | "shield-checkmark-outline"
+    | "lock-closed-outline";
+
+  const accountItems = useMemo(() => {
+    const items: {
+      icon: AccountItemIcon;
+      title: string;
+      subtitle: string;
+      onPress: () => void;
+    }[] = [
       {
-        icon: "person-outline" as const,
+        icon: "person-outline",
         title: "Edit Profile",
         subtitle: "Update your personal information",
         onPress: () => navigation.navigate("EditProfile"),
       },
       {
-        icon: "shield-checkmark-outline" as const,
+        icon: "shield-checkmark-outline",
         title: "Privacy & Security",
         subtitle: "Manage your privacy settings",
         onPress: () => console.log("Navigate to Privacy & Security"),
       },
-      {
-        icon: "lock-closed-outline" as const,
+    ];
+    if (user?.auth_provider !== "google") {
+      items.push({
+        icon: "lock-closed-outline",
         title: "Change Password",
         subtitle: "Update your account password",
         onPress: () => navigation.navigate("ChangePassword"),
-      },
-    ],
-    [navigation]
-  );
+      });
+    }
+    return items;
+  }, [navigation, user]);
 
   return (
     <Screen
@@ -182,7 +194,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={[TextStyles.h3, { marginBottom: Spacing.xs }]}>
             {displayName}
           </Text>
-            {user?.authProvider && user?.authProvider == "google" && (
+            {user?.auth_provider && user?.auth_provider == "google" && (
               <Image
                 source={require("@assets/google.png")}
                 style={{
@@ -374,7 +386,6 @@ export default function ProfileScreen({ navigation }: any) {
           </Text>
         )}
       </CustomModal>
-
     </Screen>
   );
 }
