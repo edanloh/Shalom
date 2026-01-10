@@ -1,5 +1,13 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+} from "react-native";
 import { Spacing, TextStyles, Colors, BorderRadius } from "../constants";
 import Screen from "../components/common/Screen";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +16,7 @@ import { ActionButton, CustomTextInput } from "@/components";
 import CustomModal from "../components/common/CustomModal";
 import creditService from "../services/creditService";
 import { CertificateProgress } from "../types";
+import { useAuth } from "../contexts/AuthContext";
 
 type Certificate = {
   id: string;
@@ -19,6 +28,8 @@ type Certificate = {
   duration: string;
 };
 
+const PAGE_SIZE = 20;
+
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   return new Intl.DateTimeFormat("en-US", {
@@ -29,27 +40,43 @@ const formatDate = (dateString: string) => {
 };
 
 export default function CertificatesScreen({ navigation }: any) {
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [query, setQuery] = useState("");
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextOffset, setNextOffset] = useState(0);
 
-  const mapFromProgress = (items: CertificateProgress[] = []): Certificate[] =>
-    items.map((c) => ({
-      id: c.id,
-      courseName: c.name,
-      instructor: "",
-      completedAt: new Date().toISOString(),
-      credentialId: c.id.toUpperCase(),
-      score: c.progressPercent,
-      duration: `${c.completedCourses}/${c.requiredCourses} courses`,
-    }));
+  const mapFromProgress = useCallback(
+    (items: CertificateProgress[] = []): Certificate[] =>
+      items.map((c) => ({
+        id: c.id,
+        courseName: c.name,
+        instructor: "",
+        completedAt: (c as any).issuedAt || new Date().toISOString(),
+        credentialId: c.id.toUpperCase(),
+        score: c.progressPercent,
+        duration: `${c.completedCourses}/${c.requiredCourses} courses`,
+      })),
+    []
+  );
 
   const loadCerts = useCallback(async () => {
+    if (!user?.id) {
+      setCertificates([]);
+      setNextOffset(0);
+      setHasMore(false);
+      return;
+    }
     setLoading(true);
     try {
-      const remote = await creditService.getCertificates().catch((err: any) => {
+      const remote = await creditService.getCertificates(user.id, {
+        limit: PAGE_SIZE,
+        offset: 0,
+      }).catch((err: any) => {
         const status = err?.status ?? err?.statusCode;
         const msg = (err as any)?.message || "";
         // Swallow missing function errors and treat as empty
@@ -61,17 +88,21 @@ export default function CertificatesScreen({ navigation }: any) {
       });
       const mapped = Array.isArray(remote) && remote.length ? mapFromProgress(remote) : [];
       setCertificates(mapped);
+      setNextOffset(mapped.length);
+      setHasMore(mapped.length === PAGE_SIZE);
     } catch (err) {
       console.warn("Certificates: failed to load", err);
       setCertificates([]);
+      setNextOffset(0);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mapFromProgress, user?.id]);
 
   useEffect(() => {
     loadCerts();
-  }, [loadCerts]);
+  }, [loadCerts, user?.id]);
 
   const filteredCertificates = useMemo(() => {
     const base = certificates.length ? certificates : [];
@@ -103,80 +134,170 @@ export default function CertificatesScreen({ navigation }: any) {
     }
   }, [loadCerts]);
 
+  const loadMoreCerts = useCallback(async () => {
+    if (!user?.id || loadingMore || !hasMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const startOffset = nextOffset;
+      const remote = await creditService.getCertificates(user.id, {
+        limit: PAGE_SIZE,
+        offset: startOffset,
+      }).catch((err: any) => {
+        const status = err?.status ?? err?.statusCode;
+        const msg = (err as any)?.message || "";
+        if (status === 404 || msg.toLowerCase().includes("function was not found")) {
+          return [];
+        }
+        throw err;
+      });
+      const mapped = Array.isArray(remote) && remote.length ? mapFromProgress(remote) : [];
+      setCertificates((prev) => {
+        const existing = new Set(prev.map((item) => item.id));
+        return [...prev, ...mapped.filter((item) => !existing.has(item.id))];
+      });
+      setNextOffset(startOffset + mapped.length);
+      setHasMore(mapped.length === PAGE_SIZE);
+    } catch (err) {
+      console.warn("Certificates: failed to load more", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loading, loadingMore, mapFromProgress, nextOffset, user?.id]);
+
   return (
     <Screen
       title="Certificates"
       customEdges={["top", "left", "right", "bottom"]}
-      refreshing={refreshing}
-      onRefresh={onRefresh}
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
       stickyHeader
+      useScrollView={false}
+      disableChildrenWrapper
     >
-      <CustomTextInput
-        placeholder="Search for certificates..."
-        value={query}
-        onChangeText={setQuery}
-        autoCapitalize={"none"}
-        leftIconName="search"
-        returnKeyType="search"
-      />
-
-      <View style={{ marginVertical: Spacing.sm }}>
-        <Text style={[TextStyles.h5]}>
-          {certificates.length} Certificate
-          {certificates.length !== 1 ? "s" : ""} {query ? "Found" : "Earned"}
-        </Text>
-      </View>
-
-      {certificates.map((cert, index) => (
-        <TouchableOpacity
-          key={cert.id}
-          activeOpacity={0.7}
-          style={styles.compactCard}
-          onPress={() => setSelectedCert(cert)}
-        >
-          <LinearGradient
-            colors={["#3A3A45", "#3A3A45"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.compactGradient}
+      <FlatList
+        data={filteredCertificates}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item: cert }) => (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.compactCard}
+            onPress={() => setSelectedCert(cert)}
           >
-            <View style={styles.compactHeader}>
-              <View style={styles.compactIconContainer}>
-                <Ionicons name="ribbon" size={20} color={Colors.yellow} />
-              </View>
-              <View style={{ flex: 1, paddingHorizontal: Spacing.base }}>
-                <Text style={[TextStyles.bodyMedium, { marginBottom: 2 }]}>
-                  {cert.courseName}
-                </Text>
-                <Text style={TextStyles.captionSmall}>
-                  {cert.instructor} •{" "}
-                  {formatDate(cert.completedAt).split(",")[0]}
-                </Text>
-              </View>
-              {cert.score && (
-                <View style={styles.compactScore}>
-                  <Text
-                    style={[
-                      TextStyles.captionSmall,
-                      { fontWeight: "700", color: "#1E293B" },
-                    ]}
-                  >
-                    {cert.score}%
+            <LinearGradient
+              colors={["#3A3A45", "#3A3A45"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.compactGradient}
+            >
+              <View style={styles.compactHeader}>
+                <View style={styles.compactIconContainer}>
+                  <Ionicons name="ribbon" size={20} color={Colors.yellow} />
+                </View>
+                <View style={{ flex: 1, paddingHorizontal: Spacing.base }}>
+                  <Text style={[TextStyles.bodyMedium, { marginBottom: 2 }]}>
+                    {cert.courseName}
+                  </Text>
+                  <Text style={TextStyles.captionSmall}>
+                    {cert.instructor} •{" "}
+                    {formatDate(cert.completedAt).split(",")[0]}
                   </Text>
                 </View>
-              )}
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={Colors.textSecondary}
-                style={{ marginLeft: Spacing.xs }}
-              />
+                {cert.score && (
+                  <View style={styles.compactScore}>
+                    <Text
+                      style={[
+                        TextStyles.captionSmall,
+                        { fontWeight: "700", color: "#1E293B" },
+                      ]}
+                    >
+                      {cert.score}%
+                    </Text>
+                  </View>
+                )}
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={Colors.textSecondary}
+                  style={{ marginLeft: Spacing.xs }}
+                />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.secondary}
+            colors={[Colors.secondary]}
+          />
+        }
+        ListHeaderComponent={
+          <>
+            <CustomTextInput
+              placeholder="Search for certificates..."
+              value={query}
+              onChangeText={setQuery}
+              autoCapitalize={"none"}
+              leftIconName="search"
+              returnKeyType="search"
+            />
+            <View style={{ marginVertical: Spacing.sm }}>
+              <Text style={[TextStyles.h5]}>
+                {certificates.length} Certificate
+                {certificates.length !== 1 ? "s" : ""} {query ? "Found" : "Earned"}
+              </Text>
             </View>
-          </LinearGradient>
-        </TouchableOpacity>
-      ))}
+          </>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={Colors.secondary} />
+            </View>
+          ) : query ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="search-outline" size={64} color={Colors.textMuted} />
+              <Text style={[TextStyles.h4, { marginTop: Spacing.md }]}>
+                No Certificates Found
+              </Text>
+              <Text
+                style={[
+                  TextStyles.caption,
+                  { marginTop: Spacing.xs, textAlign: "center" },
+                ]}
+              >
+                Try searching with a different course name or instructor
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="school-outline" size={64} color={Colors.textMuted} />
+              <Text style={[TextStyles.h4, { marginTop: Spacing.md }]}>
+                No Certificates Yet
+              </Text>
+              <Text style={[TextStyles.caption, { marginTop: Spacing.xs }]}>
+                Complete courses to earn certificates
+              </Text>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          hasMore ? (
+            <View style={styles.footer}>
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.footer} />
+          )
+        }
+        onEndReached={loadMoreCerts}
+        onEndReachedThreshold={0.6}
+      />
 
       {/* Certificate Detail Modal */}
       <CustomModal
@@ -305,34 +426,6 @@ export default function CertificatesScreen({ navigation }: any) {
         </View>
       </CustomModal>
 
-      {certificates.length === 0 && query && (
-        <View style={styles.emptyState}>
-          <Ionicons name="search-outline" size={64} color={Colors.textMuted} />
-          <Text style={[TextStyles.h4, { marginTop: Spacing.md }]}>
-            No Certificates Found
-          </Text>
-          <Text
-            style={[
-              TextStyles.caption,
-              { marginTop: Spacing.xs, textAlign: "center" },
-            ]}
-          >
-            Try searching with a different course name or instructor
-          </Text>
-        </View>
-      )}
-
-      {certificates.length === 0 && !query && (
-        <View style={styles.emptyState}>
-          <Ionicons name="school-outline" size={64} color={Colors.textMuted} />
-          <Text style={[TextStyles.h4, { marginTop: Spacing.md }]}>
-            No Certificates Yet
-          </Text>
-          <Text style={[TextStyles.caption, { marginTop: Spacing.xs }]}>
-            Complete courses to earn certificates
-          </Text>
-        </View>
-      )}
     </Screen>
   );
 }
@@ -407,5 +500,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 60,
+  },
+  loadingState: {
+    paddingVertical: Spacing.xl,
+    alignItems: "center",
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
+  },
+  footer: {
+    alignItems: "center",
+    paddingVertical: Spacing.md,
   },
 });

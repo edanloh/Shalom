@@ -24,12 +24,18 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const url = new URL(req.url);
   const userId = url.searchParams.get("userId") || null;
+  const limitRaw = url.searchParams.get("limit");
+  const offsetRaw = url.searchParams.get("offset");
+  const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 200);
+  const offset = Math.max(Number(offsetRaw) || 0, 0);
 
+  const to = offset + limit - 1;
   const { data: defs, error } = await supabase
     .from("achievements")
-    .select("id, name, description, icon, type, points")
+    .select("id, name, description, icon, type, points, created_at")
     .eq("is_active", true)
-    .order("points", { ascending: true });
+    .order("points", { ascending: true })
+    .range(offset, to);
   if (error) return new Response(JSON.stringify({ success: false, message: error.message }), { status: 500, headers: corsHeaders });
 
   let earned: Record<string, boolean> = {};
@@ -48,6 +54,7 @@ serve(async (req) => {
     icon: a.icon,
     type: a.type,
     points: a.points,
+    createdAt: a.created_at,
     earned: !!earned[a.id],
   })) ?? [];
 

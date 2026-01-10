@@ -71,6 +71,12 @@ export default function ProfileScreen({ navigation }: any) {
   const loadCredits = React.useCallback(async () => {
     try {
       const uid = user?.id;
+      if (!uid) {
+        setBalance(0);
+        setAchievementsData([]);
+        setCreditHistory([]);
+        return;
+      }
       const [bal, ach, hist] = await Promise.all([
         creditService.getCreditBalance(uid).catch(() => null),
         creditService.getAchievements(uid).catch(() => []),
@@ -88,7 +94,9 @@ export default function ProfileScreen({ navigation }: any) {
         return byType[a.type] || byType[a.icon] || "trophy-outline";
       };
 
-      const normalized = (Array.isArray(ach) ? ach : []).map((a: any) => ({
+      const normalized = (Array.isArray(ach) ? ach : [])
+        .filter((a: any) => a.earned !== false)
+        .map((a: any) => ({
        ...a,
        label: a.label || a.name || "Achievement",
        icon: iconFor(a),
@@ -103,7 +111,7 @@ export default function ProfileScreen({ navigation }: any) {
         type: "error",
       });
     }
-  }, []);
+  }, [user?.id]);
 
   const handleRefresh = async () => {
     try {
@@ -245,10 +253,7 @@ export default function ProfileScreen({ navigation }: any) {
        <View style={styles.achievementsGrid}>
          {(() => {
            if (!achievementsData.length) return [];
-           const earned = achievementsData.filter((a: any) => a.earned !== false);
-           const notEarned = achievementsData.filter((a: any) => a.earned === false);
-           const merged = [...earned, ...notEarned].slice(0, 6);
-           return merged;
+           return achievementsData.slice(0, 6);
          })().map((a) => (
            <TouchableOpacity
              key={a.label}
@@ -268,6 +273,11 @@ export default function ProfileScreen({ navigation }: any) {
            </TouchableOpacity>
          ))}
        </View>
+       {!achievementsData.length ? (
+         <Text style={styles.emptyAchievementsText}>
+           No achievements yet
+         </Text>
+       ) : null}
 
         {/* Account Settings */}
         <Text style={[styles.sectionTitle, { marginTop: Spacing.md }]}>
@@ -456,6 +466,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textPrimary,
     lineHeight: 16,
+  },
+  emptyAchievementsText: {
+    textAlign: "center",
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
   },
   historyCard: {
     marginHorizontal: Spacing.lg,

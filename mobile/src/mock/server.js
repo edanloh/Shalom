@@ -89,14 +89,24 @@ const endpointMap = {
         data: history.slice(offset, offset + limit),
       };
     },
-    "/credits/achievements": () => ({
-      success: true,
-      data: db.credits.achievements || [],
-    }),
-    "/getAchievements": () => ({
-      success: true,
-      data: db.credits.achievements || [],
-    }),
+    "/credits/achievements": (params, body, query) => {
+      const items = db.credits.achievements || [];
+      const limit = Math.max(Number(query.limit) || items.length, 0);
+      const offset = Math.max(Number(query.offset) || 0, 0);
+      return {
+        success: true,
+        data: items.slice(offset, offset + limit),
+      };
+    },
+    "/getAchievements": (params, body, query) => {
+      const items = db.credits.achievements || [];
+      const limit = Math.max(Number(query.limit) || items.length, 0);
+      const offset = Math.max(Number(query.offset) || 0, 0);
+      return {
+        success: true,
+        data: items.slice(offset, offset + limit),
+      };
+    },
     "/credits/goals": () => ({
       success: true,
       data: db.credits.goals || [],
@@ -105,14 +115,24 @@ const endpointMap = {
       success: true,
       data: db.credits.goals || [],
     }),
-    "/credits/certificates": () => ({
-      success: true,
-      data: db.credits.certificates || [],
-    }),
-    "/getCertificates": () => ({
-      success: true,
-      data: db.credits.certificates || [],
-    }),
+    "/credits/certificates": (params, body, query) => {
+      const items = db.credits.certificates || [];
+      const limit = Math.max(Number(query.limit) || items.length, 0);
+      const offset = Math.max(Number(query.offset) || 0, 0);
+      return {
+        success: true,
+        data: items.slice(offset, offset + limit),
+      };
+    },
+    "/getCertificates": (params, body, query) => {
+      const items = db.credits.certificates || [];
+      const limit = Math.max(Number(query.limit) || items.length, 0);
+      const offset = Math.max(Number(query.offset) || 0, 0);
+      return {
+        success: true,
+        data: items.slice(offset, offset + limit),
+      };
+    },
   },
   POST: {
     "/recommendations/events": (params, body) => {

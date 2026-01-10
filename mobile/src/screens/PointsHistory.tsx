@@ -13,6 +13,8 @@ import { Colors, Spacing, TextStyles } from "../constants";
 import Screen from "../components/common/Screen";
 import creditService from "../services/creditService";
 import { CreditEvent } from "../types";
+import { useAuth } from "../contexts/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
 
 type AppPointHistory = {
   id: string;
@@ -44,6 +46,7 @@ const formatTime = (iso: string) => {
 };
 
 export default function PointsHistoryScreen({ navigation }: any) {
+  const { user } = useAuth();
   const [history, setHistory] = useState<AppPointHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -96,9 +99,15 @@ export default function PointsHistoryScreen({ navigation }: any) {
   }, []);
 
   const loadHistory = useCallback(async () => {
+    if (!user?.id) {
+      setHistory([]);
+      setNextOffset(0);
+      setHasMore(false);
+      return;
+    }
     setLoading(true);
     try {
-      const events: CreditEvent[] = await creditService.getCreditHistory(undefined, {
+      const events: CreditEvent[] = await creditService.getCreditHistory(user.id, {
         limit: PAGE_SIZE,
         offset: 0,
       });
@@ -114,14 +123,14 @@ export default function PointsHistoryScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [mapEvents]);
+  }, [mapEvents, user?.id]);
 
   const loadMoreHistory = useCallback(async () => {
-    if (loadingMore || !hasMore || loading) return;
+    if (!user?.id || loadingMore || !hasMore || loading) return;
     setLoadingMore(true);
     try {
       const startOffset = nextOffset;
-      const events: CreditEvent[] = await creditService.getCreditHistory(undefined, {
+      const events: CreditEvent[] = await creditService.getCreditHistory(user.id, {
         limit: PAGE_SIZE,
         offset: startOffset,
       });
@@ -137,7 +146,7 @@ export default function PointsHistoryScreen({ navigation }: any) {
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loading, loadingMore, mapEvents, nextOffset]);
+  }, [hasMore, loading, loadingMore, mapEvents, nextOffset, user?.id]);
 
   useEffect(() => {
     loadHistory();
@@ -145,7 +154,7 @@ export default function PointsHistoryScreen({ navigation }: any) {
     return () => {
       if (unsub) unsub();
     };
-  }, [loadHistory]);
+  }, [loadHistory, user?.id]);
 
   const onRefresh = useCallback(async () => {
     try {
@@ -210,7 +219,17 @@ export default function PointsHistoryScreen({ navigation }: any) {
             <View style={styles.loadingState}>
               <ActivityIndicator size="large" color={Colors.secondary} />
             </View>
-          ) : null
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="trending-up-outline" size={48} color={Colors.textMuted} />
+              <Text style={[TextStyles.h4, { marginTop: Spacing.md }]}>
+                No points history yet
+              </Text>
+              <Text style={[TextStyles.caption, { marginTop: Spacing.xs, textAlign: "center" }]}>
+                Complete lessons and quizzes to earn points.
+              </Text>
+            </View>
+          )
         }
         ListFooterComponent={
           hasMore ? (
@@ -265,6 +284,11 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
   },
   sectionHeader: {
     marginBottom: Spacing.sm,

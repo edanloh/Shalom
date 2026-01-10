@@ -3,7 +3,6 @@ import apiService from './apiService';
 import { showToast } from '../components/common/Toast';
 import { AchievementItem, CertificateProgress, CreditBalance, CreditEvent, CreditEventPayload, LearningGoal } from '../types';
 
-const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID || '550e8400-e29b-41d4-a716-446655440101';
 const GOAL_HIT_POINTS = 50;
 const STREAK_INCREMENT_POINTS = 10;
 
@@ -37,8 +36,8 @@ function emitCreditUpdate() {
 }
 
 export async function getCreditBalance(userId?: string): Promise<CreditBalance> {
-  const uid = userId || DEFAULT_USER_ID;
-  const resp = await apiService.get<any>(ENDPOINTS.BALANCE, { userId: uid });
+  if (!userId) throw new Error('userId is required');
+  const resp = await apiService.get<any>(ENDPOINTS.BALANCE, { userId });
   return resp?.data ?? resp;
 }
 
@@ -46,26 +45,35 @@ export async function getCreditHistory(
   userId?: string,
   options?: { limit?: number; offset?: number }
 ): Promise<CreditEvent[]> {
-  const uid = userId || DEFAULT_USER_ID;
+  if (!userId) return [];
   const limit = options?.limit ?? 50;
   const offset = options?.offset ?? 0;
   const resp = await apiService.get<any>(ENDPOINTS.HISTORY, {
-    userId: uid,
+    userId,
     limit: String(limit),
     offset: String(offset),
   });
   return resp?.data ?? resp ?? [];
 }
 
-export async function getAchievements(userId?: string): Promise<AchievementItem[]> {
-  const uid = userId || DEFAULT_USER_ID;
-  const resp = await apiService.get<any>(ENDPOINTS.ACHIEVEMENTS, { userId: uid });
+export async function getAchievements(
+  userId?: string,
+  options?: { limit?: number; offset?: number }
+): Promise<AchievementItem[]> {
+  if (!userId) return [];
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+  const resp = await apiService.get<any>(ENDPOINTS.ACHIEVEMENTS, {
+    userId,
+    limit: String(limit),
+    offset: String(offset),
+  });
   return resp?.data ?? resp ?? [];
 }
 
 export async function getGoals(userId?: string): Promise<LearningGoal[]> {
-  const uid = userId || DEFAULT_USER_ID;
-  const resp = await apiService.get<any>(ENDPOINTS.GOALS, { userId: uid });
+  if (!userId) return [];
+  const resp = await apiService.get<any>(ENDPOINTS.GOALS, { userId });
   return resp?.data ?? resp ?? [];
 }
 
@@ -73,8 +81,8 @@ export async function getGoalsWithProgress(userId?: string): Promise<{
   goals: LearningGoal[];
   completedCourses: number;
 }> {
-  const uid = userId || DEFAULT_USER_ID;
-  const resp = await apiService.get<any>(ENDPOINTS.GOALS, { userId: uid });
+  if (!userId) return { goals: [], completedCourses: 0 };
+  const resp = await apiService.get<any>(ENDPOINTS.GOALS, { userId });
   const data = resp?.data ?? resp;
   if (Array.isArray(data)) {
     return {
@@ -88,15 +96,25 @@ export async function getGoalsWithProgress(userId?: string): Promise<{
   };
 }
 
-export async function getCertificates(userId?: string): Promise<CertificateProgress[]> {
-  const uid = userId || DEFAULT_USER_ID;
-  const resp = await apiService.get<any>(ENDPOINTS.CERTS, { userId: uid });
+export async function getCertificates(
+  userId?: string,
+  options?: { limit?: number; offset?: number }
+): Promise<CertificateProgress[]> {
+  if (!userId) return [];
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+  const resp = await apiService.get<any>(ENDPOINTS.CERTS, {
+    userId,
+    limit: String(limit),
+    offset: String(offset),
+  });
   return resp?.data ?? resp ?? [];
 }
 
 export async function recordCreditEvent(payload: CreditEventPayload) {
+  if (!payload.userId) throw new Error('userId is required');
   const body = {
-    userId: payload.userId || DEFAULT_USER_ID,
+    userId: payload.userId,
     ...payload,
   };
   try {
@@ -140,6 +158,7 @@ export async function recordCreditEvent(payload: CreditEventPayload) {
 }
 
 export async function recordGoalMilestones(goals: LearningGoal[], userId?: string) {
+  if (!userId) return;
   const raw = Array.isArray(goals) ? goals : [];
   const snapshot: GoalSnapshot[] = raw.map((g, idx) => {
     const target = Number(g.targetPoints ?? g.targetCourses ?? g.targetHours ?? 0);
@@ -166,7 +185,7 @@ export async function recordGoalMilestones(goals: LearningGoal[], userId?: strin
   try {
     const events = goalHits.map((g) =>
       recordCreditEvent({
-        userId: userId || DEFAULT_USER_ID,
+        userId,
         type: 'goal_hit',
         title: `${g.label} goal hit`,
         points: GOAL_HIT_POINTS,
@@ -176,7 +195,7 @@ export async function recordGoalMilestones(goals: LearningGoal[], userId?: strin
     if (streakIncreased != null) {
       events.push(
         recordCreditEvent({
-          userId: userId || DEFAULT_USER_ID,
+          userId,
           type: 'streak_increment',
           title: `Streak extended to ${streakIncreased} days`,
           points: STREAK_INCREMENT_POINTS,

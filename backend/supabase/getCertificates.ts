@@ -24,12 +24,19 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const url = new URL(req.url);
   const userId = url.searchParams.get("userId");
+  const limitRaw = url.searchParams.get("limit");
+  const offsetRaw = url.searchParams.get("offset");
+  const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 200);
+  const offset = Math.max(Number(offsetRaw) || 0, 0);
 
   try {
+    const to = offset + limit - 1;
     const { data, error } = await supabase
       .from("certificates")
       .select("id, user_id, course_id, learning_path_id, certificate_type, certificate_number, issued_at, issuer_name, credential_url, metadata")
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .order("issued_at", { ascending: false })
+      .range(offset, to);
 
     if (error) throw error;
 

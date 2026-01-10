@@ -101,9 +101,14 @@ export default function HomeScreen({ navigation, route }: any) {
 
   const loadCreditMeta = React.useCallback(async () => {
     try {
+      if (!user?.id) {
+        setCertCount(0);
+        setStreakDays(0);
+        return;
+      }
       const [certs, goals] = await Promise.all([
-        creditService.getCertificates().catch(() => []),
-        creditService.getGoals().catch(() => []),
+        creditService.getCertificates(user.id).catch(() => []),
+        creditService.getGoals(user.id).catch(() => []),
       ]);
       creditService.recordGoalMilestones(goals, user?.id);
       setCertCount(Array.isArray(certs) ? certs.length : 0);
@@ -178,7 +183,7 @@ export default function HomeScreen({ navigation, route }: any) {
       id: '2',
       icon: 'trophy',
       title: 'Certificates',  
-      value: certCount || 3,
+      value: certCount,
       color: Colors.certificateCardBg,
       type: 'certificate',
       navigationTarget: 'CertificatesScreen',

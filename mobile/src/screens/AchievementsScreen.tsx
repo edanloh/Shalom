@@ -1,5 +1,13 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  SectionList,
+  RefreshControl,
+} from "react-native";
 import { Spacing, TextStyles, Colors } from "../constants";
 import Screen from "../components/common/Screen";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +15,7 @@ import CustomTextInput from "@/components/CustomTextInput";
 import CustomModal from "../components/common/CustomModal";
 import creditService from "../services/creditService";
 import { AchievementItem } from "../types";
+import { useAuth } from "../contexts/AuthContext";
 
 type Achievement = {
   id: string;
@@ -45,27 +54,33 @@ const formatDate = (dateString: string) => {
   }).format(date);
 };
 
+const PAGE_SIZE = 20;
+
 export default function AchievementsScreen({ navigation }: any) {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextOffset, setNextOffset] = useState(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const remote = await creditService.getAchievements().catch(() => []);
-      const iconFor = (a: any) => {
-        const byType: Record<string, string> = {
-          badge: "trophy-outline",
-          streak: "flame",
-          certificate: "ribbon-outline",
-          level: "ribbon-outline",
-        };
-        return byType[a.type] || byType[a.icon] || "trophy-outline";
+  const mapAchievements = useCallback((items: AchievementItem[] = []) => {
+    const iconFor = (a: any) => {
+      const byType: Record<string, string> = {
+        badge: "trophy-outline",
+        streak: "flame",
+        certificate: "ribbon-outline",
+        level: "ribbon-outline",
       };
-      const normalized: Achievement[] = (remote || []).map((a: AchievementItem) => ({
+      return byType[a.type] || byType[a.icon] || "trophy-outline";
+    };
+
+    return items
+      .filter((a: any) => a.earned !== false)
+      .map((a: AchievementItem) => ({
         id: a.id,
         icon: iconFor(a),
         label: a.label || (a as any).name || "Achievement",
@@ -74,18 +89,38 @@ export default function AchievementsScreen({ navigation }: any) {
         points: (a as any).points ?? undefined,
         earned: (a as any).earned ?? true,
       }));
+  }, []);
+
+  const load = useCallback(async () => {
+    if (!user?.id) {
+      setAchievements([]);
+      setNextOffset(0);
+      setHasMore(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const remote = await creditService.getAchievements(user.id, {
+        limit: PAGE_SIZE,
+        offset: 0,
+      }).catch(() => []);
+      const normalized = mapAchievements(remote);
       setAchievements(normalized);
+      setNextOffset(normalized.length);
+      setHasMore(normalized.length === PAGE_SIZE);
     } catch (err) {
       console.warn("Achievements: failed to load", err);
       setAchievements([]);
+      setNextOffset(0);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mapAchievements, user?.id]);
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, user?.id]);
 
   const sections = useMemo(() => {
     // Filter achievements based on search query
@@ -143,68 +178,126 @@ export default function AchievementsScreen({ navigation }: any) {
     }
   }, [load]);
 
+  const loadMore = useCallback(async () => {
+    if (!user?.id || loadingMore || !hasMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const startOffset = nextOffset;
+      const remote = await creditService.getAchievements(user.id, {
+        limit: PAGE_SIZE,
+        offset: startOffset,
+      }).catch(() => []);
+      const normalized = mapAchievements(remote);
+      setAchievements((prev) => {
+        const existing = new Set(prev.map((item) => item.id));
+        return [...prev, ...normalized.filter((item) => !existing.has(item.id))];
+      });
+      setNextOffset(startOffset + normalized.length);
+      setHasMore(normalized.length === PAGE_SIZE);
+    } catch (err) {
+      console.warn("Achievements: failed to load more", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loading, loadingMore, mapAchievements, nextOffset, user?.id]);
+
   return (
     <Screen
       title="Achievements"
       customEdges={["top", "left", "right", "bottom"]}
-      refreshing={refreshing}
-      onRefresh={onRefresh}
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
       stickyHeader
+      useScrollView={false}
+      disableChildrenWrapper
     >
-      <CustomTextInput
-        placeholder="Search for achievements..."
-        value={query}
-        onChangeText={setQuery}
-        autoCapitalize={"none"}
-        leftIconName="search"
-        returnKeyType="search"
-      />
-
-      {loading ? (
-        <View style={{ paddingVertical: Spacing.lg, alignItems: "center" }}>
-          <ActivityIndicator size="large" color={Colors.secondary} />
-        </View>
-      ) : null}
-
-      {!loading && sections.length === 0 ? (
-        <Text style={[TextStyles.body, { color: Colors.textSecondary, marginTop: Spacing.md }]}>
-          No achievements found.
-        </Text>
-      ) : null}
-
-      {sections.map((section, sectionIndex) => (
-        <View key={section.title} style={{ marginBottom: Spacing.lg }}>
-          {/* Section Header */}
-          <Text style={TextStyles.h5}>{section.title}</Text>
-
-          {/* Section Items */}
-          {section.data.map((item, itemIndex) => (
-            <View key={item.id}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={styles.row}
-                onPress={() => setSelectedAchievement(item)}
-              >
-                <View style={styles.iconContainer}>
-                  <Ionicons name={item.icon as any} size={28} color="#FACC15" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={TextStyles.body} numberOfLines={1}>
-                    {item.label}
-                  </Text>
-                  <Text style={TextStyles.captionSmall}>{item.subtitle}</Text>
-                </View>
-              </TouchableOpacity>
-              {/* Item Separator */}
-              {itemIndex < section.data.length - 1 && (
-                <View style={{ height: Spacing.md }} />
-              )}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item, index, section }) => (
+          <View>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.row}
+              onPress={() => setSelectedAchievement(item)}
+            >
+              <View style={styles.iconContainer}>
+                <Ionicons name={item.icon as any} size={28} color="#FACC15" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={TextStyles.body} numberOfLines={1}>
+                  {item.label}
+                </Text>
+                <Text style={TextStyles.captionSmall}>{item.subtitle}</Text>
+              </View>
+            </TouchableOpacity>
+            {index < section.data.length - 1 ? (
+              <View style={{ height: Spacing.md }} />
+            ) : null}
+          </View>
+        )}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={TextStyles.h5}>{section.title}</Text>
+          </View>
+        )}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.secondary}
+            colors={[Colors.secondary]}
+          />
+        }
+        ListHeaderComponent={
+          <CustomTextInput
+            placeholder="Search for achievements..."
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize={"none"}
+            leftIconName="search"
+            returnKeyType="search"
+          />
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={Colors.secondary} />
             </View>
-          ))}
-        </View>
-      ))}
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="trophy-outline" size={64} color={Colors.textMuted} />
+              <Text style={[TextStyles.h4, { marginTop: Spacing.md }]}>
+                No Achievements Yet
+              </Text>
+              <Text
+                style={[
+                  TextStyles.caption,
+                  { marginTop: Spacing.xs, textAlign: "center" },
+                ]}
+              >
+                Complete courses and hit goals to earn achievements.
+              </Text>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          hasMore ? (
+            <View style={styles.footer}>
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.footer} />
+          )
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.6}
+        stickySectionHeadersEnabled={false}
+      />
 
       {/* Achievement Detail Modal */}
       <CustomModal
@@ -288,6 +381,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: Spacing.sm,
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
+  },
+  sectionHeader: {
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.lg,
+  },
+  loadingState: {
+    paddingVertical: Spacing.lg,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  footer: {
+    alignItems: "center",
+    paddingVertical: Spacing.md,
   },
   iconContainer: {
     width: ICON_SIZE,
