@@ -10,3 +10,7 @@ node_modules/
 
 #Ignore misc files
 .DS_Store
+
+/android
+/ios
+/google-services.json

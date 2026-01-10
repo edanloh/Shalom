@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { API_BASE_URL } from 'react-native-dotenv';
 import { handleLogoutCleanup } from './NotificationContext';
@@ -10,6 +9,7 @@ import { User, AuthContextType } from '@/types';
 import { useNavigation } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
+import { makeRedirectUri } from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         name: supabaseUser?.user_metadata?.name || '',
         joined_at: supabaseUser?.created_at || '',
         last_login: supabaseUser?.last_sign_in_at || '',
-          auth_provider: supabaseUser?.app_metadata?.provider || 'email',
+        auth_provider: supabaseUser?.app_metadata?.provider || 'email',
       });
     }
     setSession(supabaseSession || null);
@@ -184,26 +184,58 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Supabase Google OAuth for Expo Android
   const loginWithGoogle = async () => {
     setIsLoading(true);
     try {
-      console.log(Platform.OS);
-      if (Platform.OS === 'web') {
-        // Web: Use Supabase OAuth with HTTPS redirect
-        const { error, data } = await supabase.auth.signInWithOAuth({
-          provider: 'google'
-        });
-        console.log(data);
-        if (error) throw error;
-        // Supabase will handle redirect and session
+      // Use a custom redirect URI for Expo (must be whitelisted in Supabase dashboard)
+      const redirectTo = makeRedirectUri({
+        scheme: 'com.shalom',
+        // native: 'com.shalom://',
+      });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+        },
+      });
+
+      if (error) throw error;
+
+      // Open the returned URL in a browser for the user to complete Google login
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectTo
+        );
+        if (result.type === 'success' && result.url) {
+          // Parse the URL fragment for access_token, refresh_token, etc.
+          const url = result.url;
+          const params = Linking.parse(url);
+          // After redirect, Supabase should handle session automatically if storage is set up
+          // Fetch the session from Supabase
+          const { data: sessionData } = await supabase.auth.getSession();
+          setSession(sessionData.session);
+          const supabaseUser = sessionData.session?.user;
+          setUser(
+            supabaseUser
+              ? {
+                  id: supabaseUser.id,
+                  email: supabaseUser.email || '',
+                  name: supabaseUser.user_metadata?.name || '',
+                  joined_at: supabaseUser.created_at || '',
+                  last_login: supabaseUser.last_sign_in_at || '',
+                  auth_provider:
+                    supabaseUser.app_metadata?.provider || 'google',
+                }
+              : null
+          );
+        } else {
+          throw new Error('Google sign-in cancelled or failed');
+        }
       } else {
-        // Mobile: Use Expo AuthSession with exp:// redirect
-        const redirectUri = Linking.createURL('/');
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google'
-        });
-        if (error) throw error;
-        // Supabase will handle redirect and session
+        throw new Error('No URL returned from Supabase OAuth');
       }
     } catch (err) {
       alert('Google sign-in failed: ' + err);
