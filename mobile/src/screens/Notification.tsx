@@ -8,6 +8,9 @@ import {
   Pressable,
   Animated,
   Modal,
+  ActivityIndicator,
+  SectionList,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
@@ -33,6 +36,10 @@ export default function NotificationsScreen({ navigation }: any) {
   const {
     inAppNotifications,
     reloadNotifications,
+    loadMoreNotifications,
+    hasMoreNotifications,
+    isLoadingNotifications,
+    isLoadingMoreNotifications,
     markNotificationRead,
     markAllNotificationsRead,
     clearNotifications,
@@ -231,6 +238,8 @@ export default function NotificationsScreen({ navigation }: any) {
       customEdges={["top"]}
       refreshing={refreshing}
       onRefresh={onRefresh}
+      useScrollView={false}
+      disableChildrenWrapper
       headerLeftComponent={
         <View style={styles.menuAnchor}>
           <TouchableOpacity
@@ -299,33 +308,61 @@ export default function NotificationsScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
-      {sections.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons
-            name="notifications-outline"
-            size={36}
-            color={Colors.textSecondary}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => renderRow(item)}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={TextStyles.h5}>{section.title}</Text>
+          </View>
+        )}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.secondary}
+            colors={[Colors.secondary]}
           />
-          <Text style={[TextStyles.body, styles.emptyTitle]}>
-            No notifications yet
-          </Text>
-          <Text style={[TextStyles.captionSmall, styles.emptySubtitle]}>
-            Toast updates will appear here automatically.
-          </Text>
-        </View>
-      ) : null}
-      {sections.map((section) => (
-        <View key={section.title} style={{ marginBottom: Spacing.lg }}>
-          <Text style={TextStyles.h5}>{section.title}</Text>
-          {section.data.map((item, itemIndex) => (
-            <View key={item.id}>
-              {renderRow(item)}
-              {itemIndex < section.data.length - 1 ? <View style={{ height: 0 }} /> : null}
+        }
+        ListEmptyComponent={
+          isLoadingNotifications ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={Colors.secondary} />
             </View>
-          ))}
-        </View>
-      ))}
-      <View style={{ height: 120 }} />
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="notifications-outline"
+                size={36}
+                color={Colors.textSecondary}
+              />
+              <Text style={[TextStyles.body, styles.emptyTitle]}>
+                No notifications yet
+              </Text>
+              <Text style={[TextStyles.captionSmall, styles.emptySubtitle]}>
+                Toast updates will appear here automatically.
+              </Text>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          hasMoreNotifications ? (
+            <View style={styles.footer}>
+              {isLoadingMoreNotifications ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.footer} />
+          )
+        }
+        onEndReached={loadMoreNotifications}
+        onEndReachedThreshold={0.6}
+        stickySectionHeadersEnabled={false}
+      />
     </Screen>
   );
 }
@@ -406,6 +443,21 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     marginTop: Spacing.xs,
   },
+  loadingState: {
+    paddingVertical: Spacing.lg,
+    alignItems: "center",
+  },
+  listContent: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: 120,
+  },
+  list: {
+    flex: 1,
+  },
+  sectionHeader: {
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.lg,
+  },
   menuAnchor: {
     position: "relative",
     zIndex: 30,
@@ -461,5 +513,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 56,
     left: Spacing.lg,
+  },
+  footer: {
+    alignItems: "center",
+    paddingVertical: Spacing.md,
   },
 });

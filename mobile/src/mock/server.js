@@ -80,10 +80,15 @@ const endpointMap = {
       success: true,
       data: db.credits.history || [],
     }),
-    "/getCreditHistory": () => ({
-      success: true,
-      data: db.credits.history || [],
-    }),
+    "/getCreditHistory": (params, body, query) => {
+      const history = db.credits.history || [];
+      const limit = Math.max(Number(query.limit) || history.length, 0);
+      const offset = Math.max(Number(query.offset) || 0, 0);
+      return {
+        success: true,
+        data: history.slice(offset, offset + limit),
+      };
+    },
     "/credits/achievements": () => ({
       success: true,
       data: db.credits.achievements || [],

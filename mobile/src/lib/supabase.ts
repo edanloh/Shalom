@@ -41,11 +41,10 @@ const ExpoWebSecureStoreAdapter = {
   },
 };
 
-import {
-  SUPABASE_URL as supabaseUrl,
-  SUPABASE_PUBLISHABLE_KEY as supabasePublishableKey,
-  SUPABASE_ANON_KEY as supabaseAnonKey,
-} from 'react-native-dotenv';
+const supabaseUrl =
+  process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
   auth: {

@@ -42,9 +42,18 @@ export async function getCreditBalance(userId?: string): Promise<CreditBalance> 
   return resp?.data ?? resp;
 }
 
-export async function getCreditHistory(userId?: string): Promise<CreditEvent[]> {
+export async function getCreditHistory(
+  userId?: string,
+  options?: { limit?: number; offset?: number }
+): Promise<CreditEvent[]> {
   const uid = userId || DEFAULT_USER_ID;
-  const resp = await apiService.get<any>(ENDPOINTS.HISTORY, { userId: uid });
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+  const resp = await apiService.get<any>(ENDPOINTS.HISTORY, {
+    userId: uid,
+    limit: String(limit),
+    offset: String(offset),
+  });
   return resp?.data ?? resp ?? [];
 }
 

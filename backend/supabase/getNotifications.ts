@@ -28,17 +28,20 @@ serve(async (req) => {
   const url = new URL(req.url);
   const userId = url.searchParams.get("userId");
   const limitRaw = url.searchParams.get("limit");
+  const offsetRaw = url.searchParams.get("offset");
   const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 200);
+  const offset = Math.max(Number(offsetRaw) || 0, 0);
 
   if (!userId) return fail("userId is required", 400);
 
   try {
+    const to = offset + limit - 1;
     const { data, error } = await supabase
       .from("notifications")
       .select("id,user_id,title,message,type,is_read,created_at,action_url")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .range(offset, to);
 
     if (error) throw error;
     return ok({ success: true, data: data ?? [] });

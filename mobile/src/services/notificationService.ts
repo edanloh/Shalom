@@ -93,10 +93,18 @@ export const notificationService = {
     }
   },
 
-  async getNotifications(userId: string, limit = 50): Promise<Notification[]> {
+  async getNotifications(
+    userId: string,
+    limitOrOptions: number | { limit?: number; offset?: number } = 50
+  ): Promise<Notification[]> {
+    const resolved =
+      typeof limitOrOptions === "number"
+        ? { limit: limitOrOptions, offset: 0 }
+        : { limit: limitOrOptions.limit ?? 50, offset: limitOrOptions.offset ?? 0 };
     const resp = await apiService.get<any>(ENDPOINTS.LIST, {
       userId,
-      limit: String(limit),
+      limit: String(resolved.limit),
+      offset: String(resolved.offset),
     });
     const raw = resp?.data ?? resp ?? [];
     return Array.isArray(raw) ? raw.map(toNotification) : [];

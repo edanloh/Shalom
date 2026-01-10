@@ -1,5 +1,14 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  SectionList,
+  RefreshControl,
+} from "react-native";
 import { Colors, Spacing, TextStyles } from "../constants";
 import Screen from "../components/common/Screen";
 import creditService from "../services/creditService";
@@ -12,6 +21,8 @@ type AppPointHistory = {
   thumbnail: string;
   createdAt: string; // ISO date
 };
+
+const PAGE_SIZE = 20;
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const isSameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
@@ -35,6 +46,9 @@ const formatTime = (iso: string) => {
 export default function PointsHistoryScreen({ navigation }: any) {
   const [history, setHistory] = useState<AppPointHistory[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextOffset, setNextOffset] = useState(0);
   const sections = useMemo(() => {
     const today: AppPointHistory[] = [];
     const yesterday: AppPointHistory[] = [];
@@ -71,25 +85,59 @@ export default function PointsHistoryScreen({ navigation }: any) {
 
   const [refreshing, setRefreshing] = useState(false);
 
+  const mapEvents = useCallback((events: CreditEvent[]) => {
+    return events.map((e) => ({
+      id: e.id,
+      pointsTitle: `+${e.points}`,
+      subtitle: e.title,
+      thumbnail: "https://images.unsplash.com/photo-1521791055366-0d553872125f?w=400&h=300&fit=crop",
+      createdAt: e.timestamp,
+    }));
+  }, []);
+
   const loadHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const events: CreditEvent[] = await creditService.getCreditHistory();
-      const mapped: AppPointHistory[] = events.map((e) => ({
-        id: e.id,
-        pointsTitle: `+${e.points}`,
-        subtitle: e.title,
-        thumbnail: "https://images.unsplash.com/photo-1521791055366-0d553872125f?w=400&h=300&fit=crop",
-        createdAt: e.timestamp,
-      }));
+      const events: CreditEvent[] = await creditService.getCreditHistory(undefined, {
+        limit: PAGE_SIZE,
+        offset: 0,
+      });
+      const mapped = mapEvents(events);
       setHistory(mapped);
+      setNextOffset(mapped.length);
+      setHasMore(mapped.length === PAGE_SIZE);
     } catch (err) {
       console.warn("Failed to load credit history", err);
       setHistory([]);
+      setNextOffset(0);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mapEvents]);
+
+  const loadMoreHistory = useCallback(async () => {
+    if (loadingMore || !hasMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const startOffset = nextOffset;
+      const events: CreditEvent[] = await creditService.getCreditHistory(undefined, {
+        limit: PAGE_SIZE,
+        offset: startOffset,
+      });
+      const mapped = mapEvents(events);
+      setHistory((prev) => {
+        const existing = new Set(prev.map((item) => item.id));
+        return [...prev, ...mapped.filter((item) => !existing.has(item.id))];
+      });
+      setNextOffset(startOffset + mapped.length);
+      setHasMore(mapped.length === PAGE_SIZE);
+    } catch (err) {
+      console.warn("Failed to load more credit history", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loading, loadingMore, mapEvents, nextOffset]);
 
   useEffect(() => {
     loadHistory();
@@ -117,40 +165,68 @@ export default function PointsHistoryScreen({ navigation }: any) {
       headerLeftIcon="chevron-back"
       onHeaderLeftPress={() => navigation.goBack()}
       stickyHeader
+      useScrollView={false}
+      disableChildrenWrapper
     >
-      {loading ? (
-        <View style={{ paddingVertical: Spacing.xl, alignItems: "center" }}>
-          <ActivityIndicator size="large" color={Colors.secondary} />
-        </View>
-      ) : null}
-      {sections.map((section, sectionIndex) => (
-        <View key={section.title} style={{ marginBottom: Spacing.lg }}>
-          {/* Section Header */}
-          <Text style={TextStyles.h5}>{section.title}</Text>
-
-          {/* Section Items */}
-          {section.data.map((item, itemIndex) => (
-            <View key={item.id}>
-              <TouchableOpacity activeOpacity={0.8} style={styles.row}>
-                <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
-                <View style={styles.textBlock}>
-                  <Text style={TextStyles.body} numberOfLines={1}>
-                    {item.pointsTitle}
-                  </Text>
-                  <Text style={TextStyles.captionSmall} numberOfLines={1} ellipsizeMode="tail">
-                    {item.subtitle}
-                  </Text>
-                </View>
-                <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
-              </TouchableOpacity>
-              {/* Item Separator */}
-              {itemIndex < section.data.length - 1 && (
-                <View style={{ height: Spacing.md }} />
-              )}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item, index, section }) => (
+          <View>
+            <TouchableOpacity activeOpacity={0.8} style={styles.row}>
+              <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
+              <View style={styles.textBlock}>
+                <Text style={TextStyles.body} numberOfLines={1}>
+                  {item.pointsTitle}
+                </Text>
+                <Text style={TextStyles.captionSmall} numberOfLines={1} ellipsizeMode="tail">
+                  {item.subtitle}
+                </Text>
+              </View>
+              <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
+            </TouchableOpacity>
+            {index < section.data.length - 1 ? (
+              <View style={{ height: Spacing.md }} />
+            ) : null}
+          </View>
+        )}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={TextStyles.h5}>{section.title}</Text>
+          </View>
+        )}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.secondary}
+            colors={[Colors.secondary]}
+          />
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={Colors.secondary} />
             </View>
-          ))}
-        </View>
-      ))}
+          ) : null
+        }
+        ListFooterComponent={
+          hasMore ? (
+            <View style={styles.footer}>
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.footer} />
+          )
+        }
+        onEndReached={loadMoreHistory}
+        onEndReachedThreshold={0.6}
+        stickySectionHeadersEnabled={false}
+      />
     </Screen>
   );
 }
@@ -178,5 +254,24 @@ const styles = StyleSheet.create({
     ...TextStyles.captionSmall,
     color: Colors.textSecondary,
     marginLeft: Spacing.sm,
+  },
+  loadingState: {
+    paddingVertical: Spacing.xl,
+    alignItems: "center",
+  },
+  listContent: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
+  },
+  list: {
+    flex: 1,
+  },
+  sectionHeader: {
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.lg,
+  },
+  footer: {
+    alignItems: "center",
+    paddingVertical: Spacing.md,
   },
 });

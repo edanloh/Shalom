@@ -23,6 +23,7 @@ function handleRegistrationError(errorMessage: string) {
 }
 
 const MAX_IN_APP_NOTIFICATIONS = 200;
+const NOTIFICATION_PAGE_SIZE = 25;
 
 async function registerForPushNotificationsAsync(skipPrompt: boolean = false) {
   // Android: Set up notification channel
@@ -118,6 +119,10 @@ interface NotificationContextType {
   removeTokenFromBackend: () => Promise<void>;
   inAppNotifications: InAppNotification[];
   reloadNotifications: () => Promise<void>;
+  loadMoreNotifications: () => Promise<void>;
+  hasMoreNotifications: boolean;
+  isLoadingNotifications: boolean;
+  isLoadingMoreNotifications: boolean;
   pushInAppNotification: (
     input: Omit<InAppNotification, "id" | "userId" | "createdAt"> &
       Partial<Pick<InAppNotification, "createdAt">>
@@ -135,6 +140,10 @@ const NotificationContext = createContext<NotificationContextType>({
   removeTokenFromBackend: async () => {},
   inAppNotifications: [],
   reloadNotifications: async () => {},
+  loadMoreNotifications: async () => {},
+  hasMoreNotifications: false,
+  isLoadingNotifications: false,
+  isLoadingMoreNotifications: false,
   pushInAppNotification: () => {},
   markNotificationRead: () => {},
   markAllNotificationsRead: async () => {},
@@ -155,6 +164,10 @@ export const NotificationProvider = ({
   const [inAppNotifications, setInAppNotifications] = useState<
     InAppNotification[]
   >([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [isLoadingMoreNotifications, setIsLoadingMoreNotifications] = useState(false);
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
+  const [nextOffset, setNextOffset] = useState(0);
 
   // Register token with backend when user is authenticated and token is available
   useEffect(() => {
@@ -170,22 +183,58 @@ export const NotificationProvider = ({
   const reloadNotifications = async () => {
     if (!user?.id) {
       setInAppNotifications([]);
+      setHasMoreNotifications(false);
+      setNextOffset(0);
       return;
     }
     try {
-      const items = await notificationService.getNotifications(
-        user.id,
-        MAX_IN_APP_NOTIFICATIONS
-      );
+      setIsLoadingNotifications(true);
+      const items = await notificationService.getNotifications(user.id, {
+        limit: NOTIFICATION_PAGE_SIZE,
+        offset: 0,
+      });
       setInAppNotifications(items);
+      setNextOffset(items.length);
+      setHasMoreNotifications(
+        items.length === NOTIFICATION_PAGE_SIZE &&
+          items.length < MAX_IN_APP_NOTIFICATIONS
+      );
     } catch (error) {
       console.warn("Failed to load notifications:", error);
+    } finally {
+      setIsLoadingNotifications(false);
     }
   };
 
   useEffect(() => {
     reloadNotifications();
   }, [user?.id]);
+
+  const loadMoreNotifications = async () => {
+    if (!user?.id || isLoadingMoreNotifications || !hasMoreNotifications) return;
+    try {
+      setIsLoadingMoreNotifications(true);
+      const startOffset = nextOffset;
+      const items = await notificationService.getNotifications(user.id, {
+        limit: NOTIFICATION_PAGE_SIZE,
+        offset: startOffset,
+      });
+      setInAppNotifications((prev) => {
+        const existing = new Set(prev.map((n) => n.id));
+        const merged = [...prev, ...items.filter((n) => !existing.has(n.id))];
+        return merged.slice(0, MAX_IN_APP_NOTIFICATIONS);
+      });
+      setNextOffset(startOffset + items.length);
+      setHasMoreNotifications(
+        items.length === NOTIFICATION_PAGE_SIZE &&
+          startOffset + items.length < MAX_IN_APP_NOTIFICATIONS
+      );
+    } catch (error) {
+      console.warn("Failed to load more notifications:", error);
+    } finally {
+      setIsLoadingMoreNotifications(false);
+    }
+  };
 
   // Register for push notifications
   useEffect(() => {
@@ -369,6 +418,10 @@ export const NotificationProvider = ({
         removeTokenFromBackend,
         inAppNotifications,
         reloadNotifications,
+        loadMoreNotifications,
+        hasMoreNotifications,
+        isLoadingNotifications,
+        isLoadingMoreNotifications,
         pushInAppNotification,
         markNotificationRead,
         markAllNotificationsRead,

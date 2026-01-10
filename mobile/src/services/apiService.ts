@@ -8,11 +8,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse, PaginatedResponse } from '../types';
 
 // API Configuration
+const supabaseUrl =
+  process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
 const API_CONFIG = {
-  BASE_URL: process.env.VITE_SUPABASE_URL 
-    ? `${process.env.VITE_SUPABASE_URL}/functions/v1` 
+  BASE_URL: supabaseUrl 
+    ? `${supabaseUrl}/functions/v1` 
     : 'https://cmtfxsntlfoxgcznanpe.supabase.co/functions/v1',
-  SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_bwjUUwC-IlqND-F2-7t9yg_OWb4angZ',
+  SUPABASE_ANON_KEY: supabaseAnonKey || 'sb_publishable_bwjUUwC-IlqND-F2-7t9yg_OWb4angZ',
   TIMEOUT: 10000, // 10 seconds
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second
