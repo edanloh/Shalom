@@ -122,7 +122,7 @@ interface NotificationContextType {
     input: Omit<InAppNotification, "id" | "userId" | "createdAt"> &
       Partial<Pick<InAppNotification, "createdAt">>
   ) => void;
-  markNotificationRead: (id: string) => void;
+  markNotificationRead: (id: string, userIdOverride?: string) => void;
   markAllNotificationsRead: () => Promise<void>;
   clearNotifications: () => Promise<void>;
   deleteNotification: (id: string) => void;
@@ -311,9 +311,9 @@ export const NotificationProvider = ({
     }
   };
 
-  const markNotificationRead = (id: string) => {
-    if (!user?.id) return;
-    const userId = user.id;
+  const markNotificationRead = (id: string, userIdOverride?: string) => {
+    const userId = userIdOverride || user?.id;
+    if (!userId) return;
     setInAppNotifications((prev) =>
       prev.map((item) => (item.id === id ? { ...item, read: true } : item))
     );

@@ -1,5 +1,14 @@
-import { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Pressable, Animated } from "react-native";
+import { useMemo, useState, useCallback, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Pressable,
+  Animated,
+  Modal,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
 import { useFocusEffect } from "@react-navigation/native";
@@ -30,6 +39,8 @@ export default function NotificationsScreen({ navigation }: any) {
     deleteNotification,
   } = useNotification();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const menuButtonRef = useRef<View>(null);
 
   const sections = useMemo(() => {
     const today: InAppNotification[] = [];
@@ -69,6 +80,7 @@ export default function NotificationsScreen({ navigation }: any) {
   }, [inAppNotifications]);
 
   const [refreshing, setRefreshing] = useState(false);
+
 
   const onRefresh = useCallback(async () => {
     try {
@@ -170,7 +182,7 @@ export default function NotificationsScreen({ navigation }: any) {
           !item.read ? styles.rowUnread : null,
           item.read ? styles.rowRead : null,
         ]}
-        onPress={() => markNotificationRead(item.id)}
+        onPress={() => markNotificationRead(item.id, item.userId)}
       >
         <View style={[styles.iconBadge, { borderColor: icon.color }]}>
           <Ionicons name={icon.name as any} size={22} color={icon.color} />
@@ -201,6 +213,18 @@ export default function NotificationsScreen({ navigation }: any) {
     );
   };
 
+  const onToggleMenu = () => {
+    if (menuOpen) {
+      setMenuOpen(false);
+      return;
+    }
+    menuButtonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+      setMenuPos({ top: y + height + 6, left: x });
+      setMenuOpen(true);
+    });
+  };
+
+
   return (
     <Screen
       title="Notifications"
@@ -210,26 +234,55 @@ export default function NotificationsScreen({ navigation }: any) {
       headerLeftComponent={
         <View style={styles.menuAnchor}>
           <TouchableOpacity
-            onPress={() => setMenuOpen((prev) => !prev)}
+            ref={menuButtonRef}
+            onPress={onToggleMenu}
             style={styles.menuButton}
           >
             <Ionicons name="ellipsis-horizontal" size={20} color={Colors.white} />
           </TouchableOpacity>
-          {menuOpen ? (
+        </View>
+      }
+      headerRightIcon="settings-outline"
+      onHeaderRightPress={() => navigation.navigate("Settings")}
+      stickyHeader
+    >
+      <Modal
+        transparent
+        visible={menuOpen}
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <View style={styles.menuModalRoot}>
+          <Pressable
+            style={styles.menuOverlay}
+            onPress={() => setMenuOpen(false)}
+          />
+          <View style={[styles.menuModalAnchor, menuPos ? { top: menuPos.top, left: menuPos.left } : null]}>
             <View style={styles.menu}>
               <Pressable
                 onPress={onMarkAllRead}
-                style={[styles.menuItem, !hasUnread ? styles.menuItemDisabled : null]}
+                style={[
+                  styles.menuItem,
+                  !hasUnread ? styles.menuItemDisabled : null,
+                ]}
                 disabled={!hasUnread}
               >
-                <Text style={[styles.menuText, !hasUnread ? styles.menuTextDisabled : null]}>
+                <Text
+                  style={[
+                    styles.menuText,
+                    !hasUnread ? styles.menuTextDisabled : null,
+                  ]}
+                >
                   Mark all as read
                 </Text>
               </Pressable>
               <View style={styles.menuDivider} />
               <Pressable
                 onPress={onClearAll}
-                style={[styles.menuItem, !hasNotifications ? styles.menuItemDisabled : null]}
+                style={[
+                  styles.menuItem,
+                  !hasNotifications ? styles.menuItemDisabled : null,
+                ]}
                 disabled={!hasNotifications}
               >
                 <Text
@@ -243,13 +296,9 @@ export default function NotificationsScreen({ navigation }: any) {
                 </Text>
               </Pressable>
             </View>
-          ) : null}
+          </View>
         </View>
-      }
-      headerRightIcon="settings-outline"
-      onHeaderRightPress={() => navigation.navigate("Settings")}
-      stickyHeader
-    >
+      </Modal>
       {sections.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons
@@ -267,21 +316,15 @@ export default function NotificationsScreen({ navigation }: any) {
       ) : null}
       {sections.map((section) => (
         <View key={section.title} style={{ marginBottom: Spacing.lg }}>
-          {/* Section Header */}
           <Text style={TextStyles.h5}>{section.title}</Text>
-
-          {/* Section Items */}
           {section.data.map((item, itemIndex) => (
             <View key={item.id}>
               {renderRow(item)}
-              {/* Item Separator */}
-              {itemIndex < section.data.length - 1 && (
-                <View style={{ height: 0 }} />
-              )}
+              {itemIndex < section.data.length - 1 ? <View style={{ height: 0 }} /> : null}
             </View>
           ))}
         </View>
-      ))}      
+      ))}
       <View style={{ height: 120 }} />
     </Screen>
   );
@@ -372,9 +415,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
   },
   menu: {
-    position: "absolute",
-    top: 30,
-    left: 0,
     minWidth: 170,
     backgroundColor: "rgba(20, 20, 24, 0.95)",
     borderRadius: 12,
@@ -409,5 +449,17 @@ const styles = StyleSheet.create({
   menuDivider: {
     height: 1,
     backgroundColor: "rgba(255, 255, 255, 0.08)",
+  },
+  menuModalRoot: {
+    flex: 1,
+  },
+  menuOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "transparent",
+  },
+  menuModalAnchor: {
+    position: "absolute",
+    top: 56,
+    left: Spacing.lg,
   },
 });

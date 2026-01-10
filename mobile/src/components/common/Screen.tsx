@@ -35,6 +35,7 @@ interface ScreenProps {
   stickyHeader?: boolean;
   stickyHeaderIndices?: number[];
   disableChildrenWrapper?: boolean;
+  useScrollView?: boolean;
 }
 
 export default function Screen({
@@ -58,6 +59,7 @@ export default function Screen({
   stickyHeader = false,
   stickyHeaderIndices,
   disableChildrenWrapper = false,
+  useScrollView = true,
 }: ScreenProps) {
   const lastScrollY = useRef(0);
   const tabHidden = useRef(false);
@@ -97,49 +99,62 @@ export default function Screen({
         style={{ flex: 1 }}
       >
         {/* Content */}
-        <ScrollView
-          contentContainerStyle={[styles.fullScrollContent, customScreenStyle]}
-          nestedScrollEnabled={true}
-          stickyHeaderIndices={resolvedStickyHeaders}
-          refreshControl={
-            onRefresh ? (
-              <RefreshControl
-                refreshing={refreshing || false}
-                onRefresh={onRefresh}
-                tintColor={Colors.secondary}
-                colors={[Colors.secondary]}
-              />
-            ) : undefined
-          }
-          alwaysBounceVertical={true}
-          overScrollMode="always"
-          scrollEnabled={scrollEnabled}
-          scrollEventThrottle={16}
-          onScroll={(e) => {
-            const y = e.nativeEvent.contentOffset.y;
-            const dy = y - lastScrollY.current;
-            if (Math.abs(dy) < 8) return;
-
-            if (dy > 0 && y > 40 && !tabHidden.current) {
-              tabHidden.current = true;
-              DeviceEventEmitter.emit("tabbar:toggle", { visible: false });
-            } else if (dy < 0 && tabHidden.current) {
-              tabHidden.current = false;
-              DeviceEventEmitter.emit("tabbar:toggle", { visible: true });
+        {useScrollView ? (
+          <ScrollView
+            contentContainerStyle={[styles.fullScrollContent, customScreenStyle]}
+            nestedScrollEnabled={true}
+            stickyHeaderIndices={resolvedStickyHeaders}
+            refreshControl={
+              onRefresh ? (
+                <RefreshControl
+                  refreshing={refreshing || false}
+                  onRefresh={onRefresh}
+                  tintColor={Colors.secondary}
+                  colors={[Colors.secondary]}
+                />
+              ) : undefined
             }
+            alwaysBounceVertical={true}
+            overScrollMode="always"
+            scrollEnabled={scrollEnabled}
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              const y = e.nativeEvent.contentOffset.y;
+              const dy = y - lastScrollY.current;
+              if (Math.abs(dy) < 8) return;
 
-            lastScrollY.current = y;
-          }}
-        >
-          {headerElement}
-          {disableChildrenWrapper ? (
-            children
-          ) : (
-            <View style={widescreen ? styles.fullScrollContent : styles.scrollContent}>
-              {children}
-            </View>
-          )}
-        </ScrollView>
+              if (dy > 0 && y > 40 && !tabHidden.current) {
+                tabHidden.current = true;
+                DeviceEventEmitter.emit("tabbar:toggle", { visible: false });
+              } else if (dy < 0 && tabHidden.current) {
+                tabHidden.current = false;
+                DeviceEventEmitter.emit("tabbar:toggle", { visible: true });
+              }
+
+              lastScrollY.current = y;
+            }}
+          >
+            {headerElement}
+            {disableChildrenWrapper ? (
+              children
+            ) : (
+              <View style={widescreen ? styles.fullScrollContent : styles.scrollContent}>
+                {children}
+              </View>
+            )}
+          </ScrollView>
+        ) : (
+          <View style={{ flex: 1 }}>
+            {headerElement}
+            {disableChildrenWrapper ? (
+              children
+            ) : (
+              <View style={widescreen ? styles.fullScrollContent : styles.scrollContent}>
+                {children}
+              </View>
+            )}
+          </View>
+        )}
         <ToastHost />
       </KeyboardAvoidingView>
     </SafeAreaView>
