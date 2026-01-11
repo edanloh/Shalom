@@ -6,7 +6,6 @@ import {
   StatusBar,
   TouchableOpacity,
   Text,
-  RefreshControl,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -360,151 +359,151 @@ export default function HomeScreen({ navigation, route }: any) {
         onNotificationPress={handleNotificationPress}
       />
 
-      {/* Achievement Cards - Day Streak and Certificates */}
-      <ProgressSection
-        achievements={achievements}
-        current={goalProgress.current}
-        target={goalProgress.target || 10}
-        unit={goalProgress.unit}
-        label={goalProgress.label}
-        navigation={navigation}
-      />        
+          {/* Achievement Cards - Day Streak and Certificates */}
+          <ProgressSection
+            achievements={achievements}
+            current={goalProgress.current}
+            target={goalProgress.target || 10}
+            unit={goalProgress.unit}
+            label={goalProgress.label}
+            navigation={navigation}
+          />        
 
-      {/* My Courses Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[TextStyles.h4]}>
-            My Courses
-          </Text>
-          <TouchableOpacity onPress={handleViewAllCourses}>
-            <Text style={styles.viewAllText}>View All</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {myCoursesLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.purple400} />
-            <Text style={styles.loadingText}>Loading your courses...</Text>
-          </View>
-        ) : myCoursesError ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{myCoursesError}</Text>
-            <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
-              <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (myCoursesData?.length ?? 0) === 0 ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>You haven't enrolled in any courses yet.</Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Courses')}
-              style={styles.retryButton}
-            >
-              <Text style={styles.retryText}>Browse courses</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-          {/* <SwipeableCourseCards 
-            courses={myCoursesData}
-            onCourseComplete={handleCourseComplete}
-            onCourseLike={handleCourseLike}
-            onToggleWishlist={toggleWishlist}
-            isWishlisted={(id) => isWishlisted?.(id) ?? false}
-          /> */}
-          <CourseCarousel
-            courses={getTop10Courses(myCoursesData)}
-            // onCourseLike={(courseId: string) => {console.log("Liked" + courseId)}}
-            onToggleWishlist={toggleWishlist}
-            isWishlisted={(id) => isWishlisted?.(id) ?? false}
-          />
-          </>
-        )}
-      </View>
-
-      {/* Wishlist Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[TextStyles.h4]}>
-            Wishlist
-          </Text>
-          <TouchableOpacity onPress={handleViewWishlist}>
-            <Text style={styles.viewAllText}>View All</Text>
-          </TouchableOpacity>
-        </View>
-
-        {wishlistLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.purple400} />
-            <Text style={styles.loadingText}>Loading wishlist...</Text>
-          </View>
-        ) : wishlistError ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{wishlistError}</Text>
-            <TouchableOpacity onPress={refreshWishlist} style={styles.retryButton}>
-              <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : wishlist.length === 0 ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>You haven't added any courses into your wishlist yet.</Text>
-          </View>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
-          >
-            {wishlist.map((course) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-                variant="compact"
-                showInstructor={false}
-                onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
+          {/* My Courses Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[TextStyles.h4]}>
+                My Courses
+              </Text>
+              <TouchableOpacity onPress={handleViewAllCourses}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {myCoursesLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.purple400} />
+                <Text style={styles.loadingText}>Loading your courses...</Text>
+              </View>
+            ) : myCoursesError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{myCoursesError}</Text>
+                <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (myCoursesData?.length ?? 0) === 0 ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>You haven't enrolled in any courses yet.</Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Courses')}
+                  style={styles.retryButton}
+                >
+                  <Text style={styles.retryText}>Browse courses</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+              {/* <SwipeableCourseCards 
+                courses={myCoursesData}
+                onCourseComplete={handleCourseComplete}
+                onCourseLike={handleCourseLike}
+                onToggleWishlist={toggleWishlist}
+                isWishlisted={(id) => isWishlisted?.(id) ?? false}
+              /> */}
+              <CourseCarousel
+                courses={getTop10Courses(myCoursesData)}
+                // onCourseLike={(courseId: string) => {console.log("Liked" + courseId)}}
+                onToggleWishlist={toggleWishlist}
+                isWishlisted={(id) => isWishlisted?.(id) ?? false}
               />
-            ))}
-          </ScrollView>
-        )}
-      </View>
-
-      {/* Suggested Courses Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[TextStyles.h4]}>
-            Recommended for You
-          </Text>
-        </View>
-
-        {recommendedListLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.purple400} />
-            <Text style={styles.loadingText}>Loading suggestions...</Text>
+            </>
+            )}
           </View>
-        ) : recommendedError || coursesError ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{recommendedError || coursesError}</Text>
-            <TouchableOpacity onPress={refreshRecommended} style={styles.retryButton}>
-              <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
+
+          {/* Wishlist Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[TextStyles.h4]}>
+                Wishlist
+              </Text>
+              <TouchableOpacity onPress={handleViewWishlist}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+
+            {wishlistLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.purple400} />
+                <Text style={styles.loadingText}>Loading wishlist...</Text>
+              </View>
+            ) : wishlistError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{wishlistError}</Text>
+                <TouchableOpacity onPress={refreshWishlist} style={styles.retryButton}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : wishlist.length === 0 ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>You haven't added any courses into your wishlist yet.</Text>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
+              >
+                {wishlist.map((course) => (
+                  <CourseCard
+                    key={course.id}
+                    course={course}
+                    variant="compact"
+                    showInstructor={false}
+                    onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
+                  />
+                ))}
+              </ScrollView>
+            )}
           </View>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
-          >
-            {recommendedList.map((course) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-                variant="compact"
-                showInstructor={false}
-                onPress={(c) => handleRecommendationClick(c)}
-              />
-            ))}
-          </ScrollView>
-        )}
+
+          {/* Suggested Courses Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[TextStyles.h4]}>
+                Recommended for You
+              </Text>
+            </View>
+
+            {recommendedListLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.purple400} />
+                <Text style={styles.loadingText}>Loading suggestions...</Text>
+              </View>
+            ) : recommendedError || coursesError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{recommendedError || coursesError}</Text>
+                <TouchableOpacity onPress={refreshRecommended} style={styles.retryButton}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
+              >
+                {recommendedList.map((course) => (
+                  <CourseCard
+                    key={course.id}
+                    course={course}
+                    variant="compact"
+                    showInstructor={false}
+                    onPress={(c) => handleRecommendationClick(c)}
+                  />
+                ))}
+              </ScrollView>
+            )}
         </View>
         <View style={{ height: 130 }} />
 

@@ -65,8 +65,8 @@ export interface UpdateVideoProgressResponse {
     courseProgress: {
       progress_percentage: string;
       is_completed: boolean;
-      completed_videos: number;
-      total_videos: number;
+      completed_items: number;
+      total_items: number;
     };
   };
 }
@@ -167,8 +167,8 @@ class VideoService {
         courseProgress: {
           progress_percentage: '0',
           is_completed: false,
-          completed_videos: 0,
-          total_videos: 0,
+          completed_items: 0,
+          total_items: 0,
         },
       };
     }

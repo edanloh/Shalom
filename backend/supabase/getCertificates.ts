@@ -33,7 +33,7 @@ serve(async (req) => {
     const to = offset + limit - 1;
     const { data, error } = await supabase
       .from("certificates")
-      .select("id, user_id, course_id, learning_path_id, certificate_type, certificate_number, issued_at, issuer_name, credential_url, metadata")
+      .select("id, user_id, course_id, learning_path_id, certificate_type, certificate_number, issued_at, issuer_name, credential_url, metadata, courses(title)")
       .eq("user_id", userId)
       .order("issued_at", { ascending: false })
       .range(offset, to);
@@ -42,7 +42,12 @@ serve(async (req) => {
 
     const payload = (data || []).map((c) => ({
       id: c.id,
-      name: c.certificate_type || c.certificate_number || "Certificate",
+      name:
+        (c.metadata as any)?.course_title ||
+        (c as any)?.courses?.title ||
+        c.certificate_type ||
+        c.certificate_number ||
+        "Certificate",
       requiredPoints: (c.metadata as any)?.required_points ?? 0,
       earnedPoints: (c.metadata as any)?.earned_points ?? 0,
       requiredCourses: (c.metadata as any)?.required_courses ?? 0,

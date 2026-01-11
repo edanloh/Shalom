@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   SectionList,
   RefreshControl,
+  DeviceEventEmitter,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
@@ -48,6 +49,8 @@ export default function NotificationsScreen({ navigation }: any) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const menuButtonRef = useRef<View>(null);
+  const lastScrollY = useRef(0);
+  const tabHidden = useRef(false);
 
   const sections = useMemo(() => {
     const today: InAppNotification[] = [];
@@ -191,6 +194,7 @@ export default function NotificationsScreen({ navigation }: any) {
         ]}
         onPress={() => markNotificationRead(item.id, item.userId)}
       >
+        {!item.read ? <View style={styles.unreadAccent} /> : null}
         <View style={[styles.iconBadge, { borderColor: icon.color }]}>
           <Ionicons name={icon.name as any} size={22} color={icon.color} />
         </View>
@@ -362,6 +366,20 @@ export default function NotificationsScreen({ navigation }: any) {
         onEndReached={loadMoreNotifications}
         onEndReachedThreshold={0.6}
         stickySectionHeadersEnabled={false}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          const y = e.nativeEvent.contentOffset.y;
+          const dy = y - lastScrollY.current;
+          if (Math.abs(dy) < 8) return;
+          if (dy > 0 && y > 40 && !tabHidden.current) {
+            tabHidden.current = true;
+            DeviceEventEmitter.emit("tabbar:toggle", { visible: false });
+          } else if (dy < 0 && tabHidden.current) {
+            tabHidden.current = false;
+            DeviceEventEmitter.emit("tabbar:toggle", { visible: true });
+          }
+          lastScrollY.current = y;
+        }}
       />
     </Screen>
   );
@@ -378,6 +396,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
     alignSelf: "stretch",
+    position: "relative",
   },
   rowUnread: {
     backgroundColor: Colors.cardDark,
@@ -418,6 +437,16 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: Colors.notificationRed,
     marginLeft: Spacing.sm,
+  },
+  unreadAccent: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 6,
+    backgroundColor: Colors.purple400,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
   },
   swipeDelete: {
     backgroundColor: Colors.notificationRed,

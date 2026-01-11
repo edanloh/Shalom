@@ -24,6 +24,29 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
 };
 
+async function notifyCourseCompletion(userId: string, courseId: string) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/completeCourse`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({ userId, courseId }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('completeCourse failed:', res.status, text);
+    }
+  } catch (error) {
+    console.error('Failed to notify course completion:', error);
+  }
+}
+
 /**
  * Check and update module (section) completion status
  * A module is completed when ALL videos are watched and ALL quizzes are passed
@@ -194,9 +217,14 @@ serve(async (req) => {
     // ========================================
     // 3. Update course enrollment progress
     // ========================================
-    // Get total videos
+    // Get total videos + quizzes
     const { data: allVideos } = await supabaseClient
       .from('course_videos')
+      .select('id')
+      .eq('course_id', course_id);
+
+    const { data: allQuizzes } = await supabaseClient
+      .from('course_quizzes')
       .select('id')
       .eq('course_id', course_id);
 
@@ -208,15 +236,25 @@ serve(async (req) => {
       .eq('is_completed', true)
       .in('video_id', (allVideos || []).map((v: any) => v.id));
 
-    const total_videos = allVideos?.length || 0;
-    const completed_videos_count = completedVideos?.length || 0;
+    // Get passed quizzes
+    const { data: passedQuizzes } = await supabaseClient
+      .from('quiz_attempts')
+      .select('quiz_id')
+      .eq('user_id', userId)
+      .eq('is_passed', true)
+      .in('quiz_id', (allQuizzes || []).map((q: any) => q.id));
+
+    const totalItems = (allVideos?.length || 0) + (allQuizzes?.length || 0);
+    const completedItems =
+      (completedVideos?.length || 0) +
+      (new Set(passedQuizzes?.map((q: any) => q.quiz_id)).size || 0);
 
     // Calculate progress percentage
-    const progressPercentage = total_videos > 0 
-      ? (completed_videos_count / total_videos) * 100 
+    const progressPercentage = totalItems > 0
+      ? (completedItems / totalItems) * 100
       : 0;
 
-    const isEnrollmentCompleted = progressPercentage >= 100;
+    const isEnrollmentCompleted = totalItems > 0 && progressPercentage >= 100;
 
     // Update enrollment
     const { data: enrollment, error: enrollmentError } = await supabaseClient
@@ -235,6 +273,8 @@ serve(async (req) => {
 
     if (enrollmentError) {
       console.error('Enrollment update error:', enrollmentError);
+    } else if (isEnrollmentCompleted) {
+      await notifyCourseCompletion(userId, course_id);
     }
 
     // ========================================
@@ -264,8 +304,8 @@ serve(async (req) => {
           courseProgress: {
             progress_percentage: progressPercentage.toFixed(2),
             is_completed: isEnrollmentCompleted,
-            completed_videos: completed_videos_count,
-            total_videos: total_videos
+            completed_items: completedItems,
+            total_items: totalItems
           },
           moduleProgress: moduleCompletionStatus ? {
             section_id: section_id,

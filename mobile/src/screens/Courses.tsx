@@ -1,12 +1,15 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
+  ScrollView,
   FlatList,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
   ActivityIndicator,
+  RefreshControl,
+  DeviceEventEmitter,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -18,6 +21,7 @@ import { ImageWithFallback } from "@components/common";
 import { Images } from "../../assets";
 import Screen from "../components/common/Screen";
 import { CustomTextInput } from "@/components";
+import screenStyles from "@/styles/styles";
 const { width } = Dimensions.get("window");
 
 const CARD_BG = "#3A3A45";
@@ -140,6 +144,8 @@ export default function CoursesScreen({ navigation }: any) {
   };
 
   const [refreshing, setRefreshing] = useState(false);
+  const lastScrollY = useRef(0);
+  const tabHidden = useRef(false);
 
   const onRefresh = useCallback(async () => {
     if (!refreshCourses) return;
@@ -279,129 +285,153 @@ export default function CoursesScreen({ navigation }: any) {
   return (
     <Screen
       title="Browse Courses"
-      refreshing={refreshing}
-      onRefresh={onRefresh}
       customEdges={["top"]}
-      stickyHeader
-      stickyHeaderIndices={[0, 1]}
       disableChildrenWrapper
+      useScrollView={false}
     >
-      <View style={styles.stickyControls}>
-        {/* Search */}
-        <CustomTextInput
-          placeholder="Search for courses"
-          value={query}
-          onChangeText={setQuery}
-          autoCapitalize={"none"}
-          leftIconName="search"
-          returnKeyType="search"
-        />
+      <ScrollView
+        contentContainerStyle={screenStyles.fullScrollContent}
+        stickyHeaderIndices={[0]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.secondary}
+            colors={[Colors.secondary]}
+          />
+        }
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          const y = e.nativeEvent.contentOffset.y;
+          const dy = y - lastScrollY.current;
+          if (Math.abs(dy) < 8) return;
+          if (dy > 0 && y > 40 && !tabHidden.current) {
+            tabHidden.current = true;
+            DeviceEventEmitter.emit("tabbar:toggle", { visible: false });
+          } else if (dy < 0 && tabHidden.current) {
+            tabHidden.current = false;
+            DeviceEventEmitter.emit("tabbar:toggle", { visible: true });
+          }
+          lastScrollY.current = y;
+        }}
+      >
+        <View style={styles.stickyControls}>
+          {/* Search */}
+          <CustomTextInput
+            placeholder="Search for courses"
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize={"none"}
+            leftIconName="search"
+            returnKeyType="search"
+          />
 
-        {/* Tag chips (from course.tags, no duplicates) */}
-        <FlatList
-          data={tagChips}
-          keyExtractor={(t) => t}
-          renderItem={({ item }) => {
-            const active = item === selectedTag;
-            return (
-              <TouchableOpacity
-                onPress={() => setSelectedTag(item)}
-                activeOpacity={0.8}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text
-                  style={[styles.chipText, active && styles.chipTextActive]}
+          {/* Tag chips (from course.tags, no duplicates) */}
+          <FlatList
+            data={tagChips}
+            keyExtractor={(t) => t}
+            renderItem={({ item }) => {
+              const active = item === selectedTag;
+              return (
+                <TouchableOpacity
+                  onPress={() => setSelectedTag(item)}
+                  activeOpacity={0.8}
+                  style={[styles.chip, active && styles.chipActive]}
                 >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsRow}
-          style={styles.chipsList}
-        />
-      </View>
+                  <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+            style={styles.chipsList}
+          />
+        </View>
 
-      <View style={styles.contentWrap}>
-        {/* Jump Back In */}
-        {jumpBackIn.length > 0 && (
-          <>
-            <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>Jump Back In</Text>
-            <FlatList<Course>
-              data={jumpBackIn}
-              keyExtractor={(i) => i.id}
-              renderItem={({ item }) => <HCard item={item} withProgress />}
-              horizontal
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.hRow}
-              extraData={wishlist}
-            />
-          </>
-        )}
-
-        {/* Recommended (not enrolled) */}
-        {!query && (
-          <>
-            <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
-              Recommended
-            </Text>
-
-            {loading || refreshing ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.purple400} />
-                <Text style={styles.loadingText}>Loading recommended…</Text>
-              </View>
-            ) : recommended.length ? (
+        <View style={styles.contentWrap}>
+          {/* Jump Back In */}
+          {jumpBackIn.length > 0 && (
+            <>
+              <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>Jump Back In</Text>
               <FlatList<Course>
-                data={recommended}
+                data={jumpBackIn}
                 keyExtractor={(i) => i.id}
-                renderItem={({ item }) => <HCard item={item} />}
+                renderItem={({ item }) => <HCard item={item} withProgress />}
                 horizontal
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.hRow}
-                style={styles.hList}
                 extraData={wishlist}
               />
-            ) : (
-              <EmptyState
-                icon="sparkles-outline"
-                message="No recommendations right now."
-                subtext="Pull down to refresh."
-              />
-            )}
-          </>
-        )}
+            </>
+          )}
 
-        {/* Popular Courses (clean grid, not enrolled, tag + query filtered) */}
-        <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
-          Popular Courses
-        </Text>
-        {loading || refreshing ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.purple400} />
-            <Text style={styles.loadingText}>Loading popular courses…</Text>
-          </View>
-        ) : popular.length ? (
-          <FlatList<Course>
-            data={popular}
-            keyExtractor={(i) => i.id}
-            renderItem={({ item }) => <GCard item={item} />}
-            numColumns={2}
-            columnWrapperStyle={{ justifyContent: "space-between" }}
-            scrollEnabled={false}
-            extraData={wishlist}
-          />
-        ) : (
-          <EmptyState
-            icon="search-outline"
-            message="No courses match your filters"
-            subtext="Pull down to refresh."
-          />
-        )}
-        <View style={{ height: 120 }} />
-      </View>
+          {/* Recommended (not enrolled) */}
+          {!query && (
+            <>
+              <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
+                Recommended
+              </Text>
+
+              {loading || refreshing ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={Colors.purple400} />
+                  <Text style={styles.loadingText}>Loading recommended…</Text>
+                </View>
+              ) : recommended.length ? (
+                <FlatList<Course>
+                  data={recommended}
+                  keyExtractor={(i) => i.id}
+                  renderItem={({ item }) => <HCard item={item} />}
+                  horizontal
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.hRow}
+                  style={styles.hList}
+                  extraData={wishlist}
+                />
+              ) : (
+                <EmptyState
+                  icon="sparkles-outline"
+                  message="No recommendations right now."
+                  subtext="Pull down to refresh."
+                />
+              )}
+            </>
+          )}
+
+          {/* Popular Courses (clean grid, not enrolled, tag + query filtered) */}
+          <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
+            Popular Courses
+          </Text>
+          {loading || refreshing ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.purple400} />
+              <Text style={styles.loadingText}>Loading popular courses…</Text>
+            </View>
+          ) : popular.length ? (
+            <FlatList<Course>
+              data={popular}
+              keyExtractor={(i) => i.id}
+              renderItem={({ item }) => <GCard item={item} />}
+              numColumns={2}
+              columnWrapperStyle={{ justifyContent: "space-between" }}
+              scrollEnabled={false}
+              extraData={wishlist}
+            />
+          ) : (
+            <EmptyState
+              icon="search-outline"
+              message="No courses match your filters"
+              subtext="Pull down to refresh."
+            />
+          )}
+          <View style={{ height: 120 }} />
+        </View>
+      </ScrollView>
     </Screen>
   );
 }

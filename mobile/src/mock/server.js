@@ -261,8 +261,8 @@ const endpointMap = {
         courseProgress: {
           progress_percentage: "75",
           is_completed: false,
-          completed_videos: 18,
-          total_videos: 24,
+          completed_items: 18,
+          total_items: 24,
         },
       },
     }),

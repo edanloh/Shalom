@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  Alert,
+  Platform,
 } from "react-native";
 import { Spacing, TextStyles, Colors, BorderRadius } from "../constants";
 import Screen from "../components/common/Screen";
@@ -17,6 +19,8 @@ import CustomModal from "../components/common/CustomModal";
 import creditService from "../services/creditService";
 import { CertificateProgress } from "../types";
 import { useAuth } from "../contexts/AuthContext";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 
 type Certificate = {
   id: string;
@@ -38,6 +42,37 @@ const formatDate = (dateString: string) => {
     year: "numeric",
   }).format(date);
 };
+
+const buildCertificateHtml = (cert: Certificate) => `
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Certificate</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; padding: 40px; color: #0f172a; }
+      .card { border: 2px solid #e2e8f0; border-radius: 16px; padding: 32px; }
+      .title { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
+      .subtitle { font-size: 16px; color: #475569; margin-bottom: 24px; }
+      .name { font-size: 22px; font-weight: 600; margin: 12px 0 24px; }
+      .row { margin: 8px 0; font-size: 14px; }
+      .label { color: #64748b; display: inline-block; width: 120px; }
+      .footer { margin-top: 32px; font-size: 12px; color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="title">Certificate of Completion</div>
+      <div class="subtitle">This certifies that the learner has completed</div>
+      <div class="name">${cert.courseName}</div>
+      <div class="row"><span class="label">Instructor</span>${cert.instructor || "Shalom"}</div>
+      <div class="row"><span class="label">Completed</span>${formatDate(cert.completedAt)}</div>
+      <div class="row"><span class="label">Credential ID</span>${cert.credentialId}</div>
+      <div class="footer">Issued by Shalom Learning Platform</div>
+    </div>
+  </body>
+</html>
+`;
 
 export default function CertificatesScreen({ navigation }: any) {
   const { user } = useAuth();
@@ -163,6 +198,39 @@ export default function CertificatesScreen({ navigation }: any) {
       setLoadingMore(false);
     }
   }, [hasMore, loading, loadingMore, mapFromProgress, nextOffset, user?.id]);
+
+  const generateCertificatePdf = useCallback(async (cert: Certificate) => {
+    if (Platform.OS === "web") {
+      Alert.alert("Not supported", "Certificate download isn't supported on web.");
+      return null;
+    }
+    const html = buildCertificateHtml(cert);
+    const { uri } = await Print.printToFileAsync({ html });
+    return uri;
+  }, []);
+
+  const handleShare = useCallback(async () => {
+    if (!selectedCert) return;
+    try {
+      const uri = await generateCertificatePdf(selectedCert);
+      if (!uri) return;
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("Sharing unavailable", "Sharing is not available on this device.");
+        return;
+      }
+      await Sharing.shareAsync(uri, {
+        UTI: "com.adobe.pdf",
+        mimeType: "application/pdf",
+        dialogTitle: "Share certificate",
+      });
+    } catch (error) {
+      console.warn("Failed to share certificate:", error);
+      Alert.alert("Error", "Unable to share certificate.");
+    }
+  }, [generateCertificatePdf, selectedCert]);
+
+  const handleDownload = undefined;
 
   return (
     <Screen
@@ -406,17 +474,8 @@ export default function CertificatesScreen({ navigation }: any) {
         {/* Action Buttons */}
         <View style={styles.modalActions}>
           <ActionButton
-            text="Share"
-            onPress={() => {}}
-            style={{
-              borderColor: Colors.textSecondary,
-              borderWidth: 0.5,
-              borderRadius: BorderRadius.md,
-            }}
-          />
-          <ActionButton
-            text="Download"
-            onPress={() => {}}
+            text="Share Certificate"
+            onPress={handleShare}
             style={{
               borderColor: Colors.textSecondary,
               borderWidth: 0.5,

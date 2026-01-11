@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
   ScrollView,
@@ -7,6 +7,8 @@ import {
   Pressable,
   Text,
   Image,
+  RefreshControl,
+  DeviceEventEmitter,
 } from "react-native";
 import { Colors, Spacing, TextStyles } from "../constants";
 import { Ionicons } from "@expo/vector-icons";
@@ -41,6 +43,8 @@ export default function ProfileScreen({ navigation }: any) {
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const lastScrollY = useRef(0);
+  const tabHidden = useRef(false);
 
   // Safe fallbacks so the UI renders even if some fields are missing
   const displayName = user?.name ?? "User";
@@ -175,48 +179,70 @@ export default function ProfileScreen({ navigation }: any) {
       headerRightIcon="settings-outline"
       onHeaderRightPress={() => navigation.navigate("Settings")}
       customEdges={["top"]}
-      refreshing={refreshing}
-      onRefresh={handleRefresh}
-      stickyHeader
+      useScrollView={false}
+      disableChildrenWrapper
     >
       <ScrollView
         contentContainerStyle={[externalStyles.fullScrollContent]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Colors.secondary}
+            colors={[Colors.secondary]}
+          />
+        }
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          const y = e.nativeEvent.contentOffset.y;
+          const dy = y - lastScrollY.current;
+          if (Math.abs(dy) < 8) return;
+          if (dy > 0 && y > 40 && !tabHidden.current) {
+            tabHidden.current = true;
+            DeviceEventEmitter.emit("tabbar:toggle", { visible: false });
+          } else if (dy < 0 && tabHidden.current) {
+            tabHidden.current = false;
+            DeviceEventEmitter.emit("tabbar:toggle", { visible: true });
+          }
+          lastScrollY.current = y;
+        }}
       >
-        {/* Avatar & name */}
-        <View style={[externalStyles.header, { marginBottom: 16 }]}>
-          <View style={[externalStyles.logo, { marginBottom: 16 }]}>
-            <ImageWithFallback
-              source={avatarSrc}
-              fallback={Images.profile}
-              style={externalStyles.avatar}
-            />
-          </View>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text style={[TextStyles.h3, { marginBottom: Spacing.xs }]}>
-            {displayName}
-          </Text>
-            {user?.auth_provider && user?.auth_provider == "google" && (
-              <Image
-                source={require("@assets/google.png")}
-                style={{
-                  width: 24,
-                  height: 24,
-                  resizeMode: "contain",
-                  marginLeft: 12,
-                  marginBottom: 8,
-                }}
+        <View style={externalStyles.scrollContent}>
+          {/* Avatar & name */}
+          <View style={[externalStyles.header, { marginBottom: 16 }]}>
+            <View style={[externalStyles.logo, { marginBottom: 16 }]}>
+              <ImageWithFallback
+                source={avatarSrc}
+                fallback={Images.profile}
+                style={externalStyles.avatar}
               />
-            )}
-        </View>
-          <Text style={TextStyles.bodyMedium}>{balance} points</Text>
-        </View>
+            </View>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={[TextStyles.h3, { marginBottom: Spacing.xs }]}>
+                {displayName}
+              </Text>
+              {user?.auth_provider && user?.auth_provider == "google" && (
+                <Image
+                  source={require("@assets/google.png")}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    resizeMode: "contain",
+                    marginLeft: 12,
+                    marginBottom: 8,
+                  }}
+                />
+              )}
+            </View>
+            <Text style={TextStyles.bodyMedium}>{balance} points</Text>
+          </View>
 
         {/* Quick actions (visual-only) */}
         <View style={styles.quickRow}>
@@ -324,6 +350,7 @@ export default function ProfileScreen({ navigation }: any) {
         {/* Logout (active) */}
         <ActionButton text="Log Out" onPress={logout} />
         <View style={{ height: 120 }} />
+        </View>
       </ScrollView>
 
       {/* Achievement Detail Modal */}
@@ -448,13 +475,14 @@ const styles = StyleSheet.create({
   achievementsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
+    columnGap: Spacing.sm,
     rowGap: 18,
     marginBottom: Spacing.md,
     marginTop: 8,
   },
   achievementItem: {
-    width: "30.5%", // 3 per row
+    width: "30%", // 3 per row
     alignItems: "center",
   },
   achievementIcon: {

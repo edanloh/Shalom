@@ -24,6 +24,36 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
 };
 
+type QuizQuestion = {
+  id: string;
+  question: string;
+  correct_answer: string;
+  points: number | null;
+};
+
+async function notifyCourseCompletion(userId: string, courseId: string) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/completeCourse`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({ userId, courseId }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('completeCourse failed:', res.status, text);
+    }
+  } catch (error) {
+    console.error('Failed to notify course completion:', error);
+  }
+}
+
 /**
  * Check and update module (section) completion status
  * A module is completed when ALL videos are watched and ALL quizzes are passed
@@ -173,7 +203,7 @@ serve(async (req) => {
     if (questionsError) throw questionsError;
 
     const questionsMap = new Map(
-      (questions || []).map((row: any) => [row.id, row])
+      (questions as QuizQuestion[] | null || []).map((row) => [row.id, row])
     );
 
     // ========================================
@@ -275,7 +305,7 @@ serve(async (req) => {
       const isEnrollmentCompleted = progressPercentage >= 100;
 
       // Update enrollment
-      await supabaseClient
+      const { error: enrollmentError } = await supabaseClient
         .from('course_enrollments')
         .update({
           progress_percentage: progressPercentage.toFixed(2),
@@ -285,6 +315,10 @@ serve(async (req) => {
         })
         .eq('user_id', userId)
         .eq('course_id', quiz.course_id);
+
+      if (!enrollmentError && isEnrollmentCompleted) {
+        await notifyCourseCompletion(userId, quiz.course_id);
+      }
     }
 
     // ========================================
