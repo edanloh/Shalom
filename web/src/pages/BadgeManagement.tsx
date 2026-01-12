@@ -1,15 +1,40 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Award, Edit, Trash2, Search, Star, Trophy, Medal, Target } from "lucide-react";
+import { Plus, Award, Trash2, Search, Star, Trophy, Medal, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Pagination } from "@/components/Pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  AchievementRecord,
+  createAchievement,
+  deleteAchievement,
+  listAchievements,
+  updateAchievement,
+  uploadAchievementIcon,
+} from "@/services/achievementService";
 
 interface BadgeItem {
   id: string;
@@ -20,6 +45,8 @@ interface BadgeItem {
   points: number;
   active: boolean;
   earnedBy: number;
+  type?: string;
+  color?: string | null;
 }
 
 const BadgeManagement = () => {
@@ -28,55 +55,18 @@ const BadgeManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newBadgeName, setNewBadgeName] = useState("");
   const [newBadgeDescription, setNewBadgeDescription] = useState("");
-  const [newBadgeCriteria, setNewBadgeCriteria] = useState("");
+  const [newBadgeCriteriaType, setNewBadgeCriteriaType] = useState("courses_completed");
+  const [newBadgeCriteriaCount, setNewBadgeCriteriaCount] = useState("1");
   const [newBadgePoints, setNewBadgePoints] = useState("100");
   const [newBadgeIcon, setNewBadgeIcon] = useState<File | null>(null);
   const [badgeIconPreview, setBadgeIconPreview] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6);
+  const [deleteTarget, setDeleteTarget] = useState<BadgeItem | null>(null);
 
-  const [badges, setBadges] = useState<BadgeItem[]>([
-    {
-      id: "1",
-      name: "Course Completion Master",
-      description: "Complete 5 courses with 90% or higher score",
-      icon: "trophy",
-      criteria: "Complete 5 courses >= 90%",
-      points: 500,
-      active: true,
-      earnedBy: 45,
-    },
-    {
-      id: "2",
-      name: "Quiz Champion",
-      description: "Score 100% on 10 different quizzes",
-      icon: "star",
-      criteria: "Score 100% on 10 quizzes",
-      points: 300,
-      active: true,
-      earnedBy: 78,
-    },
-    {
-      id: "3",
-      name: "Early Bird",
-      description: "Complete lessons within 24 hours of release",
-      icon: "medal",
-      criteria: "Complete 10 lessons within 24hrs",
-      points: 200,
-      active: true,
-      earnedBy: 23,
-    },
-    {
-      id: "4",
-      name: "Perfect Streak",
-      description: "Maintain a 30-day learning streak",
-      icon: "target",
-      criteria: "30-day streak",
-      points: 400,
-      active: false,
-      earnedBy: 12,
-    },
-  ]);
+  const [badges, setBadges] = useState<BadgeItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const iconOptions = [
     { value: "trophy", icon: Trophy, label: "Trophy" },
@@ -86,13 +76,86 @@ const BadgeManagement = () => {
     { value: "award", icon: Award, label: "Award" },
   ];
 
+  const criteriaOptions = [
+    { value: "courses_completed", label: "Courses completed" },
+    { value: "goal_hits", label: "Goals hit" },
+    { value: "total_credits", label: "Total credits earned" },
+    { value: "streak_days", label: "Streak days" },
+  ];
+
   const getIconComponent = (iconName: string) => {
     const iconOption = iconOptions.find(opt => opt.value === iconName);
     return iconOption ? iconOption.icon : Award;
   };
 
-  const handleCreateBadge = () => {
-    if (!newBadgeName || !newBadgeDescription || !newBadgeCriteria) {
+  const isIconUrl = (iconValue?: string) =>
+    !!iconValue && (iconValue.startsWith("http://") || iconValue.startsWith("https://"));
+
+  const formatCriteria = (criteria: unknown) => {
+    if (!criteria) return "";
+    if (typeof criteria === "string") return criteria;
+    try {
+      const asObj = criteria as Record<string, unknown>;
+      const type = typeof asObj.type === "string" ? asObj.type : "";
+      const count = typeof asObj.count === "number" ? asObj.count : Number(asObj.count);
+      const label = criteriaOptions.find((opt) => opt.value === type)?.label;
+      if (label && Number.isFinite(count) && count > 0) {
+        return `${label}: ${count}`;
+      }
+      return JSON.stringify(criteria);
+    } catch {
+      return String(criteria);
+    }
+  };
+
+  const mapBadge = (record: AchievementRecord): BadgeItem => ({
+    id: record.id,
+    name: record.name,
+    description: record.description ?? "",
+    icon: record.icon ?? "award",
+    criteria: formatCriteria(record.criteria),
+    points: Number(record.points ?? 0),
+    active: !!record.is_active,
+    earnedBy: Number(record.earnedBy ?? 0),
+    type: record.type,
+    color: record.color ?? null,
+  });
+
+  const loadBadges = async () => {
+    setIsLoading(true);
+    try {
+      const response = await listAchievements({ type: "badge" });
+      const items = response.items.map(mapBadge);
+      setBadges(items);
+    } catch (error) {
+      console.error("Failed to load badges:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load badges",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBadges();
+  }, []);
+
+  const resetCreateForm = () => {
+    setNewBadgeName("");
+    setNewBadgeDescription("");
+    setNewBadgeCriteriaType("courses_completed");
+    setNewBadgeCriteriaCount("1");
+    setNewBadgePoints("100");
+    setNewBadgeIcon(null);
+    setBadgeIconPreview("");
+  };
+
+  const handleCreateBadge = async () => {
+    const criteriaCount = parseInt(newBadgeCriteriaCount, 10);
+    if (!newBadgeName || !newBadgeDescription) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -100,31 +163,59 @@ const BadgeManagement = () => {
       });
       return;
     }
+    if (!newBadgeCriteriaType || !Number.isFinite(criteriaCount) || criteriaCount <= 0) {
+      toast({
+        title: "Error",
+        description: "Please set a valid criteria type and count",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const newBadge: BadgeItem = {
-      id: Date.now().toString(),
-      name: newBadgeName,
-      description: newBadgeDescription,
-      icon: "award",
-      criteria: newBadgeCriteria,
-      points: parseInt(newBadgePoints) || 100,
-      active: true,
-      earnedBy: 0,
-    };
+    setIsSaving(true);
+    try {
+      let iconValue: string | null = "award";
+      if (newBadgeIcon) {
+        const upload = await uploadAchievementIcon(newBadgeIcon);
+        iconValue = upload?.url || upload?.publicUrl || upload?.path || "award";
+      }
 
-    setBadges([...badges, newBadge]);
-    toast({
-      title: "Badge Created",
-      description: `${newBadgeName} has been created successfully`
-    });
+      const created = await createAchievement({
+        name: newBadgeName,
+        description: newBadgeDescription,
+        icon: iconValue,
+        type: "badge",
+        criteria: {
+          type: newBadgeCriteriaType,
+          count: criteriaCount,
+        },
+        points: parseInt(newBadgePoints, 10) || 100,
+        isActive: true,
+      });
 
-    setIsCreateDialogOpen(false);
-    setNewBadgeName("");
-    setNewBadgeDescription("");
-    setNewBadgeCriteria("");
-    setNewBadgePoints("100");
-    setNewBadgeIcon(null);
-    setBadgeIconPreview("");
+      if (created?.id) {
+        setBadges((prev) => [mapBadge(created), ...prev]);
+      } else {
+        await loadBadges();
+      }
+
+      toast({
+        title: "Badge Created",
+        description: `${newBadgeName} has been created successfully`,
+      });
+
+      setIsCreateDialogOpen(false);
+      resetCreateForm();
+    } catch (error) {
+      console.error("Failed to create badge:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create badge",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,28 +230,61 @@ const BadgeManagement = () => {
     }
   };
 
-  const toggleBadgeStatus = (badgeId: string) => {
-    setBadges(badges.map(badge => 
-      badge.id === badgeId ? { ...badge, active: !badge.active } : badge
-    ));
-    toast({
-      title: "Badge Status Updated",
-      description: "Badge status has been changed"
-    });
+  const toggleBadgeStatus = async (badgeId: string) => {
+    const badge = badges.find((item) => item.id === badgeId);
+    if (!badge) return;
+    const nextActive = !badge.active;
+    setBadges(badges.map(b => (b.id === badgeId ? { ...b, active: nextActive } : b)));
+    try {
+      await updateAchievement({ id: badgeId, isActive: nextActive });
+      toast({
+        title: "Badge Status Updated",
+        description: "Badge status has been changed",
+      });
+    } catch (error) {
+      console.error("Failed to update badge:", error);
+      setBadges(badges.map(b => (b.id === badgeId ? { ...b, active: badge.active } : b)));
+      toast({
+        title: "Error",
+        description: "Failed to update badge status",
+        variant: "destructive",
+      });
+    }
   };
 
-  const deleteBadge = (badgeId: string) => {
+  const deleteBadge = async (badgeId: string) => {
+    const prev = badges;
     setBadges(badges.filter(badge => badge.id !== badgeId));
-    toast({
-      title: "Badge Deleted",
-      description: "Badge has been removed successfully"
-    });
+    try {
+      await deleteAchievement(badgeId);
+      toast({
+        title: "Badge Deleted",
+        description: "Badge has been removed successfully",
+      });
+    } catch (error) {
+      console.error("Failed to delete badge:", error);
+      setBadges(prev);
+      toast({
+        title: "Error",
+        description: "Failed to delete badge",
+        variant: "destructive",
+      });
+    }
   };
 
-  const filteredBadges = badges.filter(badge =>
-    badge.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    badge.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
+    await deleteBadge(id);
+  };
+
+  const filteredBadges = useMemo(() => (
+    badges.filter(badge =>
+      badge.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      badge.description.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  ), [badges, searchQuery]);
 
   const paginatedBadges = filteredBadges.slice(
     (currentPage - 1) * itemsPerPage,
@@ -178,7 +302,13 @@ const BadgeManagement = () => {
             <p className="text-muted-foreground">Create and manage achievement badges for students</p>
           </div>
           
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={(open) => {
+              if (!open) resetCreateForm();
+              setIsCreateDialogOpen(open);
+            }}
+          >
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
@@ -212,12 +342,28 @@ const BadgeManagement = () => {
                 </div>
                 <div>
                   <Label htmlFor="badge-criteria">Earning Criteria *</Label>
-                  <Input
-                    id="badge-criteria"
-                    value={newBadgeCriteria}
-                    onChange={(e) => setNewBadgeCriteria(e.target.value)}
-                    placeholder="e.g., Complete 3 courses with 85%+ score"
-                  />
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Select value={newBadgeCriteriaType} onValueChange={setNewBadgeCriteriaType}>
+                      <SelectTrigger id="badge-criteria">
+                        <SelectValue placeholder="Select criteria type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {criteriaOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      id="badge-criteria-count"
+                      type="number"
+                      min={1}
+                      value={newBadgeCriteriaCount}
+                      onChange={(e) => setNewBadgeCriteriaCount(e.target.value)}
+                      placeholder="Count"
+                    />
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="badge-points">Points Value</Label>
@@ -247,8 +393,18 @@ const BadgeManagement = () => {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateBadge}>Create Badge</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    resetCreateForm();
+                    setIsCreateDialogOpen(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateBadge} disabled={isSaving}>
+                  {isSaving ? "Creating..." : "Create Badge"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -268,7 +424,11 @@ const BadgeManagement = () => {
         </div>
 
         {/* Badge Grid */}
-        {paginatedBadges.length > 0 ? (
+        {isLoading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading badges...</p>
+          </div>
+        ) : paginatedBadges.length > 0 ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {paginatedBadges.map((badge) => {
@@ -276,8 +436,12 @@ const BadgeManagement = () => {
                 return (
                   <div key={badge.id} className="gradient-card border border-border rounded-xl p-6 hover-lift">
                     <div className="flex items-start justify-between mb-4">
-                      <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center">
-                        <IconComponent className="h-8 w-8 text-warning" />
+                      <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center overflow-hidden">
+                        {isIconUrl(badge.icon) ? (
+                          <img src={badge.icon} alt={`${badge.name} icon`} className="w-full h-full object-cover" />
+                        ) : (
+                          <IconComponent className="h-8 w-8 text-warning" />
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Switch
@@ -287,7 +451,7 @@ const BadgeManagement = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => deleteBadge(badge.id)}
+                          onClick={() => setDeleteTarget(badge)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -342,6 +506,27 @@ const BadgeManagement = () => {
           </div>
         )}
       </main>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete badge?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove{" "}
+              <span className="font-medium text-foreground">
+                {deleteTarget?.name || "this badge"}
+              </span>{" "}
+              and any related notifications. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Badge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

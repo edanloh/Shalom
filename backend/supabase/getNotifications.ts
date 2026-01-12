@@ -38,13 +38,37 @@ serve(async (req) => {
     const to = offset + limit - 1;
     const { data, error } = await supabase
       .from("notifications")
-      .select("id,user_id,title,message,type,is_read,created_at,action_url")
+      .select("id,user_id,title,message,type,is_read,created_at,action_url,related_entity_type,related_entity_id")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .range(offset, to);
 
     if (error) throw error;
-    return ok({ success: true, data: data ?? [] });
+
+    const notifications = data ?? [];
+    const achievementIds = notifications
+      .filter((n: any) => n.related_entity_type === "achievement" && n.related_entity_id)
+      .map((n: any) => n.related_entity_id);
+
+    let iconMap: Record<string, string> = {};
+    if (achievementIds.length) {
+      const { data: achievements, error: achError } = await supabase
+        .from("achievements")
+        .select("id, icon")
+        .in("id", achievementIds);
+      if (achError) throw achError;
+      iconMap = (achievements ?? []).reduce((acc: Record<string, string>, row: any) => {
+        if (row?.id && row?.icon) acc[row.id] = row.icon;
+        return acc;
+      }, {} as Record<string, string>);
+    }
+
+    const enriched = notifications.map((n: any) => ({
+      ...n,
+      icon_url: n.related_entity_type === "achievement" ? iconMap[n.related_entity_id] || null : null,
+    }));
+
+    return ok({ success: true, data: enriched });
   } catch (err: any) {
     console.error("getNotifications error", err);
     return fail("Failed to fetch notifications", 500, { error: err.message });

@@ -313,13 +313,18 @@ export const NotificationProvider = ({
       TOAST_CHANNEL,
       (payload: ToastPayload) => {
         if (!payload?.message) return;
+        const title = payload.title?.toLowerCase() || "";
+        const message = payload.message?.toLowerCase() || "";
+        if (payload.type === "success" && (title.includes("achievement") || message.includes("achievement"))) {
+          return;
+        }
         const type =
           payload.type === "success"
             ? "achievement"
             : payload.type === "error"
             ? "system"
             : "system";
-        const title =
+        const notificationTitle =
           payload.title ||
           (payload.type === "success"
             ? "Success"
@@ -327,9 +332,10 @@ export const NotificationProvider = ({
             ? "Error"
             : "Update");
         pushInAppNotification({
-          title,
+          title: notificationTitle,
           message: payload.message,
           type,
+          read: false,
         });
       }
     );

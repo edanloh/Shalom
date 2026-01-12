@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   SectionList,
   RefreshControl,
+  Image,
 } from "react-native";
 import { Spacing, TextStyles, Colors } from "../constants";
 import Screen from "../components/common/Screen";
@@ -54,6 +55,9 @@ const formatDate = (dateString: string) => {
   }).format(date);
 };
 
+const isIconUrl = (value?: string) =>
+  !!value && (value.startsWith("http://") || value.startsWith("https://"));
+
 const PAGE_SIZE = 20;
 
 export default function AchievementsScreen({ navigation }: any) {
@@ -75,7 +79,8 @@ export default function AchievementsScreen({ navigation }: any) {
         certificate: "ribbon-outline",
         level: "ribbon-outline",
       };
-      return byType[a.type] || byType[a.icon] || "trophy-outline";
+      if (isIconUrl(a.icon)) return a.icon;
+      return byType[a.type] || byType[a.icon] || a.icon || "trophy-outline";
     };
 
     return items
@@ -222,7 +227,11 @@ export default function AchievementsScreen({ navigation }: any) {
               onPress={() => setSelectedAchievement(item)}
             >
               <View style={styles.iconContainer}>
-                <Ionicons name={item.icon as any} size={28} color="#FACC15" />
+                {isIconUrl(item.icon) ? (
+                  <Image source={{ uri: item.icon }} style={styles.iconImage} resizeMode="cover" />
+                ) : (
+                  <Ionicons name={item.icon as any} size={28} color="#FACC15" />
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={TextStyles.body} numberOfLines={1}>
@@ -307,11 +316,19 @@ export default function AchievementsScreen({ navigation }: any) {
         {/* Achievement Icon */}
         <View style={styles.modalIconContainer}>
           <View style={styles.modalIconBadge}>
-            <Ionicons
-              name={selectedAchievement?.icon as any}
-              size={64}
-              color={Colors.yellow}
-            />
+            {isIconUrl(selectedAchievement?.icon) ? (
+              <Image
+                source={{ uri: selectedAchievement?.icon }}
+                style={styles.modalIconImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons
+                name={selectedAchievement?.icon as any}
+                size={64}
+                color={Colors.yellow}
+              />
+            )}
           </View>
         </View>
 
@@ -419,6 +436,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: Spacing.md,
   },
+  iconImage: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    borderRadius: 12,
+  },
 
   // Modal Styles
   modalIconContainer: {
@@ -433,6 +455,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#80703e",
     alignItems: "center",
     justifyContent: "center",
+  },
+  modalIconImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
   pointsBadge: {
     backgroundColor: Colors.secondary,

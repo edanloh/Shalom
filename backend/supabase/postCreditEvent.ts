@@ -74,6 +74,24 @@ const parseStreakDays = (event: CreditEventRecord) => {
   return null;
 };
 
+async function notifyAchievements(userId: string, awarded: AchievementDef[]) {
+  if (!awarded.length) return;
+  const payload = awarded.map((achievement) => ({
+    user_id: userId,
+    title: "Achievement unlocked",
+    message: achievement.name || "Achievement unlocked",
+    type: "achievement",
+    related_entity_type: "achievement",
+    related_entity_id: achievement.id,
+    created_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase.from("notifications").insert(payload);
+  if (error) {
+    console.error("postCreditEvent: failed to create achievement notifications", error);
+  }
+}
+
 async function countCreditEvents(userId: string, type: string) {
   const { count, error } = await supabase
     .from("credits_events")
@@ -237,6 +255,7 @@ serve(async (req) => {
       if (existing) {
         const balance = await computeBalance(event.user_id);
         const awardedAchievements = await awardAchievementsForCreditEvent(event.user_id, event, balance);
+        await notifyAchievements(event.user_id, awardedAchievements);
         return ok({
           success: true,
           data: { balance, event, duplicate: true, awardedAchievements },
@@ -250,6 +269,7 @@ serve(async (req) => {
 
     const balance = await computeBalance(event.user_id);
     const awardedAchievements = await awardAchievementsForCreditEvent(event.user_id, event, balance);
+    await notifyAchievements(event.user_id, awardedAchievements);
     return ok({ success: true, data: { balance, event, awardedAchievements } });
   } catch (err: any) {
     console.error("postCreditEvent error", err);

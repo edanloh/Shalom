@@ -171,6 +171,7 @@ export interface Notification {
   read: boolean;
   createdAt: string;
   actionUrl?: string;
+  iconUrl?: string;
 }
 
 // Navigation types

@@ -12,6 +12,7 @@ import {
   SectionList,
   RefreshControl,
   DeviceEventEmitter,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
@@ -32,6 +33,9 @@ const isYesterday = (d: Date) => {
 };
 
 const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+const isIconUrl = (value?: string) =>
+  !!value && (value.startsWith("http://") || value.startsWith("https://"));
 
 export default function NotificationsScreen({ navigation }: any) {
   const {
@@ -196,7 +200,11 @@ export default function NotificationsScreen({ navigation }: any) {
       >
         {!item.read ? <View style={styles.unreadAccent} /> : null}
         <View style={[styles.iconBadge, { borderColor: icon.color }]}>
-          <Ionicons name={icon.name as any} size={22} color={icon.color} />
+          {isIconUrl(item.iconUrl) ? (
+            <Image source={{ uri: item.iconUrl }} style={styles.iconImage} resizeMode="cover" />
+          ) : (
+            <Ionicons name={icon.name as any} size={22} color={icon.color} />
+          )}
         </View>
         <View style={{ flex: 1 }}>
           <Text
@@ -417,6 +425,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 0.8,
     backgroundColor: Colors.backgroundGray,
+  },
+  iconImage: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: 12,
   },
   titleUnread: {
     fontWeight: "700",

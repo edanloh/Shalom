@@ -34,6 +34,9 @@ type Achievement = {
   points?: number;
 };
 
+const isIconUrl = (value?: string) =>
+  !!value && (value.startsWith("http://") || value.startsWith("https://"));
+
 export default function ProfileScreen({ navigation }: any) {
   const { user, logout } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -95,7 +98,8 @@ export default function ProfileScreen({ navigation }: any) {
           certificate: "ribbon-outline",
           level: "ribbon-outline",
         };
-        return byType[a.type] || byType[a.icon] || "trophy-outline";
+        if (isIconUrl(a.icon)) return a.icon;
+        return byType[a.type] || byType[a.icon] || a.icon || "trophy-outline";
       };
 
       const normalized = (Array.isArray(ach) ? ach : [])
@@ -287,12 +291,20 @@ export default function ProfileScreen({ navigation }: any) {
              activeOpacity={0.7}
              onPress={() => setSelectedAchievement(a)}
            >
-             <Ionicons
-               name={a.icon as any}
-               size={26}
-               color="#FACC15"
-               style={styles.achievementIcon}
-             />
+             {isIconUrl(a.icon) ? (
+               <Image
+                 source={{ uri: a.icon }}
+                 style={styles.achievementIconImage}
+                 resizeMode="cover"
+               />
+             ) : (
+               <Ionicons
+                 name={a.icon as any}
+                 size={26}
+                 color="#FACC15"
+                 style={styles.achievementIcon}
+               />
+             )}
              <Text style={styles.achievementLabel} numberOfLines={2}>
                {a.label}
              </Text>
@@ -361,11 +373,19 @@ export default function ProfileScreen({ navigation }: any) {
         {/* Achievement Icon */}
         <View style={styles.modalIconContainer}>
           <View style={styles.modalIconBadge}>
-            <Ionicons
-              name={selectedAchievement?.icon as any}
-              size={64}
-              color={Colors.yellow}
-            />
+            {isIconUrl(selectedAchievement?.icon) ? (
+              <Image
+                source={{ uri: selectedAchievement?.icon }}
+                style={styles.modalIconImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons
+                name={selectedAchievement?.icon as any}
+                size={64}
+                color={Colors.yellow}
+              />
+            )}
           </View>
         </View>
 
@@ -486,6 +506,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   achievementIcon: {
+    marginVertical: 8,
+  },
+  achievementIconImage: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     marginVertical: 8,
   },
   achievementLabel: {
@@ -629,5 +655,10 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     flexDirection: "row",
     alignItems: "center",
+  },
+  modalIconImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
 });

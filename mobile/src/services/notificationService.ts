@@ -14,6 +14,7 @@ type NotificationRecord = {
   is_read: boolean;
   created_at: string;
   action_url?: string | null;
+  icon_url?: string | null;
 };
 
 const normalizeNotificationType = (value?: string): Notification["type"] => {
@@ -32,6 +33,7 @@ const toNotification = (record: NotificationRecord): Notification => ({
   read: record.is_read,
   createdAt: record.created_at,
   actionUrl: record.action_url ?? undefined,
+  iconUrl: record.icon_url ?? undefined,
 });
 
 const ENDPOINTS = {
