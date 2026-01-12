@@ -5,6 +5,7 @@ import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { useAuth } from "./AuthContext";
 import notificationService from "../services/notificationService";
+import { CREDIT_EVENT_CHANNEL } from "../services/creditService";
 import { TOAST_CHANNEL, type ToastPayload } from "../components/common/Toast";
 import type { Notification as InAppNotification } from "../types";
 
@@ -342,6 +343,14 @@ export const NotificationProvider = ({
 
     return () => sub.remove();
   }, [user?.id]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(CREDIT_EVENT_CHANNEL, () => {
+      if (!user?.id) return;
+      reloadNotifications();
+    });
+    return () => sub.remove();
+  }, [reloadNotifications, user?.id]);
 
   const registerTokenWithBackend = async () => {
     if (!user?.id || !expoPushToken) return;
