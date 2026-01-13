@@ -112,6 +112,7 @@ serve(async (req) => {
     const [
       { data: sections, error: sectionsError },
       { data: lessons, error: lessonsError },
+      { data: pdfResources, error: pdfResourcesError },
       { data: quizzes, error: quizzesError },
       { data: quizQuestions, error: quizQuestionsError },
       { data: requirements, error: requirementsError },
@@ -129,6 +130,17 @@ serve(async (req) => {
         .select(`
           id, section_id, title, description, video_url,
           order_index, duration_seconds, is_preview, thumbnail_url
+        `)
+        .in('section_id', sectionIds)
+        .order('section_id', { ascending: true })
+        .order('order_index', { ascending: true }),
+      
+      supabaseClient
+        .from('course_resources')
+        .select(`
+          id, section_id, title, description, resource_url,
+          order_index, resource_type, is_preview, thumbnail_url,
+          file_size_bytes, is_downloadable
         `)
         .in('section_id', sectionIds)
         .order('section_id', { ascending: true })
@@ -181,6 +193,7 @@ serve(async (req) => {
     // Log any errors from parallel queries
     if (sectionsError) console.error('Sections error:', sectionsError);
     if (lessonsError) console.error('Lessons error:', lessonsError);
+    if (pdfResourcesError) console.error('PDF resources error:', pdfResourcesError);
     if (quizzesError) console.error('Quizzes error:', quizzesError);
     if (quizQuestionsError) console.error('Quiz questions error:', quizQuestionsError);
     if (requirementsError) console.error('Requirements error:', requirementsError);
@@ -188,11 +201,13 @@ serve(async (req) => {
     if (reviewsError) console.error('Reviews error:', reviewsError);
 
     console.log('Fetched lessons count:', lessons?.length || 0);
+    console.log('Fetched PDF resources count:', pdfResources?.length || 0);
     console.log('Fetched quizzes count:', quizzes?.length || 0);
     console.log('Lessons data:', lessons);
+    console.log('PDF resources data:', pdfResources);
 
     // ========================================
-    // 3. Combine sections with their items (lessons + quizzes WITH QUESTIONS)
+    // 3. Combine sections with their items (lessons + PDF resources + quizzes WITH QUESTIONS)
     // ========================================
     const sectionsWithContent = (sections || []).map((section: any) => {
       // Get lessons (videos) for this section
@@ -202,6 +217,24 @@ serve(async (req) => {
           ...l,
           type: "video",
           duration_seconds: l.duration_seconds || 0 // Already in seconds
+        }));
+
+      // Get PDF resources for this section
+      const sectionPdfResources = (pdfResources || [])
+        .filter((r: any) => r.section_id === section.id)
+        .map((r: any) => ({
+          id: r.id,
+          section_id: r.section_id,
+          title: r.title,
+          description: r.description,
+          resource_url: r.resource_url,
+          resource_type: r.resource_type,
+          thumbnail_url: r.thumbnail_url,
+          is_preview: r.is_preview,
+          is_downloadable: r.is_downloadable,
+          file_size_bytes: r.file_size_bytes,
+          order_index: r.order_index,
+          type: "pdf"
         }));
 
       // Get quizzes for this section and add questions
@@ -233,8 +266,8 @@ serve(async (req) => {
           };
         });
 
-      // Combine and sort by order_index
-      const items = [...sectionLessons, ...sectionQuizzes]
+      // Combine videos, PDFs, and quizzes, then sort by order_index
+      const items = [...sectionLessons, ...sectionPdfResources, ...sectionQuizzes]
         .sort((a: any, b: any) => a.order_index - b.order_index);
 
       // Calculate total duration from videos in this section (in minutes)

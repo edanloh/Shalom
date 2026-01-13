@@ -127,29 +127,58 @@ serve(async (req) => {
 
       if (sectionError) throw sectionError;
 
-      // Create lessons (videos) for this section
+      // Create lessons (videos and PDFs) for this section
       const createdLessons = [];
       const lessons = module.lessons || [];
       for (let j = 0; j < lessons.length; j++) {
         const lesson = lessons[j];
 
-        const { data: lessonData, error: lessonError } = await supabaseClient
-          .from('course_videos')
-          .insert({
-            course_id: course.id,
-            section_id: section.id,
-            title: lesson.title,
-            description: lesson.content || '', // Store content in description field
-            video_url: lesson.videoUrl || '', // video_url
-            duration_seconds: (lesson.durationMinutes || 0) * 60, // Convert minutes to seconds
-            order_index: lesson.order ?? j,
-            is_preview: lesson.isPreview || false
-          })
-          .select()
-          .single();
+        // Determine lesson type - default to 'video' for backward compatibility
+        const lessonType = lesson.type || 'video';
 
-        if (lessonError) throw lessonError;
-        createdLessons.push(lessonData);
+        if (lessonType === 'pdf') {
+          // Insert PDF resource into course_resources table
+          const { data: resourceData, error: resourceError } = await supabaseClient
+            .from('course_resources')
+            .insert({
+              course_id: course.id,
+              section_id: section.id,
+              title: lesson.title,
+              description: lesson.content || '',
+              resource_url: lesson.resourceUrl || '',
+              resource_type: 'pdf',
+              order_index: lesson.order ?? j,
+              is_preview: lesson.isPreview || false,
+              thumbnail_url: lesson.thumbnailUrl || null,
+              is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,
+              file_size_bytes: lesson.fileSize || null
+            })
+            .select()
+            .single();
+
+          if (resourceError) throw resourceError;
+          createdLessons.push(resourceData);
+        } else {
+          // Insert video lesson into course_videos table
+          const { data: lessonData, error: lessonError } = await supabaseClient
+            .from('course_videos')
+            .insert({
+              course_id: course.id,
+              section_id: section.id,
+              title: lesson.title,
+              description: lesson.content || '',
+              video_url: lesson.videoUrl || '',
+              duration_seconds: lesson.durationSeconds || ((lesson.durationMinutes || 0) * 60),
+              order_index: lesson.order ?? j,
+              is_preview: lesson.isPreview || false,
+              thumbnail_url: lesson.thumbnailUrl || null
+            })
+            .select()
+            .single();
+
+          if (lessonError) throw lessonError;
+          createdLessons.push(lessonData);
+        }
       }
 
       // Create quizzes for this section

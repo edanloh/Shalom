@@ -1,6 +1,6 @@
 /**
  * Quiz Service - Handles all quiz-related API calls
- * Integrates with AWS Lambda backend for quiz taking and submission
+ * Integrates with Supabase backend for quiz taking and submission
  */
 
 import { apiService } from './apiService';

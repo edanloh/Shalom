@@ -163,7 +163,7 @@ const Index = () => {
                 <h3 className="text-lg font-semibold mb-4 text-foreground">
                   Recent Activity
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[450px] overflow-y-auto pr-2">
                   {stats.recent_activity.slice(0, 8).map((activity: any, index: number) => (
                     <div key={index} className="flex items-center gap-4 p-3 rounded-lg bg-background/50">
                       <div className="flex-1">

@@ -1,6 +1,6 @@
 /**
  * Course Service - Handles all course-related API calls
- * Updated to work with AWS API Gateway endpoint
+ * Updated to work with Supabase endpoints
  */
 
 import { Course, AWSApiResponse, AWSCoursesResponse, AWSCourse } from '../types';
@@ -424,7 +424,6 @@ class CourseService {
         return cachedEnrollments;
       }
       
-      
       const response = await apiService.get<any>(ENDPOINTS.USER_ENROLLMENTS(userId));
       const payload = unwrap<EnrollmentResponse | { enrollments: EnrollmentCourse[] }>(response);
 
@@ -432,9 +431,7 @@ class CourseService {
       const enrollmentsData =
         (payload as EnrollmentResponse)?.data?.enrollments ??
         (payload as any)?.enrollments ??
-        [];
-      
-      console.log('[getUserEnrollments] Raw enrollmentsData sample:', enrollmentsData[0]);
+        [];  
       
       if (!Array.isArray(enrollmentsData)) {
         console.error('getUserEnrollments - Invalid enrollment response structure:', response);
@@ -443,11 +440,6 @@ class CourseService {
 
       // Convert enrollment format to our app Course format
       const courses = enrollmentsData.map(convertEnrollmentToAppCourse);
-      console.log('getUserEnrollments - Converted courses sample:', {
-        title: courses[0]?.title,
-        progress: courses[0]?.progress,
-        modules: courses[0]?.modules
-      });
 
       // Cache the response
       await CacheManager.set(cacheKey, courses);

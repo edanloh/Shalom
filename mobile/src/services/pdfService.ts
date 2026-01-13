@@ -1,11 +1,13 @@
 /**
  * PDF Service - Handles all PDF-related API calls
- * Integrates with AWS Lambda backend for PDF access and progress tracking
+ * Integrates with Supabase backend for PDF access and progress tracking
+ */
+/**
+ * PDF Service - UPDATED to properly handle completion and cache invalidation
  */
 
 import { apiService } from "./apiService";
 
-// PDF Detail Response
 export interface PDFDetailResponse {
   success: boolean;
   message: string;
@@ -24,8 +26,8 @@ export interface PDFDetailResponse {
       title: string;
     };
     navigation: {
-      previousPDF: { id: string; title: string } | null;
-      nextPDF: { id: string; title: string } | null;
+      previousItem: { id: string; title: string; type: 'video' | 'pdf' | 'quiz' } | null;
+      nextItem: { id: string; title: string; type: 'video' | 'pdf' | 'quiz' } | null;
     };
     userProgress?: {
       is_completed: boolean;
@@ -35,21 +37,19 @@ export interface PDFDetailResponse {
   };
 }
 
-// Mark PDF as Completed Request
 export interface MarkPDFCompletedRequest {
   userId: string;
   pdfId: string;
   isCompleted: boolean;
 }
 
-// Mark PDF as Completed Response
 export interface MarkPDFCompletedResponse {
   success: boolean;
   message: string;
   data: {
     pdfProgress: {
       user_id: string;
-      pdf_id: string;
+      resource_id: string;
       is_completed: boolean;
       completed_at?: string;
       updated_at: string;
@@ -59,6 +59,22 @@ export interface MarkPDFCompletedResponse {
       is_completed: boolean;
       completed_items: number;
       total_items: number;
+      completed_videos: number;
+      total_videos: number;
+      passed_quizzes: number;
+      total_quizzes: number;
+      completed_pdfs: number;
+      total_pdfs: number;
+    };
+    moduleProgress?: {
+      section_id: string;
+      is_completed: boolean;
+      completed_videos: number;
+      total_videos: number;
+      passed_quizzes: number;
+      total_quizzes: number;
+      completed_pdfs: number;
+      total_pdfs: number;
     };
   };
 }
@@ -97,52 +113,16 @@ class PDFService {
 
   /**
    * Mark PDF as completed
-   * Endpoint: POST /courses/{courseId}/module/pdfs/progress
+   * Endpoint: POST /updatePDFProgress
    *
-   * This should be called when user marks the PDF as completed
+   * UPDATED: Now returns comprehensive progress data including module status
    */
   async markCompleted(
     courseId: string,
     request: MarkPDFCompletedRequest
   ): Promise<MarkPDFCompletedResponse["data"]> {
     try {
-      console.log("🔵 Mock: Marking PDF as completed");
-      console.log("📦 Request payload:", {
-        courseId,
-        pdfId: request.pdfId,
-        userId: request.userId,
-        isCompleted: request.isCompleted,
-      });
-
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Mock return for testing without backend
-      const mockResponse: MarkPDFCompletedResponse["data"] = {
-        pdfProgress: {
-          user_id: request.userId,
-          pdf_id: request.pdfId,
-          is_completed: request.isCompleted,
-          completed_at: request.isCompleted
-            ? new Date().toISOString()
-            : undefined,
-          updated_at: new Date().toISOString(),
-        },
-        courseProgress: {
-          progress_percentage: "75.5",
-          is_completed: false,
-          completed_items: 15,
-          total_items: 20,
-        },
-      };
-
-      console.log("✅ Mock: PDF marked as completed successfully");
-      return mockResponse;
-
-      /* Uncomment when backend is ready:
-      const endpoint = `/courses/${courseId}/module/pdfs/progress`;
-      console.log("🔵 API Call: POST", endpoint);
-      console.log("📦 Request payload:", {
+      console.log("📝 Marking PDF as completed:", {
         courseId,
         pdfId: request.pdfId,
         userId: request.userId,
@@ -150,24 +130,26 @@ class PDFService {
       });
 
       const response = await apiService.post<MarkPDFCompletedResponse>(
-        endpoint,
-        request
+        `/updatePDFProgress`,
+        {
+          userId: request.userId,
+          pdfId: request.pdfId,
+          courseId,
+          isCompleted: request.isCompleted,
+        }
       );
 
-      console.log("🟢 API Response received:", {
-        success: response.success,
-        hasData: !!response.data,
-        message: response.message,
-      });
-
       if (!response.success || !response.data) {
-        console.error("❌ API returned unsuccessful response:", response);
-        throw new Error(response.message || "Failed to mark PDF as completed");
+        throw new Error(response.message || "Failed to update PDF progress");
       }
 
-      console.log("✅ PDF marked as completed successfully");
+      console.log("✅ PDF progress updated successfully:", {
+        pdfCompleted: response.data.pdfProgress.is_completed,
+        courseProgress: response.data.courseProgress.progress_percentage + '%',
+        moduleCompleted: response.data.moduleProgress?.is_completed,
+      });
+
       return response.data;
-      */
     } catch (error) {
       console.error("❌ Error marking PDF as completed:", error);
       throw error;

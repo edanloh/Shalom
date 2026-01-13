@@ -1,6 +1,6 @@
 /**
  * Module Service - Handles course module/content API calls
- * Integrates with AWS Lambda backend for course module details
+ * Integrates with Supabase backend for course module details
  */
 
 import { apiService } from './apiService';
@@ -174,7 +174,9 @@ class ModuleService {
       const attempt = userProgress.quizAttempts?.find(qa => qa.quiz_id === item.id);
       return attempt?.is_passed || false;
     }
-
+    else if (item.type === 'pdf') {
+      return item.is_completed || false;
+    }
     return false;
   }
 
@@ -183,11 +185,9 @@ class ModuleService {
    */
   getSectionCompletionPercentage(section: CourseSection, userProgress?: UserProgress): number {
     if (!userProgress || section.items.length === 0) return 0;
-
     const completedItems = section.items.filter(item => 
       this.isItemCompleted(item, userProgress)
     ).length;
-
     return Math.round((completedItems / section.items.length) * 100);
   }
 

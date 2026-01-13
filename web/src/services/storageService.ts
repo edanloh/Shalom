@@ -60,6 +60,14 @@ export class StorageService {
   }
 
   /**
+   * Upload PDF document file
+   */
+  static async uploadPDF(file: File, courseId?: string): Promise<{ url: string; error: string | null }> {
+    const path = courseId ? `courses/${courseId}/` : '';
+    return this.uploadFile('course-pdf', file, path);
+  }
+
+  /**
    * Delete a file from storage
    * @param bucket - The storage bucket name
    * @param filePath - The path of the file to delete

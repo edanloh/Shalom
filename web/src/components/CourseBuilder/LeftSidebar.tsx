@@ -7,6 +7,7 @@ import {
   Plus,
   Trash2,
   Video,
+  ClipboardCheck
 } from "lucide-react";
 import { useCourseBuilder } from "./CourseBuilderContext";
 import { useDragAndDrop } from "./useDragAndDrop";
@@ -133,7 +134,7 @@ interface ModuleItemProps {
   onDragEnd: () => void;
   onToggleExpansion: (moduleId: string) => void;
   onDeleteModule: (moduleId: string) => void;
-  onAddLesson: (moduleId: string) => void;
+  onAddLesson: (moduleId: string, lessonType?: 'video' | 'pdf') => void;
   onDeleteLesson: (moduleId: string, lessonId: string) => void;
   onAddQuiz: (moduleId: string) => void;
   onDeleteQuiz: (moduleId: string, quizId: string) => void;
@@ -341,10 +342,16 @@ const ModuleItem = ({
 
           <div className="flex gap-2 pt-2">
             <button
-              onClick={() => onAddLesson(module.id)}
+              onClick={() => onAddLesson(module.id, 'video')}
               className="flex-1 px-3 py-2 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white text-xs rounded transition-colors"
             >
-              + Lesson
+              + Video
+            </button>
+            <button
+              onClick={() => onAddLesson(module.id, 'pdf')}
+              className="flex-1 px-3 py-2 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white text-xs rounded transition-colors"
+            >
+              + PDF
             </button>
             <button
               onClick={() => onAddQuiz(module.id)}
@@ -443,7 +450,11 @@ const LessonItem = ({
             : "opacity-0 group-hover:opacity-100"
         } cursor-grab active:cursor-grabbing`}
       />
-      <Video className="h-4 w-4 mr-2" />
+      {lesson.type === 'pdf' ? (
+        <FileText className="h-4 w-4 mr-2" />
+      ) : (
+        <Video className="h-4 w-4 mr-2" />
+      )}
       <span className="flex-1 truncate">{lesson.title}</span>
       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
         <button
@@ -544,7 +555,7 @@ const QuizItem = ({
             : "opacity-0 group-hover:opacity-100"
         } cursor-grab active:cursor-grabbing`}
       />
-      <FileText className="h-4 w-4 mr-2" />
+      <ClipboardCheck className="h-4 w-4 mr-2" />
       <span className="flex-1 truncate">{quiz.title}</span>
       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
         <button

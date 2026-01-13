@@ -91,7 +91,7 @@ serve(async (req) => {
     }
 
     // ========================================
-    // 2. Fetch sections, lessons, quizzes, requirements, outcomes, reviews in parallel
+    // 2. Fetch sections, lessons, quizzes, PDFs, requirements, outcomes, reviews in parallel
     // ========================================
     // First, get section IDs for filtering videos
     const sectionIds = await getSectionIds(supabaseClient, courseId);
@@ -101,6 +101,7 @@ serve(async (req) => {
       { data: sections, error: sectionsError },
       { data: lessons, error: lessonsError },
       { data: quizzes, error: quizzesError },
+      { data: resources, error: resourcesError },
       { data: requirements, error: requirementsError },
       { data: outcomes, error: outcomesError },
       { data: reviews, error: reviewsError }
@@ -132,6 +133,17 @@ serve(async (req) => {
         .order('order_index', { ascending: true }),
       
       supabaseClient
+        .from('course_resources')
+        .select(`
+          id, section_id, title, description, order_index,
+          resource_type, resource_url, thumbnail_url
+        `)
+        .eq('course_id', courseId)
+        .eq('resource_type', 'pdf')
+        .order('section_id', { ascending: true })
+        .order('order_index', { ascending: true }),
+      
+      supabaseClient
         .from('course_requirements')
         .select('requirement, order_index')
         .eq('course_id', courseId)
@@ -159,12 +171,14 @@ serve(async (req) => {
     if (sectionsError) console.error('Sections error:', sectionsError);
     if (lessonsError) console.error('Lessons error:', lessonsError);
     if (quizzesError) console.error('Quizzes error:', quizzesError);
+    if (resourcesError) console.error('Resources error:', resourcesError);
     if (requirementsError) console.error('Requirements error:', requirementsError);
     if (outcomesError) console.error('Outcomes error:', outcomesError);
     if (reviewsError) console.error('Reviews error:', reviewsError);
 
     console.log('Fetched lessons count:', lessons?.length || 0);
     console.log('Fetched quizzes count:', quizzes?.length || 0);
+    console.log('Fetched resources count:', resources?.length || 0);
     console.log('Lessons data:', lessons);
 
     // ========================================
@@ -193,11 +207,13 @@ serve(async (req) => {
           // Get video IDs for this course
           const videoIds = (lessons || []).map((l: any) => l.id);
           const quizIds = (quizzes || []).map((q: any) => q.id);
+          const pdfIds = (resources || []).map((r: any) => r.id);
 
-          // Fetch video progress and quiz attempts in parallel
+          // Fetch video progress, quiz attempts, and PDF progress in parallel
           const [
             { data: videoProgress },
             { data: quizAttempts },
+            { data: pdfProgress },
             { data: moduleProgress }
           ] = await Promise.all([
             supabaseClient
@@ -227,6 +243,16 @@ serve(async (req) => {
               .order('attempt_number', { ascending: false }),
             
             supabaseClient
+              .from('resource_progress')
+              .select(`
+                resource_id,
+                is_completed,
+                completed_at
+              `)
+              .eq('user_id', userId)
+              .in('resource_id', pdfIds),
+            
+            supabaseClient
               .from('user_module_progress')
               .select(`
                 section_id,
@@ -248,7 +274,7 @@ serve(async (req) => {
             }
           }
 
-          // Create module progress map for quick lookup
+          // Create module progress map for quick lookup (for completed_at timestamp)
           const moduleProgressMap = new Map();
           for (const progress of (moduleProgress || [])) {
             moduleProgressMap.set(progress.section_id, {
@@ -266,6 +292,7 @@ serve(async (req) => {
             completion_date: enrollment.completion_date,
             videoProgress: videoProgress || [],
             quizAttempts: latestQuizAttempts,
+            pdfProgress: pdfProgress || [],
             moduleProgress: moduleProgressMap
           };
         }
@@ -277,7 +304,7 @@ serve(async (req) => {
     }
 
     // ========================================
-    // 4. Combine sections with their items (lessons + quizzes)
+    // 4. Combine sections with their items (lessons + quizzes + PDFs)
     // ========================================
     const sectionsWithContent = (sections || []).map((section: any) => {
       // Get lessons (videos) for this section
@@ -286,13 +313,30 @@ serve(async (req) => {
         .map((l: any) => ({
           ...l,
           type: "video",
-          duration_seconds: l.duration_seconds || 0, // Already in seconds
+          duration_seconds: l.duration_seconds || 0,
           is_completed: userProgress?.videoProgress?.some(
             (vp: any) => vp.video_id === l.id && vp.is_completed
           ) || false
         }));
 
-      // Get quizzes for this section (WITHOUT questions for student view)
+      // Get PDFs for this section
+      const sectionPDFs = (resources || [])
+        .filter((r: any) => r.section_id === section.id)
+        .map((r: any) => ({
+          id: r.id,
+          section_id: r.section_id,
+          title: r.title,
+          description: r.description,
+          order_index: r.order_index,
+          type: "pdf",
+          pdf_url: r.resource_url,
+          thumbnail_url: r.thumbnail_url,
+          is_completed: userProgress?.pdfProgress?.some(
+            (pp: any) => pp.resource_id === r.id && pp.is_completed
+          ) || false
+        }));
+
+      // Get quizzes for this section
       const sectionQuizzes = (quizzes || [])
         .filter((q: any) => q.section_id === section.id)
         .map((q: any) => ({
@@ -304,11 +348,29 @@ serve(async (req) => {
         }));
 
       // Combine and sort by order_index
-      const items = [...sectionLessons, ...sectionQuizzes]
+      const items = [...sectionLessons, ...sectionPDFs, ...sectionQuizzes]
         .sort((a: any, b: any) => a.order_index - b.order_index);
 
-      // Get module completion status
-      const moduleCompletion = userProgress?.moduleProgress?.get(section.id);
+      console.log(`📦 Section ${section.id} (${section.title}): ${sectionLessons.length} videos, ${sectionPDFs.length} PDFs, ${sectionQuizzes.length} quizzes = ${items.length} total items`);
+
+      // ✨ CALCULATE module completion based on items
+      let isModuleCompleted = false;
+      let moduleCompletedAt = null;
+      
+      if (userId && items.length > 0) {
+        // Check if ALL items in this section are completed
+        const completedItems = items.filter((item: any) => item.is_completed);
+        isModuleCompleted = completedItems.length === items.length;
+        
+        // If module is marked as completed in DB, use that timestamp
+        // Otherwise use null (even if we calculated it's complete, we don't have the timestamp)
+        const storedProgress = userProgress?.moduleProgress?.get(section.id);
+        if (isModuleCompleted && storedProgress?.completed_at) {
+          moduleCompletedAt = storedProgress.completed_at;
+        }
+        
+        console.log(`✅ Section ${section.id} (${section.title}): ${completedItems.length}/${items.length} items completed = ${isModuleCompleted ? 'MODULE COMPLETE' : 'INCOMPLETE'}`);
+      }
 
       // Calculate total duration from videos in this section (in minutes)
       const calculatedDuration = Math.ceil(
@@ -320,8 +382,8 @@ serve(async (req) => {
         items,
         itemCount: items.length,
         duration_minutes: calculatedDuration || section.duration_minutes || 0,
-        module_is_completed: moduleCompletion?.is_completed || false,
-        module_completed_at: moduleCompletion?.completed_at || null
+        module_is_completed: isModuleCompleted,
+        module_completed_at: moduleCompletedAt
       };
     });
 
@@ -371,6 +433,7 @@ serve(async (req) => {
       totalSections: sections?.length || 0,
       totalVideos: lessons?.length || 0,
       totalQuizzes: quizzes?.length || 0,
+      totalPDFs: resources?.length || 0,
       userProgress,
       meta: {
         timestamp: new Date().toISOString(),

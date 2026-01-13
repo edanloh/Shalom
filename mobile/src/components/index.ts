@@ -17,5 +17,8 @@ export { default as Hero } from './Hero';
 export { default as Stats } from './Stats';
 export { YouTubePlayerWrapper } from './YouTubePlayerWrapper';
 
+// Course completion component
+export { CourseCompletionCard } from './CourseCompletionCard';
+
 // Template components
 export { default as Screen } from './common/Screen';

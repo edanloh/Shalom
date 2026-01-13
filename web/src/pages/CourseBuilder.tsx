@@ -24,7 +24,7 @@ const CourseBuilder = () => {
 };
 
 const CourseBuilderMain = () => {
-  const { previewMode, isLoadingCourse, hasUnsavedChanges, modalState, closeModal } = useCourseBuilder();
+  const { previewMode, isLoadingCourse, hasUnsavedChanges, modalState, closeModal, isSaving } = useCourseBuilder();
   const navigate = useNavigate();
 
   // Warn user about unsaved changes before leaving page
@@ -71,6 +71,17 @@ const CourseBuilderMain = () => {
           <RightSidebar />
         </div>
       </div>
+      
+      {/* Saving Overlay */}
+      {isSaving && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-white text-lg font-semibold">Saving course...</p>
+            <p className="text-white/70 text-sm mt-2">Please wait, do not close this window</p>
+          </div>
+        </div>
+      )}
       
       {/* Global Confirmation Modal */}
       <ConfirmationModal

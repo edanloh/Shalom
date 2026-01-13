@@ -108,7 +108,7 @@ export default function CourseDetailScreen({
         courseDetailService.getCourseDetail(courseId),
         moduleService.getModuleDetail(courseId, userId || '') // Use actual user ID from auth context
       ]);
-      
+      console.log('[CourseDetailScreen] Loaded course detail and content:', { detail, moduleData });
       setCourseDetail(detail);
       setCourseContent(moduleData);
     } catch (err) {
@@ -868,8 +868,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   reviewItem: {
-    backgroundColor: 'transparent',       // was Colors.textInputBg
-    paddingVertical: Spacing.md,          // a bit tighter
+    backgroundColor: 'transparent',      
+    paddingVertical: Spacing.md,         
     paddingHorizontal: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.gray500,
@@ -877,7 +877,7 @@ const styles = StyleSheet.create({
   reviewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.xs,             // was Spacing.sm
+    marginBottom: Spacing.xs,             
   },
   reviewerAvatar: {
     width: 32,

@@ -53,9 +53,9 @@ serve(async (req) => {
     console.log('Fetching video details:', { videoId, userId });
 
     // ========================================
-    // 1. Fetch video details with course and section info
+    // 1. Try to fetch from course_videos first
     // ========================================
-    const { data: video, error: videoError } = await supabaseClient
+    let { data: video, error: videoError } = await supabaseClient
       .from('course_videos')
       .select(`
         id,
@@ -70,7 +70,9 @@ serve(async (req) => {
         section_id,
         courses (
           id,
-          title
+          title,
+          instructor_name,
+          level
         ),
         course_sections (
           id,
@@ -80,49 +82,133 @@ serve(async (req) => {
       .eq('id', videoId)
       .single();
 
+    // ========================================
+    // 2. If not found in videos, try course_resources (PDFs)
+    // ========================================
+    let lessonType = 'video';
+    let pdfResource = null;
+    
     if (videoError || !video) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "Video not found"
-        }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      const { data: resource, error: resourceError } = await supabaseClient
+        .from('course_resources')
+        .select(`
+          id,
+          title,
+          description,
+          resource_url,
+          file_size_bytes,
+          thumbnail_url,
+          is_preview,
+          is_downloadable,
+          order_index,
+          course_id,
+          section_id,
+          courses (
+            id,
+            title,
+            instructor_name,
+            level
+          ),
+          course_sections (
+            id,
+            title
+          )
+        `)
+        .eq('id', videoId)
+        .eq('resource_type', 'pdf')
+        .single();
+
+      if (resourceError || !resource) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Lesson not found"
+          }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Convert resource to video-like structure for compatibility
+      pdfResource = resource;
+      lessonType = 'pdf';
+      video = {
+        id: resource.id,
+        title: resource.title,
+        description: resource.description,
+        resource_url: resource.resource_url,
+        file_size_bytes: resource.file_size_bytes,
+        is_downloadable: resource.is_downloadable,
+        thumbnail_url: resource.thumbnail_url,
+        is_preview: resource.is_preview,
+        order_index: resource.order_index,
+        course_id: resource.course_id,
+        section_id: resource.section_id,
+        courses: resource.courses,
+        course_sections: resource.course_sections,
+      };
     }
 
     // ========================================
-    // 2. Fetch navigation (previous and next videos in same section)
+    // 3. Fetch navigation (all items in same section - videos, PDFs, and quizzes)
     // ========================================
-    const { data: allVideos, error: navigationError } = await supabaseClient
+    const { data: allVideos, error: videoNavError } = await supabaseClient
       .from('course_videos')
       .select('id, title, order_index')
       .eq('section_id', video.section_id)
       .eq('course_id', video.course_id)
       .order('order_index', { ascending: true });
 
-    if (navigationError) throw navigationError;
+    const { data: allResources, error: resourceNavError } = await supabaseClient
+      .from('course_resources')
+      .select('id, title, order_index')
+      .eq('section_id', video.section_id)
+      .eq('course_id', video.course_id)
+      .eq('resource_type', 'pdf')
+      .order('order_index', { ascending: true });
 
-    const currentIndex = (allVideos || []).findIndex((v: any) => v.id === videoId);
+    const { data: allQuizzes, error: quizNavError } = await supabaseClient
+      .from('course_quizzes')
+      .select('id, title, order_index')
+      .eq('section_id', video.section_id)
+      .eq('course_id', video.course_id)
+      .order('order_index', { ascending: true });
+
+    if (videoNavError) throw videoNavError;
+    if (resourceNavError) throw resourceNavError;
+    if (quizNavError) throw quizNavError;
+
+    // Combine and sort all items by order_index
+    const allItems = [
+      ...(allVideos || []).map((v: any) => ({ ...v, type: 'video' })),
+      ...(allResources || []).map((r: any) => ({ ...r, type: 'pdf' })),
+      ...(allQuizzes || []).map((q: any) => ({ ...q, type: 'quiz' }))
+    ].sort((a, b) => a.order_index - b.order_index);
+
+    console.log('All items in section:', allItems.map((i: any) => ({ id: i.id, title: i.title, type: i.type, order: i.order_index })));
+
+    const currentIndex = allItems.findIndex((item: any) => item.id === videoId);
     
     const previousVideo = currentIndex > 0 
       ? { 
-          id: allVideos[currentIndex - 1].id, 
-          title: allVideos[currentIndex - 1].title 
+          id: allItems[currentIndex - 1].id, 
+          title: allItems[currentIndex - 1].title,
+          type: allItems[currentIndex - 1].type
         }
       : null;
     
-    const nextVideo = currentIndex < (allVideos?.length || 0) - 1
+    const nextVideo = currentIndex < allItems.length - 1
       ? { 
-          id: allVideos[currentIndex + 1].id, 
-          title: allVideos[currentIndex + 1].title 
+          id: allItems[currentIndex + 1].id, 
+          title: allItems[currentIndex + 1].title,
+          type: allItems[currentIndex + 1].type
         }
       : null;
 
     // ========================================
-    // 3. Fetch user progress if userId provided
+    // 4. Fetch user progress if userId provided
     // ========================================
     let userProgress = null;
     
@@ -153,22 +239,32 @@ serve(async (req) => {
     // ========================================
     // 4. Construct response
     // ========================================
+    // 5. Build response data
+    // ========================================
     const responseData = {
       id: video.id,
       title: video.title,
       description: video.description,
-      video_url: video.video_url,
-      duration_seconds: video.duration_seconds,
+      type: lessonType,
+      video_url: lessonType === 'video' ? video.video_url : undefined,
+      resource_url: lessonType === 'pdf' ? video.resource_url : undefined,
+      file_size_bytes: lessonType === 'pdf' ? video.file_size_bytes : undefined,
+      is_downloadable: lessonType === 'pdf' ? video.is_downloadable : undefined,
+      duration_seconds: lessonType === 'video' ? video.duration_seconds : undefined,
       thumbnail_url: video.thumbnail_url,
       is_preview: video.is_preview,
+      order_index: video.order_index,
       course: {
         id: video.courses.id,
-        title: video.courses.title
+        title: video.courses.title,
+        instructor_name: video.courses.instructor_name,
+        level: video.courses.level
       },
       section: {
         id: video.course_sections.id,
         title: video.course_sections.title
       },
+      sectionVideos: allItems || [],
       navigation: {
         previousVideo,
         nextVideo

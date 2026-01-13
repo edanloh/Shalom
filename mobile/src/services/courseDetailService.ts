@@ -123,15 +123,6 @@ class CourseDetailService {
       
       const response = await apiService.get<CourseDetailResponse>(`/getModuleDetail/${courseId}`);
       
-      console.log('=== Course Detail API Response ===');
-      console.log('Response keys:', Object.keys(response || {}));
-      console.log('response.success:', response?.success);
-      console.log('response.data exists:', !!response?.data);
-      console.log('response.data keys:', Object.keys(response?.data || {}));
-      console.log('response.data.sections:', response?.data?.sections);
-      console.log('Full response:', JSON.stringify(response, null, 2).slice(0, 1000));
-      console.log('================================');
-      
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch course details');
       }
