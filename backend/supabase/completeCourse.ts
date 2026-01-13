@@ -24,6 +24,29 @@ const corsHeaders = {
 const buildCertificateNumber = (courseId: string, userId: string) =>
   `CC-${courseId}-${userId}`;
 
+async function notifyStreakUpdate(userId: string, activityAt: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/updateStreak`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({ userId, activityAt }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("updateStreak failed:", res.status, text);
+    }
+  } catch (error) {
+    console.error("Failed to update streak:", error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") {
@@ -142,6 +165,8 @@ serve(async (req) => {
         console.error("Failed to send completion notification:", notifyError);
       }
     }
+
+    await notifyStreakUpdate(userId, new Date().toISOString());
 
     return new Response(
       JSON.stringify({ success: true, certificateIssued }),

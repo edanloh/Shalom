@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Screen } from "@/components";
 import { Colors, Spacing, TextStyles } from "../constants";
 import { Ionicons } from "@expo/vector-icons";
@@ -59,6 +60,7 @@ export default function LearningGoalScreen({ navigation }: any) {
   const { user } = useAuth();
   const [goals, setGoals] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [streakDays, setStreakDays] = useState<number>(0);
   const [completedCourses, setCompletedCourses] = useState<number>(0);
   const [studyHours, setStudyHours] = useState<number>(0);
@@ -156,9 +158,24 @@ export default function LearningGoalScreen({ navigation }: any) {
     [completedCourses, studyHours]
   );
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadGoals();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadGoals]);
+
   useEffect(() => {
     loadGoals();
   }, [loadGoals]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadGoals();
+    }, [loadGoals])
+  );
 
   return (
     <Screen
@@ -168,41 +185,51 @@ export default function LearningGoalScreen({ navigation }: any) {
       onHeaderLeftPress={() => navigation.goBack()}
       customEdges={["top", "bottom"]}
       stickyHeader
+      useScrollView={false}
+      disableChildrenWrapper
     >
-      <ScrollView contentContainerStyle={externalStyles.fullScrollContent} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <View style={{ paddingVertical: Spacing.lg, alignItems: "center" }}>
-            <ActivityIndicator size="large" color={Colors.secondary} />
+      <ScrollView
+        contentContainerStyle={externalStyles.fullScrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.secondary} />
+        }
+      >
+        <View style={externalStyles.scrollContent}>
+          {loading ? (
+            <View style={{ paddingVertical: Spacing.lg, alignItems: "center" }}>
+              <ActivityIndicator size="large" color={Colors.secondary} />
+            </View>
+          ) : null}
+
+          <View style={styles.streakCard}>
+            <Ionicons name="flame" size={48} color="#FF6B35" />
+            <Text style={styles.streakNumber}>{streakDays}</Text>
+            <Text style={styles.streakLabel}>Day Streak</Text>
+            <Text style={styles.streakSubtitle}>Keep learning every day! 🎯</Text>
           </View>
-        ) : null}
 
-        <View style={styles.streakCard}>
-          <Ionicons name="flame" size={48} color="#FF6B35" />
-          <Text style={styles.streakNumber}>{streakDays}</Text>
-          <Text style={styles.streakLabel}>Day Streak</Text>
-          <Text style={styles.streakSubtitle}>Keep learning every day! 🎯</Text>
-        </View>
-
-        <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>Active Goals</Text>
-        {(goals.length ? goals : []).map((goal, i) => (
-          <GoalCard key={goal.id || i} goal={goal} />
-        ))}
-        {goals.length === 0 && !loading ? (
-          <Text style={[TextStyles.body, { color: Colors.textSecondary }]}>No goals yet.</Text>
-        ) : null}
-
-        <Text
-          style={[
-            styles.sectionTitle,
-            { marginTop: Spacing.lg, marginBottom: Spacing.md },
-          ]}
-        >
-          Your Progress
-        </Text>
-        <View style={styles.statsGrid}>
-          {stats.map((stat, i) => (
-            <StatTile key={i} stat={stat} />
+          <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>Active Goals</Text>
+          {(goals.length ? goals : []).map((goal, i) => (
+            <GoalCard key={goal.id || i} goal={goal} />
           ))}
+          {goals.length === 0 && !loading ? (
+            <Text style={[TextStyles.body, { color: Colors.textSecondary }]}>No goals yet.</Text>
+          ) : null}
+
+          <Text
+            style={[
+              styles.sectionTitle,
+              { marginTop: Spacing.lg, marginBottom: Spacing.md },
+            ]}
+          >
+            Your Progress
+          </Text>
+          <View style={styles.statsGrid}>
+            {stats.map((stat, i) => (
+              <StatTile key={i} stat={stat} />
+            ))}
+          </View>
         </View>
       </ScrollView>
     </Screen>

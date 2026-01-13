@@ -24,6 +24,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
 };
 
+const MIN_DAILY_WATCH_MINUTES = 10;
+
 async function notifyCourseCompletion(userId: string, courseId: string) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -44,6 +46,43 @@ async function notifyCourseCompletion(userId: string, courseId: string) {
     }
   } catch (error) {
     console.error('Failed to notify course completion:', error);
+  }
+}
+
+const getLocalDateString = (date: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== "literal") map[part.type] = part.value;
+  }
+  return `${map.year}-${map.month}-${map.day}`;
+};
+
+async function notifyStreakUpdate(userId: string, activityAt: string) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/updateStreak`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({ userId, activityAt }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('updateStreak failed:', res.status, text);
+    }
+  } catch (error) {
+    console.error('Failed to update streak:', error);
   }
 }
 
@@ -187,6 +226,14 @@ serve(async (req) => {
     // 2. Upsert video progress
     // ========================================
     const completedAt = isCompleted ? new Date().toISOString() : null;
+    const { data: existingProgress, error: existingProgressError } = await supabaseClient
+      .from('video_progress')
+      .select('watch_time_seconds')
+      .eq('user_id', userId)
+      .eq('video_id', videoId)
+      .maybeSingle();
+
+    if (existingProgressError) throw existingProgressError;
 
     const { data: progress, error: progressError } = await supabaseClient
       .from('video_progress')
@@ -213,6 +260,51 @@ serve(async (req) => {
       lastPosition: progress.last_position_seconds,
       isCompleted: progress.is_completed
     });
+
+    const prevWatch = Number(existingProgress?.watch_time_seconds ?? 0);
+    const nextWatch = Number(progress.watch_time_seconds ?? watchTimeSeconds);
+    const deltaSeconds = Math.max(0, nextWatch - prevWatch);
+    if (deltaSeconds > 0) {
+      const { data: prefRow, error: prefErr } = await supabaseClient
+        .from('user_preferences')
+        .select('timezone')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (prefErr && prefErr.code !== 'PGRST116') throw prefErr;
+
+      const timezone = prefRow?.timezone || 'UTC';
+      const now = new Date();
+      const dateStr = getLocalDateString(now, timezone);
+
+      const { data: analyticsRow, error: analyticsErr } = await supabaseClient
+        .from('user_analytics')
+        .select('total_time_minutes')
+        .eq('user_id', userId)
+        .eq('date', dateStr)
+        .maybeSingle();
+      if (analyticsErr && analyticsErr.code !== 'PGRST116') throw analyticsErr;
+
+      const prevMinutes = Number(analyticsRow?.total_time_minutes ?? 0);
+      const newMinutes = Math.floor((prevMinutes * 60 + deltaSeconds) / 60);
+
+      if (newMinutes !== prevMinutes) {
+        const { error: analyticsUpsertErr } = await supabaseClient
+          .from('user_analytics')
+          .upsert(
+            {
+              user_id: userId,
+              date: dateStr,
+              total_time_minutes: newMinutes,
+            },
+            { onConflict: 'user_id,date' }
+          );
+        if (analyticsUpsertErr) throw analyticsUpsertErr;
+      }
+
+      if (prevMinutes < MIN_DAILY_WATCH_MINUTES && newMinutes >= MIN_DAILY_WATCH_MINUTES) {
+        await notifyStreakUpdate(userId, now.toISOString());
+      }
+    }
 
     // ========================================
     // 3. Update course enrollment progress

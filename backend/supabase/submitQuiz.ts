@@ -24,6 +24,20 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
 };
 
+const getLocalDateString = (date: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== "literal") map[part.type] = part.value;
+  }
+  return `${map.year}-${map.month}-${map.day}`;
+};
+
 type QuizQuestion = {
   id: string;
   question: string;
@@ -52,6 +66,71 @@ async function notifyCourseCompletion(userId: string, courseId: string) {
   } catch (error) {
     console.error('Failed to notify course completion:', error);
   }
+}
+
+async function notifyStreakUpdate(userId: string, activityAt: string) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/updateStreak`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({ userId, activityAt }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('updateStreak failed:', res.status, text);
+    }
+  } catch (error) {
+    console.error('Failed to update streak:', error);
+  }
+}
+
+async function updateDailyMinutes(
+  supabaseClient: any,
+  userId: string,
+  minutes: number,
+  activityAt: Date
+) {
+  if (!Number.isFinite(minutes) || minutes <= 0) return;
+
+  const { data: prefRow, error: prefErr } = await supabaseClient
+    .from('user_preferences')
+    .select('timezone')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (prefErr && prefErr.code !== 'PGRST116') throw prefErr;
+
+  const timezone = prefRow?.timezone || 'UTC';
+  const dateStr = getLocalDateString(activityAt, timezone);
+
+  const { data: analyticsRow, error: analyticsErr } = await supabaseClient
+    .from('user_analytics')
+    .select('total_time_minutes')
+    .eq('user_id', userId)
+    .eq('date', dateStr)
+    .maybeSingle();
+  if (analyticsErr && analyticsErr.code !== 'PGRST116') throw analyticsErr;
+
+  const prevMinutes = Number(analyticsRow?.total_time_minutes ?? 0);
+  const newMinutes = prevMinutes + Math.floor(minutes);
+
+  const { error: upsertErr } = await supabaseClient
+    .from('user_analytics')
+    .upsert(
+      {
+        user_id: userId,
+        date: dateStr,
+        total_time_minutes: newMinutes,
+      },
+      { onConflict: 'user_id,date' }
+    );
+  if (upsertErr) throw upsertErr;
 }
 
 /**
@@ -265,6 +344,9 @@ serve(async (req) => {
       });
 
     if (insertError) throw insertError;
+
+    await updateDailyMinutes(supabaseClient, userId, Number(timeTakenMinutes || 0), new Date());
+    await notifyStreakUpdate(userId, new Date().toISOString());
 
     // ========================================
     // 5. Update course progress if quiz passed
