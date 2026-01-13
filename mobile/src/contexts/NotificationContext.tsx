@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, { createContext, useState, useEffect, useContext, useRef } from "react";
 import { Platform, Alert, DeviceEventEmitter } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import * as Notifications from "expo-notifications";
@@ -6,7 +6,7 @@ import Constants from "expo-constants";
 import { useAuth } from "./AuthContext";
 import notificationService from "../services/notificationService";
 import { CREDIT_EVENT_CHANNEL } from "../services/creditService";
-import { TOAST_CHANNEL, type ToastPayload } from "../components/common/Toast";
+import { TOAST_CHANNEL, showToast, type ToastPayload } from "../components/common/Toast";
 import type { Notification as InAppNotification } from "../types";
 
 // Set notification handler
@@ -25,6 +25,20 @@ function handleRegistrationError(errorMessage: string) {
 
 const MAX_IN_APP_NOTIFICATIONS = 200;
 const NOTIFICATION_PAGE_SIZE = 25;
+const TOASTABLE_TYPES = new Set([
+  "streak_reminder",
+  "streak_broken",
+  "streak_hot",
+  "goal_completed",
+  "goal_expired",
+  "course",
+]);
+
+const toastTypeForNotification = (type?: string): ToastPayload["type"] => {
+  if (type === "streak_hot" || type === "goal_completed" || type === "course") return "success";
+  if (type === "streak_broken" || type === "goal_expired") return "error";
+  return "info";
+};
 
 async function registerForPushNotificationsAsync(skipPrompt: boolean = false) {
   // Android: Set up notification channel
@@ -169,6 +183,8 @@ export const NotificationProvider = ({
   const [isLoadingMoreNotifications, setIsLoadingMoreNotifications] = useState(false);
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const [nextOffset, setNextOffset] = useState(0);
+  const seenNotificationIds = useRef<Set<string>>(new Set());
+  const loadedOnce = useRef(false);
 
   // Register token with backend when user is authenticated and token is available
   useEffect(() => {
@@ -186,6 +202,8 @@ export const NotificationProvider = ({
       setInAppNotifications([]);
       setHasMoreNotifications(false);
       setNextOffset(0);
+      seenNotificationIds.current = new Set();
+      loadedOnce.current = false;
       return;
     }
     try {
@@ -194,6 +212,22 @@ export const NotificationProvider = ({
         limit: NOTIFICATION_PAGE_SIZE,
         offset: 0,
       });
+      if (loadedOnce.current) {
+        const newlyAdded = items.filter((item) => !seenNotificationIds.current.has(item.id));
+        newlyAdded.slice(0, 3).forEach((item) => {
+          if (!TOASTABLE_TYPES.has(item.type)) return;
+          showToast({
+            title: item.title,
+            message: item.message,
+            type: toastTypeForNotification(item.type),
+            durationMs: 2600,
+            skipInApp: true,
+          });
+        });
+      } else {
+        loadedOnce.current = true;
+      }
+      items.forEach((item) => seenNotificationIds.current.add(item.id));
       setInAppNotifications(items);
       setNextOffset(items.length);
       setHasMoreNotifications(
@@ -252,6 +286,18 @@ export const NotificationProvider = ({
     const notificationListener = Notifications.addNotificationReceivedListener(
       (notification) => {
         setNotification(notification);
+        const data = (notification.request?.content?.data ?? {}) as Record<string, any>;
+        const type = String(data.type || "");
+        const notificationId = data.notificationId ? String(data.notificationId) : "";
+        if (notificationId) seenNotificationIds.current.add(notificationId);
+        if (!TOASTABLE_TYPES.has(type)) return;
+        showToast({
+          title: notification.request?.content?.title ?? "Update",
+          message: notification.request?.content?.body ?? "",
+          type: toastTypeForNotification(type),
+          durationMs: 2600,
+          skipInApp: true,
+        });
       }
     );
 
@@ -314,6 +360,7 @@ export const NotificationProvider = ({
       TOAST_CHANNEL,
       (payload: ToastPayload) => {
         if (!payload?.message) return;
+        if (payload.skipInApp) return;
         const title = payload.title?.toLowerCase() || "";
         const message = payload.message?.toLowerCase() || "";
         if (payload.type === "success" && (title.includes("achievement") || message.includes("achievement"))) {

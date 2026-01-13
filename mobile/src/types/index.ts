@@ -79,12 +79,35 @@ export interface LearningGoal {
   label: string;
   targetHours: number;
   currentHours: number;
+  targetLessons?: number;
+  currentLessons?: number;
+  targetQuizzes?: number;
+  currentQuizzes?: number;
   streakDays?: number;
   deadline?: string;
   targetPoints?: number;
   currentPoints?: number;
   targetCourses?: number;
   currentCourses?: number;
+  isActive?: boolean;
+  rewardPoints?: number;
+  completedAt?: string;
+  templateId?: string;
+  isExpired?: boolean;
+}
+
+export interface GoalTemplate {
+  id: string;
+  label: string;
+  description?: string | null;
+  difficulty?: "easy" | "medium" | "hard";
+  targetHours?: number;
+  targetCourses?: number;
+  targetPoints?: number;
+  targetLessons?: number;
+  targetQuizzes?: number;
+  durationDays?: number;
+  rewardPoints?: number;
 }
 
 export interface CertificateProgress {
@@ -167,7 +190,16 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  type: 'course' | 'achievement' | 'reminder' | 'system';
+  type:
+    | 'course'
+    | 'achievement'
+    | 'reminder'
+    | 'system'
+    | 'streak_reminder'
+    | 'streak_broken'
+    | 'streak_hot'
+    | 'goal_completed'
+    | 'goal_expired';
   read: boolean;
   createdAt: string;
   actionUrl?: string;

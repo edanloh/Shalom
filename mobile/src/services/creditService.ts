@@ -1,9 +1,16 @@
 import { DeviceEventEmitter } from 'react-native';
 import apiService from './apiService';
 import { showToast } from '../components/common/Toast';
-import { AchievementItem, CertificateProgress, CreditBalance, CreditEvent, CreditEventPayload, LearningGoal } from '../types';
+import {
+  AchievementItem,
+  CertificateProgress,
+  CreditBalance,
+  CreditEvent,
+  CreditEventPayload,
+  GoalTemplate,
+  LearningGoal,
+} from '../types';
 
-const GOAL_HIT_POINTS = 50;
 const STREAK_INCREMENT_POINTS = 10;
 
 type GoalSnapshot = {
@@ -22,6 +29,10 @@ const ENDPOINTS = {
   GOALS: '/getGoals',
   CERTS: '/getCertificates',
   EVENTS: '/postCreditEvent',
+  SET_GOAL_ACTIVE: '/setGoalActive',
+  GOAL_TEMPLATES: '/getGoalTemplates',
+  CREATE_GOALS: '/createGoalsFromTemplates',
+  CLEAR_GOAL: '/clearGoal',
 };
 
 export const CREDIT_EVENT_CHANNEL = 'credits:updated';
@@ -80,19 +91,22 @@ export async function getGoals(userId?: string): Promise<LearningGoal[]> {
 export async function getGoalsWithProgress(userId?: string): Promise<{
   goals: LearningGoal[];
   completedCourses: number;
+  totalTimeMinutes: number;
 }> {
-  if (!userId) return { goals: [], completedCourses: 0 };
+  if (!userId) return { goals: [], completedCourses: 0, totalTimeMinutes: 0 };
   const resp = await apiService.get<any>(ENDPOINTS.GOALS, { userId });
   const data = resp?.data ?? resp;
   if (Array.isArray(data)) {
     return {
       goals: data,
       completedCourses: Number(resp?.completedCourses ?? 0),
+      totalTimeMinutes: Number(resp?.totalTimeMinutes ?? 0),
     };
   }
   return {
     goals: Array.isArray(data?.data) ? data.data : [],
     completedCourses: Number(data?.completedCourses ?? resp?.completedCourses ?? 0),
+    totalTimeMinutes: Number(data?.totalTimeMinutes ?? resp?.totalTimeMinutes ?? 0),
   };
 }
 
@@ -161,8 +175,17 @@ export async function recordGoalMilestones(goals: LearningGoal[], userId?: strin
   if (!userId) return;
   const raw = Array.isArray(goals) ? goals : [];
   const snapshot: GoalSnapshot[] = raw.map((g, idx) => {
-    const target = Number(g.targetPoints ?? g.targetCourses ?? g.targetHours ?? 0);
-    const current = Number(g.currentPoints ?? g.currentCourses ?? g.currentHours ?? 0);
+    const target = Number(
+      g.targetPoints ?? g.targetCourses ?? g.targetHours ?? g.targetLessons ?? g.targetQuizzes ?? 0
+    );
+    const current = Number(
+      g.currentPoints ??
+        g.currentCourses ??
+        g.currentHours ??
+        g.currentLessons ??
+        g.currentQuizzes ??
+        0
+    );
     const label = g.label || 'Goal';
     const id = String(g.id || label || `goal_${idx}`);
     return { id, current, target, label };
@@ -174,24 +197,10 @@ export async function recordGoalMilestones(goals: LearningGoal[], userId?: strin
 
   if (!prev) return;
 
-  const prevById = new Map(prev.goals.map((g) => [g.id, g]));
-  const goalHits = snapshot.filter((g) => {
-    if (g.target <= 0) return false;
-    const prevGoal = prevById.get(g.id);
-    return (prevGoal?.current ?? 0) < g.target && g.current >= g.target;
-  });
   const streakIncreased = maxStreak > prev.streakDays ? maxStreak : null;
 
   try {
-    const events = goalHits.map((g) =>
-      recordCreditEvent({
-        userId,
-        type: 'goal_hit',
-        title: `${g.label} goal hit`,
-        points: GOAL_HIT_POINTS,
-        referenceKey: `goal_hit:${g.id}`,
-      })
-    );
+    const events: Promise<any>[] = [];
     if (streakIncreased != null) {
       events.push(
         recordCreditEvent({
@@ -209,6 +218,58 @@ export async function recordGoalMilestones(goals: LearningGoal[], userId?: strin
   }
 }
 
+export async function setGoalActive(
+  goalId: string,
+  isActive: boolean,
+  userId?: string
+): Promise<LearningGoal | null> {
+  if (!userId) throw new Error('userId is required');
+  const resp = await apiService.post<any>(ENDPOINTS.SET_GOAL_ACTIVE, {
+    userId,
+    goalId,
+    isActive,
+  });
+  return resp?.data ?? resp ?? null;
+}
+
+export async function getGoalTemplates(userId?: string): Promise<GoalTemplate[]> {
+  if (!userId) throw new Error('userId is required');
+  const resp = await apiService.get<any>(ENDPOINTS.GOAL_TEMPLATES, { userId });
+  const raw = resp?.data ?? resp ?? [];
+  if (!Array.isArray(raw)) return [];
+  return raw.map((t: any) => ({
+    id: t.id,
+    label: t.label,
+    description: t.description,
+    difficulty: t.difficulty,
+    targetHours: t.target_hours,
+    targetCourses: t.target_courses,
+    targetPoints: t.target_points,
+    targetLessons: t.target_lessons,
+    targetQuizzes: t.target_quizzes,
+    durationDays: t.duration_days,
+    rewardPoints: t.reward_points,
+  }));
+}
+
+export async function createGoalsFromTemplates(
+  templateIds: string[],
+  userId?: string
+): Promise<LearningGoal[]> {
+  if (!userId) throw new Error('userId is required');
+  const resp = await apiService.post<any>(ENDPOINTS.CREATE_GOALS, {
+    userId,
+    templateIds,
+  });
+  return resp?.data ?? resp ?? [];
+}
+
+export async function clearGoal(goalId: string, userId?: string): Promise<LearningGoal | null> {
+  if (!userId) throw new Error('userId is required');
+  const resp = await apiService.post<any>(ENDPOINTS.CLEAR_GOAL, { userId, goalId });
+  return resp?.data ?? resp ?? null;
+}
+
 export default {
   getCreditBalance,
   getCreditHistory,
@@ -218,5 +279,9 @@ export default {
   getCertificates,
   recordCreditEvent,
   recordGoalMilestones,
+  setGoalActive,
+  getGoalTemplates,
+  createGoalsFromTemplates,
+  clearGoal,
   subscribeToCreditUpdates,
 };

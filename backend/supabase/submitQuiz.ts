@@ -24,6 +24,27 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
 };
 
+const isGoalComplete = (goal: any) => {
+  const checks: Array<{ target: number; current: number }> = [];
+  const targetHours = Number(goal.target_hours ?? 0);
+  const targetLessons = Number(goal.target_lessons ?? 0);
+  const targetCourses = Number(goal.target_courses ?? 0);
+  const targetPoints = Number(goal.target_points ?? 0);
+  const targetQuizzes = Number(goal.target_quizzes ?? 0);
+
+  if (targetHours > 0) checks.push({ target: targetHours, current: Number(goal.current_hours ?? 0) });
+  if (targetLessons > 0)
+    checks.push({ target: targetLessons, current: Number(goal.current_lessons ?? 0) });
+  if (targetCourses > 0)
+    checks.push({ target: targetCourses, current: Number(goal.current_courses ?? 0) });
+  if (targetPoints > 0) checks.push({ target: targetPoints, current: Number(goal.current_points ?? 0) });
+  if (targetQuizzes > 0)
+    checks.push({ target: targetQuizzes, current: Number(goal.current_quizzes ?? 0) });
+
+  if (!checks.length) return false;
+  return checks.every((c) => c.current >= c.target);
+};
+
 const getLocalDateString = (date: Date, timeZone: string) => {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -91,6 +112,33 @@ async function notifyStreakUpdate(userId: string, activityAt: string) {
   }
 }
 
+async function awardGoalCredits(userId: string, goal: any) {
+  const rewardPoints = Number(goal.reward_points ?? 0);
+  if (!rewardPoints || rewardPoints <= 0) return;
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) return;
+  const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+    },
+    body: JSON.stringify({
+      userId,
+      type: 'goal_hit',
+      title: `${goal.label || 'Goal'} completed`,
+      points: rewardPoints,
+      referenceKey: `goal_completed:${goal.id}`,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('postCreditEvent failed:', res.status, text);
+  }
+}
+
 async function updateDailyMinutes(
   supabaseClient: any,
   userId: string,
@@ -131,6 +179,63 @@ async function updateDailyMinutes(
       { onConflict: 'user_id,date' }
     );
   if (upsertErr) throw upsertErr;
+
+  return newMinutes;
+}
+
+async function updateActiveGoalsForQuiz(
+  supabaseClient: any,
+  userId: string,
+  options: { quizCompleted: boolean; deltaMinutes: number; now: Date }
+) {
+  const { quizCompleted, deltaMinutes, now } = options;
+  const { data: goals, error } = await supabaseClient
+    .from('learning_goals')
+    .select(
+      'id,label,target_hours,current_hours,target_quizzes,current_quizzes,target_courses,current_courses,target_points,current_points,target_lessons,current_lessons,is_active,completed_at,reward_points'
+    )
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .is('completed_at', null)
+    .or(`deadline.is.null,deadline.gte.${now.toISOString()}`);
+  if (error) throw error;
+  if (!goals?.length) return;
+
+  for (const goal of goals) {
+    const updates: Record<string, number | string | boolean | null> = {};
+
+    if (Number(goal.target_hours ?? 0) > 0 && deltaMinutes > 0) {
+      const addedHours = Math.round((deltaMinutes / 60) * 10000) / 10000;
+      const nextHours = Number(goal.current_hours ?? 0) + addedHours;
+      updates.current_hours = nextHours;
+      goal.current_hours = nextHours;
+    }
+
+    if (quizCompleted && Number(goal.target_quizzes ?? 0) > 0) {
+      const nextQuizzes = Number(goal.current_quizzes ?? 0) + 1;
+      updates.current_quizzes = nextQuizzes;
+      goal.current_quizzes = nextQuizzes;
+    }
+
+    const completed = isGoalComplete(goal);
+    if (completed) {
+      updates.completed_at = now.toISOString();
+      updates.is_active = false;
+    }
+
+    if (Object.keys(updates).length) {
+      let query = supabaseClient.from('learning_goals').update(updates).eq('id', goal.id);
+      if (updates.completed_at) {
+        query = query.is('completed_at', null);
+      }
+      const { error: updateErr } = await query;
+      if (updateErr) throw updateErr;
+    }
+
+    if (completed) {
+      await awardGoalCredits(userId, goal);
+    }
+  }
 }
 
 /**
@@ -270,6 +375,13 @@ serve(async (req) => {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('quiz_id', quizId);
+    const { count: previousPasses, error: passCountErr } = await supabaseClient
+      .from('quiz_attempts')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('quiz_id', quizId)
+      .eq('is_passed', true);
+    if (passCountErr) throw passCountErr;
 
     // ========================================
     // 2. Get all questions with correct answers
@@ -345,8 +457,27 @@ serve(async (req) => {
 
     if (insertError) throw insertError;
 
-    await updateDailyMinutes(supabaseClient, userId, Number(timeTakenMinutes || 0), new Date());
+    const now = new Date();
+    await updateDailyMinutes(
+      supabaseClient,
+      userId,
+      Number(timeTakenMinutes || 0),
+      now
+    );
     await notifyStreakUpdate(userId, new Date().toISOString());
+    if (isPassed && (previousPasses ?? 0) === 0) {
+      await updateActiveGoalsForQuiz(supabaseClient, userId, {
+        quizCompleted: true,
+        deltaMinutes: Number(timeTakenMinutes || 0),
+        now,
+      });
+    } else if (Number(timeTakenMinutes || 0) > 0) {
+      await updateActiveGoalsForQuiz(supabaseClient, userId, {
+        quizCompleted: false,
+        deltaMinutes: Number(timeTakenMinutes || 0),
+        now,
+      });
+    }
 
     // ========================================
     // 5. Update course progress if quiz passed

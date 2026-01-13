@@ -74,6 +74,103 @@ const parseStreakDays = (event: CreditEventRecord) => {
   return null;
 };
 
+async function sendNotification(payload: {
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
+}) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) return;
+  await fetch(`${supabaseUrl}/functions/v1/postNotification`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function notifyGoalCompleted(userId: string, goal: any, rewardPoints: number) {
+  const { data: existing, error } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("type", "goal_completed")
+    .eq("related_entity_id", goal.id)
+    .limit(1)
+    .maybeSingle();
+  if (error && error.code !== "PGRST116") throw error;
+  if (existing?.id) return;
+
+  await sendNotification({
+    userId,
+    type: "goal_completed",
+    title: "Goal completed",
+    message: `${goal.label || "Goal"} completed. +${rewardPoints} credits`,
+    relatedEntityType: "goal",
+    relatedEntityId: goal.id,
+  });
+}
+
+const isGoalComplete = (goal: any) => {
+  const checks: Array<{ target: number; current: number }> = [];
+  const targetHours = Number(goal.target_hours ?? 0);
+  const targetPoints = Number(goal.target_points ?? 0);
+  const targetCourses = Number(goal.target_courses ?? 0);
+  const targetLessons = Number(goal.target_lessons ?? 0);
+  const targetQuizzes = Number(goal.target_quizzes ?? 0);
+
+  if (targetHours > 0) checks.push({ target: targetHours, current: Number(goal.current_hours ?? 0) });
+  if (targetPoints > 0) checks.push({ target: targetPoints, current: Number(goal.current_points ?? 0) });
+  if (targetCourses > 0) checks.push({ target: targetCourses, current: Number(goal.current_courses ?? 0) });
+  if (targetLessons > 0) checks.push({ target: targetLessons, current: Number(goal.current_lessons ?? 0) });
+  if (targetQuizzes > 0) checks.push({ target: targetQuizzes, current: Number(goal.current_quizzes ?? 0) });
+
+  if (!checks.length) return false;
+  return checks.every((c) => c.current >= c.target);
+};
+
+async function awardGoalCredits(userId: string, goal: any) {
+  const rewardPoints = Number(goal.reward_points ?? 0);
+  if (!rewardPoints || rewardPoints <= 0) return;
+  const refKey = `goal_completed:${goal.id}`;
+  const { data: existing, error: existingErr } = await supabase
+    .from("credits_events")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("reference_key", refKey)
+    .maybeSingle();
+  if (existingErr) throw existingErr;
+  if (existing) return;
+  const event: CreditEventRecord = {
+    type: "goal_hit",
+    title: `${goal.label || "Goal"} completed`,
+    points: rewardPoints,
+    reference_key: refKey,
+  };
+  const { error } = await supabase.from("credits_events").insert({
+    user_id: userId,
+    type: event.type,
+    title: event.title,
+    points: event.points,
+    course_id: null,
+    timestamp: new Date().toISOString(),
+    reference_key: event.reference_key,
+  });
+  if (error && error.code !== "23505") throw error;
+
+  const balance = await computeBalance(userId);
+  const awardedAchievements = await awardAchievementsForCreditEvent(userId, event, balance);
+  await notifyAchievements(userId, awardedAchievements);
+  await notifyGoalCompleted(userId, goal, rewardPoints);
+}
+
 async function notifyAchievements(userId: string, awarded: AchievementDef[]) {
   if (!awarded.length) return;
   const payload = awarded.map((achievement) => ({
@@ -217,6 +314,44 @@ async function awardAchievementsForCreditEvent(
   return awarded ?? [];
 }
 
+async function syncPointGoals(userId: string, balance: number) {
+  const now = new Date();
+  const { data: goals, error } = await supabase
+    .from("learning_goals")
+    .select(
+      "id,label,target_points,current_points,target_hours,current_hours,target_courses,current_courses,target_lessons,current_lessons,target_quizzes,current_quizzes,is_active,completed_at,reward_points"
+    )
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .is("completed_at", null)
+    .gt("target_points", 0)
+    .or(`deadline.is.null,deadline.gte.${now.toISOString()}`);
+  if (error) throw error;
+  if (!goals?.length) return;
+
+  for (const goal of goals) {
+    const currentPoints = Number(goal.current_points ?? 0);
+    if (currentPoints !== balance) {
+      const { error: updateErr } = await supabase
+        .from("learning_goals")
+        .update({ current_points: balance })
+        .eq("id", goal.id);
+      if (updateErr) throw updateErr;
+      goal.current_points = balance;
+    }
+
+    if (isGoalComplete(goal)) {
+      const { error: completeErr } = await supabase
+        .from("learning_goals")
+        .update({ completed_at: new Date().toISOString(), is_active: false })
+        .eq("id", goal.id)
+        .is("completed_at", null);
+      if (completeErr) throw completeErr;
+      await awardGoalCredits(userId, goal);
+    }
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return fail("Method not allowed", 405);
@@ -254,6 +389,7 @@ serve(async (req) => {
 
       if (existing) {
         const balance = await computeBalance(event.user_id);
+        await syncPointGoals(event.user_id, balance);
         const awardedAchievements = await awardAchievementsForCreditEvent(event.user_id, event, balance);
         await notifyAchievements(event.user_id, awardedAchievements);
         return ok({
@@ -268,6 +404,7 @@ serve(async (req) => {
     if (insertErr) throw insertErr;
 
     const balance = await computeBalance(event.user_id);
+    await syncPointGoals(event.user_id, balance);
     const awardedAchievements = await awardAchievementsForCreditEvent(event.user_id, event, balance);
     await notifyAchievements(event.user_id, awardedAchievements);
     return ok({ success: true, data: { balance, event, awardedAchievements } });

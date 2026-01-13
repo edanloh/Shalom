@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, ContainerStyles, Spacing, Typography, TextStyles } from '../constants';
-import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
+import { useNavigation, CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { ActionButton, Screen } from '@/components';
@@ -56,9 +56,17 @@ export default function HomeScreen({ navigation, route }: any) {
   const [goalProgress, setGoalProgress] = useState<{
     current: number;
     target: number;
-    unit: "hours" | "courses" | "points";
+    unit: "hours" | "courses" | "points" | "lessons" | "quizzes";
     label: string;
   }>({ current: 0, target: 10, unit: "hours", label: "Weekly Goal" });
+  const [goalList, setGoalList] = useState<Array<{
+    id: string;
+    label: string;
+    current: number;
+    target: number;
+    unit: "hours" | "courses" | "points" | "lessons" | "quizzes";
+    deadline?: string;
+  }>>([]);
 
   // const navigation = useNavigation<CompositeNavigationProp<
   //   StackNavigationProp<MainStackParamList>,
@@ -116,35 +124,66 @@ export default function HomeScreen({ navigation, route }: any) {
         : 0;
       setStreakDays(maxStreak);
       if (Array.isArray(goals)) {
+        const activeGoals = goals.filter((g) => g.isActive && !g.isExpired && !g.completedAt);
         const goal =
+          activeGoals[0] ||
           goals.find(
             (g) =>
               Number(g.targetHours || 0) > 0 ||
               Number(g.currentHours || 0) > 0 ||
+              Number(g.targetLessons || 0) > 0 ||
+              Number(g.currentLessons || 0) > 0 ||
+              Number(g.targetQuizzes || 0) > 0 ||
+              Number(g.currentQuizzes || 0) > 0 ||
               /study|time/i.test(g.label || "")
-          ) || goals[0];
+          ) ||
+          goals[0];
 
         if (goal) {
           const targetPoints = Number(goal.targetPoints ?? 0);
           const targetCourses = Number(goal.targetCourses ?? 0);
           const targetHours = Number(goal.targetHours ?? 0);
+          const targetLessons = Number(goal.targetLessons ?? 0);
+          const targetQuizzes = Number(goal.targetQuizzes ?? 0);
           const currentPoints = Number(goal.currentPoints ?? 0);
           const currentCourses = Number(goal.currentCourses ?? 0);
           const currentHours = Number(goal.currentHours ?? 0);
+          const currentLessons = Number(goal.currentLessons ?? 0);
+          const currentQuizzes = Number(goal.currentQuizzes ?? 0);
           const label = goal.label || "Weekly Goal";
 
-          let unit: "hours" | "courses" | "points" = "hours";
+          let unit: "hours" | "courses" | "points" | "lessons" | "quizzes" = "hours";
           if (targetPoints > 0 || currentPoints > 0) unit = "points";
           else if (targetCourses > 0 || currentCourses > 0) unit = "courses";
+          else if (targetLessons > 0 || currentLessons > 0) unit = "lessons";
+          else if (targetQuizzes > 0 || currentQuizzes > 0) unit = "quizzes";
           else if (targetHours > 0 || currentHours > 0) unit = "hours";
           else if (/course/i.test(label)) unit = "courses";
           else if (/point/i.test(label)) unit = "points";
+          else if (/lesson/i.test(label)) unit = "lessons";
+          else if (/quiz/i.test(label)) unit = "quizzes";
           else if (/time|study/i.test(label)) unit = "hours";
 
           const target =
-            unit === "points" ? targetPoints : unit === "courses" ? targetCourses : targetHours;
+            unit === "points"
+              ? targetPoints
+              : unit === "courses"
+              ? targetCourses
+              : unit === "lessons"
+              ? targetLessons
+              : unit === "quizzes"
+              ? targetQuizzes
+              : targetHours;
           const current =
-            unit === "points" ? currentPoints : unit === "courses" ? currentCourses : currentHours;
+            unit === "points"
+              ? currentPoints
+              : unit === "courses"
+              ? currentCourses
+              : unit === "lessons"
+              ? currentLessons
+              : unit === "quizzes"
+              ? currentQuizzes
+              : currentHours;
 
           setGoalProgress({
             current,
@@ -153,9 +192,78 @@ export default function HomeScreen({ navigation, route }: any) {
             label,
           });
         }
+
+        const mappedGoals = activeGoals.map((g) => {
+          const targetPoints = Number(g.targetPoints ?? 0);
+          const targetCourses = Number(g.targetCourses ?? 0);
+          const targetHours = Number(g.targetHours ?? 0);
+          const targetLessons = Number(g.targetLessons ?? 0);
+          const targetQuizzes = Number(g.targetQuizzes ?? 0);
+          const currentPoints = Number(g.currentPoints ?? 0);
+          const currentCourses = Number(g.currentCourses ?? 0);
+          const currentHours = Number(g.currentHours ?? 0);
+          const currentLessons = Number(g.currentLessons ?? 0);
+          const currentQuizzes = Number(g.currentQuizzes ?? 0);
+          const label = g.label || "Goal";
+
+          let unit: "hours" | "courses" | "points" | "lessons" | "quizzes" = "hours";
+          if (targetPoints > 0 || currentPoints > 0) unit = "points";
+          else if (targetCourses > 0 || currentCourses > 0) unit = "courses";
+          else if (targetLessons > 0 || currentLessons > 0) unit = "lessons";
+          else if (targetQuizzes > 0 || currentQuizzes > 0) unit = "quizzes";
+          else if (targetHours > 0 || currentHours > 0) unit = "hours";
+          else if (/course/i.test(label)) unit = "courses";
+          else if (/point/i.test(label)) unit = "points";
+          else if (/lesson/i.test(label)) unit = "lessons";
+          else if (/quiz/i.test(label)) unit = "quizzes";
+          else if (/time|study/i.test(label)) unit = "hours";
+
+          const target =
+            unit === "points"
+              ? targetPoints
+              : unit === "courses"
+              ? targetCourses
+              : unit === "lessons"
+              ? targetLessons
+              : unit === "quizzes"
+              ? targetQuizzes
+              : targetHours;
+          const current =
+            unit === "points"
+              ? currentPoints
+              : unit === "courses"
+              ? currentCourses
+              : unit === "lessons"
+              ? currentLessons
+              : unit === "quizzes"
+              ? currentQuizzes
+              : currentHours;
+
+          return {
+            id: String(g.id || label),
+            label,
+            current,
+            target,
+            unit,
+            deadline: g.deadline,
+          };
+        });
+        const sortedGoals = mappedGoals.sort((a, b) => {
+          const aDeadline = a.deadline ? new Date(a.deadline).getTime() : Number.POSITIVE_INFINITY;
+          const bDeadline = b.deadline ? new Date(b.deadline).getTime() : Number.POSITIVE_INFINITY;
+          if (aDeadline !== bDeadline) return aDeadline - bDeadline;
+          const aProgress = a.target > 0 ? a.current / a.target : 0;
+          const bProgress = b.target > 0 ? b.current / b.target : 0;
+          if (aProgress !== bProgress) return bProgress - aProgress;
+          return a.label.localeCompare(b.label);
+        });
+        setGoalList(sortedGoals);
+      } else {
+        setGoalList([]);
       }
     } catch (err) {
       console.warn('Home: failed to load credit stats', err);
+      setGoalList([]);
     }
   }, [user?.id]);
 
@@ -166,6 +274,12 @@ export default function HomeScreen({ navigation, route }: any) {
       if (unsub) unsub();
     };
   }, [loadCreditMeta]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCreditMeta();
+    }, [loadCreditMeta])
+  );
 
   // Mock static data that doesn't require API calls
   const achievements: Achievement[] = [
@@ -366,6 +480,7 @@ export default function HomeScreen({ navigation, route }: any) {
             target={goalProgress.target || 10}
             unit={goalProgress.unit}
             label={goalProgress.label}
+            goals={goalList}
             navigation={navigation}
           />        
 

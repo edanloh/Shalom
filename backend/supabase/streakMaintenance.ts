@@ -87,6 +87,8 @@ async function sendNotification(payload: {
   title: string;
   message: string;
   type: string;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
 }) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -100,6 +102,44 @@ async function sendNotification(payload: {
     },
     body: JSON.stringify(payload),
   });
+}
+
+async function notifyExpiredGoals(nowIso: string) {
+  const { data: goals, error } = await supabase
+    .from("learning_goals")
+    .select("id, user_id, label, deadline")
+    .eq("is_active", true)
+    .is("completed_at", null)
+    .lt("deadline", nowIso);
+  if (error) throw error;
+  if (!goals?.length) return 0;
+
+  let sent = 0;
+  for (const goal of goals as Array<{ id: string; user_id: string; label?: string | null }>) {
+    const goalId = String(goal.id);
+    const goalUserId = String(goal.user_id);
+    const { data: existing, error: existingErr } = await supabase
+      .from("notifications")
+      .select("id")
+      .eq("user_id", goalUserId)
+      .eq("type", "goal_expired")
+      .eq("related_entity_id", goalId)
+      .limit(1)
+      .maybeSingle();
+    if (existingErr && existingErr.code !== "PGRST116") throw existingErr;
+    if (existing?.id) continue;
+
+    await sendNotification({
+      userId: goalUserId,
+      type: "goal_expired",
+      title: "Goal expired",
+      message: `${goal.label || "Goal"} expired. Clear it to pick a new one.`,
+      relatedEntityType: "goal",
+      relatedEntityId: goalId,
+    });
+    sent += 1;
+  }
+  return sent;
 }
 
 serve(async (req) => {
@@ -120,7 +160,7 @@ serve(async (req) => {
       .eq("is_active", true);
     if (usersErr) throw usersErr;
 
-    const userIds = (users ?? []).map((u) => u.id);
+    const userIds = (users ?? []).map((u: { id: string }) => String(u.id));
     if (!userIds.length) return ok({ success: true, data: { processed: 0 } });
 
     const { data: prefs, error: prefErr } = await supabase
@@ -130,7 +170,10 @@ serve(async (req) => {
     if (prefErr && prefErr.code !== "PGRST116") throw prefErr;
 
     const prefMap = new Map(
-      (prefs ?? []).map((row) => [row.user_id, row.timezone || "UTC"])
+      (prefs ?? []).map((row: { user_id: string; timezone?: string | null }) => [
+        String(row.user_id),
+        row.timezone || "UTC",
+      ])
     );
 
     const { data: analytics, error: analyticsErr } = await supabase
@@ -154,12 +197,13 @@ serve(async (req) => {
 
     let remindersSent = 0;
     let brokenSent = 0;
+    let goalsExpiredSent = 0;
 
     for (const userId of userIds) {
       const last = lastByUser.get(userId);
       if (!last?.date || last.streak <= 0) continue;
 
-      const tz = prefMap.get(userId) ?? "UTC";
+      const tz = String(prefMap.get(userId) ?? "UTC");
       const { dateStr: todayLocal, hour: localHour } = safeLocalParts(now, tz);
       const diffDays = daysBetween(last.date, todayLocal);
       if (diffDays <= 0) continue;
@@ -202,9 +246,11 @@ serve(async (req) => {
       }
     }
 
+    goalsExpiredSent = await notifyExpiredGoals(now.toISOString());
+
     return ok({
       success: true,
-      data: { processed: userIds.length, remindersSent, brokenSent },
+      data: { processed: userIds.length, remindersSent, brokenSent, goalsExpiredSent },
     });
   } catch (err: any) {
     console.error("streakMaintenance error", err);

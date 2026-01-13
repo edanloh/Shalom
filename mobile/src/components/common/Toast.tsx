@@ -7,6 +7,7 @@ export type ToastPayload = {
   title?: string;
   type?: "success" | "error" | "info";
   durationMs?: number;
+  skipInApp?: boolean;
 };
 
 export const TOAST_CHANNEL = "toast:show";

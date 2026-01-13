@@ -13,6 +13,7 @@ const supabase = createClient(
 );
 
 const GRACE_DAYS = 1;
+const HOT_STREAK_THRESHOLDS = new Set([3, 7, 14, 30]);
 
 const ok = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -22,6 +23,48 @@ const ok = (body: unknown, status = 200) =>
 
 const fail = (message: string, status = 500, extra: Record<string, unknown> = {}) =>
   ok({ success: false, message, ...extra }, status);
+
+async function sendNotification(payload: {
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+}) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) return;
+  await fetch(`${supabaseUrl}/functions/v1/postNotification`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function maybeNotifyHotStreak(userId: string, streakDays: number) {
+  if (!HOT_STREAK_THRESHOLDS.has(streakDays)) return;
+  const todayUtc = new Date().toISOString().split("T")[0];
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("type", "streak_hot")
+    .ilike("message", `%${streakDays}%`)
+    .gte("created_at", todayUtc)
+    .limit(1)
+    .maybeSingle();
+  if (error && error.code !== "PGRST116") throw error;
+  if (data?.id) return;
+  await sendNotification({
+    userId,
+    type: "streak_hot",
+    title: "Hot streak",
+    message: `You're on a ${streakDays}-day streak! Keep it going.`,
+  });
+}
 
 const getLocalDateParts = (date: Date, timeZone: string) => {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -106,6 +149,8 @@ serve(async (req) => {
       .update({ streak_days: newStreak })
       .eq("user_id", userId);
     if (goalsErr) throw goalsErr;
+
+    await maybeNotifyHotStreak(userId, newStreak);
 
     return ok({ success: true, data: { streakDays: newStreak, date: today } });
   } catch (err: any) {

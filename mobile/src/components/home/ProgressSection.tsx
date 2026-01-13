@@ -1,11 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet, Image, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, BorderRadius, TextStyles } from "../../constants";
 
 interface WeeklyGoalProps {
   current: number;
   target: number;
-  unit: "hours" | "courses" | "points";
+  unit: "hours" | "courses" | "points" | "lessons" | "quizzes";
   label?: string;
   navigation: any;
 }
@@ -18,7 +19,16 @@ const WeeklyGoal: React.FC<WeeklyGoalProps> = ({
   navigation,
 }) => {
   const progressPercentage = target > 0 ? Math.min((current / target) * 100, 100) : 0;
-  const unitLabel = unit === "hours" ? " hours" : unit === "courses" ? " courses" : " pts";
+  const unitLabel =
+    unit === "hours"
+      ? " hours"
+      : unit === "courses"
+      ? " courses"
+      : unit === "lessons"
+      ? " lessons"
+      : unit === "quizzes"
+      ? " quizzes"
+      : " pts";
   const formatValue = (value: number) => `${value}`;
 
   return (
@@ -47,6 +57,7 @@ interface Achievement {
   title: string;
   value: string | number;
   color: string;
+  icon?: string;
   navigationTarget?: string;
 }
 
@@ -55,21 +66,23 @@ interface AchievementCardProps {
   navigation: any;
 }
 
-const ACHIEVEMENT_LOGOS = {
-  Streak: require("../../../assets/streak.png"),
-  Certificates: require("../../../assets/certificates.png"),
-  default: require("../../../assets/placeholder_icon.png"),
-} as const;
-
 const AchievementCard: React.FC<AchievementCardProps> = ({
   achievement,
   navigation,
 }) => {
-  const logoKey = achievement.title.includes("Streak")
-    ? "Streak"
+  const iconName = achievement.icon
+    ? achievement.icon
+    : achievement.title.includes("Streak")
+    ? "flame"
     : achievement.title.includes("Certificates")
-    ? "Certificates"
-    : "default";
+    ? "trophy"
+    : "star";
+  const iconColor =
+    iconName === "flame"
+      ? Colors.streakFire
+      : iconName === "trophy"
+      ? Colors.starGold
+      : Colors.white;
 
   return (
     <Pressable
@@ -79,7 +92,7 @@ const AchievementCard: React.FC<AchievementCardProps> = ({
         navigation.navigate(achievement.navigationTarget)
       }
     >
-      <Image source={ACHIEVEMENT_LOGOS[logoKey]} style={styles.icon} />
+      <Ionicons name={iconName as any} size={32} color={iconColor} />
       <Text style={[TextStyles.h2, { color: Colors.white, marginBottom: 0 }]}>
         {achievement.value}
       </Text>
@@ -92,9 +105,19 @@ const AchievementCard: React.FC<AchievementCardProps> = ({
   );
 };
 
+type GoalItem = {
+  id: string;
+  label: string;
+  current: number;
+  target: number;
+  unit: "hours" | "courses" | "points" | "lessons" | "quizzes";
+  deadline?: string;
+};
+
 interface ProgressSectionProps extends WeeklyGoalProps {
   achievements: Achievement[];
   navigation: any;
+  goals?: GoalItem[];
 }
 
 const ProgressSection: React.FC<ProgressSectionProps> = ({
@@ -103,6 +126,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
   unit,
   label,
   achievements,
+  goals,
   navigation,
 }) => (
   <View
@@ -117,13 +141,75 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
         />
       ))}
     </View>
-    <WeeklyGoal
-      current={current}
-      target={target}
-      unit={unit}
-      label={label}
-      navigation={navigation}
-    />
+    {Array.isArray(goals) ? (
+      goals.length ? (
+        <Pressable
+          style={styles.compactGoalsCard}
+          onPress={() => navigation.navigate("LearningGoalScreen")}
+        >
+          <View style={styles.compactGoalsHeader}>
+            <Text style={styles.compactGoalsTitle}>Active goals</Text>
+            <Text style={styles.compactGoalsCountText}>{goals.length}</Text>
+          </View>
+          <View style={styles.compactGoalsList}>
+            {goals.slice(0, 2).map((goal) => {
+              const progress = goal.target > 0 ? Math.min(goal.current / goal.target, 1) : 0;
+              const unitLabel =
+                goal.unit === "hours"
+                  ? "h"
+                  : goal.unit === "courses"
+                  ? "courses"
+                  : goal.unit === "lessons"
+                  ? "lessons"
+                  : goal.unit === "quizzes"
+                  ? "quizzes"
+                  : "pts";
+              return (
+                <View key={goal.id} style={styles.compactGoalItem}>
+                  <View style={styles.compactGoalRow}>
+                    <Text style={styles.compactGoalTitle} numberOfLines={1}>
+                      {goal.label}
+                    </Text>
+                    <Text style={styles.compactGoalProgress}>
+                      {goal.current}/{goal.target} {unitLabel}
+                    </Text>
+                  </View>
+                  <View style={styles.compactProgressTrack}>
+                    <View
+                      style={[
+                        styles.compactProgressFill,
+                        {
+                          width: `${progress * 100}%`,
+                          backgroundColor:
+                            goal.target > 0 && goal.current >= goal.target
+                              ? "#22c55e"
+                              : Colors.secondary,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+            {goals.length > 2 ? (
+              <Text style={styles.compactMoreText}>+{goals.length - 2} more</Text>
+            ) : null}
+          </View>
+        </Pressable>
+      ) : (
+        <View style={styles.emptyGoals}>
+          <Text style={styles.emptyGoalsText}>No active goals set</Text>
+        </View>
+      )
+    ) : (
+      <WeeklyGoal
+        current={current}
+        target={target}
+        unit={unit}
+        label={label}
+        navigation={navigation}
+      />
+    )}
   </View>
 );
 
@@ -154,9 +240,82 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: Colors.purple400,
   },
-  icon: {
-    width: 32,
-    height: 32,
+  compactGoalsCard: {
+    backgroundColor: Colors.purple850,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.base,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  compactGoalsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.sm,
+  },
+  compactGoalsTitle: {
+    ...TextStyles.body,
+    color: Colors.white,
+    fontWeight: "700",
+  },
+  compactGoalsCountText: {
+    ...TextStyles.caption,
+    color: Colors.textSecondary,
+    fontWeight: "600",
+  },
+  compactGoalsList: {
+    gap: Spacing.sm,
+  },
+  compactMoreText: {
+    ...TextStyles.caption,
+    color: Colors.textSecondary,
+    textAlign: "right",
+  },
+  compactGoalItem: {
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: BorderRadius.md,
+  },
+  compactGoalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    justifyContent: "space-between",
+  },
+  compactGoalTitle: {
+    ...TextStyles.body,
+    color: Colors.white,
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  compactGoalProgress: {
+    ...TextStyles.caption,
+    color: Colors.white,
+    opacity: 0.8,
+  },
+  compactProgressTrack: {
+    height: 8,
+    backgroundColor: "#2A2A35",
+    borderRadius: 5,
+    overflow: "hidden",
+  },
+  compactProgressFill: {
+    height: "100%",
+    backgroundColor: Colors.secondary,
+  },
+  emptyGoals: {
+    backgroundColor: Colors.purple850,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.base,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center",
+  },
+  emptyGoalsText: {
+    ...TextStyles.bodyMedium,
+    color: Colors.textSecondary,
   },
 });
 
