@@ -14,7 +14,6 @@ import {
   Linking,
   Alert,
   Dimensions,
-  Platform,
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { useRoute, useNavigation } from "@react-navigation/native";
@@ -31,7 +30,7 @@ import { CourseCompletionCard } from "@/components";
 import { pdfService } from "@/services/pdfService";
 import { moduleService } from "@/services/moduleService";
 import { useCourseNavigation } from "@/hooks";
-import type { ModuleItem, CourseSection } from "@/services/moduleService";
+import type { ModuleItem } from "@/services/moduleService";
 
 type PDFViewNavigationProp = StackNavigationProp<MainStackParamList, "PDFView">;
 
@@ -227,7 +226,7 @@ const PDFView = () => {
     if (nextItemInModule) {
       // Navigate with completion state to trigger refresh
       if (nextItemInModule.item.type === "video") {
-        navigation.navigate("LessonPlayer", {
+        navigation.replace("LessonPlayer", {
           videoId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,
@@ -237,7 +236,7 @@ const PDFView = () => {
           pdfCompleted: true,
         } as any);
       } else if (nextItemInModule.item.type === "quiz") {
-        navigation.navigate("QuizScreen", {
+        navigation.replace("QuizScreen", {
           quizId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,
@@ -261,14 +260,14 @@ const PDFView = () => {
   const handlePrevious = () => {
     if (prevItemInModule) {
       if (prevItemInModule.item.type === "video") {
-        navigation.navigate("LessonPlayer", {
+        navigation.replace("LessonPlayer", {
           videoId: prevItemInModule.item.id,
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
         });
       } else if (prevItemInModule.item.type === "quiz") {
-        navigation.navigate("QuizScreen", {
+        navigation.replace("QuizScreen", {
           quizId: prevItemInModule.item.id,
           courseId,
           sectionId: prevItemInModule.sectionId,
@@ -296,7 +295,12 @@ const PDFView = () => {
       setShowMenu(false);
 
       const filename = `${pdfDetail.title.replace(/[^a-z0-9]/gi, "_")}.pdf`;
-      const fileUri = FileSystem.documentDirectory + filename;
+      const baseDir =
+        (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory;
+      if (!baseDir) {
+        throw new Error("File system directory unavailable");
+      }
+      const fileUri = baseDir + filename;
 
       const downloadResumable = FileSystem.createDownloadResumable(
         pdfDetail.pdf_url,
@@ -404,14 +408,14 @@ const PDFView = () => {
       headerLeftIcon="chevron-back"
       customEdges={["top", "bottom"]}
       onHeaderLeftPress={() => {
-        // Pass completion state when navigating back
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+          return;
+        }
         navigation.navigate("ModuleDetail", {
           courseId,
           sectionId,
           userId,
-          pdfCompleted: isCompleted,
-          completedPdfId: isCompleted ? pdfId : undefined,
-          timestamp: Date.now(), // Force refresh detection
         } as any);
       }}
     >

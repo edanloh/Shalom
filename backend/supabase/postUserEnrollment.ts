@@ -272,6 +272,18 @@ serve(async (req) => {
 
     if (insertError) throw insertError;
 
+    const { count: enrollmentCount, error: countError } = await supabaseClient
+      .from('course_enrollments')
+      .select('id', { count: 'exact', head: true })
+      .eq('course_id', courseId);
+    if (countError) throw countError;
+
+    const { error: studentCountError } = await supabaseClient
+      .from('courses')
+      .update({ student_count: enrollmentCount ?? 0 })
+      .eq('id', courseId);
+    if (studentCountError) throw studentCountError;
+
     return new Response(
       JSON.stringify({
         success: true,
