@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
-  ScrollView,
   Pressable,
   Alert,
 } from "react-native";
@@ -468,14 +467,14 @@ const LessonPlayer = () => {
           userId,
         });
       } else if (nextItemInModule.item.type === 'quiz') {
-        navigation.navigate("QuizScreen", {
+        navigation.replace("QuizScreen", {
           quizId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
         });
       } else if (nextItemInModule.item.type === 'pdf') {
-        navigation.navigate("PDFView", {
+        navigation.replace("PDFView", {
           pdfId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,
@@ -497,14 +496,14 @@ const LessonPlayer = () => {
           userId,
         });
       } else if (prevItemInModule.item.type === 'quiz') {
-        navigation.navigate("QuizScreen", {
+        navigation.replace("QuizScreen", {
           quizId: prevItemInModule.item.id,
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
         });
       } else if (prevItemInModule.item.type === 'pdf') {
-        navigation.navigate("PDFView", {
+        navigation.replace("PDFView", {
           pdfId: prevItemInModule.item.id,
           courseId,
           sectionId: prevItemInModule.sectionId,
@@ -524,14 +523,6 @@ const LessonPlayer = () => {
   const onYouTubeError = (error: string) => {
     console.error("YouTube player error:", error);
     const errorMsg = "Failed to play YouTube video. The video may be unavailable or restricted.";
-    setError(errorMsg);
-    showErrorAndRedirect(errorMsg);
-  };
-
-  // Video player error handler
-  const onVideoError = (error: any) => {
-    console.error("Video player error:", error);
-    const errorMsg = "Failed to play video. The video file may be corrupted or unavailable.";
     setError(errorMsg);
     showErrorAndRedirect(errorMsg);
   };
@@ -676,7 +667,7 @@ const LessonPlayer = () => {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.purple600} />
+          <ActivityIndicator size="large" color={Colors.secondary} />
           <Text style={styles.loadingText}>Loading video...</Text>
         </View>
       </SafeAreaView>
@@ -721,16 +712,13 @@ const LessonPlayer = () => {
       customEdges={["top", "bottom"]}
       onHeaderLeftPress={() => {
         saveProgress();
-        // Pass state to refresh CourseDetail if video was completed
-        if (isVideoCompleted) {
-          navigation.navigate('CourseDetail', {
-            courseId,
-            videoCompleted: true,
-            videoId,
-          } as any);
-        } else {
+        if (navigation.canGoBack()) {
           navigation.goBack();
+          return;
         }
+        navigation.navigate("CourseDetail", {
+          courseId,
+        } as any);
       }}
     >
       {/* Video Player */}
@@ -759,7 +747,6 @@ const LessonPlayer = () => {
               fullscreenOptions={{ enable: true }}
               allowsPictureInPicture
               startsPictureInPictureAutomatically
-              onError={onVideoError}
             />
 
             {/* Touchable overlay for showing/hiding controls */}
@@ -935,7 +922,7 @@ const LessonPlayer = () => {
             size={20}
             color={
               prevItemInModule
-                ? Colors.purple600
+                ? Colors.secondary
                 : Colors.textSecondary
             }
           />
@@ -1022,7 +1009,7 @@ const LessonPlayer = () => {
             size={20}
             color={
               (nextItemInModule && isVideoCompleted)
-                ? Colors.purple600
+                ? Colors.secondary
                 : Colors.textSecondary
             }
           />
@@ -1080,7 +1067,7 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   retryButton: {
-    backgroundColor: Colors.purple600,
+    backgroundColor: Colors.secondary,
   },
   goBackButton: {
     backgroundColor: Colors.gray500,
@@ -1142,7 +1129,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   playButton: {
-    backgroundColor: Colors.purple600,
+    backgroundColor: Colors.secondary,
     borderRadius: 32,
     width: 64,
     height: 64,
@@ -1167,7 +1154,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: "100%",
-    backgroundColor: Colors.purple600,
+    backgroundColor: Colors.secondary,
     opacity: 0.9,
   },
   infoCard: {
@@ -1240,7 +1227,7 @@ const styles = StyleSheet.create({
   },
   navLabel: {
     fontSize: 11,
-    color: Colors.purple600,
+    color: Colors.secondary,
     marginBottom: 4,
     fontWeight: "700",
     letterSpacing: 0.5,

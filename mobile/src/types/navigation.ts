@@ -3,7 +3,18 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type MainStackParamList = {
   MainTabs: NavigatorScreenParams<TabParamList>;
   CourseDetail: { courseId: string };
-  ModuleDetail: { courseId: string; sectionId: string; userId?: string };
+  ModuleDetail: {
+    courseId: string;
+    sectionId: string;
+    userId?: string;
+    videoCompleted?: boolean;
+    quizCompleted?: boolean;
+    pdfCompleted?: boolean;
+    completedVideoId?: string;
+    completedQuizId?: string;
+    completedPdfId?: string;
+    timestamp?: number;
+  };
   LessonPlayer: { videoId: string; courseId: string; sectionId?: string; userId?: string };
   QuizScreen: { quizId: string; courseId: string; sectionId?: string; userId?: string };
   PDFView: { pdfId: string; courseId: string; sectionId?: string; userId?: string;};

@@ -45,6 +45,55 @@ function conflict(msg: string) {
   );
 }
 
+async function updateCourseRatingOnCreate(
+  supabaseClient: any,
+  courseId: string,
+  newRating: number
+) {
+  const { data: courseRow, error } = await supabaseClient
+    .from('courses')
+    .select('rating, total_ratings')
+    .eq('id', courseId)
+    .single();
+  if (error) throw error;
+
+  const prevCount = Number(courseRow?.total_ratings ?? 0);
+  const prevRating = Number(courseRow?.rating ?? 0);
+  const nextCount = prevCount + 1;
+  const nextAvg = nextCount > 0 ? (prevRating * prevCount + newRating) / nextCount : newRating;
+
+  const { error: updateError } = await supabaseClient
+    .from('courses')
+    .update({ rating: Number(nextAvg.toFixed(2)), total_ratings: nextCount })
+    .eq('id', courseId);
+  if (updateError) throw updateError;
+}
+
+async function updateCourseRatingOnUpdate(
+  supabaseClient: any,
+  courseId: string,
+  previousRating: number,
+  newRating: number
+) {
+  const { data: courseRow, error } = await supabaseClient
+    .from('courses')
+    .select('rating, total_ratings')
+    .eq('id', courseId)
+    .single();
+  if (error) throw error;
+
+  const count = Number(courseRow?.total_ratings ?? 0);
+  if (count <= 0) return;
+  const prevAvg = Number(courseRow?.rating ?? 0);
+  const nextAvg = (prevAvg * count - previousRating + newRating) / count;
+
+  const { error: updateError } = await supabaseClient
+    .from('courses')
+    .update({ rating: Number(nextAvg.toFixed(2)) })
+    .eq('id', courseId);
+  if (updateError) throw updateError;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -144,6 +193,8 @@ serve(async (req) => {
 
       if (insertError) throw insertError;
 
+      await updateCourseRatingOnCreate(supabaseClient, courseId, rating);
+
       // Get full review details with user info
       const { data: reviewDetails, error: detailsError } = await supabaseClient
         .from('course_ratings')
@@ -191,6 +242,18 @@ serve(async (req) => {
     // ===================================================
     if (req.method === "PUT") {
       // Update existing review
+      const { data: existingReview, error: existingReviewError } = await supabaseClient
+        .from('course_ratings')
+        .select('rating')
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .single();
+      if (existingReviewError && existingReviewError.code === 'PGRST116') {
+        return notFound("No existing review to update");
+      }
+      if (existingReviewError) throw existingReviewError;
+      const previousRating = Number(existingReview?.rating ?? rating);
+
       const { data: updated, error: updateError } = await supabaseClient
         .from('course_ratings')
         .update({
@@ -209,6 +272,8 @@ serve(async (req) => {
       }
 
       if (updateError) throw updateError;
+
+      await updateCourseRatingOnUpdate(supabaseClient, courseId, previousRating, rating);
 
       // Get full review details with user info
       const { data: reviewDetails, error: detailsError } = await supabaseClient
