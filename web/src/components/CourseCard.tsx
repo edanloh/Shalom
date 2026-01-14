@@ -15,11 +15,12 @@ import {
   MoreVertical,
   Edit,
   Copy,
-  Archive,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { useState } from "react";
+import { courseService } from "@/services/courseService";
 
 interface CourseCardProps {
   id?: string;
@@ -30,6 +31,7 @@ interface CourseCardProps {
   completionRate: number;
   rating: number;
   status: "published" | "draft" | "archived";
+  onCourseUpdated?: () => void; // Callback to refresh parent component
 }
 
 export const CourseCard = ({
@@ -41,9 +43,11 @@ export const CourseCard = ({
   completionRate,
   rating,
   status,
+  onCourseUpdated,
 }: CourseCardProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const statusColors = {
     published: "status-badge-published",
@@ -59,18 +63,36 @@ export const CourseCard = ({
     navigate("/analytics");
   };
 
-  const handleDuplicate = () => {
-    toast({
-      title: "Course Duplicated",
-      description: `${title} has been duplicated`,
-    });
-  };
-
-  const handleArchive = () => {
-    toast({
-      title: "Course Archived",
-      description: `${title} has been archived`,
-    });
+  const handleDuplicate = async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      const duplicatedCourse = await courseService.duplicateCourse(id);
+      
+      toast({
+        title: "Course Duplicated",
+        description: `"${title}" has been duplicated successfully as "${duplicatedCourse.title}"`,
+        variant: "default",
+      });
+      
+      // Notify parent component to refresh the course list
+      if (onCourseUpdated) {
+        onCourseUpdated();
+      }
+      
+      // Optional: Navigate to edit the duplicated course
+      // navigate(`/course-builder/${duplicatedCourse.id}`);
+    } catch (error) {
+      console.error('Error duplicating course:', error);
+      toast({
+        title: "Duplication Failed",
+        description: error instanceof Error ? error.message : "Failed to duplicate course. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCardClick = () => {
@@ -82,8 +104,8 @@ export const CourseCard = ({
       className="overflow-hidden hover-lift border-border group cursor-pointer"
       onClick={handleCardClick}
     >
-              <div className="relative h-48 bg-muted overflow-hidden">
-          <img
+      <div className="relative h-48 bg-muted overflow-hidden">
+        <img
           src={thumbnail || DEFAULT_COURSE_THUMBNAIL}
           alt={title}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
@@ -91,7 +113,7 @@ export const CourseCard = ({
             const target = e.target as HTMLImageElement;
             target.src = DEFAULT_COURSE_THUMBNAIL;
           }}
-          />
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
         <Badge className={`absolute top-4 left-4 ${statusColors[status]}`}>
           {status.toUpperCase()}
@@ -102,6 +124,7 @@ export const CourseCard = ({
               variant="ghost"
               size="icon"
               className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm hover:bg-background/80"
+              disabled={isLoading}
             >
               <MoreVertical className="h-4 w-4" />
             </Button>
@@ -112,6 +135,7 @@ export const CourseCard = ({
                 e.stopPropagation();
                 handleEdit();
               }}
+              disabled={isLoading}
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -121,6 +145,7 @@ export const CourseCard = ({
                 e.stopPropagation();
                 handleViewAnalytics();
               }}
+              disabled={isLoading}
             >
               <BarChart3 className="h-4 w-4 mr-2" />
               View Analytics
@@ -130,18 +155,10 @@ export const CourseCard = ({
                 e.stopPropagation();
                 handleDuplicate();
               }}
+              disabled={isLoading}
             >
               <Copy className="h-4 w-4 mr-2" />
-              Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                handleArchive();
-              }}
-            >
-              <Archive className="h-4 w-4 mr-2" />
-              Archive
+              {isLoading ? "Duplicating..." : "Duplicate"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -197,6 +214,7 @@ export const CourseCard = ({
               e.stopPropagation();
               handleEdit();
             }}
+            disabled={isLoading}
           >
             Edit
           </Button>
@@ -208,6 +226,7 @@ export const CourseCard = ({
               e.stopPropagation();
               handleViewAnalytics();
             }}
+            disabled={isLoading}
           >
             Analytics
           </Button>

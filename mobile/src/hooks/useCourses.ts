@@ -1,6 +1,5 @@
 /**
  * Custom React Hooks for Course Management
- * Updated to work with AWS API Gateway
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';

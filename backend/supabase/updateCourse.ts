@@ -194,55 +194,109 @@ serve(async (req) => {
 
         processedSectionIds.push(sectionId);
 
-        // Handle lessons (videos) for this section
+        // Handle lessons (videos and PDFs) for this section
         const { data: existingVideos } = await supabaseClient
           .from('course_videos')
           .select('id')
           .eq('section_id', sectionId);
 
+        const { data: existingResources } = await supabaseClient
+          .from('course_resources')
+          .select('id')
+          .eq('section_id', sectionId);
+
         const existingVideoIds = (existingVideos || []).map((v: any) => v.id);
+        const existingResourceIds = (existingResources || []).map((r: any) => r.id);
         const processedVideoIds: string[] = [];
+        const processedResourceIds: string[] = [];
 
         const lessons = module.lessons || [];
         for (let j = 0; j < lessons.length; j++) {
           const lesson = lessons[j];
+          const lessonType = lesson.type || 'video';
 
-          if (lesson.id && existingVideoIds.includes(lesson.id)) {
-            // UPDATE existing video - preserves user video progress
-            await supabaseClient
-              .from('course_videos')
-              .update({
-                title: lesson.title,
-                description: lesson.content || '',
-                video_url: lesson.videoUrl || '',
-                duration_seconds: (lesson.durationMinutes || 0) * 60,
-                order_index: lesson.order ?? j,
-                is_preview: lesson.isPreview || false,
-                thumbnail_url: lesson.thumbnailUrl || null
-              })
-              .eq('id', lesson.id);
+          if (lessonType === 'pdf') {
+            // Handle PDF resources
+            if (lesson.id && existingResourceIds.includes(lesson.id)) {
+              // UPDATE existing PDF resource
+              await supabaseClient
+                .from('course_resources')
+                .update({
+                  title: lesson.title,
+                  description: lesson.content || '',
+                  resource_url: lesson.resourceUrl || '',
+                  resource_type: 'pdf',
+                  order_index: lesson.order ?? j,
+                  is_preview: lesson.isPreview || false,
+                  thumbnail_url: lesson.thumbnailUrl || null,
+                  is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,
+                  file_size_bytes: lesson.fileSize || null
+                })
+                .eq('id', lesson.id);
 
-            processedVideoIds.push(lesson.id);
+              processedResourceIds.push(lesson.id);
+            } else {
+              // INSERT new PDF resource
+              const { data: newResource, error: resourceError } = await supabaseClient
+                .from('course_resources')
+                .insert({
+                  course_id: courseId,
+                  section_id: sectionId,
+                  title: lesson.title,
+                  description: lesson.content || '',
+                  resource_url: lesson.resourceUrl || '',
+                  resource_type: 'pdf',
+                  order_index: lesson.order ?? j,
+                  is_preview: lesson.isPreview || false,
+                  thumbnail_url: lesson.thumbnailUrl || null,
+                  is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,
+                  file_size_bytes: lesson.fileSize || null
+                })
+                .select('id')
+                .single();
+
+              if (resourceError) throw resourceError;
+              processedResourceIds.push(newResource.id);
+            }
           } else {
-            // INSERT new video
-            const { data: newVideo, error: videoError } = await supabaseClient
-              .from('course_videos')
-              .insert({
-                course_id: courseId,
-                section_id: sectionId,
-                title: lesson.title,
-                description: lesson.content || '',
-                video_url: lesson.videoUrl || '',
-                duration_seconds: (lesson.durationMinutes || 0) * 60,
-                order_index: lesson.order ?? j,
-                is_preview: lesson.isPreview || false,
-                thumbnail_url: lesson.thumbnailUrl || null
-              })
-              .select('id')
-              .single();
+            // Handle video lessons
+            if (lesson.id && existingVideoIds.includes(lesson.id)) {
+              // UPDATE existing video - preserves user video progress
+              await supabaseClient
+                .from('course_videos')
+                .update({
+                  title: lesson.title,
+                  description: lesson.content || '',
+                  video_url: lesson.videoUrl || '',
+                  duration_seconds: lesson.durationSeconds || ((lesson.durationMinutes || 0) * 60),
+                  order_index: lesson.order ?? j,
+                  is_preview: lesson.isPreview || false,
+                  thumbnail_url: lesson.thumbnailUrl || null
+                })
+                .eq('id', lesson.id);
 
-            if (videoError) throw videoError;
-            processedVideoIds.push(newVideo.id);
+              processedVideoIds.push(lesson.id);
+            } else {
+              // INSERT new video
+              const { data: newVideo, error: videoError } = await supabaseClient
+                .from('course_videos')
+                .insert({
+                  course_id: courseId,
+                  section_id: sectionId,
+                  title: lesson.title,
+                  description: lesson.content || '',
+                  video_url: lesson.videoUrl || '',
+                  duration_seconds: lesson.durationSeconds || ((lesson.durationMinutes || 0) * 60),
+                  order_index: lesson.order ?? j,
+                  is_preview: lesson.isPreview || false,
+                  thumbnail_url: lesson.thumbnailUrl || null
+                })
+                .select('id')
+                .single();
+
+              if (videoError) throw videoError;
+              processedVideoIds.push(newVideo.id);
+            }
           }
         }
 
@@ -253,6 +307,15 @@ serve(async (req) => {
             .from('course_videos')
             .delete()
             .in('id', videosToDelete);
+        }
+
+        // Delete PDF resources that were removed from this section
+        const resourcesToDelete = existingResourceIds.filter(id => !processedResourceIds.includes(id));
+        if (resourcesToDelete.length > 0) {
+          await supabaseClient
+            .from('course_resources')
+            .delete()
+            .in('id', resourcesToDelete);
         }
 
         // Handle quizzes for this section

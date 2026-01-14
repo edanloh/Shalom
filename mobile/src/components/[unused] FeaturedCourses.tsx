@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import CourseCard from './[unused] CourseCard';
+import CourseCard from '@/components/home/CourseCard';
 import { useNavigation } from '@react-navigation/native';
 
 const featuredCourses = [

@@ -391,7 +391,7 @@ export const RightSidebar = () => {
             >
               <option value="draft">Draft</option>
               <option value="published">Published</option>
-              <option value="archived">Archived</option>
+              {/* <option value="archived">Archived</option> */}
             </select>
 
             <div className="flex items-center gap-2 text-sm">
@@ -407,12 +407,12 @@ export const RightSidebar = () => {
                   <span style={{ color: Colors.green }}>Live & Available</span>
                 </>
               )}
-              {courseStatus === "archived" && (
+              {/* {courseStatus === "archived" && (
                 <>
                   <Archive className="h-4 w-4" style={{ color: Colors.gray500 }} />
                   <span style={{ color: Colors.gray500 }}>Archived</span>
                 </>
-              )}
+              )} */}
             </div>
 
             <p style={{ color: Colors.textSecondary }} className="text-xs">
@@ -420,8 +420,8 @@ export const RightSidebar = () => {
                 "Course is in development and not visible to students"}
               {courseStatus === "published" &&
                 "Course is live and available to students"}
-              {courseStatus === "archived" &&
-                "Course is archived and no longer available"}
+              {/* {courseStatus === "archived" &&
+                "Course is archived and no longer available"} */}
             </p>
           </div>
         </div>

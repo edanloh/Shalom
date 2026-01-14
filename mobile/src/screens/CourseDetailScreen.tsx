@@ -113,7 +113,7 @@ export default function CourseDetailScreen({
         courseDetailService.getCourseDetail(courseId),
         moduleService.getModuleDetail(courseId, effectiveUserId)
       ]);
-      
+      console.log('[CourseDetailScreen] Loaded course detail and content:', { detail, moduleData });
       setCourseDetail(detail);
       setCourseContent(moduleData);
     } catch (err) {
@@ -318,12 +318,36 @@ export default function CourseDetailScreen({
         });
       }
 
-      // If you want to immediately take them somewhere after enroll, keep this:
-      // navigation.replace(
-      //   'CourseOutline',
-      //   firstModuleId ? { courseId, startAt: firstModuleId } : { courseId }
-      // );
-      // Otherwise, do nothing and let the screen re-render as enrolled.
+      // Update enrolled state and reload course data
+      setIsEnrolled(true);
+      
+      // Reload course detail to fetch updated progress
+      await loadCourseDetail();
+
+      // Show success message
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        'Enrollment Successful!',
+        'You have been successfully enrolled in this course. Start learning now!',
+        [
+          {
+            text: 'Start Learning',
+            onPress: () => {
+              if (firstModuleId && courseContent) {
+                const firstSection = courseContent.sections[0];
+                if (firstSection) {
+                  navigation.navigate('ModuleDetail', {
+                    courseId: courseId,
+                    sectionId: firstSection.id,
+                    userId: userId,
+                  });
+                }
+              }
+            }
+          },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
     } catch (e: any) {
       const status = e?.statusCode ?? e?.response?.status;
       console.log('[Enroll] error', { status, code: e?.code, msg: e?.message, details: e?.details });
@@ -881,8 +905,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   reviewItem: {
-    backgroundColor: 'transparent',       // was Colors.textInputBg
-    paddingVertical: Spacing.md,          // a bit tighter
+    backgroundColor: 'transparent',      
+    paddingVertical: Spacing.md,         
     paddingHorizontal: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.gray500,
@@ -890,7 +914,7 @@ const styles = StyleSheet.create({
   reviewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.xs,             // was Spacing.sm
+    marginBottom: Spacing.xs,             
   },
   reviewerAvatar: {
     width: 32,

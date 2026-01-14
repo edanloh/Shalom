@@ -23,11 +23,11 @@ import type {
   QuizQuestion,
   QuizDetailResponse,
   SubmitQuizResponse,
-  CourseSection,
-  ModuleItem,
 } from "@/services";
 import Screen from "@/components/common/Screen";
 import ActionButton from "@/components/ActionButton";
+import { CourseCompletionCard } from "@/components";
+import { useCourseNavigation } from "@/hooks";
 
 type QuizDetail = QuizDetailResponse["data"];
 type QuizResult = SubmitQuizResponse["data"];
@@ -57,11 +57,18 @@ const QuizScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
-  const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
+
+  // Use course navigation hook
+  const { nextItem: nextItemInModule, isLastItem } = useCourseNavigation(
+    courseId,
+    userId,
+    quizId,
+    "quiz",
+    sectionId
+  );
 
   useEffect(() => {
     fetchQuizDetail();
-    fetchCourseSections();
   }, [quizId]);
 
   useEffect(() => {
@@ -116,53 +123,14 @@ const QuizScreen = () => {
 
   const fetchCourseSections = async () => {
     try {
-      const moduleDetail = await moduleService.getModuleDetail(courseId, userId);
+      const moduleDetail = await moduleService.getModuleDetail(
+        courseId,
+        userId
+      );
       setCourseSections(moduleDetail.sections);
     } catch (err) {
-      console.error('Error fetching course sections:', err);
+      console.error("Error fetching course sections:", err);
     }
-  };
-
-  const findNextItemAcrossModules = (): { item: ModuleItem; sectionId: string } | null => {
-    if (!sectionId || courseSections.length === 0) return null;
-
-    // Find current section
-    const currentSectionIndex = courseSections.findIndex(
-      (section) => section.id === sectionId
-    );
-
-    if (currentSectionIndex === -1) return null;
-
-    const currentSection = courseSections[currentSectionIndex];
-    
-    // First, try to find next item in CURRENT module
-    if (currentSection.items && currentSection.items.length > 0) {
-      const currentItemIndex = currentSection.items.findIndex(
-        (item) => item.id === quizId && item.type === 'quiz'
-      );
-      
-      // If current quiz found and there's a next item in this module
-      if (currentItemIndex !== -1 && currentItemIndex < currentSection.items.length - 1) {
-        return {
-          item: currentSection.items[currentItemIndex + 1],
-          sectionId: currentSection.id,
-        };
-      }
-    }
-
-    // If no next item in current module, look through remaining sections
-    for (let i = currentSectionIndex + 1; i < courseSections.length; i++) {
-      const section = courseSections[i];
-      if (section.items && section.items.length > 0) {
-        // Return the first item (video or quiz) in the next module
-        return {
-          item: section.items[0],
-          sectionId: section.id,
-        };
-      }
-    }
-
-    return null;
   };
 
   const handleAnswerSelect = (questionId: string, optionText: string) => {
@@ -296,40 +264,58 @@ const QuizScreen = () => {
     setReviewMode(false);
     setShowResults(true);
   };
+ const handleComplete = () => {
+    console.log('🎯 handleComplete called:', {
+      isPassed: quizResult?.isPassed,
+      nextItemInModule: nextItemInModule,
+      hasItem: nextItemInModule ? !!nextItemInModule.item : false,
+      isLastItem,
+    });
 
-  const handleComplete = () => {
     // Only auto-navigate if quiz was passed
     if (quizResult && quizResult.isPassed) {
-      const nextItem = findNextItemAcrossModules();
-      
-      console.log('🎯 Quiz passed! Finding next item...', {
+      console.log('🎯 Quiz passed! Checking next item...', {
         currentQuizId: quizId,
         currentSectionId: sectionId,
-        nextItem: nextItem ? {
-          id: nextItem.item.id,
-          type: nextItem.item.type,
-          title: nextItem.item.title
-        } : null
+        isLastItem,
+        nextItemInModule,
       });
       
-      if (nextItem) {
-        // Navigate to next item (video or quiz)
-        if (nextItem.item.type === 'video') {
+      // Extra safety check - make sure nextItemInModule AND nextItemInModule.item exist
+      if (nextItemInModule && nextItemInModule.item) {
+        console.log('✅ Next item found:', {
+          id: nextItemInModule.item.id,
+          type: nextItemInModule.item.type,
+          title: nextItemInModule.item.title,
+          sectionId: nextItemInModule.sectionId,
+        });
+
+        // Navigate to next item (video, quiz, or pdf)
+        if (nextItemInModule.item.type === 'video') {
           navigation.replace('LessonPlayer', {
-            videoId: nextItem.item.id,
+            videoId: nextItemInModule.item.id,
             courseId,
-            sectionId: nextItem.sectionId,
+            sectionId: nextItemInModule.sectionId,
             userId,
           });
-        } else if (nextItem.item.type === 'quiz') {
+        } else if (nextItemInModule.item.type === 'quiz') {
           navigation.replace('QuizScreen', {
-            quizId: nextItem.item.id,
+            quizId: nextItemInModule.item.id,
             courseId,
-            sectionId: nextItem.sectionId,
+            sectionId: nextItemInModule.sectionId,
+            userId,
+          });
+        } else if (nextItemInModule.item.type === 'pdf') {
+          navigation.replace('PDFView', {
+            pdfId: nextItemInModule.item.id,
+            courseId,
+            sectionId: nextItemInModule.sectionId,
             userId,
           });
         }
         return;
+      } else {
+        console.log('⚠️ No valid next item - nextItemInModule:', nextItemInModule);
       }
     }
     
@@ -340,6 +326,7 @@ const QuizScreen = () => {
       quizId,
     } as any);
   };
+
 
   const formatTime = (seconds: number) => {
     return quizService.formatTime(seconds);
@@ -376,12 +363,12 @@ const QuizScreen = () => {
   if (showResults && quizResult) {
     const isPassed = quizResult.isPassed;
     const scorePercentage = quizResult.score;
-    
+
     // Check if this is the first time passing the quiz
     const isFirstPass = isPassed && quizResult.attemptNumber === 1;
-    
+
     // Calculate passing mark in questions
-    const passingMarkQuestions = quizDetail 
+    const passingMarkQuestions = quizDetail
       ? Math.ceil((quizDetail.passing_score / 100) * quizResult.totalQuestions)
       : 0;
 
@@ -403,7 +390,7 @@ const QuizScreen = () => {
           {/* Result Section */}
           <View style={styles.resultSection}>
             <View style={styles.resultContainer}>
-              <Image 
+              <Image
                 source={isPassed ? Images.quizSuccess : Images.quizFail}
                 style={styles.resultImage}
                 resizeMode="contain"
@@ -416,7 +403,7 @@ const QuizScreen = () => {
               <Text style={styles.scoreValue}>
                 {quizResult.correctAnswers}/{quizResult.totalQuestions}
               </Text>
-              
+
               {/* Show points only on first pass */}
               {isFirstPass && (
                 <View style={styles.pointsContainer}>
@@ -429,82 +416,103 @@ const QuizScreen = () => {
               {/* Show passing mark for failed attempts */}
               {!isPassed && (
                 <Text style={styles.passingMarkText}>
-                  Passing Mark: {passingMarkQuestions}/{quizResult.totalQuestions}
+                  Passing Mark: {passingMarkQuestions}/
+                  {quizResult.totalQuestions}
                 </Text>
               )}
 
               <Text style={styles.scoreSubtext}>
-                {isPassed 
-                  ? "Good effort! Keep going!" 
+                {isPassed
+                  ? "Good effort! Keep going!"
                   : "Almost there — Try again!"}
               </Text>
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.resultActions}>
-            {quizResult.attemptsRemaining > 0 && !isPassed ? (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleRetry}
-              >
-                <Image 
-                  source={Images.quizRetry} 
-                  style={styles.actionButtonIcon}
-                  resizeMode="contain"
-                />
-                <Text style={styles.actionButtonText}>Retry</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleReview}
-              >
-                <Image 
-                  source={Images.quizReview} 
-                  style={styles.actionButtonIcon}
-                  resizeMode="contain"
-                />
-                <Text style={styles.actionButtonText}>Review</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleComplete}
-            >
-              <Image 
-                source={Images.quizComplete} 
-                style={styles.actionButtonIcon}
-                resizeMode="contain"
-              />
-              <Text style={styles.actionButtonText}>Complete</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Stats */}
-          {/* <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{scorePercentage}%</Text>
-              <Text style={styles.statLabel}>Score</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                +{quizResult.correctAnswers * 10}
+          {/* Course Completion Card - Show only if passed and is last item */}
+          {isPassed && isLastItem && (
+            <View style={styles.courseCompletionCard}>
+              <View style={styles.courseCompletionHeader}>
+                <Ionicons name="trophy" size={32} color={Colors.starGold} />
+                <Text style={styles.courseCompletionTitle}>
+                  🎉 Congratulations!
+                </Text>
+              </View>
+              <Text style={styles.courseCompletionText}>
+                You've completed this course. Great job!
               </Text>
-              <Text style={styles.statLabel}>Points</Text>
+              <TouchableOpacity
+                style={styles.backToCourseButton}
+                onPress={handleComplete}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.backToCourseButtonText}>
+                  Back to Course Overview
+                </Text>
+                <Ionicons name="arrow-forward" size={20} color={Colors.white} />
+              </TouchableOpacity>
             </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{quizResult.attemptNumber}</Text>
-              <Text style={styles.statLabel}>Attempt</Text>
+          )}
+
+          {/* Action Buttons - Only show if NOT last item or if failed */}
+          {(!isLastItem || !isPassed) && (
+            <View style={styles.resultActions}>
+              {quizResult.attemptsRemaining > 0 && !isPassed ? (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleRetry}
+                >
+                  <Image
+                    source={Images.quizRetry}
+                    style={styles.actionButtonIcon}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.actionButtonText}>Retry</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleReview}
+                >
+                  <Image
+                    source={Images.quizReview}
+                    style={styles.actionButtonIcon}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.actionButtonText}>Review</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleComplete}
+              >
+                <Image
+                  source={Images.quizComplete}
+                  style={styles.actionButtonIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.actionButtonText}>Complete</Text>
+              </TouchableOpacity>
             </View>
-          </View> */}
+          )}
         </ScrollView>
       </SafeAreaView>
     );
   }
 
+  // const currentQuestion = quizDetail.questions[currentQuestionIndex];
+  /* ----------  safe current-question helpers  ---------- */
   const currentQuestion = quizDetail.questions[currentQuestionIndex];
+  if (!currentQuestion) {
+    // ➜ prevents the crash
+    return (
+      <SafeAreaView style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={Colors.purple400} />
+        <Text style={styles.loadingText}>Building question…</Text>
+      </SafeAreaView>
+    );
+  }
   const answeredCount = selectedAnswers.size;
   const isCurrentQuestionAnswered = selectedAnswers.has(currentQuestion.id);
 
@@ -624,11 +632,11 @@ const QuizScreen = () => {
 
       {/* Options */}
       <View style={styles.modernOptionsContainer}>
-        {currentQuestion.options.map((option, index) => {
+        {currentQuestion.options?.filter(Boolean).map((option, index) => {
           const isSelected =
             selectedAnswers.get(currentQuestion.id) === option.option_text;
 
-          // In review mode, determine if this option is correct/incorrect
+          /* ----------  review-mode colours / icons  ---------- */
           let borderColor = "#3a3a4e";
           let backgroundColor = "#2a2a3e";
           let showCheckmark = false;
@@ -642,18 +650,15 @@ const QuizScreen = () => {
             const wasUserAnswer = option.option_text === userAnswer;
 
             if (isCorrectAnswer) {
-              // This is the correct answer - show green
               borderColor = Colors.green;
               backgroundColor = "#1a3a2a";
               showCheckmark = true;
             } else if (wasUserAnswer && !isCorrectAnswer) {
-              // User selected this wrong answer - show red
               borderColor = Colors.red;
               backgroundColor = "#3a1a1a";
               showCross = true;
             }
           } else if (isSelected) {
-            // Normal mode - show purple for selected
             borderColor = Colors.purple400;
             backgroundColor = "#3a2a5e";
           }
@@ -686,9 +691,7 @@ const QuizScreen = () => {
               <Text
                 style={[
                   styles.modernOptionText,
-                  isSelected &&
-                    !reviewMode &&
-                    styles.modernOptionTextSelected,
+                  isSelected && !reviewMode && styles.modernOptionTextSelected,
                 ]}
               >
                 {option.option_text}
@@ -699,19 +702,13 @@ const QuizScreen = () => {
       </View>
 
       {/* Bottom Navigation */}
-      <View style={{paddingVertical: Spacing.lg}}>
+      <View style={{ paddingVertical: Spacing.lg }}>
         {reviewMode ? (
-          <View style={{flexDirection: "column"}}>
+          <View style={{ flexDirection: "column" }}>
             {currentQuestionIndex < quizDetail.questions.length - 1 ? (
-              <ActionButton
-                onPress={handleNextQuestion}
-                text={"Next"}
-              />
+              <ActionButton onPress={handleNextQuestion} text={"Next"} />
             ) : (
-              <ActionButton
-                onPress={handleDoneReview}
-                text={"Done"}
-              />
+              <ActionButton onPress={handleDoneReview} text={"Done"} />
             )}
             {currentQuestionIndex > 0 && (
               <ActionButton
@@ -732,7 +729,9 @@ const QuizScreen = () => {
             onPress={handleNextQuestion}
             text={"Next"}
             disabled={!reviewMode && !isCurrentQuestionAnswered}
-            style={!reviewMode && !isCurrentQuestionAnswered && { opacity: 0.2 } }
+            style={
+              !reviewMode && !isCurrentQuestionAnswered && { opacity: 0.2 }
+            }
           />
         )}
       </View>
@@ -969,6 +968,50 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
   },
 
+  // Course Completion Card
+  courseCompletionCard: {
+    backgroundColor: Colors.textInputBg,
+    marginBottom: Spacing.xl,
+    padding: Spacing.lg,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.starGold + "40",
+  },
+  courseCompletionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  courseCompletionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+  },
+  courseCompletionText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: Spacing.lg,
+  },
+  backToCourseButton: {
+    backgroundColor: Colors.purple600,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: 10,
+    gap: Spacing.sm,
+  },
+  backToCourseButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.white,
+  },
+
   // Result Actions
   resultActions: {
     flexDirection: "row",
@@ -1014,7 +1057,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 13,
     color: Colors.textSecondary,
-  }
+  },
 });
 
 export default QuizScreen;

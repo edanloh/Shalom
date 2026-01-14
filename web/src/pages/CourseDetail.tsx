@@ -108,6 +108,10 @@ const CourseDetail = () => {
       }
 
       const courseData = fullData.data.course;
+      
+      // Get actual enrolled count from API (will be fetched separately below)
+      let actualEnrolledCount = parseInt(courseData.student_count) || 0;
+      
       const response = {
         id: courseData.id,
         title: courseData.title,
@@ -117,19 +121,20 @@ const CourseDetail = () => {
         status: courseData.is_published ? 'published' : 'draft',
         instructor: courseData.instructor_name || 'Unknown',
         instructorId: courseData.instructor_id,
-        enrolledCount: parseInt(courseData.student_count) || 0,
-        completionRate: 0,
-        rating: parseFloat(courseData.rating) || 0,
-        totalRatings: parseInt(courseData.total_ratings) || 0,
+        enrolledCount: actualEnrolledCount,
+        completionRate: 0, // Will be calculated after fetching students
+        // Use the calculated rating from reviews (not the database rating)
+        rating: parseFloat(courseData.rating) || 0, // This is the calculated average from reviews
+        totalRatings: parseInt(courseData.totalRatings) || 0, // This is the count of reviews
         duration: `${courseData.duration_hours || 0}h`,
         modules: fullData.data.totalSections || 0,
         lessons: fullData.data.totalVideos || 0,
         quizzes: fullData.data.totalQuizzes || 0,
-        createdDate: courseData.created_at,
-        lastUpdated: courseData.updated_at
+        createdDate: courseData.created_at ? new Date(courseData.created_at).toLocaleDateString() : 'N/A',
+        lastUpdated: courseData.updated_at ? new Date(courseData.updated_at).toLocaleDateString() : 'N/A'
       };
 
-      setCourse(response);
+      // Note: setCourse will be called after fetching students to get accurate stats
       
       // Set sections (modules) from the instructor API response
       if (fullData.data && fullData.data.sections) {
@@ -139,12 +144,14 @@ const CourseDetail = () => {
       }
 
       // Set reviews from the API response (if available)
-      if (fullData.data && fullData.data.reviews) {
-        const reviewsData = fullData.data.reviews.map((review: any, index: number) => ({
+      // Reviews are nested under course.reviews in the API response
+      if (courseData && courseData.reviews) {
+        const reviewsData = courseData.reviews.map((review: any, index: number) => ({
           id: review.id || index,
-          studentName: review.reviewer_name || review.student_name || 'Anonymous',
+          studentName: review.reviewerName || review.reviewer_name || review.student_name || 'Anonymous',
           rating: parseFloat(review.rating || '5'),
-          date: review.created_at ? new Date(review.created_at).toLocaleDateString() : 'N/A',
+          date: review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 
+                review.created_at ? new Date(review.created_at).toLocaleDateString() : 'N/A',
           comment: review.review || review.comment || '',
         }));
         setReviews(reviewsData);
@@ -152,13 +159,27 @@ const CourseDetail = () => {
         setReviews([]);
       }
 
-      // Fetch enrolled students separately
+      // Fetch enrolled students separately and update stats
       try {
         const studentsData = await courseService.getCourseStudents(courseId);
         setEnrolledStudents(studentsData);
+        
+        // Update the actual enrolled count
+        response.enrolledCount = studentsData.length;
+        
+        // Calculate actual completion rate
+        if (studentsData.length > 0) {
+          const completedCount = studentsData.filter(s => s.progress === 100).length;
+          response.completionRate = Math.round((completedCount / studentsData.length) * 100);
+        }
+        
+        // Update course state with real stats
+        setCourse(response);
       } catch (err) {
         console.error('Error fetching students:', err);
         setEnrolledStudents([]);
+        // Still set course even if student fetch fails
+        setCourse(response);
       }
 
       // Fetch available students (not enrolled)
@@ -186,12 +207,13 @@ const CourseDetail = () => {
   const modulesList = modules.length > 0 ? modules.map((section: any) => {
     const items = section.items || [];
     const videos = items.filter((item: any) => item.type === 'video');
+    const pdfs = items.filter((item: any) => item.type === 'pdf');
     const quizzes = items.filter((item: any) => item.type === 'quiz');
     
     return {
       id: section.id,
       title: section.title,
-      lessons: videos.length,
+      lessons: videos.length + pdfs.length,
       quizzes: quizzes.length,
       duration: section.total_duration_seconds 
         ? `${Math.floor(section.total_duration_seconds / 60)} min`
@@ -200,22 +222,35 @@ const CourseDetail = () => {
         : 'N/A',
       isCompleted: false,
       completedAt: null,
-      items: [
-        ...videos.map((video: any) => ({
-          id: video.id,
-          type: 'lesson' as const,
-          title: video.title,
-          duration: video.duration_seconds 
-            ? `${Math.floor(video.duration_seconds / 60)} min`
-            : 'N/A',
-        })),
-        ...quizzes.map((quiz: any) => ({
-          id: quiz.id,
-          type: 'quiz' as const,
-          title: quiz.title,
-          questions: quiz.questions?.length || 0,
-        })),
-      ],
+      // Map items directly to preserve order_index sequence from backend
+      items: items.map((item: any) => {
+        if (item.type === 'video') {
+          return {
+            id: item.id,
+            type: 'lesson' as const,
+            title: item.title,
+            duration: item.duration_seconds 
+              ? `${Math.floor(item.duration_seconds / 60)} min`
+              : 'N/A',
+          };
+        } else if (item.type === 'pdf') {
+          return {
+            id: item.id,
+            type: 'pdf' as const,
+            title: item.title,
+            fileSize: item.file_size_bytes 
+              ? `${(item.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+              : 'N/A',
+          };
+        } else {
+          return {
+            id: item.id,
+            type: 'quiz' as const,
+            title: item.title,
+            questions: item.questions?.length || 0,
+          };
+        }
+      }),
     };
   }) : [
     {
@@ -363,6 +398,8 @@ const CourseDetail = () => {
 
   const handleItemClick = (module: any, item: any) => {
     if (item.type === "lesson") {
+      navigate(`/course/${courseId}/module/${module.id}/lesson/${item.id}`);
+    } else if (item.type === "pdf") {
       navigate(`/course/${courseId}/module/${module.id}/lesson/${item.id}`);
     } else if (item.type === "quiz") {
       navigate(`/course/${courseId}/module/${module.id}/quiz/${item.id}`);
@@ -546,14 +583,18 @@ const CourseDetail = () => {
                             <div className="flex items-center gap-3">
                               {item.type === "lesson" ? (
                                 <Video className="h-4 w-4 text-accent" />
+                              ) : item.type === "pdf" ? (
+                                <FileText className="h-4 w-4 text-primary" />
                               ) : (
-                                <FileText className="h-4 w-4 text-warning" />
+                                <MessageSquare className="h-4 w-4 text-warning" />
                               )}
                               <span className="text-sm">{item.title}</span>
                             </div>
                             <span className="text-xs text-muted-foreground">
                               {item.type === "lesson"
                                 ? item.duration
+                                : item.type === "pdf"
+                                ? item.fileSize
                                 : `${item.questions} questions`}
                             </span>
                           </div>
@@ -568,7 +609,7 @@ const CourseDetail = () => {
             {/* Course Reviews Section */}
             <div className="gradient-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Student Reviews</h2>
+                <h2 className="text-2xl font-bold">Course Review</h2>
               </div>
 
               {reviews.length === 0 ? (

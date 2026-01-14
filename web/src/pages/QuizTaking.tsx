@@ -22,7 +22,7 @@ interface CourseSection {
 
 interface ModuleItem {
   id: string;
-  type: 'video' | 'quiz';
+  type: 'video' | 'quiz' | 'pdf';
   title: string;
   description?: string;
   order_index: number;
@@ -42,10 +42,13 @@ const QuizTaking = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
 
+  // Instructor view - show answers and explanations
+  const isInstructorView = true;
+  
   const quiz = {
     id: quizId,
     title: "React Basics Assessment",
-    totalQuestions: 10,
+    totalQuestions: 3, // Will be updated to questions.length below
     passingScore: 70,
     timeLimit: 30,
     questions: [
@@ -60,7 +63,8 @@ const QuizTaking = () => {
           "A CSS framework",
           "A server-side language"
         ],
-        correctAnswer: 0
+        correctAnswer: 0,
+        explanation: "React is a popular JavaScript library developed by Facebook for building user interfaces, particularly single-page applications."
       },
       {
         id: 2,
@@ -73,17 +77,22 @@ const QuizTaking = () => {
           "useContext",
           "useReducer"
         ],
-        correctAnswer: 1
+        correctAnswer: 1,
+        explanation: "useState is the primary hook for adding state to functional components in React. It returns the current state and a function to update it."
       },
       {
         id: 3,
         type: "short_answer",
         question: "Explain the difference between props and state in React.",
         image: null,
+        explanation: "Props are read-only data passed from parent to child components, while state is mutable data managed within a component. Props enable component reusability, while state manages dynamic data that changes over time."
       },
       // ... more questions
     ],
   };
+  
+  // Update totalQuestions to match actual questions array
+  quiz.totalQuestions = quiz.questions.length;
 
   const currentQ = quiz.questions[currentQuestion];
   const progress = ((currentQuestion + 1) / quiz.totalQuestions) * 100;
@@ -91,20 +100,35 @@ const QuizTaking = () => {
   // Fetch course sections on mount to enable navigation
   useEffect(() => {
     const fetchCourseSections = async () => {
-      if (!courseId || !user?.sub) return;
+      if (!courseId) {
+        console.log('❌ Missing courseId');
+        return;
+      }
+      
+      // Use hardcoded admin ID for instructor view (same as CourseDetail)
+      const adminId = user?.id || user?.sub || (user as any)?.['cognito:username'] || '550e8400-e29b-41d4-a716-446655440101';
       
       try {
-        const response = await apiService.get(`/getModuleDetail/${courseId}?userId=${user.sub}`);
+        console.log('🔄 Fetching course sections for:', courseId, 'with adminId:', adminId);
+        const response = await apiService.get(`/getModuleDetailInstructor/${adminId}/${courseId}`);
+        console.log('📦 API Response:', response);
+        console.log('📦 Response data:', response?.data);
+        console.log('📦 Sections:', response?.data?.sections);
+        console.log('📦 Sections length:', response?.data?.sections?.length || 0);
+        
         if (response?.data?.sections) {
           setCourseSections(response.data.sections);
+          console.log('✅ Course sections set:', response.data.sections.length);
+        } else {
+          console.log('⚠️ No sections found in response');
         }
       } catch (error) {
-        console.error('Error fetching course sections:', error);
+        console.error('❌ Error fetching course sections:', error);
       }
     };
 
     fetchCourseSections();
-  }, [courseId, user?.sub]);
+  }, [courseId]);
 
   const findNextItemAcrossModules = (): { item: ModuleItem; sectionId: string } | null => {
     if (!moduleId || courseSections.length === 0) return null;
@@ -276,14 +300,8 @@ const QuizTaking = () => {
               <div>
                 <h1 className="text-2xl font-bold">{quiz.title}</h1>
                 <p className="text-sm text-muted-foreground">
-                  Question {currentQuestion + 1} of {quiz.totalQuestions}
+                  Question {currentQuestion + 1} of {quiz.totalQuestions} • Instructor View
                 </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-warning">
-                  <Clock className="h-5 w-5" />
-                  <span className="font-semibold">{formatTime(timeRemaining)}</span>
-                </div>
               </div>
             </div>
             <Progress value={progress} className="h-2" />
@@ -308,36 +326,54 @@ const QuizTaking = () => {
             </div>
 
             {currentQ.type === "mcq" && currentQ.options && (
-              <RadioGroup
-                value={answers[currentQuestion]}
-                onValueChange={(value) => setAnswers({ ...answers, [currentQuestion]: value })}
-                className="space-y-3"
-              >
-                {currentQ.options.map((option, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center space-x-3 p-4 rounded-lg border border-border hover:bg-muted/10 cursor-pointer"
-                  >
-                    <RadioGroupItem value={index.toString()} id={`option-${index}`} />
-                    <Label
-                      htmlFor={`option-${index}`}
-                      className="flex-1 cursor-pointer"
+              <div className="space-y-3">
+                {currentQ.options.map((option, index) => {
+                  const isCorrect = currentQ.correctAnswer === index;
+                  return (
+                    <div
+                      key={index}
+                      className={`flex items-center space-x-3 p-4 rounded-lg border ${
+                        isCorrect 
+                          ? 'border-success bg-success/10' 
+                          : 'border-border'
+                      }`}
                     >
-                      {option}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center border-2 ${
+                        isCorrect 
+                          ? 'border-success bg-success text-success-foreground' 
+                          : 'border-muted-foreground'
+                      }`}>
+                        {isCorrect && '✓'}
+                      </div>
+                      <Label className="flex-1">
+                        {option}
+                        {isCorrect && (
+                          <span className="ml-2 text-xs font-semibold text-success">
+                            (Correct Answer)
+                          </span>
+                        )}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
             )}
 
             {currentQ.type === "short_answer" && (
-              <Textarea
-                placeholder="Type your answer here..."
-                value={answers[currentQuestion] || ""}
-                onChange={(e) => setAnswers({ ...answers, [currentQuestion]: e.target.value })}
-                rows={6}
-                className="w-full"
-              />
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg border border-border bg-muted/5">
+                  <p className="text-sm font-semibold text-muted-foreground mb-2">Sample Answer:</p>
+                  <p className="text-foreground">{(currentQ as any).explanation || 'No sample answer provided.'}</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Explanation Section */}
+            {(currentQ as any).explanation && currentQ.type === "mcq" && (
+              <div className="mt-6 p-4 rounded-lg bg-primary/5 border border-primary/20">
+                <p className="text-sm font-semibold text-primary mb-2">Explanation:</p>
+                <p className="text-foreground">{(currentQ as any).explanation}</p>
+              </div>
             )}
           </div>
 
@@ -349,26 +385,49 @@ const QuizTaking = () => {
               disabled={currentQuestion === 0}
             >
               <ChevronLeft className="h-4 w-4 mr-2" />
-              Previous
+              Previous Question
             </Button>
 
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <AlertCircle className="h-4 w-4" />
-              {Object.keys(answers).length} of {quiz.totalQuestions} answered
+              Question {currentQuestion + 1} of {quiz.totalQuestions}
             </div>
 
             {currentQuestion < quiz.questions.length - 1 ? (
               <Button onClick={handleNext}>
-                Next
+                Next Question
                 <ChevronLeft className="h-4 w-4 ml-2 rotate-180" />
               </Button>
             ) : (
               <Button 
-                onClick={handleSubmit} 
-                className="bg-success hover:bg-success/90"
-                disabled={isSubmitting}
+                onClick={() => {
+                  const nextItem = findNextItemAcrossModules();
+                  console.log('🔍 Navigation Debug:', {
+                    currentQuizId: quizId,
+                    currentModuleId: moduleId,
+                    courseSections: courseSections.length,
+                    nextItem: nextItem ? {
+                      id: nextItem.item.id,
+                      type: nextItem.item.type,
+                      title: nextItem.item.title,
+                      sectionId: nextItem.sectionId
+                    } : null
+                  });
+                  
+                  if (nextItem) {
+                    if (nextItem.item.type === 'video' || nextItem.item.type === 'pdf') {
+                      navigate(`/course/${courseId}/module/${nextItem.sectionId}/lesson/${nextItem.item.id}`);
+                    } else if (nextItem.item.type === 'quiz') {
+                      navigate(`/course/${courseId}/module/${nextItem.sectionId}/quiz/${nextItem.item.id}`);
+                    }
+                  } else {
+                    console.log('❌ No next item found, navigating back to course');
+                    navigate(`/course/${courseId}`);
+                  }
+                }}
+                className="bg-primary hover:bg-primary/90"
               >
-                {isSubmitting ? "Submitting..." : "Submit Quiz"}
+                Next Item
+                <ChevronLeft className="h-4 w-4 ml-2 rotate-180" />
               </Button>
             )}
           </div>

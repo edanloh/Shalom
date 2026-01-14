@@ -18,10 +18,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { MainStackParamList } from "@/types/navigation";
-import { videoService, moduleService } from "@/services";
+import { videoService } from "@/services";
 import type { VideoDetailResponse } from "@/services";
 import Screen from "@/components/common/Screen";
-import type { CourseSection, ModuleItem } from "@/services/moduleService";
+import { CourseCompletionCard } from "@/components";
+import { useCourseNavigation } from "@/hooks";
 
 const width = Dimensions.get("window").width;
 const VIDEOWIDTH = width - Spacing.lg * 2;
@@ -88,19 +89,24 @@ const LessonPlayer = () => {
   const [error, setError] = useState<string | null>(null);
   const [isYouTubeVideo, setIsYouTubeVideo] = useState(false);
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
-  const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
-  const [nextItemInModule, setNextItemInModule] = useState<{
-    item: ModuleItem;
-    sectionId: string;
-  } | null>(null);
-  const [prevItemInModule, setPrevItemInModule] = useState<{
-    item: ModuleItem;
-    sectionId: string;
-  } | null>(null);
+  // Add separate state for completion to force UI updates
+  const [isVideoCompleted, setIsVideoCompleted] = useState(false);
+
+  // Use course navigation hook
+  const {
+    nextItem: nextItemInModule,
+    previousItem: prevItemInModule,
+    isLastItem,
+  } = useCourseNavigation(
+    courseId,
+    userId,
+    videoId,
+    'video',
+    videoDetail?.section?.id || sectionId
+  );
 
   useEffect(() => {
     fetchVideoDetail();
-    fetchCourseSections();
 
     // Save progress when user leaves the screen
     return () => {
@@ -161,6 +167,9 @@ const LessonPlayer = () => {
 
       const data = await videoService.getVideoDetail(courseId, videoId, userId);
       setVideoDetail(data);
+      
+      // Initialize completion state
+      setIsVideoCompleted(data.userProgress?.is_completed || false);
 
       // Check if it's a YouTube video
       if (isYouTubeUrl(data.video_url)) {
@@ -220,110 +229,16 @@ const LessonPlayer = () => {
     );
   };
 
-  const fetchCourseSections = async () => {
-    try {
-      const moduleDetail = await moduleService.getModuleDetail(courseId, userId);
-      setCourseSections(moduleDetail.sections);
-    } catch (err) {
-      console.error('Error fetching course sections:', err);
-    }
-  };
-
-  const findNextItemAcrossModules = (): { item: ModuleItem; sectionId: string } | null => {
-    if (!videoDetail || courseSections.length === 0) return null;
-
-    // Find current section
-    const currentSectionIndex = courseSections.findIndex(
-      (section) => section.id === videoDetail.section.id
-    );
-
-    if (currentSectionIndex === -1) return null;
-
-    const currentSection = courseSections[currentSectionIndex];
-    
-    // First, try to find next item in CURRENT module
-    if (currentSection.items && currentSection.items.length > 0) {
-      const currentItemIndex = currentSection.items.findIndex(
-        (item) => item.id === videoId && item.type === 'video'
-      );
-      
-      // If current video found and there's a next item in this module
-      if (currentItemIndex !== -1 && currentItemIndex < currentSection.items.length - 1) {
-        return {
-          item: currentSection.items[currentItemIndex + 1],
-          sectionId: currentSection.id,
-        };
-      }
-    }
-
-    // If no next item in current module, look through remaining sections
-    for (let i = currentSectionIndex + 1; i < courseSections.length; i++) {
-      const section = courseSections[i];
-      if (section.items && section.items.length > 0) {
-        // Return the first item (video or quiz) in the next module
-        return {
-          item: section.items[0],
-          sectionId: section.id,
-        };
-      }
-    }
-
-    return null;
-  };
-
-  const findPreviousItemAcrossModules = (): { item: ModuleItem; sectionId: string } | null => {
-    if (!videoDetail || courseSections.length === 0) return null;
-
-    // Find current section
-    const currentSectionIndex = courseSections.findIndex(
-      (section) => section.id === videoDetail.section.id
-    );
-
-    if (currentSectionIndex === -1) return null;
-
-    const currentSection = courseSections[currentSectionIndex];
-    
-    // First, try to find previous item in CURRENT module
-    if (currentSection.items && currentSection.items.length > 0) {
-      const currentItemIndex = currentSection.items.findIndex(
-        (item) => item.id === videoId && item.type === 'video'
-      );
-      
-      // If current video found and there's a previous item in this module
-      if (currentItemIndex > 0) {
-        return {
-          item: currentSection.items[currentItemIndex - 1],
-          sectionId: currentSection.id,
-        };
-      }
-    }
-
-    // If no previous item in current module, look through previous sections
-    for (let i = currentSectionIndex - 1; i >= 0; i--) {
-      const section = courseSections[i];
-      if (section.items && section.items.length > 0) {
-        // Return the last item (video or quiz) in the previous module
-        return {
-          item: section.items[section.items.length - 1],
-          sectionId: section.id,
-        };
-      }
-    }
-
-    return null;
-  };
-
+  // Track completion state changes for debugging
   useEffect(() => {
-    if (videoDetail && courseSections.length > 0) {
-      // Always check for next item in sequential order (current module first, then next module)
-      const nextItem = findNextItemAcrossModules();
-      setNextItemInModule(nextItem);
-
-      // Always check for previous item in sequential order (current module first, then previous module)
-      const prevItem = findPreviousItemAcrossModules();
-      setPrevItemInModule(prevItem);
-    }
-  }, [videoDetail, courseSections]);
+    console.log('🎯 isVideoCompleted state changed:', isVideoCompleted);
+    console.log('🎨 Current render state:', {
+      isVideoCompleted,
+      hasVideoDetail: !!videoDetail,
+      hasUserProgress: !!(videoDetail?.userProgress),
+      videoId: videoDetail?.id,
+    });
+  }, [isVideoCompleted, videoDetail]);
 
   const saveProgress = async () => {
     // Skip if essential data is missing
@@ -390,7 +305,7 @@ const LessonPlayer = () => {
         });
       }
     } catch (err) {
-      console.error(" Error saving progress:", err);
+      console.error("❌ Error saving progress:", err);
     }
   };
 
@@ -414,6 +329,37 @@ const LessonPlayer = () => {
     const subscription = player.addListener("playToEnd", async () => {
       console.log("🏁 Video finished! Marking as complete...");
       
+      // ALWAYS update the completion state immediately
+      console.log('✅ SETTING isVideoCompleted to TRUE! (regular video)');
+      setIsVideoCompleted(true);
+      
+      // Update UI immediately
+      if (videoDetail && videoDetail.userProgress) {
+        console.log('📊 Current videoDetail state (regular video):', {
+          is_completed: videoDetail.userProgress.is_completed,
+          watch_time: videoDetail.userProgress.watch_time_seconds,
+        });
+        
+        setVideoDetail((prevDetail) => {
+          const updated = {
+            ...prevDetail!,
+            userProgress: {
+              ...prevDetail!.userProgress!,
+              is_completed: true,
+              watch_time_seconds: Math.floor(duration),
+              last_position_seconds: Math.floor(duration),
+            },
+          };
+          
+          console.log('🔄 New videoDetail state (regular video):', {
+            is_completed: updated.userProgress.is_completed,
+            watch_time: updated.userProgress.watch_time_seconds,
+          });
+          
+          return updated;
+        });
+      }
+      
       // Force completion when video ends
       if (videoDetail && userId) {
         try {
@@ -423,17 +369,6 @@ const LessonPlayer = () => {
             watchTimeSeconds: Math.floor(duration),
             isCompleted: true,
             lastPositionSeconds: Math.floor(duration),
-          });
-          
-          // Update local state
-          setVideoDetail({
-            ...videoDetail,
-            userProgress: {
-              ...videoDetail.userProgress!,
-              is_completed: true,
-              watch_time_seconds: Math.floor(duration),
-              last_position_seconds: Math.floor(duration),
-            },
           });
           
           console.log('✅ Video marked as complete!');
@@ -446,7 +381,7 @@ const LessonPlayer = () => {
     return () => {
       subscription.remove();
     };
-  }, [player, isYouTubeVideo]);
+  }, [player, isYouTubeVideo, videoDetail, duration]);
 
   const togglePlayPause = () => {
     if (isYouTubeVideo) {
@@ -512,6 +447,16 @@ const LessonPlayer = () => {
   };
 
   const handleNextVideo = () => {
+    // Check if current video is completed before allowing navigation
+    if (!isVideoCompleted) {
+      Alert.alert(
+        "Complete This Lesson",
+        "Please watch at least 90% of the video to unlock the next item.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
     if (nextItemInModule) {
       saveProgress();
       
@@ -525,6 +470,13 @@ const LessonPlayer = () => {
       } else if (nextItemInModule.item.type === 'quiz') {
         navigation.navigate("QuizScreen", {
           quizId: nextItemInModule.item.id,
+          courseId,
+          sectionId: nextItemInModule.sectionId,
+          userId,
+        });
+      } else if (nextItemInModule.item.type === 'pdf') {
+        navigation.navigate("PDFView", {
+          pdfId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
@@ -547,6 +499,13 @@ const LessonPlayer = () => {
       } else if (prevItemInModule.item.type === 'quiz') {
         navigation.navigate("QuizScreen", {
           quizId: prevItemInModule.item.id,
+          courseId,
+          sectionId: prevItemInModule.sectionId,
+          userId,
+        });
+      } else if (prevItemInModule.item.type === 'pdf') {
+        navigation.navigate("PDFView", {
+          pdfId: prevItemInModule.item.id,
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
@@ -605,7 +564,7 @@ const LessonPlayer = () => {
           const currentTime = await youtubePlayerRef.current.getCurrentTime();
           const videoDuration = await youtubePlayerRef.current.getDuration();
 
-          // Update state
+          // Update state immediately
           setCurrentPosition(currentTime);
           if (duration === 0 && videoDuration > 0) {
             setDuration(videoDuration);
@@ -625,31 +584,60 @@ const LessonPlayer = () => {
               state,
             });
 
-            try {
-              const result = await videoService.updateProgress(courseId, {
-                userId,
-                videoId,
-                watchTimeSeconds: Math.floor(currentTime),
-                isCompleted,
-                lastPositionSeconds: Math.floor(currentTime),
-              });
+            // ALWAYS update the completion state if video is completed
+            if (isCompleted) {
+              console.log('✅ SETTING isVideoCompleted to TRUE!');
+              setIsVideoCompleted(true);
+            }
 
-              // Update local state if video is now completed
-              if (isCompleted && videoDetail && videoDetail.userProgress) {
-                console.log('✅ Updating local state - YouTube video completed!');
-                setVideoDetail({
-                  ...videoDetail,
+            // Update UI immediately BEFORE the API call
+            if (isCompleted && videoDetail && videoDetail.userProgress) {
+              console.log('✅ Updating local state IMMEDIATELY - YouTube video completed!');
+              console.log('📊 Current videoDetail state:', {
+                is_completed: videoDetail.userProgress.is_completed,
+                watch_time: videoDetail.userProgress.watch_time_seconds,
+              });
+              
+              setVideoDetail((prevDetail) => {
+                const updated = {
+                  ...prevDetail!,
                   userProgress: {
-                    ...videoDetail.userProgress,
+                    ...prevDetail!.userProgress!,
                     is_completed: true,
                     watch_time_seconds: Math.floor(currentTime),
                     last_position_seconds: Math.floor(currentTime),
                   },
+                };
+                
+                console.log('🔄 New videoDetail state:', {
+                  is_completed: updated.userProgress.is_completed,
+                  watch_time: updated.userProgress.watch_time_seconds,
                 });
-              }
-            } catch (err) {
-              console.error("❌ Error saving YouTube progress:", err);
+                
+                return updated;
+              });
             }
+
+            // Then save to backend (don't await to keep UI responsive)
+            videoService.updateProgress(courseId, {
+              userId,
+              videoId,
+              watchTimeSeconds: Math.floor(currentTime),
+              isCompleted,
+              lastPositionSeconds: Math.floor(currentTime),
+            }).catch(err => {
+              console.error("❌ Error saving YouTube progress:", err);
+              // Optionally revert UI state if API call fails
+              if (isCompleted && videoDetail && videoDetail.userProgress) {
+                setVideoDetail((prevDetail) => ({
+                  ...prevDetail!,
+                  userProgress: {
+                    ...prevDetail!.userProgress!,
+                    is_completed: false,
+                  },
+                }));
+              }
+            });
           } else {
             console.log(
               "⚠️ Skipping YouTube progress save - insufficient data:",
@@ -734,7 +722,7 @@ const LessonPlayer = () => {
       onHeaderLeftPress={() => {
         saveProgress();
         // Pass state to refresh CourseDetail if video was completed
-        if (videoDetail?.userProgress?.is_completed) {
+        if (isVideoCompleted) {
           navigation.navigate('CourseDetail', {
             courseId,
             videoCompleted: true,
@@ -882,19 +870,21 @@ const LessonPlayer = () => {
 
       {/* Video Info Card */}
       <View style={styles.infoCard}>
-        <Text style={styles.videoTitle}>{videoDetail.title}</Text>
-
-        {videoDetail.userProgress && (
-          <View style={styles.progressBadge}>
+        {/* Completion Badge - Show ABOVE title */}
+        {videoDetail && (
+          <View 
+            key={`badge-${isVideoCompleted}`} 
+            style={styles.progressBadge}
+          >
             <Ionicons
               name={
-                videoDetail.userProgress.is_completed
+                isVideoCompleted
                   ? "checkmark-circle"
                   : "time-outline"
               }
               size={16}
               color={
-                videoDetail.userProgress.is_completed
+                isVideoCompleted
                   ? Colors.green
                   : Colors.starGold
               }
@@ -902,18 +892,22 @@ const LessonPlayer = () => {
             <Text
               style={[
                 styles.progressText,
-                videoDetail.userProgress.is_completed &&
+                isVideoCompleted &&
                   styles.progressTextCompleted,
               ]}
             >
-              {videoDetail.userProgress.is_completed
+              {isVideoCompleted
                 ? "Completed"
-                : `Watched ${formatTime(
+                : videoDetail.userProgress
+                ? `Watched ${formatTime(
                     videoDetail.userProgress.watch_time_seconds
-                  )}`}
+                  )}`
+                : "Not started"}
             </Text>
           </View>
         )}
+
+        <Text style={styles.videoTitle}>{videoDetail.title}</Text>
 
         {videoDetail.description && (
           <View style={styles.descriptionContainer}>
@@ -952,7 +946,11 @@ const LessonPlayer = () => {
                 !prevItemInModule && styles.navLabelDisabled,
               ]}
             >
-              PREVIOUS
+              {prevItemInModule?.item.type === 'quiz' 
+                ? 'PREVIOUS QUIZ' 
+                : prevItemInModule?.item.type === 'pdf'
+                ? 'PREVIOUS PDF'
+                : 'PREVIOUS LESSON'}
             </Text>
             {prevItemInModule ? (
               <Text style={styles.navButtonText} numberOfLines={2}>
@@ -960,19 +958,20 @@ const LessonPlayer = () => {
               </Text>
             ) : (
               <Text style={styles.navButtonTextDisabled}>
-                No previous lesson
+                No previous item
               </Text>
             )}
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity
+          key={`next-btn-${isVideoCompleted}`}
           style={[
             styles.navButton,
-            !nextItemInModule && styles.navButtonDisabled,
+            (!nextItemInModule || (nextItemInModule && !isVideoCompleted)) && styles.navButtonDisabled,
           ]}
           onPress={handleNextVideo}
-          disabled={!nextItemInModule}
+          disabled={!nextItemInModule || !isVideoCompleted}
           activeOpacity={0.7}
         >
           <View style={styles.navButtonContent}>
@@ -980,18 +979,33 @@ const LessonPlayer = () => {
               style={[
                 styles.navLabel,
                 styles.navLabelRight,
-                !nextItemInModule && styles.navLabelDisabled,
+                (!nextItemInModule || (nextItemInModule && !isVideoCompleted)) && styles.navLabelDisabled,
               ]}
             >
-              NEXT
+              {nextItemInModule?.item.type === 'quiz' 
+                ? 'NEXT QUIZ' 
+                : nextItemInModule?.item.type === 'pdf'
+                ? 'NEXT PDF'
+                : 'NEXT LESSON'}
             </Text>
             {nextItemInModule ? (
-              <Text
-                style={[styles.navButtonText, styles.navButtonTextRight]}
-                numberOfLines={2}
-              >
-                {nextItemInModule.item.title}
-              </Text>
+              <>
+                <Text
+                  style={[
+                    styles.navButtonText, 
+                    styles.navButtonTextRight,
+                    !isVideoCompleted && styles.navButtonTextDisabled
+                  ]}
+                  numberOfLines={2}
+                >
+                  {nextItemInModule.item.title}
+                </Text>
+                {!isVideoCompleted && (
+                  <Text style={styles.lockedText}>
+                    🔒 Complete this lesson first
+                  </Text>
+                )}
+              </>
             ) : (
               <Text
                 style={[
@@ -999,7 +1013,7 @@ const LessonPlayer = () => {
                   styles.navButtonTextRight,
                 ]}
               >
-                No next lesson
+                No next item
               </Text>
             )}
           </View>
@@ -1007,13 +1021,22 @@ const LessonPlayer = () => {
             name="chevron-forward"
             size={20}
             color={
-              nextItemInModule
+              (nextItemInModule && isVideoCompleted)
                 ? Colors.purple600
                 : Colors.textSecondary
             }
           />
         </TouchableOpacity>
       </View>
+
+      {/* Course Completion Message */}
+      {isLastItem && isVideoCompleted && (
+        <CourseCompletionCard
+          courseId={courseId}
+          navigation={navigation}
+          onBackToCourse={() => saveProgress()}
+        />
+      )}
     </Screen>
   );
 };
@@ -1074,6 +1097,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.black,
     position: "relative",
     alignSelf: "center",
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   videoWrapper: {
     width: "100%",
@@ -1123,7 +1148,7 @@ const styles = StyleSheet.create({
     height: 64,
     justifyContent: "center",
     alignItems: "center",
-    opacity: 0.8,
+    opacity: 0.9,
   },
   bottomControls: {
     padding: Spacing.md,
@@ -1143,20 +1168,13 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     backgroundColor: Colors.purple600,
-    opacity: 0.8,
+    opacity: 0.9,
   },
   infoCard: {
     backgroundColor: Colors.textInputBg,
     marginTop: Spacing.lg,
     padding: Spacing.md,
     borderRadius: 12,
-  },
-  videoTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-    lineHeight: 24,
   },
   progressBadge: {
     flexDirection: "row",
@@ -1176,6 +1194,13 @@ const styles = StyleSheet.create({
   },
   progressTextCompleted: {
     color: Colors.green,
+  },
+  videoTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+    lineHeight: 24,
   },
   descriptionContainer: {
     marginTop: Spacing.md,
@@ -1239,6 +1264,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     lineHeight: 18,
+  },
+  lockedText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    textAlign: "right",
+    fontStyle: 'italic',
   },
 });
 

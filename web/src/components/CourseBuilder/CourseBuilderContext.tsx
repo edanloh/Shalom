@@ -32,14 +32,17 @@ export interface Lesson {
   id: string;
   title: string;
   baseTitle?: string;
-  type: string;
+  type: 'video' | 'pdf';
   status: string;
   content: string;
-  videoUrl: string;
+  videoUrl: string; // For video lessons
+  resourceUrl?: string; // For PDF lessons
   thumbnailUrl?: string;
   durationSeconds?: number;
   isPreview?: boolean;
   order?: number;
+  fileSize?: number; // For PDF file size
+  isDownloadable?: boolean; // For PDF download permission
 }
 
 export interface Module {
@@ -179,17 +182,21 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
         // Transform sections to moduleDetails format
         const moduleDetails = sections.map((section: any) => {
           const lessons = section.items
-            ?.filter((item: any) => item.type === 'video')
-            .map((video: any) => ({
-              id: video.id,
-              title: video.title,
-              content: video.description || '',
-              video_url: video.video_url || '',
-              thumbnail_url: video.thumbnail_url || '',
-              duration: `${Math.floor((video.duration_seconds || 0) / 60)} min`,
-              duration_seconds: video.duration_seconds || 0,
-              is_preview: video.is_preview || false,
-              order_index: video.order_index
+            ?.filter((item: any) => item.type === 'video' || item.type === 'pdf')
+            .map((item: any) => ({
+              id: item.id,
+              title: item.title,
+              type: item.type || 'video',
+              content: item.description || '',
+              video_url: item.video_url || '',
+              resource_url: item.resource_url || '',
+              file_size_bytes: item.file_size_bytes,
+              is_downloadable: item.is_downloadable || false,
+              thumbnail_url: item.thumbnail_url || '',
+              duration: item.type === 'video' ? `${Math.floor((item.duration_seconds || 0) / 60)} min` : '',
+              duration_seconds: item.duration_seconds || 0,
+              is_preview: item.is_preview || false,
+              order_index: item.order_index
             })) || [];
 
           const quizzes = section.items
@@ -247,10 +254,13 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
             id: lesson.id.toString(),
             title: lesson.title,
             baseTitle: lesson.title,
-            type: "video",
+            type: lesson.type || "video",
             status: "published",
             content: lesson.content || "",
             videoUrl: lesson.video_url || "",
+            resourceUrl: lesson.resource_url || "",
+            fileSizeBytes: lesson.file_size_bytes,
+            isDownloadable: lesson.is_downloadable || false,
             thumbnailUrl: lesson.thumbnail_url || "",
             durationSeconds: lesson.duration_seconds || 0,
             isPreview: lesson.is_preview || false,
@@ -500,8 +510,9 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
         // Check if lesson has local files that need uploading
         const hasLocalThumbnail = lesson.thumbnailUrl?.startsWith('[LOCAL_FILE:');
         const hasLocalVideo = lesson.videoUrl?.startsWith('[LOCAL_FILE:');
+        const hasLocalPdf = lesson.resourceUrl?.startsWith('[LOCAL_FILE:');
         
-        if (hasLocalThumbnail || hasLocalVideo) {
+        if (hasLocalThumbnail || hasLocalVideo || hasLocalPdf) {
           // Get files from fileCache (from useVideoUpload)
           const cacheKey = `${module.id}-${lesson.id}`;
           const cachedFiles = (window as any).__lessonFileCache?.get(cacheKey);
@@ -535,6 +546,22 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
                 }
               } catch (err) {
                 console.error(`Video upload error for lesson ${lesson.title}:`, err);
+                hasErrors = true;
+              }
+            }
+            
+            // Upload PDF
+            if (hasLocalPdf && cachedFiles.pdfFile) {
+              try {
+                const { url, error } = await StorageService.uploadPDF(cachedFiles.pdfFile);
+                if (error) {
+                  console.error(`PDF upload failed for lesson ${lesson.title}:`, error);
+                  hasErrors = true;
+                } else {
+                  uploadedModules[moduleIndex].lessons[lessonIndex].resourceUrl = url;
+                }
+              } catch (err) {
+                console.error(`PDF upload error for lesson ${lesson.title}:`, err);
                 hasErrors = true;
               }
             }
@@ -583,16 +610,20 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
         description: module.description || '',
         order: index, // Add order index for each module
         lessons: module.lessons.map((lesson, lessonIndex) => ({
-          id: lesson.id, // Preserve video ID for UPDATE
+          id: lesson.id, // Preserve video/resource ID for UPDATE
           // Save only the user's custom title, not the "Lesson X.Y:" prefix
           title: lesson.baseTitle || lesson.title.replace(/^Lesson \d+\.\d+:\s*/, ''),
           content: lesson.content || '',
-          videoUrl: lesson.videoUrl || null,
+          type: lesson.type || 'video', // Include lesson type
+          videoUrl: lesson.type === 'video' ? (lesson.videoUrl || null) : null,
+          resourceUrl: lesson.type === 'pdf' ? (lesson.resourceUrl || null) : null,
           thumbnailUrl: lesson.thumbnailUrl || null,
-          durationSeconds: lesson.durationSeconds || 0,
+          durationSeconds: lesson.type === 'video' ? (lesson.durationSeconds || 0) : undefined,
           order: lesson.order ?? lessonIndex, // Use existing order or index
-          durationMinutes: Math.floor((lesson.durationSeconds || 0) / 60),
-          isPreview: lesson.isPreview || false
+          durationMinutes: lesson.type === 'video' ? Math.floor((lesson.durationSeconds || 0) / 60) : undefined,
+          isPreview: lesson.isPreview || false,
+          isDownloadable: lesson.type === 'pdf' ? (lesson.isDownloadable ?? true) : undefined,
+          fileSize: lesson.type === 'pdf' ? lesson.fileSize : undefined
         })),
         quizzes: module.quizzes.map((quiz, quizIndex) => ({
           id: quiz.id, // Preserve quiz ID for UPDATE

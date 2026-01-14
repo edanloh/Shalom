@@ -1,11 +1,11 @@
 /**
  * Video Service - Handles all video-related API calls
- * Integrates with AWS Lambda backend for video playback and progress tracking
+ * Integrates with Supabase backend for video playback and progress tracking
  */
 
 import { apiService } from './apiService';
 
-// Video Detail Response from getVideoDetail Lambda
+// Video Detail Response from getVideoDetail
 export interface VideoDetailResponse {
   success: boolean;
   message: string;

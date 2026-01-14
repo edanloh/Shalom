@@ -48,24 +48,34 @@ export const useContentManagement = () => {
   };
 
   // Lesson functions
-  const addLesson = (moduleId: string) => {
+  const addLesson = (moduleId: string, lessonType: 'video' | 'pdf' = 'video') => {
     const newLessonId = `l${Date.now()}`;
     let updatedModules = modules.map((m) => {
       if (m.id === moduleId) {
+        // Calculate next order based on max existing order value
+        const allOrders = [
+          ...m.lessons.map(l => l.order ?? 0),
+          ...m.quizzes.map(q => q.order ?? 0)
+        ];
+        const maxOrder = allOrders.length > 0 ? Math.max(...allOrders) : -1;
+        const nextOrder = maxOrder + 1;
+        
+        const newLesson: Lesson = {
+          id: newLessonId,
+          title: `New Lesson`, // Will be updated by numbering
+          baseTitle: "New Lesson",
+          type: lessonType,
+          status: "draft",
+          content: "",
+          videoUrl: lessonType === 'video' ? "" : undefined,
+          resourceUrl: lessonType === 'pdf' ? "" : undefined,
+          isDownloadable: lessonType === 'pdf' ? true : undefined,
+          order: nextOrder,
+        } as Lesson;
+        
         return {
           ...m,
-          lessons: [
-            ...m.lessons,
-            {
-              id: newLessonId,
-              title: `New Lesson`, // Will be updated by numbering
-              baseTitle: "New Lesson",
-              type: "video",
-              status: "draft",
-              content: "",
-              videoUrl: "",
-            },
-          ],
+          lessons: [...m.lessons, newLesson],
         };
       }
       return m;
@@ -80,6 +90,14 @@ export const useContentManagement = () => {
   };
 
   const deleteLesson = (moduleId: string, lessonId: string) => {
+    // Clear selection if deleting the currently selected lesson
+    setSelectedItem((current: any) => {
+      if (current?.type === 'lesson' && current?.id === lessonId) {
+        return null;
+      }
+      return current;
+    });
+    
     let updatedModules = modules.map((m) =>
       m.id === moduleId
         ? { ...m, lessons: m.lessons.filter((l) => l.id !== lessonId) }
@@ -116,6 +134,14 @@ export const useContentManagement = () => {
     const newQuizId = `q${Date.now()}`;
     let updatedModules = modules.map((m) => {
       if (m.id === moduleId) {
+        // Calculate next order based on max existing order value
+        const allOrders = [
+          ...m.lessons.map(l => l.order ?? 0),
+          ...m.quizzes.map(q => q.order ?? 0)
+        ];
+        const maxOrder = allOrders.length > 0 ? Math.max(...allOrders) : -1;
+        const nextOrder = maxOrder + 1;
+        
         return {
           ...m,
           quizzes: [
@@ -126,6 +152,7 @@ export const useContentManagement = () => {
               baseTitle: "New Quiz",
               status: "draft",
               passingScore: 70,
+              order: nextOrder,
               questions: [
                 {
                   id: `qq${Date.now()}`,
@@ -153,6 +180,14 @@ export const useContentManagement = () => {
   };
 
   const deleteQuiz = (moduleId: string, quizId: string) => {
+    // Clear selection if deleting the currently selected quiz
+    setSelectedItem((current: any) => {
+      if (current?.type === 'quiz' && current?.id === quizId) {
+        return null;
+      }
+      return current;
+    });
+    
     let updatedModules = modules.map((m) =>
       m.id === moduleId
         ? { ...m, quizzes: m.quizzes.filter((q) => q.id !== quizId) }

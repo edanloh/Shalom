@@ -17,3 +17,8 @@ export {
   type UseCoursesReturn,
   type UseMyCOursesReturn,
 } from './useCourses';
+
+export {
+  useCourseNavigation,
+  type NavigationItem,
+} from './useCourseNavigation';

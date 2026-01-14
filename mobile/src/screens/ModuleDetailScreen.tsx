@@ -1,3 +1,9 @@
+// UPDATED: ModuleDetailScreen with proper refresh on return
+// Key changes:
+// 1. Use useFocusEffect to reload data when screen comes into focus
+// 2. Check route params for completion indicators
+// 3. Force refresh when items are completed
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -11,7 +17,11 @@ import {
 import { Alert } from "react-native";
 import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
+import {
+  useRoute,
+  useNavigation,
+  useFocusEffect,
+} from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import type { StackNavigationProp } from "@react-navigation/stack";
@@ -38,6 +48,9 @@ const ModuleDetailScreen = () => {
   const { courseId, sectionId, userId } = route.params as any;
   const [isEnrolled, setIsEnrolled] = useState(false);
 
+  const [moduleDetail, setModuleDetail] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [courseContent, setCourseContent] = useState<CourseContent | null>(
     null
@@ -49,39 +62,110 @@ const ModuleDetailScreen = () => {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      if (!userId) { 
+      if (!userId) {
         if (mounted) setIsEnrolled(false);
-        return; 
+        return;
       }
       try {
-        const enrolled = await courseService.isUserEnrolledInCourse(userId, courseId);
+        const enrolled = await courseService.isUserEnrolledInCourse(
+          userId,
+          courseId
+        );
         if (mounted) setIsEnrolled(enrolled);
       } catch {
         if (mounted) setIsEnrolled(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [courseId, userId]);
 
+  // Reload when screen comes into focus AND when items are completed
   useFocusEffect(
     React.useCallback(() => {
-      if (userId) {
-        fetchCourseContent();
-      }
-    }, [courseId, userId])
+      if (!userId) return;
+
+      const handleFocus = async () => {
+        // Check if we're returning from a completed item
+        const params = route.params as any;
+        const hasCompletion =
+          params?.videoCompleted ||
+          params?.quizCompleted ||
+          params?.pdfCompleted ||
+          params?.timestamp;
+
+        if (hasCompletion) {
+          console.log("✅ Item completed detected, forcing refresh...", {
+            videoCompleted: params?.videoCompleted,
+            quizCompleted: params?.quizCompleted,
+            pdfCompleted: params?.pdfCompleted,
+            completedItemId:
+              params?.completedVideoId ||
+              params?.completedQuizId ||
+              params?.completedPdfId,
+            timestamp: params?.timestamp,
+          });
+
+          // Force reload to get updated completion status
+          await fetchCourseContent();
+
+          // Clear the completion flags after refresh completes
+          navigation.setParams({
+            videoCompleted: undefined,
+            quizCompleted: undefined,
+            pdfCompleted: undefined,
+            completedVideoId: undefined,
+            completedQuizId: undefined,
+            completedPdfId: undefined,
+            timestamp: undefined,
+          });
+        } else {
+          // Normal focus refresh
+          await fetchCourseContent();
+        }
+      };
+
+      handleFocus();
+    }, [courseId, userId, route.params])
   );
 
   const fetchCourseContent = async () => {
     try {
       setLoading(true);
+      console.log("📊 Fetching course content...", {
+        courseId,
+        userId,
+        sectionId,
+      });
+
       const data = await moduleService.getModuleDetail(courseId, userId);
       setCourseContent(data);
 
-      const section = sectionId
+      // If we have a current section, try to maintain it, otherwise use sectionId or first section
+      const section = currentSection
+        ? moduleService.getSectionById(data.sections, currentSection.id) ||
+          (sectionId
+            ? moduleService.getSectionById(data.sections, sectionId)
+            : data.sections[0])
+        : sectionId
         ? moduleService.getSectionById(data.sections, sectionId)
         : data.sections[0];
 
       setCurrentSection(section);
+
+      if (section) {
+        const completedItems =
+          section.items?.filter((i: ModuleItem) => i.is_completed).length || 0;
+        const totalItems = section.items?.length || 0;
+        console.log("📊 Section loaded:", {
+          sectionId: section.id,
+          title: section.title,
+          totalItems,
+          completedItems,
+          moduleCompleted: (section as any).module_is_completed,
+        });
+      }
     } catch (error) {
       console.error("Error fetching course content:", error);
     } finally {
@@ -93,7 +177,7 @@ const ModuleDetailScreen = () => {
     return moduleService.formatDuration(seconds);
   };
 
-  const getItemProgress = (itemId: string, itemType: ModuleItem['type'] ) => {
+  const getItemProgress = (itemId: string, itemType: ModuleItem["type"]) => {
     if (!courseContent) return null;
     return moduleService.getItemProgress(
       itemId,
@@ -111,7 +195,10 @@ const ModuleDetailScreen = () => {
       "Please enroll to access lessons and quizzes.",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Go to course", onPress: () => navigation.navigate("CourseDetail", { courseId }) },
+        {
+          text: "Go to course",
+          onPress: () => navigation.navigate("CourseDetail", { courseId }),
+        },
       ]
     );
     return false;
@@ -119,6 +206,13 @@ const ModuleDetailScreen = () => {
 
   const handleItemPress = async (item: ModuleItem) => {
     if (!(await requireEnrollment())) return;
+
+    console.log("📍 Navigating to item:", {
+      type: item.type,
+      id: item.id,
+      title: item.title,
+      isCompleted: item.is_completed,
+    });
 
     if (item.type === "video") {
       navigation.navigate("LessonPlayer", {
@@ -149,7 +243,10 @@ const ModuleDetailScreen = () => {
     const currentIndex = courseContent.sections.findIndex(
       (s) => s.id === currentSection.id
     );
-    if (currentIndex === -1 || currentIndex === courseContent.sections.length - 1) {
+    if (
+      currentIndex === -1 ||
+      currentIndex === courseContent.sections.length - 1
+    ) {
       return null;
     }
     return courseContent.sections[currentIndex + 1];
@@ -180,15 +277,7 @@ const ModuleDetailScreen = () => {
 
   const renderItem = (item: ModuleItem, index: number) => {
     const progress = getItemProgress(item.id, item.type);
-    const isCompleted =
-      item.type === "video"
-        ? (progress as any)?.is_completed
-        : (progress as any)?.is_passed;
-
-    // Debug: Log duration values
-    if (item.type === "video") {
-      console.log(`Video: ${item.title}, duration_seconds: ${item.duration_seconds}, formatted: ${formatDuration(item.duration_seconds)}`);
-    }
+    const isCompleted = item.is_completed;
 
     return (
       <TouchableOpacity
@@ -201,15 +290,14 @@ const ModuleDetailScreen = () => {
           {item.type === "video" ? (
             <Ionicons name="play-circle" size={24} color={Colors.purple400} />
           ) : item.type === "pdf" ? (
-            <Ionicons name="newspaper-outline" size={24} color={Colors.white} />
+            <Ionicons name="document-text" size={24} color={Colors.purple400} />
           ) : (
-            <Ionicons name="document-text" size={24} color={Colors.yellow} />
+            <Ionicons name="help-circle" size={24} color={Colors.yellow} />
           )}
         </View>
 
         <View style={styles.itemContent}>
           <View style={styles.itemHeader}>
-            {/* <Text style={styles.itemIndex}></Text> */}
             <Text style={styles.itemTitle} numberOfLines={2}>
               {index + 1}. {item.title}
             </Text>
@@ -243,6 +331,16 @@ const ModuleDetailScreen = () => {
                     color={Colors.textSecondary}
                   />
                   <Text style={styles.itemMetaText}>Quiz</Text>
+                </View>
+              )}
+              {item.type === "pdf" && (
+                <View style={styles.itemMeta}>
+                  <Ionicons
+                    name="newspaper-outline"
+                    size={14}
+                    color={Colors.textSecondary}
+                  />
+                  <Text style={styles.itemMetaText}>PDF Document</Text>
                 </View>
               )}
             </View>
@@ -329,11 +427,7 @@ const ModuleDetailScreen = () => {
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionIconContainer}>
-            <Ionicons
-              name="book-outline"
-              size={24}
-              color={Colors.purple400}
-            />
+            <Ionicons name="book-outline" size={24} color={Colors.purple400} />
           </View>
           <Text style={styles.sectionTitle}>{currentSection.title}</Text>
         </View>
@@ -363,6 +457,21 @@ const ModuleDetailScreen = () => {
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Ionicons
+              name="newspaper-outline"
+              size={18}
+              color={Colors.purple400}
+            />
+            <Text style={styles.statText}>
+              {
+                currentSection.items.filter((i: ModuleItem) => i.type === "pdf")
+                  .length
+              }{" "}
+              PDFs
+            </Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Ionicons
               name="document-text-outline"
               size={18}
               color={Colors.purple400}
@@ -378,11 +487,7 @@ const ModuleDetailScreen = () => {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Ionicons
-              name="time-outline"
-              size={18}
-              color={Colors.purple400}
-            />
+            <Ionicons name="time-outline" size={18} color={Colors.purple400} />
             <Text style={styles.statText}>
               {currentSection.duration_minutes || 0} min
             </Text>
@@ -399,7 +504,8 @@ const ModuleDetailScreen = () => {
               {moduleService.getSectionCompletionPercentage(
                 currentSection,
                 courseContent.userProgress
-              )}%
+              )}
+              %
             </Text>
           </View>
           <View style={styles.progressBarContainer}>
@@ -424,7 +530,9 @@ const ModuleDetailScreen = () => {
               />
               <Text style={styles.moduleCompletedText}>
                 Module Completed on{" "}
-                {new Date((currentSection as any).module_completed_at).toLocaleDateString()}
+                {new Date(
+                  (currentSection as any).module_completed_at
+                ).toLocaleDateString()}
               </Text>
             </View>
           )}
@@ -467,7 +575,9 @@ const ModuleDetailScreen = () => {
             <Ionicons
               name="chevron-back"
               size={20}
-              color={getPreviousSection() ? Colors.purple400 : Colors.textSecondary}
+              color={
+                getPreviousSection() ? Colors.purple400 : Colors.textSecondary
+              }
             />
             <View style={styles.navButtonContent}>
               <Text
@@ -538,7 +648,6 @@ const ModuleDetailScreen = () => {
     </Screen>
   );
 };
-
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,

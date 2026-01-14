@@ -1,8 +1,8 @@
-// supabase/functions/getVideoDetail/index.ts
+// supabase/functions/getLessonDetail/index.ts
 /**
- * Supabase Edge Function: getVideoDetail
+ * Supabase Edge Function: getLessonDetail
  * Purpose: Fetch video details with navigation (prev/next) and user progress
- * Endpoint: GET /getVideoDetail/{videoId}?userId={userId}
+ * Endpoint: GET /getLessonDetail/{videoId}?userId={userId}
  * Database: PostgreSQL (Supabase compatible)
  */
 
@@ -30,14 +30,14 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     
-    // Extract videoId from path: /getVideoDetail/{videoId}
+    // Extract videoId from path: /getLessonDetail/{videoId}
     const pathParts = url.pathname.split('/').filter(Boolean);
     const videoId = pathParts[pathParts.length - 1];
     
     // Extract userId from query parameter
     const userId = url.searchParams.get('userId');
 
-    if (!videoId || videoId === 'getVideoDetail') {
+    if (!videoId || videoId === 'getLessonDetail') {
       return new Response(
         JSON.stringify({
           success: false,
@@ -186,8 +186,6 @@ serve(async (req) => {
       ...(allResources || []).map((r: any) => ({ ...r, type: 'pdf' })),
       ...(allQuizzes || []).map((q: any) => ({ ...q, type: 'quiz' }))
     ].sort((a, b) => a.order_index - b.order_index);
-
-    console.log('All items in section:', allItems.map((i: any) => ({ id: i.id, title: i.title, type: i.type, order: i.order_index })));
 
     const currentIndex = allItems.findIndex((item: any) => item.id === videoId);
     

@@ -11,11 +11,8 @@ import { DEFAULT_COURSE_THUMBNAIL } from '@/constants/images';
 const ENDPOINTS = {
   COURSES: '/courses',
   COURSE_BY_ID: (courseId: string) => `/courses/${courseId}`,
-  // COURSE_STUDENTS: (courseId: string) => `/courses/${courseId}/students`,
-  // AVAILABLE_STUDENTS: (courseId: string) => `/courses/${courseId}/availableStudents`,
   COURSE_STUDENTS: (courseId: string) => `/getCourseStudents/${courseId}`,
   AVAILABLE_STUDENTS: (courseId: string) => `/getAvailableStudents/${courseId}`,
-  // ALL_STUDENTS: '/students',
   ALL_STUDENTS: '/getAllStudents',
   COURSE_REVIEWS: (courseId: string) => `/courses/${courseId}/reviews`,
   USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
@@ -23,8 +20,8 @@ const ENDPOINTS = {
   UPDATE_COURSE: (courseId: string) => `/courses/${courseId}`,
   DELETE_COURSE: (courseId: string) => `/courses/${courseId}`,
   ENROLL_STUDENT: (courseId: string) => `/courses/${courseId}/enroll`,
-  // INSTRUCTOR_STATS: (adminId: string) => `/admin/${adminId}/stats`,
-    INSTRUCTOR_STATS: (adminId: string) => `/getInstructorStats/${adminId}`,
+  INSTRUCTOR_STATS: (adminId: string) => `/getInstructorStats/${adminId}`,
+  COURSE_DUPLICATE: (courseId: string) => `/courseDuplicateHandler/${encodeURIComponent(courseId)}`,
   RECOMMENDATIONS: '/recommendations',
   RECOMMENDATION_EVENT: '/recommendations/events',
 };
@@ -132,6 +129,26 @@ export interface EnrollmentCourse {
   last_accessed_formatted: string;
   enrollment_date_formatted: string;
   completion_date_formatted: string | null;
+}
+
+export interface DuplicateCourseResponse {
+  success: boolean;
+  message: string;
+  data: {
+    originalCourseId: string;
+    duplicatedCourseId: string;
+    duplicatedCourse: any;
+    counts: {
+      sections: number;
+      videos: number;
+      quizzes: number;
+      resources: number;
+    };
+  };
+  meta: {
+    timestamp: string;
+    requestId: string;
+  };
 }
 
 // Helper function to convert AWS course format to web format
@@ -549,6 +566,42 @@ class CourseService {
       return response.data;
     } catch (error) {
       console.error(`Error fetching instructor stats for ${adminId}:`, error);
+      throw error;
+    }
+  }
+
+
+  /**
+   * Duplicate a course
+   * POST /courseDuplicateHandler/{courseId}
+   * Creates a copy of the course with all its sections, videos, quizzes, and resources (PDFs)
+   */
+  async duplicateCourse(courseId: string): Promise<Course> {
+    try {
+      if (!courseId) throw new Error('Missing courseId');
+      
+      const url = ENDPOINTS.COURSE_DUPLICATE(courseId);
+      const response = await apiService.post<DuplicateCourseResponse>(url);
+      
+      const data = response?.data ?? response;
+      const duplicatedCourseData = data?.data?.duplicatedCourse ?? data?.duplicatedCourse;
+      
+      if (!duplicatedCourseData) {
+        throw new Error('Invalid API response when duplicating course');
+      }
+      
+      // Convert to app Course format
+      const duplicatedCourse = convertAWSCourseToAppCourse(duplicatedCourseData);
+      
+      // Clear relevant caches
+      await Promise.all([
+        CacheManager.clear(CACHE_CONFIG.COURSES_KEY),
+        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
+      ]);
+      
+      return duplicatedCourse;
+    } catch (error) {
+      console.error(`Error duplicating course ${courseId}:`, error);
       throw error;
     }
   }
