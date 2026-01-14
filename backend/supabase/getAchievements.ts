@@ -23,40 +23,49 @@ const supabase = createClient(
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const url = new URL(req.url);
-  const userId = url.searchParams.get("userId") || null;
+  const userId = url.searchParams.get("userId");
   const limitRaw = url.searchParams.get("limit");
   const offsetRaw = url.searchParams.get("offset");
   const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 200);
   const offset = Math.max(Number(offsetRaw) || 0, 0);
 
-  const to = offset + limit - 1;
-  const { data: defs, error } = await supabase
-    .from("achievements")
-    .select("id, name, description, icon, type, points, created_at")
-    .eq("is_active", true)
-    .order("points", { ascending: true })
-    .range(offset, to);
-  if (error) return new Response(JSON.stringify({ success: false, message: error.message }), { status: 500, headers: corsHeaders });
-
-  let earned: Record<string, boolean> = {};
-  if (userId) {
-    const { data: ua } = await supabase
-      .from("user_achievements")
-      .select("achievement_id")
-      .eq("user_id", userId);
-    earned = (ua || []).reduce((m, r) => ({ ...m, [r.achievement_id]: true }), {});
+  if (!userId) {
+    return new Response(JSON.stringify({ success: true, data: [] }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
-  const payload = defs?.map((a) => ({
-    id: a.id,
-    label: a.name,
-    description: a.description,
-    icon: a.icon,
-    type: a.type,
-    points: a.points,
-    createdAt: a.created_at,
-    earned: !!earned[a.id],
-  })) ?? [];
+  const to = offset + limit - 1;
+  const { data: earnedRows, error } = await supabase
+    .from("user_achievements")
+    .select(
+      "earned_at, created_at, achievements!inner(id, name, description, icon, type, points, created_at, is_active)"
+    )
+    .eq("user_id", userId)
+    .eq("achievements.is_active", true)
+    .order("earned_at", { ascending: false })
+    .range(offset, to);
+
+  if (error) {
+    return new Response(JSON.stringify({ success: false, message: error.message }), {
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+
+  const payload =
+    earnedRows?.map((row: any) => ({
+      id: row.achievements?.id,
+      label: row.achievements?.name,
+      description: row.achievements?.description,
+      icon: row.achievements?.icon,
+      type: row.achievements?.type,
+      points: row.achievements?.points,
+      createdAt: row.achievements?.created_at,
+      earned: true,
+      earnedAt: row.earned_at ?? row.created_at ?? null,
+    })) ?? [];
 
   return new Response(JSON.stringify({ success: true, data: payload }), {
     status: 200,

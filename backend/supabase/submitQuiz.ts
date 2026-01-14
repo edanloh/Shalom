@@ -154,73 +154,6 @@ const isGoalComplete = (goal: any) => {
   return checks.every((c) => c.current >= c.target);
 };
 
-const getLocalDateString = (date: Date, timeZone: string) => {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const map: Record<string, string> = {};
-  for (const part of parts) {
-    if (part.type !== "literal") map[part.type] = part.value;
-  }
-  return `${map.year}-${map.month}-${map.day}`;
-};
-
-type QuizQuestion = {
-  id: string;
-  question: string;
-  correct_answer: string;
-  points: number | null;
-};
-
-async function notifyCourseCompletion(userId: string, courseId: string) {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  if (!supabaseUrl || !serviceKey) return;
-  try {
-    const res = await fetch(`${supabaseUrl}/functions/v1/completeCourse`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${serviceKey}`,
-        apikey: serviceKey,
-      },
-      body: JSON.stringify({ userId, courseId }),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('completeCourse failed:', res.status, text);
-    }
-  } catch (error) {
-    console.error('Failed to notify course completion:', error);
-  }
-}
-
-async function notifyStreakUpdate(userId: string, activityAt: string) {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  if (!supabaseUrl || !serviceKey) return;
-  try {
-    const res = await fetch(`${supabaseUrl}/functions/v1/updateStreak`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${serviceKey}`,
-        apikey: serviceKey,
-      },
-      body: JSON.stringify({ userId, activityAt }),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('updateStreak failed:', res.status, text);
-    }
-  } catch (error) {
-    console.error('Failed to update streak:', error);
-  }
-}
-
 async function awardGoalCredits(userId: string, goal: any) {
   const rewardPoints = Number(goal.reward_points ?? 0);
   if (!rewardPoints || rewardPoints <= 0) return;
@@ -248,50 +181,6 @@ async function awardGoalCredits(userId: string, goal: any) {
   }
 }
 
-async function updateDailyMinutes(
-  supabaseClient: any,
-  userId: string,
-  minutes: number,
-  activityAt: Date
-) {
-  if (!Number.isFinite(minutes) || minutes <= 0) return;
-
-  const { data: prefRow, error: prefErr } = await supabaseClient
-    .from('user_preferences')
-    .select('timezone')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (prefErr && prefErr.code !== 'PGRST116') throw prefErr;
-
-  const timezone = prefRow?.timezone || 'UTC';
-  const dateStr = getLocalDateString(activityAt, timezone);
-
-  const { data: analyticsRow, error: analyticsErr } = await supabaseClient
-    .from('user_analytics')
-    .select('total_time_minutes')
-    .eq('user_id', userId)
-    .eq('date', dateStr)
-    .maybeSingle();
-  if (analyticsErr && analyticsErr.code !== 'PGRST116') throw analyticsErr;
-
-  const prevMinutes = Number(analyticsRow?.total_time_minutes ?? 0);
-  const newMinutes = prevMinutes + Math.floor(minutes);
-
-  const { error: upsertErr } = await supabaseClient
-    .from('user_analytics')
-    .upsert(
-      {
-        user_id: userId,
-        date: dateStr,
-        total_time_minutes: newMinutes,
-      },
-      { onConflict: 'user_id,date' }
-    );
-  if (upsertErr) throw upsertErr;
-
-  return newMinutes;
-}
-
 async function updateActiveGoalsForQuiz(
   supabaseClient: any,
   userId: string,
@@ -314,16 +203,20 @@ async function updateActiveGoalsForQuiz(
     const updates: Record<string, number | string | boolean | null> = {};
 
     if (Number(goal.target_hours ?? 0) > 0 && deltaMinutes > 0) {
+      const targetHours = Number(goal.target_hours ?? 0);
       const addedHours = Math.round((deltaMinutes / 60) * 10000) / 10000;
       const nextHours = Number(goal.current_hours ?? 0) + addedHours;
-      updates.current_hours = nextHours;
-      goal.current_hours = nextHours;
+      const cappedHours = targetHours > 0 ? Math.min(nextHours, targetHours) : nextHours;
+      updates.current_hours = cappedHours;
+      goal.current_hours = cappedHours;
     }
 
     if (quizCompleted && Number(goal.target_quizzes ?? 0) > 0) {
+      const targetQuizzes = Number(goal.target_quizzes ?? 0);
       const nextQuizzes = Number(goal.current_quizzes ?? 0) + 1;
-      updates.current_quizzes = nextQuizzes;
-      goal.current_quizzes = nextQuizzes;
+      const cappedQuizzes = targetQuizzes > 0 ? Math.min(nextQuizzes, targetQuizzes) : nextQuizzes;
+      updates.current_quizzes = cappedQuizzes;
+      goal.current_quizzes = cappedQuizzes;
     }
 
     const completed = isGoalComplete(goal);
@@ -484,13 +377,6 @@ serve(async (req) => {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('quiz_id', quizId);
-    const { count: previousPasses, error: passCountErr } = await supabaseClient
-      .from('quiz_attempts')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('quiz_id', quizId)
-      .eq('is_passed', true);
-    if (passCountErr) throw passCountErr;
 
     // ========================================
     // 2. Get all questions with correct answers
@@ -539,6 +425,16 @@ serve(async (req) => {
       : 0;
     const isPassed = score >= quiz.passing_score;
     const attemptNumber = (previousAttempts || 0) + 1;
+    let previousPasses = 0;
+    if (isPassed) {
+      const { count: passCount } = await supabaseClient
+        .from('quiz_attempts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('quiz_id', quizId)
+        .eq('is_passed', true);
+      previousPasses = passCount ?? 0;
+    }
 
     // ========================================
     // 4. Save quiz attempt
@@ -566,18 +462,10 @@ serve(async (req) => {
 
     if (insertError) throw insertError;
 
-    await updateDailyMinutes(supabaseClient, userId, Number(timeTakenMinutes || 0), new Date());
-    await notifyStreakUpdate(userId, new Date().toISOString());
-
     const now = new Date();
-    await updateDailyMinutes(
-      supabaseClient,
-      userId,
-      Number(timeTakenMinutes || 0),
-      now
-    );
-    await notifyStreakUpdate(userId, new Date().toISOString());
-    if (isPassed && (previousPasses ?? 0) === 0) {
+    await updateDailyMinutes(supabaseClient, userId, Number(timeTakenMinutes || 0), now);
+    await notifyStreakUpdate(userId, now.toISOString());
+    if (isPassed && previousPasses === 0) {
       await updateActiveGoalsForQuiz(supabaseClient, userId, {
         quizCompleted: true,
         deltaMinutes: Number(timeTakenMinutes || 0),

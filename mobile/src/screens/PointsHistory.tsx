@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   SectionList,
@@ -20,7 +19,6 @@ type AppPointHistory = {
   id: string;
   pointsTitle: string;
   subtitle: string;
-  thumbnail: string;
   createdAt: string; // ISO date
 };
 
@@ -93,7 +91,6 @@ export default function PointsHistoryScreen({ navigation }: any) {
       id: e.id,
       pointsTitle: `+${e.points}`,
       subtitle: e.title,
-      thumbnail: "https://images.unsplash.com/photo-1521791055366-0d553872125f?w=400&h=300&fit=crop",
       createdAt: e.timestamp,
     }));
   }, []);
@@ -183,7 +180,9 @@ export default function PointsHistoryScreen({ navigation }: any) {
         renderItem={({ item, index, section }) => (
           <View>
             <TouchableOpacity activeOpacity={0.8} style={styles.row}>
-              <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
+              <View style={styles.iconBadge}>
+                <Ionicons name="trending-up" size={22} color={Colors.green} />
+              </View>
               <View style={styles.textBlock}>
                 <Text style={TextStyles.body} numberOfLines={1}>
                   {item.pointsTitle}
@@ -259,11 +258,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: Spacing.sm,
   },
-  thumb: {
+  iconBadge: {
     width: THUMB,
     height: THUMB,
     borderRadius: 12,
     marginRight: Spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.backgroundGray,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
   textBlock: {
     flex: 1,

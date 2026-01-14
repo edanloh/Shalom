@@ -387,6 +387,7 @@ serve(async (req) => {
             resource_type: resource.resource_type,
             resource_url: resource.resource_url,
             file_size_bytes: resource.file_size_bytes,
+            estimated_read_minutes: resource.estimated_read_minutes,
             download_count: 0, // Reset download count for duplicate
             is_downloadable: resource.is_downloadable,
             order_index: resource.order_index,

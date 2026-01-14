@@ -330,14 +330,16 @@ async function syncPointGoals(userId: string, balance: number) {
   if (!goals?.length) return;
 
   for (const goal of goals) {
+    const targetPoints = Number(goal.target_points ?? 0);
+    const cappedPoints = targetPoints > 0 ? Math.min(balance, targetPoints) : balance;
     const currentPoints = Number(goal.current_points ?? 0);
-    if (currentPoints !== balance) {
+    if (currentPoints !== cappedPoints) {
       const { error: updateErr } = await supabase
         .from("learning_goals")
-        .update({ current_points: balance })
+        .update({ current_points: cappedPoints })
         .eq("id", goal.id);
       if (updateErr) throw updateErr;
-      goal.current_points = balance;
+      goal.current_points = cappedPoints;
     }
 
     if (isGoalComplete(goal)) {

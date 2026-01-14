@@ -23,14 +23,26 @@ import { useAuth } from "../contexts/AuthContext";
 const CARD_BG = "#3A3A45";
 const TILE_BG = "#5B38E3";
 
-const GoalCard = ({ goal, onClear, clearing }: any) => (
-  <View
-    style={[
-      styles.goalCard,
-      goal.isExpired && styles.goalCardExpired,
-      goal.isCompleted && styles.goalCardCompleted,
-    ]}
-  >
+const formatProgressValue = (value: number, unit: "points" | "courses" | "hours" | "lessons" | "quizzes") => {
+  if (!Number.isFinite(value)) return "0";
+  if (unit !== "hours") return String(value);
+  const rounded = Math.round(value * 100) / 100;
+  const text = rounded.toFixed(2);
+  return text.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+};
+
+const GoalCard = ({ goal, onClear, clearing }: any) => {
+  const displayCurrent = Math.min(goal.current, goal.target);
+  const displayTarget = goal.target;
+
+  return (
+    <View
+      style={[
+        styles.goalCard,
+        goal.isExpired && styles.goalCardExpired,
+        goal.isCompleted && styles.goalCardCompleted,
+      ]}
+    >
     <View
       style={{
         marginBottom: Spacing.md,
@@ -65,14 +77,15 @@ const GoalCard = ({ goal, onClear, clearing }: any) => (
           ]}
         />
       </View>
-      <View style={styles.progressRow}>
-        <Text style={styles.progressText}>
-          {goal.current} / {goal.target} {goal.unit}
-        </Text>
-        {typeof goal.rewardPoints === "number" ? (
-          <Text style={styles.rewardText}>+{goal.rewardPoints} pts</Text>
-        ) : null}
-      </View>
+    <View style={styles.progressRow}>
+      <Text style={styles.progressText}>
+        {formatProgressValue(displayCurrent, goal.unit)} /{" "}
+        {formatProgressValue(displayTarget, goal.unit)} {goal.unit}
+      </Text>
+      {typeof goal.rewardPoints === "number" ? (
+        <Text style={styles.rewardText}>+{goal.rewardPoints} pts</Text>
+      ) : null}
+    </View>
       {goal.isExpired || goal.isCompleted ? (
         <View style={styles.clearRow}>
           <Pressable
@@ -89,8 +102,9 @@ const GoalCard = ({ goal, onClear, clearing }: any) => (
         </View>
       ) : null}
     </View>
-  </View>
-);
+    </View>
+  );
+};
 
 const StatTile = ({ stat }: any) => (
   <View style={styles.statTile}>

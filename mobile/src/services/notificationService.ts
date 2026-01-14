@@ -18,7 +18,16 @@ type NotificationRecord = {
 };
 
 const normalizeNotificationType = (value?: string): Notification["type"] => {
-  if (value === "course" || value === "achievement" || value === "reminder") {
+  if (
+    value === "course" ||
+    value === "achievement" ||
+    value === "reminder" ||
+    value === "streak_reminder" ||
+    value === "streak_broken" ||
+    value === "streak_hot" ||
+    value === "goal_completed" ||
+    value === "goal_expired"
+  ) {
     return value;
   }
   return "system";

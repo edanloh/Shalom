@@ -259,7 +259,7 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
             content: lesson.content || "",
             videoUrl: lesson.video_url || "",
             resourceUrl: lesson.resource_url || "",
-            fileSizeBytes: lesson.file_size_bytes,
+            fileSize: lesson.file_size_bytes,
             isDownloadable: lesson.is_downloadable || false,
             thumbnailUrl: lesson.thumbnail_url || "",
             durationSeconds: lesson.duration_seconds || 0,
@@ -559,6 +559,9 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
                   hasErrors = true;
                 } else {
                   uploadedModules[moduleIndex].lessons[lessonIndex].resourceUrl = url;
+                  if (!uploadedModules[moduleIndex].lessons[lessonIndex].fileSize) {
+                    uploadedModules[moduleIndex].lessons[lessonIndex].fileSize = cachedFiles.pdfFile.size;
+                  }
                 }
               } catch (err) {
                 console.error(`PDF upload error for lesson ${lesson.title}:`, err);
@@ -623,7 +626,10 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
           durationMinutes: lesson.type === 'video' ? Math.floor((lesson.durationSeconds || 0) / 60) : undefined,
           isPreview: lesson.isPreview || false,
           isDownloadable: lesson.type === 'pdf' ? (lesson.isDownloadable ?? true) : undefined,
-          fileSize: lesson.type === 'pdf' ? lesson.fileSize : undefined
+          fileSize:
+            lesson.type === 'pdf'
+              ? lesson.fileSize ?? (lesson as any).fileSizeBytes
+              : undefined
         })),
         quizzes: module.quizzes.map((quiz, quizIndex) => ({
           id: quiz.id, // Preserve quiz ID for UPDATE

@@ -90,7 +90,11 @@ export default function AchievementsScreen({ navigation }: any) {
         icon: iconFor(a),
         label: a.label || (a as any).name || "Achievement",
         subtitle: (a as any).description || a.label || "",
-        createdAt: (a as any).createdAt || new Date().toISOString(),
+        createdAt:
+          (a as any).earnedAt ||
+          (a as any).earned_at ||
+          (a as any).createdAt ||
+          new Date().toISOString(),
         points: (a as any).points ?? undefined,
         earned: (a as any).earned ?? true,
       }));

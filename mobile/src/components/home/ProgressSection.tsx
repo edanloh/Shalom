@@ -29,7 +29,15 @@ const WeeklyGoal: React.FC<WeeklyGoalProps> = ({
       : unit === "quizzes"
       ? " quizzes"
       : " pts";
-  const formatValue = (value: number) => `${value}`;
+  const formatValue = (value: number) => {
+    if (!Number.isFinite(value)) return "0";
+    if (unit !== "hours") return `${value}`;
+    const rounded = Math.round(value * 100) / 100;
+    const text = rounded.toFixed(2);
+    return text.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+  };
+
+  const displayCurrent = Math.min(current, target);
 
   return (
     <Pressable
@@ -39,7 +47,7 @@ const WeeklyGoal: React.FC<WeeklyGoalProps> = ({
       <View style={styles.row}>
         <Text style={TextStyles.bodyMedium}>{label || "Weekly Goal"}</Text>
         <Text style={TextStyles.caption}>
-          {formatValue(current)}/{formatValue(target)}
+          {formatValue(displayCurrent)}/{formatValue(target)}
           {unitLabel}
         </Text>
       </View>
@@ -164,6 +172,14 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
                   : goal.unit === "quizzes"
                   ? "quizzes"
                   : "pts";
+              const formatCompact = (value: number) => {
+                if (!Number.isFinite(value)) return "0";
+                if (goal.unit !== "hours") return `${value}`;
+                const rounded = Math.round(value * 100) / 100;
+                const text = rounded.toFixed(2);
+                return text.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+              };
+              const displayCurrent = Math.min(goal.current, goal.target);
               return (
                 <View key={goal.id} style={styles.compactGoalItem}>
                   <View style={styles.compactGoalRow}>
@@ -171,7 +187,8 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
                       {goal.label}
                     </Text>
                     <Text style={styles.compactGoalProgress}>
-                      {goal.current}/{goal.target} {unitLabel}
+                      {formatCompact(displayCurrent)}/{formatCompact(goal.target)}{" "}
+                      {unitLabel}
                     </Text>
                   </View>
                   <View style={styles.compactProgressTrack}>

@@ -136,7 +136,7 @@ serve(async (req) => {
         .from('course_resources')
         .select(`
           id, section_id, title, description, order_index,
-          resource_type, resource_url, thumbnail_url
+          resource_type, resource_url, thumbnail_url, estimated_read_minutes
         `)
         .eq('course_id', courseId)
         .eq('resource_type', 'pdf')
@@ -331,6 +331,7 @@ serve(async (req) => {
           type: "pdf",
           pdf_url: r.resource_url,
           thumbnail_url: r.thumbnail_url,
+          estimated_read_minutes: r.estimated_read_minutes ?? 0,
           is_completed: userProgress?.pdfProgress?.some(
             (pp: any) => pp.resource_id === r.id && pp.is_completed
           ) || false
@@ -373,9 +374,14 @@ serve(async (req) => {
       }
 
       // Calculate total duration from videos in this section (in minutes)
-      const calculatedDuration = Math.ceil(
+      const videoMinutes = Math.ceil(
         sectionLessons.reduce((sum: number, video: any) => sum + (video.duration_seconds || 0), 0) / 60
       );
+      const pdfMinutes = sectionPDFs.reduce(
+        (sum: number, pdf: any) => sum + Number(pdf.estimated_read_minutes || 0),
+        0
+      );
+      const calculatedDuration = videoMinutes + pdfMinutes;
 
       return {
         ...section,

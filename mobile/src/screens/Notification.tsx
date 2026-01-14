@@ -147,6 +147,14 @@ export default function NotificationsScreen({ navigation }: any) {
         ? { name: "book-outline", color: Colors.blue }
         : item.type === "reminder"
         ? { name: "alarm-outline", color: Colors.red }
+        : item.type === "streak_hot" || item.type === "streak_reminder"
+        ? { name: "flame-outline", color: Colors.streakFire }
+        : item.type === "streak_broken"
+        ? { name: "warning-outline", color: Colors.notificationRed }
+        : item.type === "goal_completed"
+        ? { name: "checkmark-circle-outline", color: Colors.secondary }
+        : item.type === "goal_expired"
+        ? { name: "time-outline", color: Colors.notificationRed }
         : { name: "notifications-outline", color: Colors.textSecondary };
 
     const renderRightActions = (

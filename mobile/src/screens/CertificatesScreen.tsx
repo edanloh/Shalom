@@ -34,6 +34,16 @@ type Certificate = {
 
 const PAGE_SIZE = 20;
 
+const formatDurationHours = (hours?: number | null) => {
+  if (!Number.isFinite(hours) || (hours ?? 0) <= 0) return "—";
+  const totalMinutes = Math.round((hours as number) * 60);
+  const hrs = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  if (hrs <= 0) return `${mins}m`;
+  if (mins === 0) return `${hrs}h`;
+  return `${hrs}h ${mins}m`;
+};
+
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   return new Intl.DateTimeFormat("en-US", {
@@ -90,11 +100,11 @@ export default function CertificatesScreen({ navigation }: any) {
       items.map((c) => ({
         id: c.id,
         courseName: c.name,
-        instructor: "",
+        instructor: c.instructorName || "",
         completedAt: (c as any).issuedAt || new Date().toISOString(),
         credentialId: c.id.toUpperCase(),
         score: c.progressPercent,
-        duration: `${c.completedCourses}/${c.requiredCourses} courses`,
+        duration: formatDurationHours(c.durationHours),
       })),
     []
   );

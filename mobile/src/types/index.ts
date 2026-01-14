@@ -72,6 +72,12 @@ export interface AchievementItem {
   id: string;
   icon: string;
   label: string;
+  description?: string;
+  type?: string;
+  points?: number;
+  createdAt?: string;
+  earned?: boolean;
+  earnedAt?: string | null;
 }
 
 export interface LearningGoal {
@@ -118,6 +124,8 @@ export interface CertificateProgress {
   requiredCourses: number;
   completedCourses: number;
   progressPercent: number;
+  durationHours?: number | null;
+  instructorName?: string | null;
 }
 
 export interface Achievement {

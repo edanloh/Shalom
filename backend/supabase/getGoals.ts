@@ -91,19 +91,56 @@ serve(async (req) => {
 
     const timezone = prefRow?.timezone || "UTC";
 
-    const payload = (goals ?? []).map((g) => ({
-      id: g.id,
-      label: g.label,
+    const updates: Array<{ id: string; patch: Record<string, number> }> = [];
+    const payload = (goals ?? []).map((g) => {
+      const isCompleted = Boolean(g.completed_at);
+      const targetHours = Number(g.target_hours ?? 0);
+      const targetPoints = Number(g.target_points ?? 0);
+      const targetCourses = Number(g.target_courses ?? 0);
+      const targetLessons = Number(g.target_lessons ?? 0);
+      const targetQuizzes = Number(g.target_quizzes ?? 0);
+      const currentHours = Number(g.current_hours ?? 0);
+      const currentPoints = Number(g.current_points ?? 0);
+      const currentCourses = Number(g.current_courses ?? 0);
+      const currentLessons = Number(g.current_lessons ?? 0);
+      const currentQuizzes = Number(g.current_quizzes ?? 0);
+
+      const cappedHours =
+        isCompleted && targetHours > 0 ? Math.min(currentHours, targetHours) : currentHours;
+      const cappedPoints =
+        isCompleted && targetPoints > 0 ? Math.min(currentPoints, targetPoints) : currentPoints;
+      const cappedCourses =
+        isCompleted && targetCourses > 0 ? Math.min(currentCourses, targetCourses) : currentCourses;
+      const cappedLessons =
+        isCompleted && targetLessons > 0 ? Math.min(currentLessons, targetLessons) : currentLessons;
+      const cappedQuizzes =
+        isCompleted && targetQuizzes > 0 ? Math.min(currentQuizzes, targetQuizzes) : currentQuizzes;
+
+      if (isCompleted) {
+        const patch: Record<string, number> = {};
+        if (cappedHours !== currentHours) patch.current_hours = cappedHours;
+        if (cappedPoints !== currentPoints) patch.current_points = cappedPoints;
+        if (cappedCourses !== currentCourses) patch.current_courses = cappedCourses;
+        if (cappedLessons !== currentLessons) patch.current_lessons = cappedLessons;
+        if (cappedQuizzes !== currentQuizzes) patch.current_quizzes = cappedQuizzes;
+        if (Object.keys(patch).length) {
+          updates.push({ id: g.id, patch });
+        }
+      }
+
+      return {
+        id: g.id,
+        label: g.label,
       targetHours: g.target_hours,
-      currentHours: g.current_hours,
+      currentHours: cappedHours,
       targetPoints: g.target_points,
-      currentPoints: g.current_points,
+      currentPoints: cappedPoints,
       targetCourses: g.target_courses,
-      currentCourses: g.current_courses,
+      currentCourses: cappedCourses,
       targetLessons: g.target_lessons,
-      currentLessons: g.current_lessons,
+      currentLessons: cappedLessons,
       targetQuizzes: g.target_quizzes,
-      currentQuizzes: g.current_quizzes,
+      currentQuizzes: cappedQuizzes,
       streakDays: g.streak_days,
       deadline: g.deadline,
       isActive: g.is_active,
@@ -111,7 +148,21 @@ serve(async (req) => {
       completedAt: g.completed_at,
       templateId: g.template_id,
       isExpired: isExpired(g.deadline, timezone),
-    }));
+    };
+    });
+
+    if (updates.length) {
+      const results = await Promise.allSettled(
+        updates.map((u) =>
+          supabase.from("learning_goals").update(u.patch).eq("id", u.id)
+        )
+      );
+      for (const res of results) {
+        if (res.status === "rejected") {
+          console.warn("getGoals: failed to cap completed goal progress", res.reason);
+        }
+      }
+    }
 
     return new Response(
       JSON.stringify({

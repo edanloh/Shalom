@@ -121,8 +121,10 @@ async function updateActiveGoalsForCourseCompletion(supabaseClient: any, userId:
     const updates: Record<string, number | string | boolean | null> = {};
 
     if (Number(goal.target_courses ?? 0) > 0 && Number(goal.current_courses ?? 0) !== totalCompleted) {
-      updates.current_courses = totalCompleted;
-      goal.current_courses = totalCompleted;
+      const targetCourses = Number(goal.target_courses ?? 0);
+      const cappedCourses = targetCourses > 0 ? Math.min(totalCompleted, targetCourses) : totalCompleted;
+      updates.current_courses = cappedCourses;
+      goal.current_courses = cappedCourses;
     }
 
     const completed = isGoalComplete(goal);

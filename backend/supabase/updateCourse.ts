@@ -15,6 +15,13 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'PUT,OPTIONS',
 };
 
+const estimatePdfReadMinutes = (fileSizeBytes?: number | null) => {
+  if (!Number.isFinite(fileSizeBytes) || (fileSizeBytes ?? 0) <= 0) return 0;
+  const bytesPerPage = 200 * 1024; // ~200KB/page heuristic
+  const pages = Math.max(1, Math.round((fileSizeBytes as number) / bytesPerPage));
+  return Math.max(1, pages * 2); // ~2 minutes per page
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -230,7 +237,8 @@ serve(async (req) => {
                   is_preview: lesson.isPreview || false,
                   thumbnail_url: lesson.thumbnailUrl || null,
                   is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,
-                  file_size_bytes: lesson.fileSize || null
+                  file_size_bytes: lesson.fileSize || null,
+                  estimated_read_minutes: estimatePdfReadMinutes(lesson.fileSize || null)
                 })
                 .eq('id', lesson.id);
 
@@ -250,7 +258,8 @@ serve(async (req) => {
                   is_preview: lesson.isPreview || false,
                   thumbnail_url: lesson.thumbnailUrl || null,
                   is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,
-                  file_size_bytes: lesson.fileSize || null
+                  file_size_bytes: lesson.fileSize || null,
+                  estimated_read_minutes: estimatePdfReadMinutes(lesson.fileSize || null)
                 })
                 .select('id')
                 .single();
@@ -466,6 +475,39 @@ serve(async (req) => {
           .delete()
           .in('id', sectionsToDelete);
       }
+    }
+
+    if (modules && Array.isArray(modules) && courseFields.durationHours === undefined) {
+      let computedDurationMinutes = 0;
+      for (const module of modules) {
+        const lessons = module?.lessons || [];
+        for (const lesson of lessons) {
+          if ((lesson?.type || 'video') === 'pdf') {
+            computedDurationMinutes += estimatePdfReadMinutes(lesson?.fileSize ?? null);
+          } else {
+            const seconds =
+              Number(lesson?.durationSeconds) ||
+              Number(lesson?.durationMinutes || 0) * 60 ||
+              0;
+            computedDurationMinutes += Math.round(seconds / 60);
+          }
+        }
+      }
+      const computedDurationHours =
+        computedDurationMinutes > 0
+          ? Math.round((computedDurationMinutes / 60) * 100) / 100
+          : 0;
+      const { data: updatedDuration, error: durationErr } = await supabaseClient
+        .from('courses')
+        .update({
+          duration_hours: computedDurationHours,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', courseId)
+        .select()
+        .single();
+      if (durationErr) throw durationErr;
+      if (updatedDuration) course = updatedDuration;
     }
 
     // Update outcomes if provided

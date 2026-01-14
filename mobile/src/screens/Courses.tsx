@@ -377,7 +377,7 @@ export default function CoursesScreen({ navigation }: any) {
                 Recommended
               </Text>
 
-              {loading || refreshing ? (
+              {recommendedLoading || refreshing ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={Colors.purple400} />
                   <Text style={styles.loadingText}>Loading recommended…</Text>
