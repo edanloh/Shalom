@@ -76,8 +76,8 @@ export interface ModuleDetailResponse {
       duration_hours: number;
       thumbnail_url?: string;
       rating: string;
+      total_ratings: number;
       student_count: number;
-
       is_published: boolean;
       is_featured: boolean;
       language: string;

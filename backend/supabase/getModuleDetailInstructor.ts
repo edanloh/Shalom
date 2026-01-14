@@ -63,7 +63,7 @@ serve(async (req) => {
       .select(`
         id, title, description, instructor_name, level,
         duration_hours, thumbnail_url,
-        rating, student_count, is_published,
+        rating, total_ratings, student_count, is_published,
         is_featured, language, tags,
         created_at, updated_at,
         categories (
