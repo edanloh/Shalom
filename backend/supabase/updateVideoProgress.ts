@@ -86,6 +86,36 @@ async function notifyStreakUpdate(userId: string, activityAt: string) {
   }
 }
 
+async function recordLessonCompleted(userId: string, courseId: string, videoId: string) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({
+        userId,
+        type: 'lesson_completed',
+        title: 'Lesson completed',
+        points: 0,
+        courseId,
+        referenceKey: `lesson_completed:video:${videoId}`,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postCreditEvent lesson_completed failed:', res.status, text);
+    }
+  } catch (error) {
+    console.error('Failed to record lesson completion:', error);
+  }
+}
+
 const isGoalComplete = (goal: any) => {
   const checks: Array<{ target: number; current: number }> = [];
   const targetHours = Number(goal.target_hours ?? 0);
@@ -419,6 +449,9 @@ serve(async (req) => {
       deltaSeconds,
       now,
     });
+    if (lessonCompleted) {
+      await recordLessonCompleted(userId, course_id, videoId);
+    }
 
     // ========================================
     // 3. Update course enrollment progress

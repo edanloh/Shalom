@@ -23,6 +23,36 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST,OPTIONS",
 };
 
+async function recordLessonCompleted(userId: string, courseId: string, pdfId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({
+        userId,
+        type: "lesson_completed",
+        title: "Lesson completed",
+        points: 0,
+        courseId,
+        referenceKey: `lesson_completed:pdf:${pdfId}`,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("postCreditEvent lesson_completed failed:", res.status, text);
+    }
+  } catch (error) {
+    console.error("Failed to record lesson completion:", error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -60,6 +90,16 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    const { data: existingProgress, error: existingError } = await supabase
+      .from("resource_progress")
+      .select("is_completed")
+      .eq("user_id", userId)
+      .eq("resource_id", pdfId)
+      .maybeSingle();
+    if (existingError && existingError.code !== "PGRST116") {
+      throw existingError;
+    }
+
     // Upsert PDF progress
     const { data: progressData, error: progressError } = await supabase
       .from("resource_progress")
@@ -81,6 +121,10 @@ serve(async (req) => {
     if (progressError) {
       console.error("Error updating PDF progress:", progressError);
       throw progressError;
+    }
+    const lessonCompleted = Boolean(isCompleted) && !Boolean(existingProgress?.is_completed);
+    if (lessonCompleted) {
+      await recordLessonCompleted(userId, courseId, pdfId);
     }
 
     // Recalculate course progress

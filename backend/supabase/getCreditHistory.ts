@@ -34,6 +34,7 @@ serve(async (req) => {
       .from("credits_events")
       .select("id,type,title,points,course_id,timestamp")
       .eq("user_id", userId)
+      .neq("points", 0)
       .order("timestamp", { ascending: false })
       .range(offset, to);
 

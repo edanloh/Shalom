@@ -91,6 +91,36 @@ async function notifyStreakUpdate(userId: string, activityAt: string) {
   }
 }
 
+async function recordQuizScore(userId: string, quizId: string, courseId: string, score: number) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({
+        userId,
+        type: 'quiz_score',
+        title: `Quiz score: ${score}%`,
+        points: 0,
+        courseId,
+        referenceKey: `quiz_score:${quizId}:${score}`,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postCreditEvent quiz_score failed:', res.status, text);
+    }
+  } catch (error) {
+    console.error('Failed to record quiz score:', error);
+  }
+}
+
 async function updateDailyMinutes(
   supabaseClient: any,
   userId: string,
@@ -547,6 +577,8 @@ serve(async (req) => {
         quiz.section_id
       );
     }
+
+    await recordQuizScore(userId, quizId, quiz.course_id, score);
 
     // ========================================
     // 6. Return response

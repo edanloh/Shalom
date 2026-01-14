@@ -74,6 +74,38 @@ const parseStreakDays = (event: CreditEventRecord) => {
   return null;
 };
 
+const parseQuizScore = (event: CreditEventRecord) => {
+  if (event.reference_key?.startsWith("quiz_score:")) {
+    const parts = event.reference_key.split(":");
+    const raw = parts[parts.length - 1];
+    const score = Number(raw);
+    return Number.isFinite(score) ? score : null;
+  }
+  const match = event.title?.match(/(\d+)\s*%/);
+  if (match) {
+    const score = Number(match[1]);
+    return Number.isFinite(score) ? score : null;
+  }
+  return null;
+};
+
+async function getCourseCompletionDays(userId: string, courseId?: string | null) {
+  if (!courseId) return null;
+  const { data, error } = await supabase
+    .from("course_enrollments")
+    .select("enrollment_date, completion_date")
+    .eq("user_id", userId)
+    .eq("course_id", courseId)
+    .maybeSingle();
+  if (error && error.code !== "PGRST116") throw error;
+  if (!data?.enrollment_date) return null;
+  const start = new Date(data.enrollment_date);
+  const end = new Date(data.completion_date ?? new Date().toISOString());
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const diffMs = end.getTime() - start.getTime();
+  return Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+}
+
 async function sendNotification(payload: {
   userId: string;
   title: string;
@@ -229,10 +261,23 @@ async function awardAchievementsForCreditEvent(
   if (criteriaTypes.has("goal_hits") || criteriaTypes.has("goal_hit")) {
     totals.goal_hits = await countCreditEvents(userId, "goal_hit");
   }
+  if (criteriaTypes.has("lessons_completed") || criteriaTypes.has("lesson_completed")) {
+    totals.lessons_completed = await countCreditEvents(userId, "lesson_completed");
+  }
 
   let streakDays: number | null = null;
   if (criteriaTypes.has("streak_days") || criteriaTypes.has("consecutive_days")) {
     streakDays = parseStreakDays(event);
+  }
+
+  let quizScore: number | null = null;
+  if (criteriaTypes.has("quiz_score")) {
+    quizScore = parseQuizScore(event);
+  }
+
+  let courseCompletionDays: number | null = null;
+  if (criteriaTypes.has("course_completion_time") && event.type === "course_completed") {
+    courseCompletionDays = await getCourseCompletionDays(userId, event.course_id ?? null);
   }
 
   const toAward: Array<{ achievement_id: string; value?: number | null }> = [];
@@ -242,7 +287,12 @@ async function awardAchievementsForCreditEvent(
     const criteriaType = criteria.type as string | undefined;
     if (!criteriaType) continue;
 
-    const threshold = parseCriteriaNumber(criteria, ["count", "min", "points", "total", "value"]);
+    const threshold =
+      criteriaType === "quiz_score"
+        ? parseCriteriaNumber(criteria, ["score", "min", "value"])
+        : criteriaType === "course_completion_time"
+        ? parseCriteriaNumber(criteria, ["days", "max", "value"])
+        : parseCriteriaNumber(criteria, ["count", "min", "points", "total", "value"]);
     if (!threshold) continue;
 
     if (
@@ -272,11 +322,33 @@ async function awardAchievementsForCreditEvent(
     }
 
     if (
+      (criteriaType === "lessons_completed" || criteriaType === "lesson_completed") &&
+      (totals.lessons_completed ?? 0) >= threshold
+    ) {
+      toAward.push({ achievement_id: def.id, value: totals.lessons_completed ?? null });
+      continue;
+    }
+
+    if (
       (criteriaType === "streak_days" || criteriaType === "consecutive_days") &&
       streakDays != null &&
       streakDays >= threshold
     ) {
       toAward.push({ achievement_id: def.id, value: streakDays });
+      continue;
+    }
+
+    if (criteriaType === "quiz_score" && quizScore != null && quizScore >= threshold) {
+      toAward.push({ achievement_id: def.id, value: quizScore });
+      continue;
+    }
+
+    if (
+      criteriaType === "course_completion_time" &&
+      courseCompletionDays != null &&
+      courseCompletionDays <= threshold
+    ) {
+      toAward.push({ achievement_id: def.id, value: courseCompletionDays });
       continue;
     }
   }

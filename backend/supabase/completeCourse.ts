@@ -24,6 +24,36 @@ const corsHeaders = {
 const buildCertificateNumber = (courseId: string, userId: string) =>
   `CC-${courseId}-${userId}`;
 
+async function recordCourseCompleted(userId: string, courseId: string, courseTitle: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({
+        userId,
+        type: "course_completed",
+        title: `Course completed: ${courseTitle}`,
+        points: 0,
+        courseId,
+        referenceKey: `course_completed:${courseId}`,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("postCreditEvent course_completed failed:", res.status, text);
+    }
+  } catch (error) {
+    console.error("Failed to record course completion:", error);
+  }
+}
+
 const isGoalComplete = (goal: any) => {
   const checks: Array<{ target: number; current: number }> = [];
   const targetHours = Number(goal.target_hours ?? 0);
@@ -244,6 +274,8 @@ serve(async (req) => {
       }
       certificateIssued = true;
     }
+
+    await recordCourseCompleted(userId, courseId, courseTitle);
 
     if (certificateIssued) {
       try {
