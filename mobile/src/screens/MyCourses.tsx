@@ -27,8 +27,6 @@ export default function MyCourses({ navigation }: any) {
   const wishIds = useMemo(() => new Set(wishlist.map(c => c.id)), [wishlist]);
   const isWishlisted = (c: Course) => wishIds.has(c.id);
 
-
-  // Debug logging for user state
   useEffect(() => {
     console.log('MyCourses - Current user from AuthContext:', user);
     if (user) {
@@ -36,8 +34,8 @@ export default function MyCourses({ navigation }: any) {
     }
   }, [user]);
 
-  // Filter courses for incomplete ones only (progress < 100% and > 0%)
-  const { continueWatching, inProgress, notStarted } = useMemo(() => {
+  // Filter courses into categories
+  const { continueWatching, completed, notStarted } = useMemo(() => {
     const allCourses = courses || [];
     
     // Continue Watching: courses with progress > 0% but < 100%
@@ -46,28 +44,35 @@ export default function MyCourses({ navigation }: any) {
       return progress > 0 && progress < 100;
     });
     
-    // In Progress: same as continue watching (showing progress)
-    const ip = cw;
+    // Completed: courses with 100% progress
+    const comp = allCourses.filter(c => {
+      const progress = c.progress?.percentage ?? 0;
+      return progress >= 100;
+    });
     
     // Not Started: courses with 0% progress
     const ns = allCourses.filter(c => (c.progress?.percentage ?? 0) === 0);
     
-    // console.log('MyCourses - Filtered courses:', { 
-    //   total: allCourses.length, 
-    //   continueWatching: cw.length, 
-    //   inProgress: ip.length, 
-    //   notStarted: ns.length 
-    // });
+    console.log('MyCourses - Filtered courses:', { 
+      total: allCourses.length, 
+      continueWatching: cw.length, 
+      completed: comp.length,
+      notStarted: ns.length 
+    });
     
-    return { continueWatching: cw, inProgress: ip, notStarted: ns };
+    return { continueWatching: cw, completed: comp, notStarted: ns };
   }, [courses]);
+
+  // Combine all courses for "In Progress" section (show everything)
+  const inProgress = useMemo(() => {
+    return [...continueWatching, ...notStarted]; // Show both in-progress and not-started
+  }, [continueWatching, notStarted]);
 
   const getModuleLabel = (course: Course): string => {
     const completed = course?.progress?.completed ?? 0;
     const total     = course?.progress?.total ?? 1;
     const pct       = course?.progress?.percentage ?? 0;
 
-    // figure out which module index the user is on
     const isDone = pct >= 100 || completed >= total;
     const index  = isDone 
         ? Math.max(1, Math.min(completed, total))
@@ -77,16 +82,11 @@ export default function MyCourses({ navigation }: any) {
         ? course.progress!.currentModule!.trim()
         : '';
 
-    if (!raw) return `Module ${index}`;           // no title provided
-
-    // If the string already looks like "Module 8: Something", just use it.
+    if (!raw) return `Module ${index}`;
     if (/^module\s*\d+/i.test(raw)) return raw;
-
-    // Otherwise assume it's just a title and format it.
     return `Module ${index}: ${raw}`;
   };
 
-  // Handle user not authenticated
   if (!user) {
     return (
       <Screen
@@ -110,8 +110,54 @@ export default function MyCourses({ navigation }: any) {
       stickyHeader
     >
       <View>
-        {/* Continue Watching Section */}
-        <Text style={[ TextStyles.h5, { marginVertical: Spacing.md, marginBottom: Spacing.base }]}>Continue Watching</Text>
+        {/* Continue Watching Section - Only show if there are courses in progress */}
+        {continueWatching.length > 0 && (
+          <>
+            <Text style={[ TextStyles.h5, { marginVertical: Spacing.md, marginBottom: Spacing.base }]}>
+              Continue Watching
+            </Text>
+            
+            <FlatList
+              data={continueWatching}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              ItemSeparatorComponent={() => <View style={{ width: Spacing.md }} />}
+              extraData={wishlist}
+              renderItem={({ item }) => {
+                const moduleLabel = getModuleLabel(item);
+                return (
+                  <TouchableOpacity 
+                    style={styles.cwCard}
+                    onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
+                  >
+                    <View style={styles.cwThumbWrapper}>
+                      <ImageWithFallback 
+                        source={{ uri: item.image }} 
+                        fallback={Images.coursePlaceholder}
+                        style={styles.cwThumb} 
+                      /> 
+
+                      <View style={styles.progressOverlay}>
+                        <Text style={styles.progressText}>
+                          {Math.round(item.progress?.percentage || 0)}%
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={TextStyles.bodyMedium} numberOfLines={2}>{item.title}</Text>
+                    <Text style={TextStyles.caption} numberOfLines={1}>{moduleLabel}</Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </>
+        )}
+
+        {/* All My Courses Section */}
+        <Text style={[ TextStyles.h5, { marginTop: Spacing.xl, marginBottom: Spacing.base }]}>
+          My Courses
+        </Text>
         
         {loading && !refreshing ? (
           <View style={styles.centerContainer}>
@@ -126,124 +172,78 @@ export default function MyCourses({ navigation }: any) {
               onPress={retry}
             />
           </View>
-        ) : continueWatching.length === 0 ? (
+        ) : courses.length === 0 ? (
           <View style={styles.centerContainer}>
-            <Text style={TextStyles.body}>No courses in progress</Text>
-            <Text style={TextStyles.caption}>Start a course to see it here!</Text>
+            <Text style={TextStyles.body}>No enrolled courses</Text>
+            <Text style={TextStyles.caption}>Enroll in a course to get started!</Text>
           </View>
         ) : (
-          <FlatList
-            data={continueWatching}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={{ width: Spacing.md }} />}
-            extraData={wishlist}
-            renderItem={({ item }) => {
+          <View>
+            {courses.map((item) => {
+              const pct = item.progress?.percentage ?? 0;
               const moduleLabel = getModuleLabel(item);
               return (
-                <TouchableOpacity 
-                  style={styles.cwCard}
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.9}
                   onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
+                  style={styles.ipCard}
                 >
-                  {/* rounded rect ONLY for the thumbnail */}
-                  <View style={styles.cwThumbWrapper}>
-                    <ImageWithFallback 
-                      source={{ uri: item.image }} 
-                      fallback={Images.coursePlaceholder}
-                      style={styles.cwThumb} 
-                    /> 
+                  <View style={styles.ipLeft}>
+                    <Text style={styles.ipTitle} numberOfLines={2}>{item.title}</Text>
 
-                    {/* Progress indicator overlay */}
-                    <View style={styles.progressOverlay}>
-                      <Text style={styles.progressText}>{Math.round(item.progress?.percentage || 0)}%</Text>
+                    <View style={styles.ipMetaRow}>
+                      <Ionicons name="star" size={12} color="#FACC15" />
+                      <Text style={styles.ipMetaText}>
+                        {(item.rating as any)?.toFixed?.(1) ?? item.rating}
+                      </Text>
+                      <Text style={styles.ipMetaDot}>•</Text>
+                      <Text style={styles.ipMetaText}>{item.modules ?? 12} modules</Text>
                     </View>
+
+                    <View style={styles.ipPercentRow}>
+                      <Text style={styles.ipMetaText}>{pct}% complete</Text>
+                    </View>
+
+                    <ProgressBar percent={pct} />
                   </View>
 
-                  {/* text sits outside, below */}
-                  <Text style={TextStyles.bodyMedium} numberOfLines={2}>{item.title}</Text>
-                  <Text style={TextStyles.caption} numberOfLines={1}>{moduleLabel}</Text>
+                  <View style={styles.ipRight}>
+                    <ImageWithFallback
+                      source={{ uri: item.image }}
+                      fallback={Images.coursePlaceholder}
+                      style={styles.ipImage}
+                    />
+                    <View style={styles.badgeRow}>
+                      <View style={styles.levelBadge}>
+                        <Text style={styles.levelText}>{item.level}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
+                        hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+                        style={styles.heartBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          wishIds.has(item.id) ? 'Remove from wishlist' : 'Add to wishlist'
+                        }
+                      >
+                        <Ionicons
+                          name={wishIds.has(item.id) ? 'heart' : 'heart-outline'}
+                          size={20}
+                          color="#fff"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               );
-            }}
-          />
-        )}
-
-        {/* In Progress Section */}
-        <Text style={[ TextStyles.h5, { marginTop: Spacing.xl, marginBottom: Spacing.base }]}>In Progress</Text>
-        
-        {(loading || error) ? (
-        // No horizontal padding for the loading/error text
-        <Text style={[styles.message, { paddingHorizontal: 0, marginHorizontal: Spacing.lg }]}>
-            {loading ? 'Loading…' : `Error: ${error}`}
-        </Text>
-        ) : (
-        // Apply horizontal padding only to the content block
-        <View>
-            {inProgress.map((item) => {
-            const pct = item.progress?.percentage ?? 0;
-            const moduleLabel = getModuleLabel(item);
-            return (
-              <TouchableOpacity
-                key={item.id}
-                activeOpacity={0.9}
-                onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
-                style={styles.ipCard}
-              >
-                {/* Left: text */}
-                <View style={styles.ipLeft}>
-                  <Text style={styles.ipTitle} numberOfLines={2}>{item.title}</Text>
-
-                  {/* meta row like Wishlist */}
-                  <View style={styles.ipMetaRow}>
-                    <Ionicons name="star" size={12} color="#FACC15" />
-                    <Text style={styles.ipMetaText}>{(item.rating as any)?.toFixed?.(1) ?? item.rating}</Text>
-                    <Text style={styles.ipMetaDot}>•</Text>
-                    <Text style={styles.ipMetaText}>{item.modules ?? 12} modules</Text>
-                  </View>
-
-                  <View style={styles.ipPercentRow}>
-                    <Text style={styles.ipMetaText}>{pct}% complete</Text>
-                  </View>
-
-                  <ProgressBar percent={pct} />
-                </View>
-
-                {/* Right: fixed image block + overlays */}
-                <View style={styles.ipRight}>
-                  <ImageWithFallback
-                    source={{ uri: item.image }}
-                    fallback={Images.coursePlaceholder}
-                    style={styles.ipImage}
-                  />
-                  <View style={styles.badgeRow}>
-                    <View style={styles.levelBadge}>
-                      <Text style={styles.levelText}>{item.level}</Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
-                      hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
-                      style={styles.heartBtn}
-                      accessibilityRole="button"
-                      accessibilityLabel={wishIds.has(item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                    >
-                      <Ionicons
-                        name={wishIds.has(item.id) ? 'heart' : 'heart-outline'}
-                        size={20}
-                        color="#fff"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
             })}
-        </View>
+          </View>
         )}
       </View>
     </Screen>
   );
-};
+}
 
 const CARD_RADIUS = BorderRadius.lg;
 const w = Dimensions.get("window").width;

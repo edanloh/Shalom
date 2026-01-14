@@ -1,9 +1,3 @@
-// UPDATED: ModuleDetailScreen with proper refresh on return
-// Key changes:
-// 1. Use useFocusEffect to reload data when screen comes into focus
-// 2. Check route params for completion indicators
-// 3. Force refresh when items are completed
-
 import React, { useState, useEffect } from "react";
 import {
   View,

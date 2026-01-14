@@ -276,12 +276,86 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
 };
 
 // Helper function to convert enrollment data to Course format
+// const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
+//   // Use section counts if available (after backend redeploy), otherwise calculate from items
+//   const totalSections = enrollment.total_sections || 0;
+//   const completedSections = enrollment.completed_sections || 0;
+  
+//   // Calculate from video/quiz data for accurate item-level tracking
+//   const totalVideos = parseInt(enrollment.total_videos) || 0;
+//   const completedVideos = parseInt(enrollment.completed_videos) || 0;
+//   const totalQuizzes = parseInt(enrollment.total_quizzes) || 0;
+//   const passedQuizzes = parseInt(enrollment.passed_quizzes) || 0;
+  
+//   const totalItems = totalVideos + totalQuizzes;
+//   const completedItems = completedVideos + passedQuizzes;
+  
+//   // Calculate progress percentage from actual completion data
+//   // Don't trust the API's progress_percentage as it may be stale
+//   const calculatedPercentage = totalItems > 0 
+//     ? Math.round((completedItems / totalItems) * 100) 
+//     : 0;
+  
+//   // For display counts, use section counts if available, otherwise use item counts
+//   const progressTotal = totalSections > 0 ? totalSections : totalItems;
+//   const progressCompleted = totalSections > 0 ? completedSections : completedItems;
+  
+//   // Generate avatar from instructor name
+//   const generateAvatar = (name: string): string => {
+//     if (!name) return 'https://via.placeholder.com/50x50';
+//     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=50&background=3B82F6&color=fff`;
+//   };
+
+//   // Map level to lowercase format
+//   const mapLevel = (level: string): 'beginner' | 'intermediate' | 'advanced' => {
+//     const levelLower = level?.toLowerCase();
+//     switch (levelLower) {
+//       case 'intermediate': return 'intermediate';
+//       case 'advanced': return 'advanced';
+//       default: return 'beginner';
+//     }
+//   };
+
+//   return {
+//     id: enrollment.course_id,
+//     title: enrollment.title,
+//     description: enrollment.description,
+//     instructor: {
+//       id: `instructor-${enrollment.instructor_name.replace(/\s+/g, '-').toLowerCase()}`,
+//       name: enrollment.instructor_name,
+//       avatar: enrollment.instructor_avatar || generateAvatar(enrollment.instructor_name),
+//       category: enrollment.category_name,
+//       rating: parseFloat(enrollment.instructor_rating),
+//       bio: `Expert ${enrollment.category_name} instructor`,
+//     },
+//     progress: {
+//       completed: progressCompleted,
+//       total: progressTotal,
+//       percentage: calculatedPercentage,
+//       lastAccessed: enrollment.last_accessed,
+//     },
+//     duration: `${enrollment.duration_hours}h`,
+//     rating: parseFloat(enrollment.rating),
+//     image: enrollment.thumbnail_url,
+//     category: enrollment.category_name,
+//     level: mapLevel(enrollment.level),
+//     modules: progressTotal,
+//     tags: enrollment.tags || [],
+//     prerequisites: [],
+//     outcomes: [],
+//     createdAt: enrollment.enrollment_date,
+//     updatedAt: enrollment.last_accessed,
+//     isWishlisted: Boolean(enrollment.is_in_wishlist),
+//   };
+// };
+
+// Helper function to convert enrollment data to Course format
 const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
-  // Use section counts if available (after backend redeploy), otherwise calculate from items
+  // Primary: Use section counts if available (preferred method)
   const totalSections = enrollment.total_sections || 0;
   const completedSections = enrollment.completed_sections || 0;
   
-  // Calculate from video/quiz data for accurate item-level tracking
+  // Fallback: Calculate from video/quiz data if sections aren't available
   const totalVideos = parseInt(enrollment.total_videos) || 0;
   const completedVideos = parseInt(enrollment.completed_videos) || 0;
   const totalQuizzes = parseInt(enrollment.total_quizzes) || 0;
@@ -290,19 +364,30 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
   const totalItems = totalVideos + totalQuizzes;
   const completedItems = completedVideos + passedQuizzes;
   
-  // Calculate progress percentage from actual completion data
-  // Don't trust the API's progress_percentage as it may be stale
-  const calculatedPercentage = totalItems > 0 
-    ? Math.round((completedItems / totalItems) * 100) 
+  // Determine which data to use
+  const hasSectionData = totalSections > 0;
+  const progressTotal = hasSectionData ? totalSections : totalItems;
+  const progressCompleted = hasSectionData ? completedSections : completedItems;
+  
+  // Calculate progress percentage
+  const calculatedPercentage = progressTotal > 0 
+    ? Math.round((progressCompleted / progressTotal) * 100) 
     : 0;
   
-  // For display counts, use section counts if available, otherwise use item counts
-  const progressTotal = totalSections > 0 ? totalSections : totalItems;
-  const progressCompleted = totalSections > 0 ? completedSections : completedItems;
+  console.log(`[courseService] Converting enrollment for "${enrollment.title}":`, {
+    hasSectionData,
+    totalSections,
+    completedSections,
+    totalItems,
+    completedItems,
+    progressTotal,
+    progressCompleted,
+    calculatedPercentage,
+  });
   
   // Generate avatar from instructor name
   const generateAvatar = (name: string): string => {
-    if (!name) return 'https://via.placeholder.com/50x50';
+    if (!name) return 'https://ui-avatars.com/api/?name=Unknown&size=50&background=3B82F6&color=fff';
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=50&background=3B82F6&color=fff`;
   };
 

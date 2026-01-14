@@ -151,15 +151,13 @@ serve(async (req) => {
         level: originalCourse.level,
         duration_hours: originalCourse.duration_hours,
         thumbnail_url: originalCourse.thumbnail_url,
-        video_preview_url: originalCourse.video_preview_url,
         tags: originalCourse.tags,
         language: originalCourse.language,
-        subtitles: originalCourse.subtitles,
         is_published: false, // Always start as unpublished
         is_featured: false,
         rating: 0,
-        total_ratings: 0,
         student_count: 0,
+
         created_at: timestamp,
         updated_at: timestamp,
       };
@@ -421,7 +419,7 @@ serve(async (req) => {
         duration_hours: newCourse.duration_hours,
         thumbnail_url: newCourse.thumbnail_url,
         rating: newCourse.rating,
-        total_ratings: newCourse.total_ratings,
+        // total_ratings: newCourse.total_ratings,
         student_count: newCourse.student_count,
         tags: newCourse.tags,
         is_published: newCourse.is_published,

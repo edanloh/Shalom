@@ -112,7 +112,7 @@ const Index = () => {
               title="Course Rating"
               value={stats.statistics.average_rating}
               icon={Star}
-              trend="Across all courses"
+              trend="Across all published courses"
               variant="warning"
             />
             <StatsCard

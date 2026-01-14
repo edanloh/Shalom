@@ -31,6 +31,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const bypassAuth = true;
+  const bypassUserId =
+    process.env.EXPO_PUBLIC_BYPASS_USER_ID || '550e8400-e29b-41d4-a716-446655440101';
+  const bypassEmail =
+    process.env.EXPO_PUBLIC_BYPASS_USER_EMAIL || 'shalomfyp@gmail.com';
 
   // Set the below to skip auth during development
   // const [user, setUser] = useState<User | null>({
@@ -108,8 +113,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   //     backdoor();
   //   }
   // }, [session, user]);
+  useEffect(() => {
+    if (!bypassAuth) return;
+    setUser({
+      id: bypassUserId,
+      email: bypassEmail,
+      username: 'shalomfyp',
+      name: 'Shalom FYP',
+      role: 'learner',
+      avatar:
+        'https://ui-avatars.com/api/?name=Shalom+FYP&size=50&background=6366F1&color=fff',
+      bio: 'Learning enthusiast exploring various courses',
+      location: 'Singapore',
+      phone: '+65 9123 4567',
+      authProvider: 'dev',
+    });
+    setSession({} as Session);
+  }, [bypassAuth, bypassEmail, bypassUserId]);
 
   const login = async (email: string, password: string) => {
+    if (bypassAuth) {
+      return { success: true, error: undefined };
+    }
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
@@ -133,6 +158,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const register = async (email: string, password: string, name: string) => {
+    if (bypassAuth) {
+      return { success: true, error: undefined };
+    }
     const { data, error } = await supabase.auth.signUp({
       email: email,
       password: password,
@@ -153,6 +181,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
+    if (bypassAuth) {
+      return;
+    }
     supabase.auth.signOut();
     setUser(null);
   };
@@ -186,6 +217,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Supabase Google OAuth for Expo Android
   const loginWithGoogle = async () => {
+    if (bypassAuth) {
+      return;
+    }
     setIsLoading(true);
     try {
       // Use a custom redirect URI for Expo (must be whitelisted in Supabase dashboard)

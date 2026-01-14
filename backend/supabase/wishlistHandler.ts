@@ -119,7 +119,6 @@ serve(async (req) => {
             duration_hours,
             thumbnail_url,
             rating,
-            total_ratings,
             student_count,
             tags,
             categories (
@@ -143,7 +142,6 @@ serve(async (req) => {
         duration_hours: item.courses.duration_hours,
         thumbnail_url: item.courses.thumbnail_url,
         rating: item.courses.rating,
-        total_ratings: item.courses.total_ratings,
         student_count: item.courses.student_count,
         tags: item.courses.tags,
         category_name: item.courses.categories?.name,

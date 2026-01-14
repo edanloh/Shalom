@@ -13,7 +13,6 @@ export interface CourseDetailResponse {
       level: string;
       duration_hours: number;
       thumbnail_url: string;
-      video_preview_url: string | null;
       rating: string | number;
       total_ratings?: number;
       totalRatings?: number;

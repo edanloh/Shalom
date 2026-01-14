@@ -65,9 +65,9 @@ serve(async (req) => {
       .from('courses')
       .select(`
         id, title, description, instructor_name, level,
-        duration_hours, thumbnail_url, video_preview_url,
-        rating, total_ratings, student_count, is_published,
-        is_featured, language, subtitles, tags,
+        duration_hours, thumbnail_url,
+        rating, student_count, is_published,
+        is_featured, language, tags,
         created_at, updated_at,
         categories (
           id,
