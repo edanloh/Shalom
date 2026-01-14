@@ -53,8 +53,7 @@ export const notificationService = {
    */
   async registerPushToken(userId: string, pushToken: string) {
     try {
-      const response = await apiService.post("/pushNotificationHandler", {
-        action: "register",
+      const response = await apiService.post("/pushNotificationHandler/register", {
         userId,
         pushToken,
         platform: "expo",
@@ -78,8 +77,7 @@ export const notificationService = {
    */
   async removePushToken(userId: string, pushToken: string) {
     try {
-      const response = await apiService.post("/pushNotificationHandler", {
-        action: "unregister",
+      const response = await apiService.post("/pushNotificationHandler/unregister", {
         userId,
         pushToken,
       });
