@@ -51,7 +51,10 @@ export default function ProfileScreen({ navigation }: any) {
 
   // Safe fallbacks so the UI renders even if some fields are missing
   const displayName = user?.name ?? "User";
-  const avatarUri = getAvatarUri(user);
+  let avatarUri = getAvatarUri(user);
+  if (!avatarUri) {
+    avatarUri = `https://cmtfxsntlfoxgcznanpe.supabase.co/storage/v1/object/public/profilepics/${user?.email}_avatar.png`;
+  }
   const avatarSrc = avatarUri ? { uri: avatarUri } : Images.profile;
 
   const quickActions = useMemo(

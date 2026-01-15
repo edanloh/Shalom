@@ -23,9 +23,27 @@ export async function fetchUserProfile(
   return resp?.data ?? resp ?? [];
 }
 
-export async function updateUserProfile(id: string, payload: Partial<UserProfile>): Promise<UserProfile> {
+export async function updateUserProfile(
+  id: string,
+  payload: Partial<UserProfile>
+): Promise<UserProfile> {
   const url = '/updateUserInfo';
   const resp = await apiService.patch<UserProfile>(url, { id, payload });
+  const data: any = (resp as any)?.data ?? (resp as any);
+  return data?.data ?? data;
+}
+
+export async function uploadProfilePic(id: string, avatar: File): Promise<any> {
+  const url = '/uploadProfilePic';
+  // Read the file as an ArrayBuffer
+  const arrayBuffer = await avatar.arrayBuffer();
+  // Set headers for filename, content-type, and user id
+  const resp = await apiService.post<any>(url, arrayBuffer, {
+    headers: {
+      'Content-Type': avatar.type,
+      'x-file-name': avatar.name,
+    },
+  });
   const data: any = (resp as any)?.data ?? (resp as any);
   return data?.data ?? data;
 }
