@@ -182,7 +182,7 @@ function TabNavigator() {
         tabBarLabelPosition: "below-icon",
       })}
       tabBar={(props) => (
-        <Animated.View style={[props.style as any, tabBarAnimatedStyle]}>
+        <Animated.View style={tabBarAnimatedStyle}>
           <BottomTabBar {...props} />
         </Animated.View>
       )}
