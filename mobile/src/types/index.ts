@@ -17,7 +17,7 @@ export interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   changePassword: ( currentPassword: string, newPassword: string ) => Promise<{ success: boolean; error?: string }>;
   fetchEmail: (email: string) => Promise<any>;
-  loginWithToken: (credentials: Tokens, path: string) => Promise<void>;
+  loginWithToken: (credentials: Tokens, type?: string) => Promise<void>;
   setIsResettingPassword: (value: boolean) => void;
 }
 

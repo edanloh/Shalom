@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // });
   // const [isAuthenticated, setIsAuthenticated] = useState(true);
 
-  const loginWithToken = async ({ access_token, refresh_token, path }: Tokens & { path?: string }) => {
+  const loginWithToken = async ({ access_token, refresh_token, type }: Tokens & { type?: string }) => {
     console.log('[DeepLink] loginWithToken called', {
       access_token,
       refresh_token,
@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } = await signIn();
 
     console.log('[DeepLink] Supabase user after setSession:', supabaseUser);
-    if (path === 'ResetPassword') {
+    if (type === 'recovery') {
       setIsResettingPassword(true);
       setUser({
         id: supabaseUser?.id || '',
