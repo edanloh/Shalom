@@ -12,8 +12,8 @@ import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
 import { disableStudent } from "@/lib/disableStudent";
-import { API_BASE_URL } from "@/env";
 import { Colors } from "@/constants";
+import { courseService } from "@/services";
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -31,21 +31,10 @@ const Students = () => {
 		setLoading(true);
 		setError("");
 		try {
-			const response = await fetch(`${API_BASE_URL}/students`, {
-				method: "GET",
-				headers: { "Content-Type": "application/json" },
-			});
-			if (!response.ok) {
-				throw new Error("Failed to fetch students from API");
-			}
-			const result = await response.json();
-			
-			if (!result.success || !result.data) {
-				throw new Error(result.message || "Failed to fetch students");
-			}
+			const result = await courseService.getAllStudents();
 			
 			// Transform API data to match the expected structure
-			const transformedStudents = result.data.students.map((student: any) => ({
+			const transformedStudents = result.students.map((student: any) => ({
 				id: student.id,
 				name: student.name || "Unknown User",
 				email: student.email || "",

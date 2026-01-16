@@ -1,11 +1,7 @@
-import React from 'react';
-import { SafeAreaView, View, Text, StyleSheet, Pressable } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { MainStackParamList } from '../types';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 
-type Props = NativeStackScreenProps<MainStackParamList, 'NotFound'>;
-
-const NotFoundScreen: React.FC<Props> = ({ navigation }) => {
+export default function NotFoundScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
@@ -27,7 +23,5 @@ const styles = StyleSheet.create({
   link: { paddingVertical: 8, paddingHorizontal: 12 },
   linkText: { color: '#2563eb', textDecorationLine: 'underline', fontSize: 16 },
 });
-
-export default NotFoundScreen;
 
 

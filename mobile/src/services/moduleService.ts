@@ -1,6 +1,6 @@
 /**
  * Module Service - Handles course module/content API calls
- * Integrates with AWS Lambda backend for course module details
+ * Integrates with Supabase backend for course module details
  */
 
 import { apiService } from './apiService';
@@ -8,7 +8,7 @@ import { apiService } from './apiService';
 // Module Item (Video or Quiz)
 export interface ModuleItem {
   id: string;
-  type: 'video' | 'quiz';
+  type: 'video' | 'quiz' | 'pdf';
   title: string;
   description?: string;
   order_index: number;
@@ -107,7 +107,8 @@ export interface ModuleDetailResponse {
 class ModuleService {
   /**
    * Get course module content with sections, videos, quizzes, and user progress
-   * Endpoint: GET /courses/{courseId}/module?userId={userId}
+   * Endpoint: GET /getModuleDetail/{courseId}?userId={userId}
+   * Maps to getModuleDetail.mjs Lambda function
    */
   async getModuleDetail(courseId: string, userId?: string): Promise<ModuleDetailResponse['data']> {
     try {      
@@ -117,7 +118,7 @@ class ModuleService {
       }
 
       const response = await apiService.get<ModuleDetailResponse>(
-        `/courses/${courseId}/module`,
+        `/getModuleDetail/${courseId}`,
         params
       );
 
@@ -144,7 +145,7 @@ class ModuleService {
    */
   getItemProgress(
     itemId: string,
-    itemType: 'video' | 'quiz',
+    itemType: ModuleItem['type'],
     userProgress?: UserProgress
   ): any {
     if (!userProgress) return null;
@@ -153,6 +154,8 @@ class ModuleService {
       return userProgress.videoProgress?.find(vp => vp.video_id === itemId);
     } else if (itemType === 'quiz') {
       return userProgress.quizAttempts?.find(qa => qa.quiz_id === itemId);
+    } else if (itemType === 'pdf') {
+      return null; // No progress tracking for PDFs
     }
 
     return null;
@@ -171,7 +174,9 @@ class ModuleService {
       const attempt = userProgress.quizAttempts?.find(qa => qa.quiz_id === item.id);
       return attempt?.is_passed || false;
     }
-
+    else if (item.type === 'pdf') {
+      return item.is_completed || false;
+    }
     return false;
   }
 
@@ -180,11 +185,9 @@ class ModuleService {
    */
   getSectionCompletionPercentage(section: CourseSection, userProgress?: UserProgress): number {
     if (!userProgress || section.items.length === 0) return 0;
-
     const completedItems = section.items.filter(item => 
       this.isItemCompleted(item, userProgress)
     ).length;
-
     return Math.round((completedItems / section.items.length) * 100);
   }
 
@@ -192,9 +195,18 @@ class ModuleService {
    * Format duration from seconds to readable string
    */
   formatDuration(seconds?: number): string {
-    if (!seconds) return '';
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    if (!seconds || seconds === 0) return '0:00';
+    
+    // Ensure we're working with an integer
+    const totalSeconds = Math.floor(seconds);
+    
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }
 

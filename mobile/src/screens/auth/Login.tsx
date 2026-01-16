@@ -21,8 +21,9 @@ import styles from "@/styles/styles";
 import CustomTextInput from "@components/CustomTextInput";
 import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
-import { Colors, TextStyles } from "@/constants";
+import { Colors, Spacing, TextStyles } from "@/constants";
 import externalStyles from "@styles/styles";
+import { useEffect } from "react";
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
@@ -43,69 +44,22 @@ export default function LoginScreen({ navigation }: any) {
     if (!result.success) {
       setLoginWarning(result.error || "Login failed. Please try again");
     }
-    // Navigation will happen automatically when isAuthenticated changes
+    // Navigation will happen automatically when Supabase session state changes
   };
 
-  const handleGoogleLogin = async () => {
-    const cognitoAuthUrl =
-      `${COGNITO_DOMAIN}/oauth2/authorize?` +
-      `identity_provider=Google` +
-      `&client_id=${COGNITO_CLIENT_ID}` +
-      `&response_type=code` +
-      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-      `&scope=email%20openid%20phone`;
-    const result = await WebBrowser.openAuthSessionAsync(
-      cognitoAuthUrl,
-      REDIRECT_URI
-    );
-    if (result.type === "success") {
-      if (result.url) {
-        const urlParams = new URLSearchParams(result.url.split("?")[1]);
-        const authCode = urlParams.get("code");
-        if (authCode) {
-          // Exchange code for tokens
-          try {
-            const tokenResponse = await fetch(
-              `${COGNITO_DOMAIN}/oauth2/token`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: `grant_type=authorization_code&client_id=${COGNITO_CLIENT_ID}&code=${authCode}&redirect_uri=${encodeURIComponent(
-                  REDIRECT_URI
-                )}`,
-              }
-            );
-            const tokens = await tokenResponse.json();
-            if (tokens.id_token) {
-              // Call AuthContext to set user as authenticated
-              if (typeof loginWithGoogle === "function") {
-                await loginWithGoogle(tokens);
-              }
-              // Navigation will happen automatically when isAuthenticated changes
-            } else {
-              Alert.alert("Error", "Failed to retrieve tokens from Cognito");
-            }
-          } catch (err) {
-            console.error("Error exchanging code for tokens:", err);
-            Alert.alert("Error", "Google login failed");
-          }
-        }
-      }
-    } else if (result.type === "dismiss") {
-      console.log("Google sign-in was cancelled");
-    } else {
-      console.log("Cognito sign-in failed");
-    }
-  };
+  // Google login is now handled by AuthContext for both web and mobile
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { justifyContent: "center", padding: Spacing.lg },
+        ]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logo}>
@@ -201,7 +155,7 @@ export default function LoginScreen({ navigation }: any) {
             style={{ alignItems: "center", marginBottom: 16, marginTop: 16 }}
           >
             <TouchableOpacity
-              onPress={handleGoogleLogin}
+              onPress={loginWithGoogle}
               disabled={loading}
               style={[
                 {

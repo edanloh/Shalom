@@ -1,11 +1,11 @@
 /**
  * Video Service - Handles all video-related API calls
- * Integrates with AWS Lambda backend for video playback and progress tracking
+ * Integrates with Supabase backend for video playback and progress tracking
  */
 
 import { apiService } from './apiService';
 
-// Video Detail Response from getVideoDetail Lambda
+// Video Detail Response from getVideoDetail
 export interface VideoDetailResponse {
   success: boolean;
   message: string;
@@ -65,8 +65,8 @@ export interface UpdateVideoProgressResponse {
     courseProgress: {
       progress_percentage: string;
       is_completed: boolean;
-      completed_videos: number;
-      total_videos: number;
+      completed_items: number;
+      total_items: number;
     };
   };
 }
@@ -74,17 +74,20 @@ export interface UpdateVideoProgressResponse {
 class VideoService {
   /**
    * Get video details with navigation and user progress
-   * Endpoint: GET /courses/{courseId}/module/videos/{videoId}?userId={userId}
+   * Endpoint: GET /getVideoDetail/{videoId}?userId={userId}&courseId={courseId}
+   * Maps to getVideoDetail.mjs Lambda function
    */
   async getVideoDetail(courseId: string, videoId: string, userId?: string): Promise<VideoDetailResponse['data']> {
     try {      
-      const params: Record<string, string> = {};
+      const params: Record<string, string> = {
+        courseId: courseId,
+      };
       if (userId) {
         params.userId = userId;
       }
 
       const response = await apiService.get<VideoDetailResponse>(
-        `/courses/${courseId}/module/videos/${videoId}`,
+        `/getVideoDetail/${videoId}`,
         params
       );
 
@@ -101,7 +104,8 @@ class VideoService {
 
   /**
    * Update video watch progress
-   * Endpoint: POST /courses/{courseId}/module/videos/progress
+   * Endpoint: POST /updateVideoProgress
+   * Maps to updateVideoProgress.mjs Lambda function
    * 
    * This should be called:
    * - Every 10 seconds during playback
@@ -110,7 +114,7 @@ class VideoService {
    */
   async updateProgress(courseId: string, request: UpdateVideoProgressRequest): Promise<UpdateVideoProgressResponse['data']> {
     try {
-      const endpoint = `/courses/${courseId}/module/videos/progress`;
+      const endpoint = `/updateVideoProgress`;
       console.log('🔵 API Call: POST', endpoint);
       console.log('📦 Request payload:', {
         courseId,
@@ -123,7 +127,7 @@ class VideoService {
 
       const response = await apiService.post<UpdateVideoProgressResponse>(
         endpoint,
-        request
+        { ...request, courseId } // Include courseId in the body
       );
 
       console.log('🟢 API Response received:', {
@@ -163,8 +167,8 @@ class VideoService {
         courseProgress: {
           progress_percentage: '0',
           is_completed: false,
-          completed_videos: 0,
-          total_videos: 0,
+          completed_items: 0,
+          total_items: 0,
         },
       };
     }

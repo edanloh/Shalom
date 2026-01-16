@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronLeft, ChevronRight, Video, FileText, CheckCircle, Clock, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { lessonService } from "@/services";
 
 // Helper function to detect video type and convert to embeddable URL
 const getVideoEmbedInfo = (url: string) => {
@@ -65,6 +66,9 @@ const LessonDetail = () => {
 
   useEffect(() => {
     if (courseId && lessonId) {
+      // Reset state when lesson changes to ensure clean transitions
+      setLesson(null);
+      setError(null);
       fetchLessonData();
     }
   }, [courseId, lessonId]);
@@ -74,45 +78,56 @@ const LessonDetail = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch course details which includes all sections and videos
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/courses/${courseId}`);
-      const data = await response.json();
+      // TODO: Get actual userId from auth context
+      const userId = '550e8400-e29b-41d4-a716-446655440101';
 
-      if (!data.success || !data.data) {
-        throw new Error('Failed to fetch course data');
-      }
-
-      setCourse(data.data.course);
+      // Call lesson service to get lesson details
+      const lessonData = await lessonService.getLessonDetail(lessonId!, userId);
       
-      // Find the video/lesson in the sections
-      let foundLesson = null;
-      let foundSection = null;
-      const videos: any[] = [];
+      // Set lesson data from API response - handle both video and PDF types
+      setLesson({
+        id: lessonData.id,
+        title: lessonData.title,
+        description: lessonData.description || '',
+        type: lessonData.type || 'video', // 'video' or 'pdf'
+        video_url: lessonData.video_url,
+        videoUrl: lessonData.video_url, // Also set camelCase for compatibility
+        resource_url: lessonData.resource_url, // For PDF lessons
+        resourceUrl: lessonData.resource_url,
+        is_downloadable: lessonData.is_downloadable,
+        file_size_bytes: lessonData.file_size_bytes,
+        duration: lessonData.duration_seconds,
+        thumbnail: lessonData.thumbnail_url,
+        order: lessonData.order_index,
+      });
 
-      if (data.data.sections) {
-        for (const section of data.data.sections) {
-          if (section.videos) {
-            videos.push(...section.videos);
-            
-            const video = section.videos.find((v: any) => v.id === lessonId);
-            if (video) {
-              foundLesson = video;
-              foundSection = section;
-            }
-          }
-        }
+      // Set course data
+      setCourse({
+        id: lessonData.course?.id,
+        title: lessonData.course?.title,
+        instructor_name: lessonData.course?.instructor_name,
+        level: lessonData.course?.level,
+      });
+
+      // Set current section
+      setCurrentSection({
+        id: lessonData.section?.id,
+        title: lessonData.section?.title,
+      });
+
+      // Set all videos for navigation (from sectionVideos) - include all types
+      // Backend already returns items sorted by order_index, so use as-is
+      if (lessonData.sectionVideos) {
+        setAllVideos(lessonData.sectionVideos.map((v: any) => ({
+          id: v.id,
+          title: v.title,
+          order: v.order_index,
+          type: v.type || 'video',
+        })));
       }
-
-      if (!foundLesson) {
-        throw new Error('Lesson not found');
-      }
-
-      setLesson(foundLesson);
-      setCurrentSection(foundSection);
-      setAllVideos(videos);
       
-      // Mock progress for now (would come from enrollment data)
-      setProgress(0);
+      // Set user progress
+      setProgress(lessonData.userProgress?.progress_percentage || 0);
     } catch (err) {
       console.error('Error fetching lesson data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch lesson data');
@@ -133,10 +148,18 @@ const LessonDetail = () => {
       description: "Great job! Moving to the next item.",
     });
     
-    // Find next video or quiz in the section
+    // Find next item in the section (including quizzes)
     const currentIndex = allVideos.findIndex(v => v.id === lessonId);
-    if (currentIndex < allVideos.length - 1) {
-      navigate(`/course/${courseId}/lesson/${allVideos[currentIndex + 1].id}`);
+    if (currentIndex >= 0 && currentIndex < allVideos.length - 1) {
+      const nextItem = allVideos[currentIndex + 1];
+      const nextItemId = nextItem.id;
+      
+      // Navigate to quiz or lesson based on type
+      if (nextItem.type === 'quiz') {
+        navigate(`/course/${courseId}/module/${moduleId || currentSection?.id}/quiz/${nextItemId}`);
+      } else {
+        navigate(`/course/${courseId}/module/${moduleId || currentSection?.id}/lesson/${nextItemId}`);
+      }
     } else {
       navigate(`/course/${courseId}`);
     }
@@ -145,14 +168,30 @@ const LessonDetail = () => {
   const handlePrevious = () => {
     const currentIndex = allVideos.findIndex(v => v.id === lessonId);
     if (currentIndex > 0) {
-      navigate(`/course/${courseId}/lesson/${allVideos[currentIndex - 1].id}`);
+      const prevItem = allVideos[currentIndex - 1];
+      const prevItemId = prevItem.id;
+      
+      // Navigate to quiz or lesson based on type
+      if (prevItem.type === 'quiz') {
+        navigate(`/course/${courseId}/module/${moduleId || currentSection?.id}/quiz/${prevItemId}`);
+      } else {
+        navigate(`/course/${courseId}/module/${moduleId || currentSection?.id}/lesson/${prevItemId}`);
+      }
     }
   };
 
   const handleNext = () => {
     const currentIndex = allVideos.findIndex(v => v.id === lessonId);
     if (currentIndex < allVideos.length - 1) {
-      navigate(`/course/${courseId}/lesson/${allVideos[currentIndex + 1].id}`);
+      const nextItem = allVideos[currentIndex + 1];
+      const nextItemId = nextItem.id;
+      
+      // Navigate to quiz or lesson based on type
+      if (nextItem.type === 'quiz') {
+        navigate(`/course/${courseId}/module/${moduleId || currentSection?.id}/quiz/${nextItemId}`);
+      } else {
+        navigate(`/course/${courseId}/module/${moduleId || currentSection?.id}/lesson/${nextItemId}`);
+      }
     } else {
       navigate(`/course/${courseId}`);
     }
@@ -193,6 +232,18 @@ const LessonDetail = () => {
   const currentIndex = allVideos.findIndex(v => v.id === lessonId);
   const hasPrevious = currentIndex > 0;
   const hasNext = currentIndex < allVideos.length - 1;
+  
+  // Get next item info for button label
+  const nextItem = hasNext ? allVideos[currentIndex + 1] : null;
+  const nextItemLabel = nextItem?.type === 'quiz' ? 'Next Quiz' : 
+                       nextItem?.type === 'pdf' ? 'Next PDF' : 
+                       'Next Lesson';
+  
+  // Get previous item info for button label
+  const prevItem = hasPrevious ? allVideos[currentIndex - 1] : null;
+  const prevItemLabel = prevItem?.type === 'quiz' ? 'Previous Quiz' : 
+                       prevItem?.type === 'pdf' ? 'Previous PDF' : 
+                       'Previous Lesson';
 
   return (
     <div className="min-h-screen bg-background">
@@ -213,8 +264,20 @@ const LessonDetail = () => {
             <div>
               <h1 className="text-[32px] font-bold">{lesson.title}</h1>
               <p className="text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                {lesson.duration_seconds ? `${Math.floor(lesson.duration_seconds / 60)} minutes` : 'N/A'}
+                {lesson.type === 'pdf' ? (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    {lesson.file_size_bytes 
+                      ? `${(lesson.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+                      : 'PDF Document'
+                    }
+                  </>
+                ) : (
+                  <>
+                    <Clock className="h-4 w-4" />
+                    {lesson.duration ? `${Math.floor(lesson.duration / 60)} minutes` : 'N/A'}
+                  </>
+                )}
               </p>
               {currentSection && (
                 <p className="text-sm text-muted-foreground">
@@ -222,61 +285,78 @@ const LessonDetail = () => {
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">{progress}% Complete</span>
-              <Progress value={progress} className="w-32" />
-            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 space-y-6">
-            {/* Video Player */}
+            {/* Video Player or PDF Viewer */}
             <div className="gradient-card border border-border rounded-xl overflow-hidden">
               <div className="aspect-video bg-card">
-                {(() => {
-                  const videoInfo = getVideoEmbedInfo(lesson.video_url);
-                  
-                  if (videoInfo.type === 'none' || !videoInfo.embedUrl) {
-                    return (
-                      <div className="flex items-center justify-center h-full bg-muted">
-                        <div className="text-center">
-                          <Video className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                          <p className="text-muted-foreground">No video available for this lesson</p>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (videoInfo.type === 'direct') {
-                    return (
-                      <video
-                        controls
-                        className="w-full h-full"
-                        poster={lesson.thumbnail_url}
-                      >
-                        <source src={videoInfo.embedUrl} type="video/mp4" />
-                        <source src={videoInfo.embedUrl} type="video/webm" />
-                        <source src={videoInfo.embedUrl} type="video/ogg" />
-                        Your browser does not support the video tag.
-                      </video>
-                    );
-                  }
-
-                  // YouTube, Vimeo, or generic iframe
-                  return (
+                {lesson.type === 'pdf' ? (
+                  // PDF Viewer
+                  lesson.resource_url ? (
                     <iframe
-                      width="100%"
-                      height="100%"
-                      src={videoInfo.embedUrl}
+                      src={lesson.resource_url}
                       title={lesson.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                      allowFullScreen
                       className="w-full h-full"
+                      style={{ minHeight: '600px' }}
                       frameBorder="0"
-                    ></iframe>
-                  );
-                })()}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full bg-muted">
+                      <div className="text-center">
+                        <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-muted-foreground">No PDF available for this lesson</p>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  // Video Player
+                  (() => {
+                    const videoInfo = getVideoEmbedInfo(lesson.video_url);
+                    
+                    if (videoInfo.type === 'none' || !videoInfo.embedUrl) {
+                      return (
+                        <div className="flex items-center justify-center h-full bg-muted">
+                          <div className="text-center">
+                            <Video className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                            <p className="text-muted-foreground">No video available for this lesson</p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (videoInfo.type === 'direct') {
+                      return (
+                        <video
+                          controls
+                          className="w-full h-full"
+                          poster={lesson.thumbnail_url}
+                        >
+                          <source src={videoInfo.embedUrl} type="video/mp4" />
+                          <source src={videoInfo.embedUrl} type="video/webm" />
+                          <source src={videoInfo.embedUrl} type="video/ogg" />
+                          Your browser does not support the video tag.
+                        </video>
+                      );
+                    }
+
+                    // YouTube, Vimeo, or generic iframe
+                    return (
+                      <iframe
+                        width="100%"
+                        height="100%"
+                        src={videoInfo.embedUrl}
+                        title={lesson.title}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                        allowFullScreen
+                        className="w-full h-full"
+                        frameBorder="0"
+                      ></iframe>
+                    );
+                  })()
+                )}
               </div>
             </div>
 
@@ -299,6 +379,18 @@ const LessonDetail = () => {
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">About this lesson</h3>
                       <p className="text-foreground">{lesson.description}</p>
+                      
+                      {lesson.type === 'pdf' && lesson.is_downloadable && lesson.resource_url && (
+                        <div className="mt-4">
+                          <Button
+                            onClick={() => window.open(lesson.resource_url, '_blank')}
+                            variant="outline"
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Download PDF
+                          </Button>
+                        </div>
+                      )}
                       
                       {course && course.outcomes && course.outcomes.length > 0 && (
                         <div>
@@ -330,17 +422,13 @@ const LessonDetail = () => {
                 disabled={!hasPrevious}
               >
                 <ChevronLeft className="h-4 w-4 mr-2" />
-                Previous Lesson
-              </Button>
-              <Button onClick={handleComplete}>
-                Mark as Complete
-                <CheckCircle className="h-4 w-4 ml-2" />
+                {prevItemLabel}
               </Button>
               <Button 
                 onClick={handleNext}
                 disabled={!hasNext}
               >
-                {hasNext ? 'Next Lesson' : 'Back to Course'}
+                {hasNext ? nextItemLabel : 'Back to Course'}
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
@@ -369,47 +457,6 @@ const LessonDetail = () => {
                 )}
               </div>
             </div>
-
-            {currentSection && currentSection.videos && currentSection.videos.length > 0 && (
-              <div className="gradient-card border border-border rounded-xl p-6">
-                <h3 className="font-semibold mb-4">Section Progress</h3>
-                <div className="space-y-3">
-                  {currentSection.videos.map((video: any, index: number) => {
-                    const isCurrent = video.id === lessonId;
-                    const isPast = allVideos.findIndex(v => v.id === video.id) < currentIndex;
-                    
-                    return (
-                      <div 
-                        key={video.id} 
-                        className={`flex items-center justify-between text-sm cursor-pointer hover:text-primary transition-colors ${
-                          isCurrent ? 'font-semibold text-accent' : isPast ? 'text-foreground' : 'text-muted-foreground'
-                        }`}
-                        onClick={() => navigate(`/course/${courseId}/lesson/${video.id}`)}
-                      >
-                        <span className="flex-1 truncate">{video.title}</span>
-                        {isPast && <CheckCircle className="h-4 w-4 text-success ml-2 flex-shrink-0" />}
-                        {isCurrent && <div className="h-2 w-2 rounded-full bg-accent animate-pulse ml-2 flex-shrink-0" />}
-                        {!isPast && !isCurrent && <Clock className="h-4 w-4 ml-2 flex-shrink-0" />}
-                      </div>
-                    );
-                  })}
-                  
-                  {currentSection.quizzes && currentSection.quizzes.length > 0 && (
-                    <>
-                      {currentSection.quizzes.map((quiz: any) => (
-                        <div 
-                          key={quiz.id} 
-                          className="flex items-center justify-between text-sm text-muted-foreground"
-                        >
-                          <span className="flex-1 truncate">{quiz.title}</span>
-                          <FileText className="h-4 w-4 ml-2 flex-shrink-0" />
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </main>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,10 +36,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { courseService, moduleService, Course, Module, Review, Student } from "@/services";
+import { supabaseService } from "@/services/supabaseService";
 
 const CourseDetail = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as { quizCompleted?: boolean; quizId?: string; isPassed?: boolean } | null;
   const { toast } = useToast();
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -61,6 +64,27 @@ const CourseDetail = () => {
     }
   }, [courseId]);
 
+  // Refresh data when returning from quiz
+  useEffect(() => {
+    if (locationState?.quizCompleted && courseId) {
+      console.log('Quiz completed, refreshing course data...');
+      // Clear the location state to prevent refetching on subsequent renders
+      window.history.replaceState({}, document.title);
+      // Refetch course data to get updated progress
+      fetchCourseData();
+    }
+  }, [locationState?.quizCompleted]);
+
+  // Refresh data when returning from quiz
+  useEffect(() => {
+    if (locationState?.quizCompleted && courseId) {
+      // Clear the location state to prevent refetching on subsequent renders
+      window.history.replaceState({}, document.title);
+      // Refetch course data to get updated progress
+      fetchCourseData();
+    }
+  }, [locationState?.quizCompleted, courseId]);
+
   const fetchCourseData = async () => {
     if (!courseId) return;
 
@@ -71,14 +95,23 @@ const CourseDetail = () => {
       // Use instructor endpoint to get full course details
       // TODO: Get actual admin ID from auth context
       const adminId = '550e8400-e29b-41d4-a716-446655440101';
-      const fullResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/admin/${adminId}/${courseId}`);
-      const fullData = await fullResponse.json();
+      
+      // Call Supabase Edge Function with path parameters
+      const fullData = await supabaseService.post<{
+        success: boolean;
+        data?: { course: any; totalSections?: number; totalVideos?: number; totalQuizzes?: number };
+        message?: string;
+      }>(`getModuleDetailInstructor/${adminId}/${courseId}`, {});
       
       if (!fullData.success || !fullData.data) {
         throw new Error(fullData.message || 'Course not found');
       }
 
       const courseData = fullData.data.course;
+      
+      // Get actual enrolled count from API (will be fetched separately below)
+      let actualEnrolledCount = parseInt(courseData.student_count) || 0;
+      
       const response = {
         id: courseData.id,
         title: courseData.title,
@@ -88,19 +121,20 @@ const CourseDetail = () => {
         status: courseData.is_published ? 'published' : 'draft',
         instructor: courseData.instructor_name || 'Unknown',
         instructorId: courseData.instructor_id,
-        enrolledCount: parseInt(courseData.student_count) || 0,
-        completionRate: 0,
-        rating: parseFloat(courseData.rating) || 0,
-        totalRatings: parseInt(courseData.total_ratings) || 0,
+        enrolledCount: actualEnrolledCount,
+        completionRate: 0, // Will be calculated after fetching students
+        // Use the calculated rating from reviews (not the database rating)
+        rating: parseFloat(courseData.rating) || 0, // This is the calculated average from reviews
+        totalRatings: parseInt(courseData.totalRatings) || 0, // This is the count of reviews
         duration: `${courseData.duration_hours || 0}h`,
         modules: fullData.data.totalSections || 0,
         lessons: fullData.data.totalVideos || 0,
         quizzes: fullData.data.totalQuizzes || 0,
-        createdDate: courseData.created_at,
-        lastUpdated: courseData.updated_at
+        createdDate: courseData.created_at ? new Date(courseData.created_at).toLocaleDateString() : 'N/A',
+        lastUpdated: courseData.updated_at ? new Date(courseData.updated_at).toLocaleDateString() : 'N/A'
       };
 
-      setCourse(response);
+      // Note: setCourse will be called after fetching students to get accurate stats
       
       // Set sections (modules) from the instructor API response
       if (fullData.data && fullData.data.sections) {
@@ -110,12 +144,14 @@ const CourseDetail = () => {
       }
 
       // Set reviews from the API response (if available)
-      if (fullData.data && fullData.data.reviews) {
-        const reviewsData = fullData.data.reviews.map((review: any, index: number) => ({
+      // Reviews are nested under course.reviews in the API response
+      if (courseData && courseData.reviews) {
+        const reviewsData = courseData.reviews.map((review: any, index: number) => ({
           id: review.id || index,
-          studentName: review.reviewer_name || review.student_name || 'Anonymous',
+          studentName: review.reviewerName || review.reviewer_name || review.student_name || 'Anonymous',
           rating: parseFloat(review.rating || '5'),
-          date: review.created_at ? new Date(review.created_at).toLocaleDateString() : 'N/A',
+          date: review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 
+                review.created_at ? new Date(review.created_at).toLocaleDateString() : 'N/A',
           comment: review.review || review.comment || '',
         }));
         setReviews(reviewsData);
@@ -123,13 +159,27 @@ const CourseDetail = () => {
         setReviews([]);
       }
 
-      // Fetch enrolled students separately
+      // Fetch enrolled students separately and update stats
       try {
         const studentsData = await courseService.getCourseStudents(courseId);
         setEnrolledStudents(studentsData);
+        
+        // Update the actual enrolled count
+        response.enrolledCount = studentsData.length;
+        
+        // Calculate actual completion rate
+        if (studentsData.length > 0) {
+          const completedCount = studentsData.filter(s => s.progress === 100).length;
+          response.completionRate = Math.round((completedCount / studentsData.length) * 100);
+        }
+        
+        // Update course state with real stats
+        setCourse(response);
       } catch (err) {
         console.error('Error fetching students:', err);
         setEnrolledStudents([]);
+        // Still set course even if student fetch fails
+        setCourse(response);
       }
 
       // Fetch available students (not enrolled)
@@ -154,35 +204,55 @@ const CourseDetail = () => {
   };
 
   // Transform API sections to UI-friendly format
-  const modulesList = modules.length > 0 ? modules.map((section: any) => ({
-    id: section.id,
-    title: section.title,
-    lessons: section.videos?.length || 0,
-    quizzes: section.quizzes?.length || 0,
-    duration: section.total_duration_seconds 
-      ? `${Math.floor(section.total_duration_seconds / 60)} min`
-      : section.duration_minutes
-      ? `${section.duration_minutes} min`
-      : 'N/A',
-    isCompleted: false,
-    completedAt: null,
-    items: [
-      ...(section.videos || []).map((video: any) => ({
-        id: video.id,
-        type: 'lesson' as const,
-        title: video.title,
-        duration: video.duration_seconds 
-          ? `${Math.floor(video.duration_seconds / 60)} min`
-          : 'N/A',
-      })),
-      ...(section.quizzes || []).map((quiz: any) => ({
-        id: quiz.id,
-        type: 'quiz' as const,
-        title: quiz.title,
-        questions: quiz.question_count || 0,
-      })),
-    ],
-  })) : [
+  const modulesList = modules.length > 0 ? modules.map((section: any) => {
+    const items = section.items || [];
+    const videos = items.filter((item: any) => item.type === 'video');
+    const pdfs = items.filter((item: any) => item.type === 'pdf');
+    const quizzes = items.filter((item: any) => item.type === 'quiz');
+    
+    return {
+      id: section.id,
+      title: section.title,
+      lessons: videos.length + pdfs.length,
+      quizzes: quizzes.length,
+      duration: section.total_duration_seconds 
+        ? `${Math.floor(section.total_duration_seconds / 60)} min`
+        : section.duration_minutes
+        ? `${section.duration_minutes} min`
+        : 'N/A',
+      isCompleted: false,
+      completedAt: null,
+      // Map items directly to preserve order_index sequence from backend
+      items: items.map((item: any) => {
+        if (item.type === 'video') {
+          return {
+            id: item.id,
+            type: 'lesson' as const,
+            title: item.title,
+            duration: item.duration_seconds 
+              ? `${Math.floor(item.duration_seconds / 60)} min`
+              : 'N/A',
+          };
+        } else if (item.type === 'pdf') {
+          return {
+            id: item.id,
+            type: 'pdf' as const,
+            title: item.title,
+            fileSize: item.file_size_bytes 
+              ? `${(item.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+              : 'N/A',
+          };
+        } else {
+          return {
+            id: item.id,
+            type: 'quiz' as const,
+            title: item.title,
+            questions: item.questions?.length || 0,
+          };
+        }
+      }),
+    };
+  }) : [
     {
       id: 1,
       title: "Introduction to Data Science",
@@ -329,6 +399,8 @@ const CourseDetail = () => {
   const handleItemClick = (module: any, item: any) => {
     if (item.type === "lesson") {
       navigate(`/course/${courseId}/module/${module.id}/lesson/${item.id}`);
+    } else if (item.type === "pdf") {
+      navigate(`/course/${courseId}/module/${module.id}/lesson/${item.id}`);
     } else if (item.type === "quiz") {
       navigate(`/course/${courseId}/module/${module.id}/quiz/${item.id}`);
     }
@@ -384,23 +456,23 @@ const CourseDetail = () => {
             <div className="flex-1">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-[32px] font-bold">{course.title}</h1>
-                    <Badge className={course.status === 'published' ? "status-badge-published" : "status-badge-draft"}>
-                      {course.status.toUpperCase()}
-                    </Badge>
-                  </div>
+                  <h1 className="text-[32px] font-bold pr-2">{course.title}</h1>
                   <p className="text-muted-foreground mb-2">
                     by {course.instructor}
                   </p>
-                  <Badge variant="outline" className="mr-2">
+                  <Badge variant="outline" className="my-2 py-2 px-2">
                     {course.category}
                   </Badge>
                 </div>
-                <Button onClick={() => navigate(`/course-builder/${courseId}`)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Course
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Badge className={course.status === 'published' ? "status-badge-published" : "status-badge-draft"}>
+                    {course.status.toUpperCase()}
+                  </Badge>
+                  <Button onClick={() => navigate(`/course-builder/${courseId}`)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Course
+                  </Button>
+                </div>
               </div>
 
               <p className="text-foreground mb-6">{course.description}</p>
@@ -511,14 +583,18 @@ const CourseDetail = () => {
                             <div className="flex items-center gap-3">
                               {item.type === "lesson" ? (
                                 <Video className="h-4 w-4 text-accent" />
+                              ) : item.type === "pdf" ? (
+                                <FileText className="h-4 w-4 text-primary" />
                               ) : (
-                                <FileText className="h-4 w-4 text-warning" />
+                                <MessageSquare className="h-4 w-4 text-warning" />
                               )}
                               <span className="text-sm">{item.title}</span>
                             </div>
                             <span className="text-xs text-muted-foreground">
                               {item.type === "lesson"
                                 ? item.duration
+                                : item.type === "pdf"
+                                ? item.fileSize
                                 : `${item.questions} questions`}
                             </span>
                           </div>
@@ -533,7 +609,7 @@ const CourseDetail = () => {
             {/* Course Reviews Section */}
             <div className="gradient-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Student Reviews</h2>
+                <h2 className="text-2xl font-bold">Course Review</h2>
               </div>
 
               {reviews.length === 0 ? (
@@ -718,9 +794,11 @@ const CourseDetail = () => {
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={() => navigate(`/students?course=${courseId}`)}
+                  onClick={() => navigate(`/course/${courseId}/students`, { 
+                    state: { courseName: course.title } 
+                  })}
                 >
-                  View All Students
+                View Enrolled Students
                 </Button>
               </div>
             </div>

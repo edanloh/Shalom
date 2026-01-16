@@ -14,8 +14,9 @@ export interface CourseDetailResponse {
       duration_hours: number;
       thumbnail_url: string;
       video_preview_url: string | null;
-      rating: string;
-      total_ratings: number;
+      rating: string | number;
+      total_ratings?: number;
+      totalRatings?: number;
       student_count: number;
       is_published: boolean;
       is_featured: boolean;
@@ -42,6 +43,18 @@ export interface CourseDetailResponse {
       total_duration_seconds: number;
       requirements: string[];
       outcomes: string[];
+      ratingBreakdown?: Record<number, number>;
+      reviews?: Array<{
+        rating: number;
+        review: string;
+        created_at?: string;
+        createdAt?: string;
+        reviewer_name?: string;
+        reviewerName?: string;
+        reviewer_avatar?: string | null;
+        reviewerAvatar?: string | null;
+        is_anonymous?: boolean;
+      }>;
     };
     sections: any[];
     videos: any[];
@@ -112,13 +125,18 @@ export interface ProcessedCourseDetail {
 }
 
 class CourseDetailService {
+  /**
+   * Get course detail
+   * Endpoint: GET /getModuleDetail/{courseId}
+   * Maps to getModuleDetail.mjs Lambda function
+   */
   async getCourseDetail(courseId: string): Promise<ProcessedCourseDetail> {
     try {
       console.log(`Fetching course details for: ${courseId}`);
       
-      const response = await apiService.get<CourseDetailResponse>(`/courses/${courseId}`);
+      const response = await apiService.get<CourseDetailResponse>(`/getModuleDetail/${courseId}`);
       
-      if (!response.success || !response.data) {
+      if (!response?.success || !response?.data) {
         throw new Error('Failed to fetch course details');
       }
 
@@ -130,32 +148,33 @@ class CourseDetailService {
   }
 
   private processCourseDetail(data: CourseDetailResponse['data']): ProcessedCourseDetail {
-    const { course, reviews, statistics } = data;
+    const { course } = data;
+    const reviewsSource =
+      (data as any)?.reviews ??
+      (course as any)?.reviews ??
+      [];
 
     // Process modules - only use actual sections from API
-    const modules: CourseModule[] = data.sections.map((section: any, index: number) => ({
+    const modules: CourseModule[] = (data.sections || []).map((section: any, index: number) => ({
       id: section.id,
       title: section.title || `Module ${index + 1}`,
       description: section.description,
-      order: section.order || index + 1,
-      isCompleted: false, // TODO: Get from user progress
-      duration: section.estimated_duration || undefined,
+      order: section.order_index || section.order || index + 1,
+      isCompleted: section.module_is_completed || false,
+      duration: section.duration_minutes || section.estimated_duration || undefined,
     }));
-
-    // Generate rating breakdown (fallback if not in API)
-    const ratingBreakdown = this.generateRatingBreakdown(
-      parseFloat(course.rating),
-      course.total_ratings
-    );
 
     // Process reviews
-    const processedReviews = reviews.map(review => ({
+    const processedReviews = (reviewsSource || []).map((review: any) => ({
       rating: review.rating,
       review: review.review,
-      reviewerName: review.reviewer_name,
-      reviewerAvatar: review.reviewer_avatar,
-      createdAt: review.created_at,
+      reviewerName: review.reviewer_name ?? review.reviewerName ?? "Anonymous",
+      reviewerAvatar: review.reviewer_avatar ?? review.reviewerAvatar ?? null,
+      createdAt: review.created_at ?? review.createdAt ?? new Date().toISOString(),
     }));
+
+    // Calculate actual rating breakdown from reviews
+    const ratingBreakdown = this.calculateRatingBreakdown(processedReviews);
 
     return {
       id: course.id,
@@ -163,39 +182,55 @@ class CourseDetailService {
       description: course.description,
       image: course.thumbnail_url,
       instructor: {
-        name: course.instructor_name,
-        avatar: course.instructor_avatar,
-        bio: course.instructor_bio,
-        rating: parseFloat(course.instructor_rating),
-        studentsCount: course.instructor_total_students,
-        expertise: course.instructor_expertise,
+        name: course.instructor_name || 'Unknown',
+        avatar: course.instructor_avatar || '',
+        bio: course.instructor_bio || '',
+        rating: parseFloat(course.instructor_rating || '0'),
+        studentsCount: course.instructor_total_students || 0,
+        expertise: course.instructor_expertise || [],
       },
-      rating: parseFloat(course.rating),
-      totalRatings: course.total_ratings,
-      studentCount: course.student_count,
-      duration: this.formatDuration(course.duration_hours),
+      rating: parseFloat(String(course.rating || 0)),
+      totalRatings: Number(
+        ((course as any).total_ratings ?? (course as any).totalRatings ?? processedReviews.length) || 0
+      ),
+      studentCount: course.student_count || 0,
+      duration: this.formatDuration(course.duration_hours || 0),
       level: course.level,
-      category: course.category_name,
-      tags: course.tags,
+      category: course.category_name || 'Uncategorized',
+      tags: course.tags || [],
       modules,
       reviews: processedReviews,
-      ratingBreakdown,
-      requirements: course.requirements,
-      outcomes: course.outcomes,
+      ratingBreakdown: (course as any).ratingBreakdown ?? ratingBreakdown,
+      requirements: course.requirements || [],
+      outcomes: course.outcomes || [],
     };
   }
 
-  private generateRatingBreakdown(rating: number, totalRatings: number): Record<number, number> {
-    // Generate realistic rating distribution based on overall rating
-    if (rating >= 4.5) {
-      return { 5: 60, 4: 25, 3: 10, 2: 3, 1: 2 };
-    } else if (rating >= 4.0) {
-      return { 5: 45, 4: 35, 3: 15, 2: 3, 1: 2 };
-    } else if (rating >= 3.5) {
-      return { 5: 30, 4: 35, 3: 25, 2: 7, 1: 3 };
-    } else {
-      return { 5: 20, 4: 25, 3: 30, 2: 15, 1: 10 };
+  private calculateRatingBreakdown(reviews: Array<{ rating: number }>): Record<number, number> {
+    // Initialize counts for each star rating
+    const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    
+    // Count actual ratings from reviews
+    reviews.forEach(review => {
+      const rating = Math.round(review.rating);
+      if (rating >= 1 && rating <= 5) {
+        counts[rating as keyof typeof counts]++;
+      }
+    });
+    
+    // Calculate percentages
+    const total = reviews.length;
+    if (total === 0) {
+      return { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     }
+    
+    return {
+      5: Math.round((counts[5] / total) * 100),
+      4: Math.round((counts[4] / total) * 100),
+      3: Math.round((counts[3] / total) * 100),
+      2: Math.round((counts[2] / total) * 100),
+      1: Math.round((counts[1] / total) * 100),
+    };
   }
 
   private formatDuration(hours: number): string {

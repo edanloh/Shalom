@@ -1,8 +1,5 @@
-import React, { useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, StatusBar, ScrollView, TouchableOpacity, Image, ActivityIndicator, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
+import { useMemo, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMyCourses } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,8 +7,8 @@ import { ImageWithFallback } from '../components/common';
 import { Images } from '../../assets';
 import { Colors, Spacing, TextStyles, BorderRadius, Shadows } from '../constants';
 import type { Course } from '../types';
-import type { MainStackParamList } from '../types';
 import { useCourses } from '../contexts/CourseContext';
+import { ActionButton, Screen } from '@/components';
 
 const ProgressBar = ({ percent }: { percent: number }) => {
   const p = Math.max(0, Math.min(100, percent));
@@ -22,8 +19,7 @@ const ProgressBar = ({ percent }: { percent: number }) => {
   );
 };
 
-const MyCourses: React.FC = () => {
-  const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
+export default function MyCourses({ navigation }: any) {
   const { user } = useAuth();
   const { courses, loading, error, refreshing, refresh, retry } = useMyCourses();
   const { wishlist = [], toggleWishlist } = useCourses();
@@ -93,43 +89,29 @@ const MyCourses: React.FC = () => {
   // Handle user not authenticated
   if (!user) {
     return (
-      <SafeAreaView style={styles.container} edges={['top','left','right']}>
-        <StatusBar barStyle="light-content" translucent={false} backgroundColor={Colors.primary} />
+      <Screen
+        title="My Courses"
+        navigation={navigation}
+        headerLeftIcon="chevron-back"
+        stickyHeader
+      >
         <View style={styles.centerContainer}>
-          <Text style={styles.message}>Please log in to view your courses</Text>
+          <Text style={TextStyles.body}>Please log in to view your courses</Text>
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top','left','right']}>
-      <StatusBar barStyle="light-content" translucent={false} backgroundColor={Colors.primary} />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
-          <Ionicons name="chevron-back" size={26} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Courses</Text>
-        {/* spacer to balance flex */}
-        <View style={{ width: 26 }} />
-      </View>
-
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentInsetAdjustmentBehavior="automatic"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refresh}
-            tintColor={Colors.textPrimary}
-            colors={[Colors.purple400]}
-          />
-        }
-      >
+    <Screen
+      title="My Courses"
+      navigation={navigation}
+      headerLeftIcon="chevron-back"
+      stickyHeader
+    >
+      <View>
         {/* Continue Watching Section */}
-        <Text style={styles.sectionTitle}>Continue Watching</Text>
+        <Text style={[ TextStyles.h5, { marginVertical: Spacing.md, marginBottom: Spacing.base }]}>Continue Watching</Text>
         
         {loading && !refreshing ? (
           <View style={styles.centerContainer}>
@@ -139,14 +121,15 @@ const MyCourses: React.FC = () => {
         ) : error ? (
           <View style={styles.centerContainer}>
             <Text style={styles.errorMessage}>Error: {error}</Text>
-            <TouchableOpacity onPress={retry} style={styles.retryButton}>
-              <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
+            <ActionButton
+              text="Retry"
+              onPress={retry}
+            />
           </View>
         ) : continueWatching.length === 0 ? (
           <View style={styles.centerContainer}>
-            <Text style={styles.emptyMessage}>No courses in progress</Text>
-            <Text style={styles.emptySubMessage}>Start a course to see it here!</Text>
+            <Text style={TextStyles.body}>No courses in progress</Text>
+            <Text style={TextStyles.caption}>Start a course to see it here!</Text>
           </View>
         ) : (
           <FlatList
@@ -154,7 +137,6 @@ const MyCourses: React.FC = () => {
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: Spacing.lg }}
             ItemSeparatorComponent={() => <View style={{ width: Spacing.md }} />}
             extraData={wishlist}
             renderItem={({ item }) => {
@@ -179,8 +161,8 @@ const MyCourses: React.FC = () => {
                   </View>
 
                   {/* text sits outside, below */}
-                  <Text style={styles.cwTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.cwSubtitle} numberOfLines={1}>{moduleLabel}</Text>
+                  <Text style={TextStyles.bodyMedium} numberOfLines={2}>{item.title}</Text>
+                  <Text style={TextStyles.caption} numberOfLines={1}>{moduleLabel}</Text>
                 </TouchableOpacity>
               );
             }}
@@ -188,111 +170,88 @@ const MyCourses: React.FC = () => {
         )}
 
         {/* In Progress Section */}
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>In Progress</Text>
-            
-            {(loading || error) ? (
-            // No horizontal padding for the loading/error text
-            <Text style={[styles.message, { paddingHorizontal: 0, marginHorizontal: Spacing.lg }]}>
-                {loading ? 'Loading…' : `Error: ${error}`}
-            </Text>
-            ) : (
-            // Apply horizontal padding only to the content block
-            <View style={{ paddingHorizontal: Spacing.lg }}>
-                {inProgress.map((item) => {
-                const pct = item.progress?.percentage ?? 0;
-                const moduleLabel = getModuleLabel(item);
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    activeOpacity={0.9}
-                    onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
-                    style={styles.ipCard}
-                  >
-                    {/* Left: text */}
-                    <View style={styles.ipLeft}>
-                      <Text style={styles.ipTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={[ TextStyles.h5, { marginTop: Spacing.xl, marginBottom: Spacing.base }]}>In Progress</Text>
+        
+        {(loading || error) ? (
+        // No horizontal padding for the loading/error text
+        <Text style={[styles.message, { paddingHorizontal: 0, marginHorizontal: Spacing.lg }]}>
+            {loading ? 'Loading…' : `Error: ${error}`}
+        </Text>
+        ) : (
+        // Apply horizontal padding only to the content block
+        <View>
+            {inProgress.map((item) => {
+            const pct = item.progress?.percentage ?? 0;
+            const moduleLabel = getModuleLabel(item);
+            return (
+              <TouchableOpacity
+                key={item.id}
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
+                style={styles.ipCard}
+              >
+                {/* Left: text */}
+                <View style={styles.ipLeft}>
+                  <Text style={styles.ipTitle} numberOfLines={2}>{item.title}</Text>
 
-                      {/* meta row like Wishlist */}
-                      <View style={styles.ipMetaRow}>
-                        <Ionicons name="star" size={12} color="#FACC15" />
-                        <Text style={styles.ipMetaText}>{(item.rating as any)?.toFixed?.(1) ?? item.rating}</Text>
-                        <Text style={styles.ipMetaDot}>•</Text>
-                        <Text style={styles.ipMetaText}>{item.modules ?? 12} modules</Text>
-                      </View>
+                  {/* meta row like Wishlist */}
+                  <View style={styles.ipMetaRow}>
+                    <Ionicons name="star" size={12} color="#FACC15" />
+                    <Text style={styles.ipMetaText}>{(item.rating as any)?.toFixed?.(1) ?? item.rating}</Text>
+                    <Text style={styles.ipMetaDot}>•</Text>
+                    <Text style={styles.ipMetaText}>{item.modules ?? 12} modules</Text>
+                  </View>
 
-                      <View style={styles.ipPercentRow}>
-                        <Text style={styles.ipMetaText}>{pct}% complete</Text>
-                      </View>
+                  <View style={styles.ipPercentRow}>
+                    <Text style={styles.ipMetaText}>{pct}% complete</Text>
+                  </View>
 
-                      <ProgressBar percent={pct} />
+                  <ProgressBar percent={pct} />
+                </View>
+
+                {/* Right: fixed image block + overlays */}
+                <View style={styles.ipRight}>
+                  <ImageWithFallback
+                    source={{ uri: item.image }}
+                    fallback={Images.coursePlaceholder}
+                    style={styles.ipImage}
+                  />
+                  <View style={styles.badgeRow}>
+                    <View style={styles.levelBadge}>
+                      <Text style={styles.levelText}>{item.level}</Text>
                     </View>
-
-                    {/* Right: fixed image block + overlays */}
-                    <View style={styles.ipRight}>
-                      <ImageWithFallback
-                        source={{ uri: item.image }}
-                        fallback={Images.coursePlaceholder}
-                        style={styles.ipImage}
+                    <TouchableOpacity
+                      onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
+                      hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+                      style={styles.heartBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={wishIds.has(item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                    >
+                      <Ionicons
+                        name={wishIds.has(item.id) ? 'heart' : 'heart-outline'}
+                        size={20}
+                        color="#fff"
                       />
-                      <View style={styles.badgeRow}>
-                        <View style={styles.levelBadge}>
-                          <Text style={styles.levelText}>{item.level}</Text>
-                        </View>
-                        <TouchableOpacity
-                          onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
-                          hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
-                          style={styles.heartBtn}
-                          accessibilityRole="button"
-                          accessibilityLabel={wishIds.has(item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                        >
-                          <Ionicons
-                            name={wishIds.has(item.id) ? 'heart' : 'heart-outline'}
-                            size={20}
-                            color="#fff"
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-                })}
-            </View>
-            )}
-
-            <View style={{ height: Spacing.xl * 1.5 }} />
-            </ScrollView>
-    </SafeAreaView>
-    
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+            })}
+        </View>
+        )}
+      </View>
+    </Screen>
   );
 };
 
 const CARD_RADIUS = BorderRadius.lg;
+const w = Dimensions.get("window").width;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.primary, // your dark background
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
-  headerTitle: {
-    ...TextStyles.h4,
-    textAlign: 'center',
-    flex: 1,
-  },
-
-  // Section title
-  sectionTitle: {
-    ...TextStyles.h4,
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.sm,
   },
 
   message: {
@@ -304,7 +263,8 @@ const styles = StyleSheet.create({
 
   // Continue Watching (horizontal)
   cwCard: {
-    width: 300,
+    width: Math.min(w * 0.72, 300),
+    gap: Spacing.sm
   },
   cwThumbWrapper: {
     borderRadius: CARD_RADIUS,
@@ -316,16 +276,7 @@ const styles = StyleSheet.create({
   cwThumb: {
     width: '100%',
     height: 150,
-  },
-  cwTitle: {
-    ...TextStyles.bodyMedium,
-    paddingHorizontal: Spacing.md,
-    marginTop: Spacing.sm,
-  },
-  cwSubtitle: {
-    ...TextStyles.caption,
-    paddingHorizontal: Spacing.md,
-    marginTop: 2,
+    paddingBottom: Spacing.sm
   },
   badgeRow: {
     position: 'absolute',
@@ -360,6 +311,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     overflow: 'hidden',
     minHeight: 100,
+    maxHeight: 150,
   },
   ipLeft: {
     flex: 1,
@@ -377,8 +329,7 @@ const styles = StyleSheet.create({
   },
   ipImage: {
     flex: 1,
-    width: undefined,
-    height: undefined,
+    width: 150,
     resizeMode: 'cover',
   },
   ipTitle: {
@@ -432,7 +383,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.lg,
-    minHeight: 200,
+    gap: Spacing.md,
   },
   loadingMessage: {
     ...TextStyles.body,
@@ -445,26 +396,6 @@ const styles = StyleSheet.create({
     color: Colors.red,
     textAlign: 'center',
     marginBottom: Spacing.md,
-  },
-  retryButton: {
-    backgroundColor: Colors.purple400,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.base,
-  },
-  retryText: {
-    ...TextStyles.bodyMedium,
-    color: Colors.white,
-  },
-  emptyMessage: {
-    ...TextStyles.h4,
-    textAlign: 'center',
-    marginBottom: Spacing.sm,
-  },
-  emptySubMessage: {
-    ...TextStyles.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
   },
   progressOverlay: {
     position: 'absolute',
@@ -481,5 +412,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default MyCourses;

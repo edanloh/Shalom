@@ -1,15 +1,17 @@
 /**
  * Course Service - Handles all course-related API calls
- * Updated to work with AWS API Gateway endpoint
+ * Updated to work with Supabase endpoints
  */
 
 import { Course, AWSApiResponse, AWSCoursesResponse, AWSCourse } from '../types';
 import apiService from './apiService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 function unwrap<T = any>(r: any): T {
   return (r && typeof r === 'object' && 'data' in r ? r.data : r) as T;
 }
+
+const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID || '550e8400-e29b-41d4-a716-446655440101';
 
 // Cache configuration
 const CACHE_CONFIG = {
@@ -17,19 +19,23 @@ const CACHE_CONFIG = {
   CACHE_DURATION: 5 * 60 * 1000, // 5 minutes in milliseconds
 };
 
-// Course service endpoints
+// Course service endpoints - Supabase Edge Functions
 const ENDPOINTS = {
-  COURSES: '/courses',
-  USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
-  COURSE_REVIEWS: (courseId: string) => `/courses/${encodeURIComponent(courseId)}/reviews`,
+  COURSES: '/getAllCourse', // Maps to getAllCourse.mjs
+  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, // Maps to getUserEnrollment.mjs
+  COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, // Maps to getModuleDetail.mjs
+  COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, // Maps to courseReviewHandler
+  POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, // Maps to postUserEnrollment.mjs
+  RECOMMENDATIONS: '/getRecommendations',
+  RECOMMENDATION_EVENT: '/postRecommendationEvent',
 };
 
 
-// Wishlist endpoints
+// Wishlist endpoints - Supabase Edge Functions
 const WISHLIST = {
-  BASE: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}/wishlist`,
+  BASE: (uid: string) => `/wishlistHandler/${encodeURIComponent(uid)}`, // Maps to wishlistHandler.mjs
   ITEM: (uid: string, courseId: string) =>
-    `/courses/enrollment/${encodeURIComponent(uid)}/wishlist/?courseId=${encodeURIComponent(courseId)}`,
+    `/wishlistHandler/${encodeURIComponent(uid)}?courseId=${encodeURIComponent(courseId)}`,
 };
 
 export interface CourseListParams {
@@ -70,6 +76,8 @@ export interface EnrollmentCourse {
   video_watch_time_seconds: string;
   total_quizzes: string;
   passed_quizzes: string;
+  total_sections: number;
+  completed_sections: number;
   video_progress_percent: number;
   quiz_progress_percent: number;
   estimated_time_remaining_minutes: number;
@@ -164,7 +172,7 @@ export interface UpdateReviewPayload {
 class CacheManager {
   static async get<T>(key: string): Promise<T | null> {
     try {
-      const cachedData = await AsyncStorage.getItem(key);
+      const cachedData = await SecureStore.getItemAsync(key);
       if (!cachedData) return null;
 
       const { data, timestamp } = JSON.parse(cachedData);
@@ -172,7 +180,7 @@ class CacheManager {
 
       // Check if cache is still valid
       if (now - timestamp > CACHE_CONFIG.CACHE_DURATION) {
-        await AsyncStorage.removeItem(key);
+        await SecureStore.deleteItemAsync(key);
         return null;
       }
 
@@ -189,7 +197,7 @@ class CacheManager {
         data,
         timestamp: Date.now(),
       };
-      await AsyncStorage.setItem(key, JSON.stringify(cacheData));
+      await SecureStore.setItemAsync(key, JSON.stringify(cacheData));
     } catch (error) {
       console.warn(`Cache write error for key ${key}:`, error);
     }
@@ -197,7 +205,7 @@ class CacheManager {
 
   static async clear(key: string): Promise<void> {
     try {
-      await AsyncStorage.removeItem(key);
+      await SecureStore.deleteItemAsync(key);
     } catch (error) {
       console.warn(`Cache clear error for key ${key}:`, error);
     }
@@ -251,7 +259,10 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
     },
     duration: durationStr,
     rating: parseFloat(awsCourse.rating || '4.0'),
-    image: awsCourse.thumbnail_url || 'https://via.placeholder.com/400x250',
+    image:
+      awsCourse.thumbnail_url ||
+      awsCourse.image ||
+      'https://via.placeholder.com/400x250',
     category: awsCourse.category_name || 'General',
     level: mapLevel(awsCourse.level),
     modules: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
@@ -266,6 +277,29 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
 
 // Helper function to convert enrollment data to Course format
 const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
+  // Use section counts if available (after backend redeploy), otherwise calculate from items
+  const totalSections = enrollment.total_sections || 0;
+  const completedSections = enrollment.completed_sections || 0;
+  
+  // Calculate from video/quiz data for accurate item-level tracking
+  const totalVideos = parseInt(enrollment.total_videos) || 0;
+  const completedVideos = parseInt(enrollment.completed_videos) || 0;
+  const totalQuizzes = parseInt(enrollment.total_quizzes) || 0;
+  const passedQuizzes = parseInt(enrollment.passed_quizzes) || 0;
+  
+  const totalItems = totalVideos + totalQuizzes;
+  const completedItems = completedVideos + passedQuizzes;
+  
+  // Calculate progress percentage from actual completion data
+  // Don't trust the API's progress_percentage as it may be stale
+  const calculatedPercentage = totalItems > 0 
+    ? Math.round((completedItems / totalItems) * 100) 
+    : 0;
+  
+  // For display counts, use section counts if available, otherwise use item counts
+  const progressTotal = totalSections > 0 ? totalSections : totalItems;
+  const progressCompleted = totalSections > 0 ? completedSections : completedItems;
+  
   // Generate avatar from instructor name
   const generateAvatar = (name: string): string => {
     if (!name) return 'https://via.placeholder.com/50x50';
@@ -282,10 +316,6 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     }
   };
 
-  // Calculate modules from duration
-  const totalModules = Math.floor(enrollment.duration_hours / 2) || 10;
-  const completedModules = Math.floor((totalModules * parseFloat(enrollment.progress_percentage)) / 100);
-
   return {
     id: enrollment.course_id,
     title: enrollment.title,
@@ -299,9 +329,9 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
       bio: `Expert ${enrollment.category_name} instructor`,
     },
     progress: {
-      completed: completedModules,
-      total: totalModules,
-      percentage: Math.round(parseFloat(enrollment.progress_percentage)),
+      completed: progressCompleted,
+      total: progressTotal,
+      percentage: calculatedPercentage,
       lastAccessed: enrollment.last_accessed,
     },
     duration: `${enrollment.duration_hours}h`,
@@ -309,7 +339,7 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     image: enrollment.thumbnail_url,
     category: enrollment.category_name,
     level: mapLevel(enrollment.level),
-    modules: totalModules,
+    modules: progressTotal,
     tags: enrollment.tags || [],
     prerequisites: [],
     outcomes: [],
@@ -350,15 +380,23 @@ class CourseService {
         throw new Error('No response received from API');
       }
 
-      // The response structure is: { courses: [...], pagination: {...}, filters: {...}, meta: {...} }
-      // Check if courses array exists directly on response (parsed by apiService from data)
+      // The API response structure is: { success: true, data: [...], pagination: {...} }
+      // Where data is the array of courses directly
       let coursesArray;
-      if (response.courses && Array.isArray(response.courses)) {
-        coursesArray = response.courses;
+      if (Array.isArray(response.data)) {
+        // Format: { success: true, data: [...] }
+        coursesArray = response.data;
       } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
+        // Nested format: { success: true, data: { courses: [...] } }
         coursesArray = response.data.courses;
+      } else if (response.courses && Array.isArray(response.courses)) {
+        // Direct format: { courses: [...] }
+        coursesArray = response.courses;
+      } else if (Array.isArray(response)) {
+        // Array format: [...]
+        coursesArray = response;
       } else {
-        console.error('Invalid API response structure:', response);
+        console.error('Invalid API response structure:', JSON.stringify(response).slice(0, 500));
         throw new Error('Invalid API response: courses array not found');
       }
 
@@ -380,8 +418,7 @@ class CourseService {
    */
   async getUserEnrollments(userId: string): Promise<Course[]> {
     try {
-      // REMOVE LATER - Temporary override for testing
-      userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
+      userId = userId || DEFAULT_USER_ID;
       
       // For testing, skip cache and always fetch fresh data
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`;
@@ -393,7 +430,6 @@ class CourseService {
         return cachedEnrollments;
       }
       
-      
       const response = await apiService.get<any>(ENDPOINTS.USER_ENROLLMENTS(userId));
       const payload = unwrap<EnrollmentResponse | { enrollments: EnrollmentCourse[] }>(response);
 
@@ -401,7 +437,7 @@ class CourseService {
       const enrollmentsData =
         (payload as EnrollmentResponse)?.data?.enrollments ??
         (payload as any)?.enrollments ??
-        [];
+        [];  
       
       if (!Array.isArray(enrollmentsData)) {
         console.error('getUserEnrollments - Invalid enrollment response structure:', response);
@@ -410,7 +446,6 @@ class CourseService {
 
       // Convert enrollment format to our app Course format
       const courses = enrollmentsData.map(convertEnrollmentToAppCourse);
-      console.log('getUserEnrollments - Course titles:', courses.map(c => c.title));
 
       // Cache the response
       await CacheManager.set(cacheKey, courses);
@@ -462,44 +497,80 @@ class CourseService {
   }
 
   /**
-   * Get suggested courses (remaining courses after enrolled ones)
+   * Get recommended courses (remaining courses after enrolled ones)
    */
-  async getSuggestedCourses(): Promise<Course[]> {
+  async getRecommendedCourses(userId?: string): Promise<Course[]> {
     try {
-      // Check cache first
-      const cachedCourses = await CacheManager.get<Course[]>(`${CACHE_CONFIG.COURSES_KEY}_suggested`);
-      if (cachedCourses) {
-        return cachedCourses;
-      }
+      const uid = userId || '550e8400-e29b-41d4-a716-446655440101';
+      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_recommended_${uid}`;
 
-      // Get all courses and return remaining as suggested
-      const allCourses = await this.getCourses();
-      if (!allCourses || allCourses.length === 0) {
-        return [];
-      }
+      const resp = await apiService.get<any>(ENDPOINTS.RECOMMENDATIONS, {
+        userId: uid,
+        limit: '8',
+      });
 
-      // For demo: return courses starting from index 2
-      const suggestedCourses = allCourses.slice(2);
+      const recs =
+        (Array.isArray(resp?.data) ? resp?.data : null) ??
+        resp?.data?.data?.recommendations ??
+        resp?.data?.recommendations ??
+        resp?.recommendations ??
+        [];
 
-      // Cache the filtered courses
-      await CacheManager.set(`${CACHE_CONFIG.COURSES_KEY}_suggested`, suggestedCourses);
+      const sorted = Array.isArray(recs)
+        ? [...recs].sort((a, b) => {
+            const sa = Number(a.score ?? a.recommendation_score ?? 0);
+            const sb = Number(b.score ?? b.recommendation_score ?? 0);
+            if (sb !== sa) return sb - sa;
+            const ra = Number(a.rank ?? a.recommendation_rank ?? Infinity);
+            const rb = Number(b.rank ?? b.recommendation_rank ?? Infinity);
+            return ra - rb;
+          })
+        : [];
 
-      return suggestedCourses;
+      const courses = sorted
+        .map((item: any, idx: number) => {
+          let coursePayload: any = item.course || item;
+          if (typeof coursePayload === 'string') {
+            try {
+              coursePayload = JSON.parse(coursePayload);
+            } catch {
+              coursePayload = null;
+            }
+          }
+          if (!coursePayload || typeof coursePayload !== 'object') {
+            return null;
+          }
+          try {
+            const course = convertAWSCourseToAppCourse(coursePayload);
+            return {
+              ...course,
+              recommendationReason: item.reason || coursePayload.recommendation_reason,
+              recommendationScore: item.score || coursePayload.recommendation_score,
+              recommendationRank: item.rank ?? item.recommendation_rank ?? idx + 1,
+            };
+          } catch (err) {
+            console.warn('Failed to map recommendation item', err);
+            return null;
+          }
+        })
+        .filter(Boolean) as Course[];
+
+      await CacheManager.set(cacheKey, courses);
+      return courses;
     } catch (error) {
-      console.error('Error fetching suggested courses:', error);
-      throw error;
+      console.warn('Error fetching recommended courses, falling back to empty list:', error);
+      return [];
     }
   }
 
 async getWishlist(userId: string): Promise<Course[]> {
-  if (!userId) throw new Error('Missing userId');
+  if (!userId) userId = DEFAULT_USER_ID;
   const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`;
   const cached = await CacheManager.get<Course[]>(cacheKey);
   if (cached) return cached;
   // remove later - temporary override for testing
-  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
 
-  const resp = await apiService.get<any>(WISHLIST.BASE(userId));
+  const resp = await apiService.get<any>(WISHLIST.BASE(userId), { userId });
   const array = resp?.courses ?? resp?.data?.courses ?? [];
   const courses = array.map(convertAWSCourseToAppCourse);
   await CacheManager.set(cacheKey, courses);
@@ -507,16 +578,15 @@ async getWishlist(userId: string): Promise<Course[]> {
 }
 
 async addToWishlist(userId: string, courseId: string): Promise<void> {
-  if (!userId || !courseId) throw new Error('Missing userId/courseId');
-    // remove later - temporary override for testing
-  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
-  await apiService.post(WISHLIST.ITEM(userId , courseId));
+  if (!userId) userId = DEFAULT_USER_ID;
+  if (!courseId) throw new Error('Missing courseId');
+  await apiService.post(WISHLIST.ITEM(userId , courseId), { userId, courseId });
   await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
 }
 
 async removeFromWishlist(userId: string, courseId: string): Promise<void> {
-  if (!userId || !courseId) throw new Error('Missing userId/courseId');
-  userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
+  if (!userId) userId = DEFAULT_USER_ID;
+  if (!courseId) throw new Error('Missing courseId');
   await apiService.delete(WISHLIST.ITEM(userId, courseId));
   await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
 }
@@ -573,14 +643,14 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
       await Promise.all([
         CacheManager.clear(CACHE_CONFIG.COURSES_KEY),
         CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
-        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_suggested`),
+        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_recommended`),
       ]);
       
       // Pre-load essential data
       await Promise.all([
         this.getCourses(),
         this.getMyCourses(),
-        this.getSuggestedCourses(),
+        this.getRecommendedCourses(),
       ]);
     } catch (error) {
       console.error('Error refreshing cache:', error);
@@ -593,18 +663,18 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
   async getCacheStatus(): Promise<{
     courses: boolean;
     myCourses: boolean;
-    suggestedCourses: boolean;
+    recommendedCourses: boolean;
   }> {
-    const [courses, myCourses, suggestedCourses] = await Promise.all([
+    const [courses, myCourses, recommendedCourses] = await Promise.all([
       CacheManager.get(CACHE_CONFIG.COURSES_KEY),
       CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_my`),
-      CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_suggested`),
+      CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_recommended`),
     ]);
 
     return {
       courses: courses !== null,
       myCourses: myCourses !== null,
-      suggestedCourses: suggestedCourses !== null,
+      recommendedCourses: recommendedCourses !== null,
     };
   }
 
@@ -615,32 +685,35 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    */
   async isUserEnrolledInCourse(userId: string, courseId: string): Promise<boolean> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
-    userId = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
 
     // Reuse the enrollments fetch (it already maps to Course[])
-    const enrolledCourses = await this.getUserEnrollments(userId);
+    const uid = userId || DEFAULT_USER_ID;
+    const enrolledCourses = await this.getUserEnrollments(uid);
     return enrolledCourses.some(c => String(c.id) === String(courseId));
   }
 
   /**
    * Enroll user in course (free courses).
-   * POST /courses/enrollment  with { userId, courseId }
+   * POST /postUserEnrollment with { userId, courseId }
+   * Maps to postUserEnrollment.mjs Lambda function
    * Expects idempotent server (409 if already enrolled).
    */
   async enrollInCourse(userId: string, courseId: string): Promise<{ firstModuleId?: string }> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
-    userId = '550e8400-e29b-41d4-a716-446655440102'; // Temporary override for testing
+    const uid = userId || DEFAULT_USER_ID;
 
-    const url = ENDPOINTS.USER_ENROLLMENTS(userId);
+    const url = ENDPOINTS.POST_ENROLLMENT(uid);
     const resp = await apiService.post<any>(url, {
+      userId: uid,
       courseId,
+      // optional fields supported by the edge function
       initialProgress: 0,
       isCompleted: false,
       totalWatchTimeMinutes: 0,
     });
 
     await Promise.all([
-      CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`),
+      CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_enrollments_${uid}`),
       CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
     ]);
 
@@ -718,6 +791,39 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
     });
     const data: any = (resp as any)?.data ?? (resp as any);
     return data?.data ?? data;
+  }
+
+  async recordRecommendationEvent(payload: {
+    userId?: string;
+    courseId?: string;
+    eventType: 'impression' | 'view' | 'click' | 'start' | 'complete' | 'dismiss' | 'save';
+    context?: Record<string, any>;
+    requestId?: string;
+  }): Promise<void> {
+    const body = {
+      userId: payload.userId || '550e8400-e29b-41d4-a716-446655440101',
+      courseId: payload.courseId ?? null,
+      eventType: payload.eventType,
+      context: payload.context || {},
+      requestId: payload.requestId,
+    };
+
+    try {
+      await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
+      console.info('rec_event_ok', {
+        eventType: body.eventType,
+        courseId: body.courseId,
+        placement: body.context?.placement,
+      });
+    } catch (err) {
+      console.warn('rec_event_fail', {
+        eventType: body.eventType,
+        courseId: body.courseId,
+        placement: body.context?.placement,
+        error: (err as any)?.message || err,
+      });
+      throw err;
+    }
   }
 
 }

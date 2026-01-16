@@ -6,12 +6,12 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: Colors.primary 
   },
-  scrollContent: { 
-    flexGrow: 1, 
-    justifyContent: "center", 
-    padding: Spacing.lg 
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
   },
-  slimScrollContent: { 
+  fullScrollContent: { 
     flexGrow: 1, 
     justifyContent: "flex-start", 
     padding: 0 
@@ -21,8 +21,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
-    minHeight: 40,
+    marginVertical: Spacing.sm,
+    minHeight: 50,
     backgroundColor: Colors.primary,
   },
   header: { 
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   eyeIcon: { 
-    padding: Spacing.base 
+    padding: Spacing.md 
   },
   inputContainer: {
     flexDirection: "row",
@@ -67,7 +67,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.textInputBg,
   },
   inputIcon: { 
-    marginLeft: Spacing.base 
+    marginLeft: Spacing.md,
+    marginRight: Spacing.sm
   },
   input: {
     flex: 1,
@@ -102,10 +103,22 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "center",
   },
-  headerTitle: { 
-    ...TextStyles.h4,
+  headerTitle: {
+    ...TextStyles.h5,
     fontFamily: Typography.fontFamily.semiBold,
     marginBottom: 0,
+    color: Colors.textPrimary,
+  },
+  headerSubtitle: {
+    ...TextStyles.bodySmall,
+    color: Colors.textSecondary,
+  },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: '#E5E7EB',
   },
 });
 

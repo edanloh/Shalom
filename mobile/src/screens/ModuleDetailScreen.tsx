@@ -1,8 +1,13 @@
+// UPDATED: ModuleDetailScreen with proper refresh on return
+// Key changes:
+// 1. Use useFocusEffect to reload data when screen comes into focus
+// 2. Check route params for completion indicators
+// 3. Force refresh when items are completed
+
 import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
@@ -11,7 +16,11 @@ import {
 import { Alert } from "react-native";
 import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRoute, useNavigation } from "@react-navigation/native";
+import {
+  useRoute,
+  useNavigation,
+  useFocusEffect,
+} from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import type { StackNavigationProp } from "@react-navigation/stack";
@@ -22,6 +31,7 @@ import type {
   CourseSection,
   ModuleDetailResponse,
 } from "@/services";
+import Screen from "@/components/common/Screen";
 
 const { width } = Dimensions.get("window");
 
@@ -37,6 +47,9 @@ const ModuleDetailScreen = () => {
   const { courseId, sectionId, userId } = route.params as any;
   const [isEnrolled, setIsEnrolled] = useState(false);
 
+  const [moduleDetail, setModuleDetail] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [courseContent, setCourseContent] = useState<CourseContent | null>(
     null
@@ -48,35 +61,110 @@ const ModuleDetailScreen = () => {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      if (!userId) { 
+      if (!userId) {
         if (mounted) setIsEnrolled(false);
-        return; 
+        return;
       }
       try {
-        const enrolled = await courseService.isUserEnrolledInCourse(userId, courseId);
+        const enrolled = await courseService.isUserEnrolledInCourse(
+          userId,
+          courseId
+        );
         if (mounted) setIsEnrolled(enrolled);
       } catch {
         if (mounted) setIsEnrolled(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [courseId, userId]);
 
-  useEffect(() => {
-    fetchCourseContent();
-  }, [courseId]);
+  // Reload when screen comes into focus AND when items are completed
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!userId) return;
+
+      const handleFocus = async () => {
+        // Check if we're returning from a completed item
+        const params = route.params as any;
+        const hasCompletion =
+          params?.videoCompleted ||
+          params?.quizCompleted ||
+          params?.pdfCompleted ||
+          params?.timestamp;
+
+        if (hasCompletion) {
+          console.log("✅ Item completed detected, forcing refresh...", {
+            videoCompleted: params?.videoCompleted,
+            quizCompleted: params?.quizCompleted,
+            pdfCompleted: params?.pdfCompleted,
+            completedItemId:
+              params?.completedVideoId ||
+              params?.completedQuizId ||
+              params?.completedPdfId,
+            timestamp: params?.timestamp,
+          });
+
+          // Force reload to get updated completion status
+          await fetchCourseContent();
+
+          // Clear the completion flags after refresh completes
+          navigation.setParams({
+            videoCompleted: undefined,
+            quizCompleted: undefined,
+            pdfCompleted: undefined,
+            completedVideoId: undefined,
+            completedQuizId: undefined,
+            completedPdfId: undefined,
+            timestamp: undefined,
+          });
+        } else {
+          // Normal focus refresh
+          await fetchCourseContent();
+        }
+      };
+
+      handleFocus();
+    }, [courseId, userId, route.params])
+  );
 
   const fetchCourseContent = async () => {
     try {
       setLoading(true);
+      console.log("📊 Fetching course content...", {
+        courseId,
+        userId,
+        sectionId,
+      });
+
       const data = await moduleService.getModuleDetail(courseId, userId);
       setCourseContent(data);
 
-      const section = sectionId
+      // If we have a current section, try to maintain it, otherwise use sectionId or first section
+      const section = currentSection
+        ? moduleService.getSectionById(data.sections, currentSection.id) ||
+          (sectionId
+            ? moduleService.getSectionById(data.sections, sectionId)
+            : data.sections[0])
+        : sectionId
         ? moduleService.getSectionById(data.sections, sectionId)
         : data.sections[0];
 
       setCurrentSection(section);
+
+      if (section) {
+        const completedItems =
+          section.items?.filter((i: ModuleItem) => i.is_completed).length || 0;
+        const totalItems = section.items?.length || 0;
+        console.log("📊 Section loaded:", {
+          sectionId: section.id,
+          title: section.title,
+          totalItems,
+          completedItems,
+          moduleCompleted: (section as any).module_is_completed,
+        });
+      }
     } catch (error) {
       console.error("Error fetching course content:", error);
     } finally {
@@ -88,7 +176,7 @@ const ModuleDetailScreen = () => {
     return moduleService.formatDuration(seconds);
   };
 
-  const getItemProgress = (itemId: string, itemType: "video" | "quiz") => {
+  const getItemProgress = (itemId: string, itemType: ModuleItem["type"]) => {
     if (!courseContent) return null;
     return moduleService.getItemProgress(
       itemId,
@@ -106,7 +194,10 @@ const ModuleDetailScreen = () => {
       "Please enroll to access lessons and quizzes.",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Go to course", onPress: () => navigation.navigate("CourseDetail", { courseId }) },
+        {
+          text: "Go to course",
+          onPress: () => navigation.navigate("CourseDetail", { courseId }),
+        },
       ]
     );
     return false;
@@ -114,6 +205,13 @@ const ModuleDetailScreen = () => {
 
   const handleItemPress = async (item: ModuleItem) => {
     if (!(await requireEnrollment())) return;
+
+    console.log("📍 Navigating to item:", {
+      type: item.type,
+      id: item.id,
+      title: item.title,
+      isCompleted: item.is_completed,
+    });
 
     if (item.type === "video") {
       navigation.navigate("LessonPlayer", {
@@ -129,6 +227,13 @@ const ModuleDetailScreen = () => {
         sectionId: currentSection?.id,
         userId,
       });
+    } else if (item.type === "pdf") {
+      navigation.navigate("PDFView", {
+        pdfId: item.id,
+        courseId,
+        sectionId: currentSection?.id,
+        userId,
+      });
     }
   };
 
@@ -137,7 +242,10 @@ const ModuleDetailScreen = () => {
     const currentIndex = courseContent.sections.findIndex(
       (s) => s.id === currentSection.id
     );
-    if (currentIndex === -1 || currentIndex === courseContent.sections.length - 1) {
+    if (
+      currentIndex === -1 ||
+      currentIndex === courseContent.sections.length - 1
+    ) {
       return null;
     }
     return courseContent.sections[currentIndex + 1];
@@ -168,10 +276,7 @@ const ModuleDetailScreen = () => {
 
   const renderItem = (item: ModuleItem, index: number) => {
     const progress = getItemProgress(item.id, item.type);
-    const isCompleted =
-      item.type === "video"
-        ? (progress as any)?.is_completed
-        : (progress as any)?.is_passed;
+    const isCompleted = item.is_completed;
 
     return (
       <TouchableOpacity
@@ -183,14 +288,15 @@ const ModuleDetailScreen = () => {
         <View style={styles.itemIconContainer}>
           {item.type === "video" ? (
             <Ionicons name="play-circle" size={24} color={Colors.purple400} />
+          ) : item.type === "pdf" ? (
+            <Ionicons name="document-text" size={24} color={Colors.purple400} />
           ) : (
-            <Ionicons name="document-text" size={24} color={Colors.yellow} />
+            <Ionicons name="help-circle" size={24} color={Colors.yellow} />
           )}
         </View>
 
         <View style={styles.itemContent}>
           <View style={styles.itemHeader}>
-            {/* <Text style={styles.itemIndex}></Text> */}
             <Text style={styles.itemTitle} numberOfLines={2}>
               {index + 1}. {item.title}
             </Text>
@@ -224,6 +330,16 @@ const ModuleDetailScreen = () => {
                     color={Colors.textSecondary}
                   />
                   <Text style={styles.itemMetaText}>Quiz</Text>
+                </View>
+              )}
+              {item.type === "pdf" && (
+                <View style={styles.itemMeta}>
+                  <Ionicons
+                    name="newspaper-outline"
+                    size={14}
+                    color={Colors.textSecondary}
+                  />
+                  <Text style={styles.itemMetaText}>PDF Document</Text>
                 </View>
               )}
             </View>
@@ -298,238 +414,240 @@ const ModuleDetailScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {courseContent.course.title}
+    <Screen
+      title={courseContent.course.title}
+      subtitle={currentSection.title}
+      navigation={navigation}
+      headerLeftIcon="chevron-back"
+      customEdges={["top", "bottom"]}
+      onHeaderLeftPress={() => navigation.goBack()}
+    >
+      {/* Section Info */}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionIconContainer}>
+            <Ionicons name="book-outline" size={24} color={Colors.purple400} />
+          </View>
+          <Text style={styles.sectionTitle}>{currentSection.title}</Text>
+        </View>
+
+        {currentSection.description && (
+          <Text style={styles.sectionDescription}>
+            {currentSection.description}
           </Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {currentSection.title}
-          </Text>
+        )}
+
+        <View style={styles.sectionStats}>
+          <View style={styles.statItem}>
+            <Ionicons
+              name="videocam-outline"
+              size={18}
+              color={Colors.purple400}
+            />
+            <Text style={styles.statText}>
+              {
+                currentSection.items.filter(
+                  (i: ModuleItem) => i.type === "video"
+                ).length
+              }{" "}
+              videos
+            </Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Ionicons
+              name="newspaper-outline"
+              size={18}
+              color={Colors.purple400}
+            />
+            <Text style={styles.statText}>
+              {
+                currentSection.items.filter((i: ModuleItem) => i.type === "pdf")
+                  .length
+              }{" "}
+              PDFs
+            </Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Ionicons
+              name="document-text-outline"
+              size={18}
+              color={Colors.purple400}
+            />
+            <Text style={styles.statText}>
+              {
+                currentSection.items.filter(
+                  (i: ModuleItem) => i.type === "quiz"
+                ).length
+              }{" "}
+              quizzes
+            </Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Ionicons name="time-outline" size={18} color={Colors.purple400} />
+            <Text style={styles.statText}>
+              {currentSection.duration_minutes || 0} min
+            </Text>
+          </View>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Section Info */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionIconContainer}>
-              <Ionicons
-                name="book-outline"
-                size={24}
-                color={Colors.purple400}
-              />
-            </View>
-            <Text style={styles.sectionTitle}>{currentSection.title}</Text>
-          </View>
-
-          {currentSection.description && (
-            <Text style={styles.sectionDescription}>
-              {currentSection.description}
+      {/* Progress Section - Module Progress */}
+      {courseContent.userProgress && currentSection && (
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>Module Progress</Text>
+            <Text style={styles.progressPercentage}>
+              {moduleService.getSectionCompletionPercentage(
+                currentSection,
+                courseContent.userProgress
+              )}
+              %
             </Text>
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${moduleService.getSectionCompletionPercentage(
+                    currentSection,
+                    courseContent.userProgress
+                  )}%`,
+                },
+              ]}
+            />
+          </View>
+          {(currentSection as any).module_is_completed && (
+            <View style={styles.moduleCompletedBadge}>
+              <Ionicons
+                name="checkmark-circle"
+                size={16}
+                color={Colors.green}
+              />
+              <Text style={styles.moduleCompletedText}>
+                Module Completed on{" "}
+                {new Date(
+                  (currentSection as any).module_completed_at
+                ).toLocaleDateString()}
+              </Text>
+            </View>
           )}
-
-          <View style={styles.sectionStats}>
-            <View style={styles.statItem}>
-              <Ionicons
-                name="videocam-outline"
-                size={18}
-                color={Colors.purple400}
-              />
-              <Text style={styles.statText}>
-                {
-                  currentSection.items.filter(
-                    (i: ModuleItem) => i.type === "video"
-                  ).length
-                }{" "}
-                videos
-              </Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons
-                name="document-text-outline"
-                size={18}
-                color={Colors.purple400}
-              />
-              <Text style={styles.statText}>
-                {
-                  currentSection.items.filter(
-                    (i: ModuleItem) => i.type === "quiz"
-                  ).length
-                }{" "}
-                quizzes
-              </Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons
-                name="time-outline"
-                size={18}
-                color={Colors.purple400}
-              />
-              <Text style={styles.statText}>
-                {currentSection.duration_minutes} min
-              </Text>
-            </View>
-          </View>
         </View>
+      )}
 
-        {/* Progress Section - Module Progress */}
-        {courseContent.userProgress && currentSection && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Module Progress</Text>
-              <Text style={styles.progressPercentage}>
-                {moduleService.getSectionCompletionPercentage(
-                  currentSection,
-                  courseContent.userProgress
-                )}%
-              </Text>
-            </View>
-            <View style={styles.progressBarContainer}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${moduleService.getSectionCompletionPercentage(
-                      currentSection,
-                      courseContent.userProgress
-                    )}%`,
-                  },
-                ]}
-              />
-            </View>
-            {(currentSection as any).module_is_completed && (
-              <View style={styles.moduleCompletedBadge}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={Colors.green}
-                />
-                <Text style={styles.moduleCompletedText}>
-                  Module Completed on{" "}
-                  {new Date((currentSection as any).module_completed_at).toLocaleDateString()}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Content Items */}
-        <View style={styles.contentSection}>
-          <Text style={styles.contentTitle}>Lessons</Text>
-          {currentSection.items.map((item: ModuleItem, index: number) =>
+      {/* Content Items */}
+      <View style={styles.contentSection}>
+        <Text style={styles.contentTitle}>Lessons</Text>
+        {currentSection.items && currentSection.items.length > 0 ? (
+          currentSection.items.map((item: ModuleItem, index: number) =>
             renderItem(item, index)
-          )}
-        </View>
-
-        {/* Module Navigation */}
-        {courseContent.sections.length > 1 && (
-          <View style={styles.navigationContainer}>
-            <TouchableOpacity
-              style={[
-                styles.navButton,
-                !getPreviousSection() && styles.navButtonDisabled,
-              ]}
-              onPress={handlePreviousSection}
-              disabled={!getPreviousSection()}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="chevron-back"
-                size={20}
-                color={getPreviousSection() ? Colors.purple400 : Colors.textSecondary}
-              />
-              <View style={styles.navButtonContent}>
-                <Text
-                  style={[
-                    styles.navLabel,
-                    !getPreviousSection() && styles.navLabelDisabled,
-                  ]}
-                >
-                  PREVIOUS MODULE
-                </Text>
-                {getPreviousSection() ? (
-                  <Text style={styles.navButtonText} numberOfLines={2}>
-                    {getPreviousSection()?.title}
-                  </Text>
-                ) : (
-                  <Text style={styles.navButtonTextDisabled}>
-                    No previous module
-                  </Text>
-                )}
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.navButton,
-                !getNextSection() && styles.navButtonDisabled,
-              ]}
-              onPress={handleNextSection}
-              disabled={!getNextSection()}
-              activeOpacity={0.7}
-            >
-              <View style={styles.navButtonContent}>
-                <Text
-                  style={[
-                    styles.navLabel,
-                    styles.navLabelRight,
-                    !getNextSection() && styles.navLabelDisabled,
-                  ]}
-                >
-                  NEXT MODULE
-                </Text>
-                {getNextSection() ? (
-                  <Text
-                    style={[styles.navButtonText, styles.navButtonTextRight]}
-                    numberOfLines={2}
-                  >
-                    {getNextSection()?.title}
-                  </Text>
-                ) : (
-                  <Text
-                    style={[
-                      styles.navButtonTextDisabled,
-                      styles.navButtonTextRight,
-                    ]}
-                  >
-                    No next module
-                  </Text>
-                )}
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={getNextSection() ? Colors.purple400 : Colors.textSecondary}
-              />
-            </TouchableOpacity>
+          )
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons
+              name="folder-open-outline"
+              size={48}
+              color={Colors.textSecondary}
+            />
+            <Text style={styles.emptyStateText}>
+              No lessons available in this module yet
+            </Text>
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+
+      {/* Module Navigation */}
+      {courseContent.sections.length > 1 && (
+        <View style={styles.navigationContainer}>
+          <TouchableOpacity
+            style={[
+              styles.navButton,
+              !getPreviousSection() && styles.navButtonDisabled,
+            ]}
+            onPress={handlePreviousSection}
+            disabled={!getPreviousSection()}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={
+                getPreviousSection() ? Colors.purple400 : Colors.textSecondary
+              }
+            />
+            <View style={styles.navButtonContent}>
+              <Text
+                style={[
+                  styles.navLabel,
+                  !getPreviousSection() && styles.navLabelDisabled,
+                ]}
+              >
+                PREVIOUS MODULE
+              </Text>
+              {getPreviousSection() ? (
+                <Text style={styles.navButtonText} numberOfLines={2}>
+                  {getPreviousSection()?.title}
+                </Text>
+              ) : (
+                <Text style={styles.navButtonTextDisabled}>
+                  No previous module
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.navButton,
+              !getNextSection() && styles.navButtonDisabled,
+            ]}
+            onPress={handleNextSection}
+            disabled={!getNextSection()}
+            activeOpacity={0.7}
+          >
+            <View style={styles.navButtonContent}>
+              <Text
+                style={[
+                  styles.navLabel,
+                  styles.navLabelRight,
+                  !getNextSection() && styles.navLabelDisabled,
+                ]}
+              >
+                NEXT MODULE
+              </Text>
+              {getNextSection() ? (
+                <Text
+                  style={[styles.navButtonText, styles.navButtonTextRight]}
+                  numberOfLines={2}
+                >
+                  {getNextSection()?.title}
+                </Text>
+              ) : (
+                <Text
+                  style={[
+                    styles.navButtonTextDisabled,
+                    styles.navButtonTextRight,
+                  ]}
+                >
+                  No next module
+                </Text>
+              )}
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={getNextSection() ? Colors.purple400 : Colors.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
+      )}
+    </Screen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -566,48 +684,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.white,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray600,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.gray600,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: Spacing.md,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: Spacing.xl * 2,
-  },
   progressSection: {
-    backgroundColor: Colors.gray600,
-    marginHorizontal: Spacing.lg,
+    backgroundColor: Colors.textInputBg,
     marginTop: Spacing.lg,
     padding: Spacing.lg,
+    paddingTop: Spacing.md,
     borderRadius: 12,
   },
   progressHeader: {
@@ -651,8 +732,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   sectionCard: {
-    backgroundColor: Colors.gray600,
-    marginHorizontal: Spacing.lg,
+    backgroundColor: Colors.textInputBg,
     marginTop: Spacing.lg,
     padding: Spacing.lg,
     borderRadius: 12,
@@ -708,7 +788,6 @@ const styles = StyleSheet.create({
   },
   contentSection: {
     marginTop: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
   },
   contentTitle: {
     fontSize: 18,
@@ -716,9 +795,22 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.md,
   },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.xl * 2,
+    backgroundColor: Colors.textInputBg,
+    borderRadius: 12,
+  },
+  emptyStateText: {
+    fontSize: TextStyles.body.fontSize,
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
+    textAlign: "center",
+  },
   itemCard: {
     flexDirection: "row",
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     borderRadius: 12,
     padding: Spacing.md,
     marginBottom: Spacing.md,
@@ -800,7 +892,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   navigationContainer: {
-    marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
     gap: Spacing.sm,
   },
@@ -809,7 +900,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.gray600,
+    backgroundColor: Colors.textInputBg,
     borderRadius: 10,
   },
   navButtonDisabled: {

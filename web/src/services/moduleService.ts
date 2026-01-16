@@ -51,8 +51,8 @@ class ModuleService {
     try {
       // Use instructor endpoint to get full details including quiz questions
       const instructorId = adminId || '550e8400-e29b-41d4-a716-446655440201';
-      const response = await apiService.get<any>(`/admin/${instructorId}/${courseId}`);
-      
+      // const response = await apiService.get<any>(`/admin/${instructorId}/${courseId}`);
+      const response = await apiService.get<any>(`/getModuleDetailInstructor/${instructorId}/${courseId}`);
       if (!response || !response.data || !response.data.sections) {
         console.warn('No sections found in response:', response);
         return [];
@@ -161,8 +161,12 @@ class ModuleService {
     moduleData: Partial<ModuleDetail>
   ): Promise<ModuleDetail> {
     try {
+      // const response = await apiService.put<any>(
+      //   `/courses/${courseId}/modules/${moduleId}`,
+      //   moduleData
+      // );
       const response = await apiService.put<any>(
-        `/courses/${courseId}/modules/${moduleId}`,
+        `/updateCourse/${courseId}`,
         moduleData
       );
 
@@ -185,6 +189,47 @@ class ModuleService {
       await apiService.delete(`/courses/${courseId}/modules/${moduleId}`);
     } catch (error) {
       console.error(`Error deleting module ${moduleId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update a course with its modules, lessons, and quizzes
+   * @param courseId - The course ID to update
+   * @param courseData - Complete course data including modules
+   */
+  async updateCourse(courseId: string, courseData: any): Promise<any> {
+    try {
+      const response = await apiService.post(`/updateCourse/${courseId}`, courseData);
+      return response;
+    } catch (error) {
+      console.error(`Error updating course ${courseId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Submit quiz answers for grading
+   * @param quizId - The quiz ID
+   * @param userId - The user ID submitting the quiz
+   * @param answers - Array of answers: [{ questionId: string, answer: string }]
+   * @param timeTakenMinutes - Optional time taken to complete the quiz
+   */
+  async submitQuiz(
+    quizId: string,
+    userId: string,
+    answers: Array<{ questionId: string; answer: string }>,
+    timeTakenMinutes?: number
+  ): Promise<any> {
+    try {
+      const response = await apiService.post(`/submitQuiz/${quizId}`, {
+        userId,
+        answers,
+        timeTakenMinutes
+      });
+      return response;
+    } catch (error) {
+      console.error(`Error submitting quiz ${quizId}:`, error);
       throw error;
     }
   }

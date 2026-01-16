@@ -1,5 +1,11 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ImageWithFallback } from "../common"; // adjust path if needed
 import { Colors, Spacing, Typography } from "../../constants";
@@ -26,19 +32,26 @@ const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
   </View>
 );
 
-const CourseCard: React.FC<Props> = ({
+export default function CourseCard({ 
   course,
   onPress,
   variant = "compact",
   showInstructor = false,
-}) => {
+}: Props) {
   const { wishlist = [], toggleWishlist } = useCourses();
   const isWishlisted = !!wishlist?.some((c) => c.id === course.id);
+  const rankLabel =
+    course.recommendationRank || course.recommendationScore
+      ? `#${course.recommendationRank ?? "?"} • ${Number(course.recommendationScore ?? 0).toFixed(1)}`
+      : null;
 
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      style={[styles.card, variant === "compact" ? styles.cardCompact : styles.cardProgress]}
+      style={[
+        styles.card,
+        variant === "compact" ? styles.cardCompact : styles.cardProgress,
+      ]}
       onPress={() => onPress?.(course)}
     >
       {/* Image block with overlay */}
@@ -46,7 +59,9 @@ const CourseCard: React.FC<Props> = ({
         <ImageWithFallback
           source={{ uri: course?.image }}
           fallback={Images.coursePlaceholder ?? Images.placeholder}
-          style={variant === "compact" ? styles.imageCompact : styles.imageProgress}
+          style={
+            variant === "compact" ? styles.imageCompact : styles.imageProgress
+          }
         />
 
         <View style={styles.badgeRow}>
@@ -60,20 +75,38 @@ const CourseCard: React.FC<Props> = ({
               toggleWishlist(course);
             }}
             accessibilityRole="button"
-            accessibilityLabel={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+            accessibilityLabel={
+              isWishlisted ? "Remove from wishlist" : "Add to wishlist"
+            }
             hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
             style={styles.heartBtn}
             activeOpacity={0.7}
           >
-            <Ionicons name={isWishlisted ? "heart" : "heart-outline"} size={18} color="#fff" />
+            <Ionicons
+              name={isWishlisted ? "heart" : "heart-outline"}
+              size={18}
+              color="#fff"
+            />
           </TouchableOpacity>
         </View>
+        {rankLabel ? (
+          <View style={styles.rankBadge}>
+            <Text style={styles.rankText}>{rankLabel}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Text/content */}
       <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={2}>{course.title}</Text>
+        <Text style={styles.title} numberOfLines={2}>
+          {course.title}
+        </Text>
         <MetaRow rating={course.rating} modules={course.modules} />
+        {course.recommendationReason ? (
+          <Text style={styles.reason} numberOfLines={1}>
+            {course.recommendationReason}
+          </Text>
+        ) : null}
 
         {showInstructor && course.instructor?.name ? (
           <Text style={styles.instructor} numberOfLines={1}>
@@ -87,7 +120,12 @@ const CourseCard: React.FC<Props> = ({
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${Math.max(0, Math.min(100, course.progress?.percentage ?? 0))}%` },
+                  {
+                    width: `${Math.max(
+                      0,
+                      Math.min(100, course.progress?.percentage ?? 0)
+                    )}%`,
+                  },
                 ]}
               />
             </View>
@@ -138,14 +176,14 @@ const styles = StyleSheet.create({
     top: Spacing.sm,
     right: Spacing.sm,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
+    gap: 8,
   },
   levelBadge: {
     backgroundColor: Colors.purple400,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: 8,
-    marginRight: 8,
   },
   levelText: {
     fontFamily: Typography.fontFamily.medium,
@@ -156,6 +194,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 14,
     padding: 6,
+  },
+  rankBadge: {
+    position: "absolute",
+    left: Spacing.sm,
+    top: Spacing.sm,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  rankText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: Typography.fontFamily.medium,
   },
 
   content: {
@@ -175,6 +227,13 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 2,
     paddingTop: 6,
+  },
+  reason: {
+    color: Colors.purple200,
+    fontSize: 12,
+    paddingHorizontal: 2,
+    paddingTop: 4,
+    fontFamily: Typography.fontFamily.medium,
   },
   metaText: {
     color: Colors.textSecondary,
@@ -210,5 +269,3 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.regular,
   },
 });
-
-export default CourseCard;

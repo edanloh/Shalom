@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const defaultUserId = user?.id || '550e8400-e29b-41d4-a716-446655440201';
 
   // State for API data
   const [courses, setCourses] = useState<any[]>([]);
@@ -40,12 +41,12 @@ const Index = () => {
       setError(null);
 
       // Get admin ID from user (fallback to mock for now)
-      const adminId = user?.id || '550e8400-e29b-41d4-a716-446655440201';
+      const adminId = defaultUserId;
 
       // Fetch courses and admin stats in parallel using courseService
       const [coursesData, statsData] = await Promise.all([
         courseService.getCourses({ sortBy: 'updated_at', sortOrder: 'desc' }),
-        courseService.getInstructorStats(adminId)
+        courseService.getInstructorStats(adminId),
       ]);
 
       setCourses(coursesData);
@@ -163,7 +164,7 @@ const Index = () => {
                 <h3 className="text-lg font-semibold mb-4 text-foreground">
                   Recent Activity
                 </h3>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[450px] overflow-y-auto pr-2">
                   {stats.recent_activity.slice(0, 8).map((activity: any, index: number) => (
                     <div key={index} className="flex items-center gap-4 p-3 rounded-lg bg-background/50">
                       <div className="flex-1">

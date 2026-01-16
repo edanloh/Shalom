@@ -13,13 +13,13 @@ interface CourseImageProps extends Omit<ImageProps, 'source'> {
  * CourseImage - A component that displays course images with fallback to placeholder
  * Automatically shows placeholder when image fails to load
  */
-const CourseImage: React.FC<CourseImageProps> = ({
+export default function CourseImage({ 
   uri,
   style,
   placeholder = 'coursePlaceholder',
   showPlaceholderOnError = true,
   ...imageProps
-}) => {
+}: CourseImageProps) {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -88,5 +88,3 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
 });
-
-export default CourseImage;

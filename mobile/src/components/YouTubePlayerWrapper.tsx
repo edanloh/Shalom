@@ -16,11 +16,13 @@ interface YouTubePlayerWrapperProps {
   };
   onChangeState?: (state: string) => void;
   onProgress?: (data: { currentTime: number; duration: number }) => void;
+  onError?: (error: any) => void;
 }
 
 export const YouTubePlayerWrapper = React.forwardRef<any, YouTubePlayerWrapperProps>(
   (props, ref) => {
-    const { videoId, height, play, initialPlayerParams, onChangeState, onProgress } = props;
+    const { videoId, height, play, initialPlayerParams, onChangeState, onProgress, onError } =
+      props;
 
     const handleProgress = (data: any) => {
       console.log('🎬 YouTube iframe progress event:', data);
@@ -40,6 +42,7 @@ export const YouTubePlayerWrapper = React.forwardRef<any, YouTubePlayerWrapperPr
         play={play}
         onChangeState={onChangeState}
         onProgress={handleProgress}
+        onError={onError}
         initialPlayerParams={initialPlayerParams}
       />
     );

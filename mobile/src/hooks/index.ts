@@ -13,7 +13,12 @@ export {
   // Legacy exports (deprecated - use CourseContext instead)
   useCourses,
   useMyCourses,
-  useSuggestedCourses,
+  useRecommendedCourses,
   type UseCoursesReturn,
   type UseMyCOursesReturn,
 } from './useCourses';
+
+export {
+  useCourseNavigation,
+  type NavigationItem,
+} from './useCourseNavigation';

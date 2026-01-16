@@ -44,7 +44,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    borderRadius: 8,
   },
   webFallbackTitle: {
     fontSize: 18,

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Save,
   BarChart3,
@@ -8,9 +8,13 @@ import {
   Eye,
   Globe,
   Archive,
+  X,
 } from "lucide-react";
 import { useCourseBuilder } from "./CourseBuilderContext";
 import { Colors } from "../../constants/Colors";
+
+// Module-level cache for course thumbnail file
+const courseThumbnailFileCache: { file: File | null } = { file: null };
 
 export const RightSidebar = () => {
   const {
@@ -23,10 +27,49 @@ export const RightSidebar = () => {
     setCourseName,
     courseDescription,
     setCourseDescription,
+    courseThumbnailUrl,
+    setCourseThumbnailUrl,
     courseStatus,
     setCourseStatus,
     setHasUnsavedChanges,
   } = useCourseBuilder();
+
+  const [thumbnailInputType, setThumbnailInputType] = useState<'url' | 'upload'>('url');
+  const [selectedThumbnailFile, setSelectedThumbnailFile] = useState<File | null>(null);
+
+  // Restore state from cache on mount
+  React.useEffect(() => {
+    if (courseThumbnailUrl?.startsWith('[LOCAL_FILE:')) {
+      // Restore from cache
+      const cachedFile = courseThumbnailFileCache.file || (window as any).__courseThumbnailFile;
+      if (cachedFile) {
+        setSelectedThumbnailFile(cachedFile);
+        setThumbnailInputType('upload');
+      }
+    } else if (courseThumbnailUrl && courseThumbnailUrl.trim() !== '') {
+      // It's a URL
+      setThumbnailInputType('url');
+    }
+  }, [courseThumbnailUrl]);
+
+  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedThumbnailFile(file);
+      courseThumbnailFileCache.file = file;
+      (window as any).__courseThumbnailFile = file;
+      setCourseThumbnailUrl(`[LOCAL_FILE: ${file.name}]`);
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const clearThumbnail = () => {
+    setSelectedThumbnailFile(null);
+    courseThumbnailFileCache.file = null;
+    (window as any).__courseThumbnailFile = null;
+    setCourseThumbnailUrl('');
+    setHasUnsavedChanges(true);
+  };
 
   const handleMouseDown = () => {
     setIsResizing("right");
@@ -112,8 +155,8 @@ export const RightSidebar = () => {
           >
             Course Title
           </label>
-          <input
-            type="text"
+          <textarea
+            rows={2}
             value={courseName}
             onChange={(e) => {
               setCourseName(e.target.value);
@@ -122,9 +165,11 @@ export const RightSidebar = () => {
             style={{ 
               backgroundColor: Colors.textInputBg,
               borderColor: Colors.gray600,
-              color: Colors.textPrimary
+              color: Colors.textPrimary,
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word'
             }}
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-y"
             placeholder="Enter course title"
           />
         </div>
@@ -147,11 +192,179 @@ export const RightSidebar = () => {
             style={{ 
               backgroundColor: Colors.textInputBg,
               borderColor: Colors.gray600,
-              color: Colors.textPrimary
+              color: Colors.textPrimary,
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word'
             }}
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-none"
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-y"
             placeholder="Enter course description..."
           />
+        </div>
+
+        {/* Course Thumbnail */}
+        <div>
+          <label
+            style={{ color: Colors.textSecondary }}
+            className="block text-sm font-medium mb-2"
+          >
+            Course Thumbnail (optional)
+          </label>
+          <div className="flex gap-2 mb-2">
+            <button
+              onClick={() => {
+                setThumbnailInputType('url');
+              }}
+              disabled={thumbnailInputType === 'upload' && (!!selectedThumbnailFile || !!courseThumbnailUrl?.startsWith('[LOCAL_FILE:'))}
+              style={{
+                backgroundColor: thumbnailInputType === 'url' ? Colors.accent : Colors.gray800,
+                color: Colors.textPrimary,
+                opacity: (thumbnailInputType === 'upload' && (!!selectedThumbnailFile || !!courseThumbnailUrl?.startsWith('[LOCAL_FILE:'))) ? 0.5 : 1,
+                cursor: (thumbnailInputType === 'upload' && (!!selectedThumbnailFile || !!courseThumbnailUrl?.startsWith('[LOCAL_FILE:'))) ? 'not-allowed' : 'pointer',
+              }}
+              className="px-3 py-1 rounded text-sm"
+            >
+              URL
+            </button>
+            <button
+              onClick={() => {
+                setThumbnailInputType('upload');
+              }}
+              disabled={thumbnailInputType === 'url' && !!courseThumbnailUrl && !courseThumbnailUrl.startsWith('[LOCAL_FILE:')}
+              style={{
+                backgroundColor: thumbnailInputType === 'upload' ? Colors.accent : Colors.gray800,
+                color: Colors.textPrimary,
+                opacity: (thumbnailInputType === 'url' && !!courseThumbnailUrl && !courseThumbnailUrl.startsWith('[LOCAL_FILE:')) ? 0.5 : 1,
+                cursor: (thumbnailInputType === 'url' && !!courseThumbnailUrl && !courseThumbnailUrl.startsWith('[LOCAL_FILE:')) ? 'not-allowed' : 'pointer',
+              }}
+              className="px-3 py-1 rounded text-sm"
+            >
+              Upload File
+            </button>
+          </div>
+          {thumbnailInputType === 'url' ? (
+            <div>
+              <input
+                type="url"
+                value={courseThumbnailUrl?.startsWith('[LOCAL_FILE:') ? '' : (courseThumbnailUrl || "")}
+                onChange={(e) => {
+                  setCourseThumbnailUrl(e.target.value);
+                  setHasUnsavedChanges(true);
+                }}
+                style={{
+                  backgroundColor: Colors.textInputBg,
+                  borderColor: Colors.gray600,
+                  color: Colors.textPrimary,
+                }}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+                placeholder="https://..."
+              />
+              {courseThumbnailUrl && !courseThumbnailUrl.startsWith('[LOCAL_FILE:') && (
+                <>
+                  <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: Colors.gray800 }}>
+                    <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
+                      📎 Thumbnail URL added
+                    </span>
+                    <button
+                      onClick={clearThumbnail}
+                      style={{ color: Colors.textSecondary }}
+                      className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
+                      title="Clear thumbnail"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="mt-3">
+                    <label
+                      style={{ color: Colors.textSecondary }}
+                      className="block text-sm font-medium mb-2"
+                    >
+                      Thumbnail Preview
+                    </label>
+                    <div
+                      className="rounded overflow-hidden border"
+                      style={{
+                        borderColor: Colors.gray600,
+                        maxWidth: '100%'
+                      }}
+                    >
+                      <img
+                        src={courseThumbnailUrl}
+                        alt="Thumbnail preview"
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          display: 'block'
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.parentElement!.innerHTML = '<p style="padding: 20px; text-align: center; color: #94a3b8;">Failed to load image</p>';
+                        }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div>
+              <div>
+                <input
+                  key={`course-thumbnail`}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleThumbnailFileChange}
+                  style={{
+                    backgroundColor: Colors.textInputBg,
+                    borderColor: Colors.gray600,
+                    color: Colors.textPrimary,
+                  }}
+                  className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+                />
+                {(selectedThumbnailFile || courseThumbnailUrl?.startsWith('[LOCAL_FILE:')) && (
+                  <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: Colors.gray800 }}>
+                    <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
+                      📎 {selectedThumbnailFile?.name || courseThumbnailUrl?.split('[LOCAL_FILE: ')[1]?.replace(']', '')}
+                    </span>
+                    <button
+                      onClick={clearThumbnail}
+                      style={{ color: Colors.textSecondary }}
+                      className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
+                      title="Clear thumbnail"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              {selectedThumbnailFile && (
+                <div className="mt-3">
+                  <label
+                    style={{ color: Colors.textSecondary }}
+                    className="block text-sm font-medium mb-2"
+                  >
+                    Thumbnail Preview
+                  </label>
+                  <div
+                    className="rounded overflow-hidden border"
+                    style={{
+                      borderColor: Colors.gray600,
+                      maxWidth: '100%'
+                    }}
+                  >
+                    <img
+                      src={URL.createObjectURL(selectedThumbnailFile)}
+                      alt="Thumbnail preview"
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Course Status */}
@@ -178,7 +391,7 @@ export const RightSidebar = () => {
             >
               <option value="draft">Draft</option>
               <option value="published">Published</option>
-              <option value="archived">Archived</option>
+              {/* <option value="archived">Archived</option> */}
             </select>
 
             <div className="flex items-center gap-2 text-sm">
@@ -194,21 +407,21 @@ export const RightSidebar = () => {
                   <span style={{ color: Colors.green }}>Live & Available</span>
                 </>
               )}
-              {courseStatus === "archived" && (
+              {/* {courseStatus === "archived" && (
                 <>
                   <Archive className="h-4 w-4" style={{ color: Colors.gray500 }} />
                   <span style={{ color: Colors.gray500 }}>Archived</span>
                 </>
-              )}
+              )} */}
             </div>
 
-            <p style={{ color: Colors.textMuted }} className="text-xs">
+            <p style={{ color: Colors.textSecondary }} className="text-xs">
               {courseStatus === "draft" &&
                 "Course is in development and not visible to students"}
               {courseStatus === "published" &&
                 "Course is live and available to students"}
-              {courseStatus === "archived" &&
-                "Course is archived and no longer available"}
+              {/* {courseStatus === "archived" &&
+                "Course is archived and no longer available"} */}
             </p>
           </div>
         </div>
@@ -253,7 +466,7 @@ export const RightSidebar = () => {
               className="flex items-center justify-between p-3 rounded"
             >
               <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" style={{ color: Colors.accent }} />
+                <BarChart3 className="h-4 w-4" style={{ color: Colors.streakFire }} />
                 <span style={{ color: Colors.textSecondary }} className="text-sm">Quizzes</span>
               </div>
               <span style={{ color: Colors.textPrimary }} className="text-lg font-semibold">

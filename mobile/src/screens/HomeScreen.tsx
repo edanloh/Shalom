@@ -6,15 +6,15 @@ import {
   StatusBar,
   TouchableOpacity,
   Text,
-  RefreshControl,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, ContainerStyles, Spacing, Typography, TextStyles } from '../constants';
-import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
+import { useNavigation, CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { ActionButton, Screen } from '@/components';
 
 // components (values)
 import ProfileHeader from '../components/home/ProfileHeader';
@@ -25,10 +25,13 @@ import CourseCard from '../components/home/CourseCard';
 // Import hooks and types
 import { useCourses } from '../contexts/CourseContext';
 import { useAuth } from '../contexts/AuthContext';
+import courseService from '../services/courseService';
+import creditService from '../services/creditService';
+import { showToast } from '@/components/common/Toast';
 
 // types
 import type { Course } from '../types';
-import type { MainStackParamList, TabParamList } from '../types/navigation';
+import CourseCarousel from '@/components/home/CourseCarousel';
 
 // Types for API-ready data structures
 interface Achievement {
@@ -38,40 +41,53 @@ interface Achievement {
   value: string | number;
   color: string;
   type: 'streak' | 'certificate' | 'badge' | 'level';
-}
-
-interface WeeklyGoalData {
-  id: string;
-  userId: string;
-  targetHours: number;
-  currentHours: number;
-  weekStartDate: string;
-  weekEndDate: string;
+  navigationTarget?: string;
 }
 
 type TabType = 'home' | 'courses' | 'search' | 'settings';
 
-const HomeScreen: React.FC = () => {
+export default function HomeScreen({ navigation, route }: any) {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { user, login, register } = useAuth();
+  const [certCount, setCertCount] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
+  const [goalProgress, setGoalProgress] = useState<{
+    current: number;
+    target: number;
+    unit: "hours" | "courses" | "points" | "lessons" | "quizzes";
+    label: string;
+  }>({ current: 0, target: 10, unit: "hours", label: "Weekly Goal" });
+  const [goalList, setGoalList] = useState<Array<{
+    id: string;
+    label: string;
+    current: number;
+    target: number;
+    unit: "hours" | "courses" | "points" | "lessons" | "quizzes";
+    deadline?: string;
+  }>>([]);
 
-  const navigation = useNavigation<CompositeNavigationProp<
-    StackNavigationProp<MainStackParamList>,
-    BottomTabNavigationProp<TabParamList>
-  >>();
+  // const navigation = useNavigation<CompositeNavigationProp<
+  //   StackNavigationProp<MainStackParamList>,
+  //   BottomTabNavigationProp<TabParamList>
+  // >>();
 
   // Use unified CourseContext for all course data
   const {
+    courses,
+    loading: coursesLoading,
+    error: coursesError,
+    refreshCourses,
+
     myCourses: myCoursesData,
     myCoursesLoading,
     myCoursesError,
     refreshMyCourses,
     
-    suggestedCourses: suggestedCoursesData,
-    suggestedLoading,
-    suggestedError,
-    refreshSuggested,
+    recommendedCourses,
+    recommendedLoading,
+    recommendedError,
+    refreshRecommended,
 
     wishlist,
     wishlistLoading,
@@ -89,42 +105,211 @@ const HomeScreen: React.FC = () => {
     }
   }, [user]);
 
+  const loadCreditMeta = React.useCallback(async () => {
+    try {
+      if (!user?.id) {
+        setCertCount(0);
+        setStreakDays(0);
+        return;
+      }
+      const [certs, goals] = await Promise.all([
+        creditService.getCertificates(user.id).catch(() => []),
+        creditService.getGoals(user.id).catch(() => []),
+      ]);
+      creditService.recordGoalMilestones(goals, user?.id);
+      setCertCount(Array.isArray(certs) ? certs.length : 0);
+      const maxStreak = Array.isArray(goals)
+        ? goals.reduce((m, g) => Math.max(m, g.streakDays || 0), 0)
+        : 0;
+      setStreakDays(maxStreak);
+      if (Array.isArray(goals)) {
+        const activeGoals = goals.filter((g) => g.isActive && !g.isExpired && !g.completedAt);
+        const goal =
+          activeGoals[0] ||
+          goals.find(
+            (g) =>
+              Number(g.targetHours || 0) > 0 ||
+              Number(g.currentHours || 0) > 0 ||
+              Number(g.targetLessons || 0) > 0 ||
+              Number(g.currentLessons || 0) > 0 ||
+              Number(g.targetQuizzes || 0) > 0 ||
+              Number(g.currentQuizzes || 0) > 0 ||
+              /study|time/i.test(g.label || "")
+          ) ||
+          goals[0];
+
+        if (goal) {
+          const targetPoints = Number(goal.targetPoints ?? 0);
+          const targetCourses = Number(goal.targetCourses ?? 0);
+          const targetHours = Number(goal.targetHours ?? 0);
+          const targetLessons = Number(goal.targetLessons ?? 0);
+          const targetQuizzes = Number(goal.targetQuizzes ?? 0);
+          const currentPoints = Number(goal.currentPoints ?? 0);
+          const currentCourses = Number(goal.currentCourses ?? 0);
+          const currentHours = Number(goal.currentHours ?? 0);
+          const currentLessons = Number(goal.currentLessons ?? 0);
+          const currentQuizzes = Number(goal.currentQuizzes ?? 0);
+          const label = goal.label || "Weekly Goal";
+
+          let unit: "hours" | "courses" | "points" | "lessons" | "quizzes" = "hours";
+          if (targetPoints > 0 || currentPoints > 0) unit = "points";
+          else if (targetCourses > 0 || currentCourses > 0) unit = "courses";
+          else if (targetLessons > 0 || currentLessons > 0) unit = "lessons";
+          else if (targetQuizzes > 0 || currentQuizzes > 0) unit = "quizzes";
+          else if (targetHours > 0 || currentHours > 0) unit = "hours";
+          else if (/course/i.test(label)) unit = "courses";
+          else if (/point/i.test(label)) unit = "points";
+          else if (/lesson/i.test(label)) unit = "lessons";
+          else if (/quiz/i.test(label)) unit = "quizzes";
+          else if (/time|study/i.test(label)) unit = "hours";
+
+          const target =
+            unit === "points"
+              ? targetPoints
+              : unit === "courses"
+              ? targetCourses
+              : unit === "lessons"
+              ? targetLessons
+              : unit === "quizzes"
+              ? targetQuizzes
+              : targetHours;
+          const current =
+            unit === "points"
+              ? currentPoints
+              : unit === "courses"
+              ? currentCourses
+              : unit === "lessons"
+              ? currentLessons
+              : unit === "quizzes"
+              ? currentQuizzes
+              : currentHours;
+
+          setGoalProgress({
+            current,
+            target,
+            unit,
+            label,
+          });
+        }
+
+        const mappedGoals = activeGoals.map((g) => {
+          const targetPoints = Number(g.targetPoints ?? 0);
+          const targetCourses = Number(g.targetCourses ?? 0);
+          const targetHours = Number(g.targetHours ?? 0);
+          const targetLessons = Number(g.targetLessons ?? 0);
+          const targetQuizzes = Number(g.targetQuizzes ?? 0);
+          const currentPoints = Number(g.currentPoints ?? 0);
+          const currentCourses = Number(g.currentCourses ?? 0);
+          const currentHours = Number(g.currentHours ?? 0);
+          const currentLessons = Number(g.currentLessons ?? 0);
+          const currentQuizzes = Number(g.currentQuizzes ?? 0);
+          const label = g.label || "Goal";
+
+          let unit: "hours" | "courses" | "points" | "lessons" | "quizzes" = "hours";
+          if (targetPoints > 0 || currentPoints > 0) unit = "points";
+          else if (targetCourses > 0 || currentCourses > 0) unit = "courses";
+          else if (targetLessons > 0 || currentLessons > 0) unit = "lessons";
+          else if (targetQuizzes > 0 || currentQuizzes > 0) unit = "quizzes";
+          else if (targetHours > 0 || currentHours > 0) unit = "hours";
+          else if (/course/i.test(label)) unit = "courses";
+          else if (/point/i.test(label)) unit = "points";
+          else if (/lesson/i.test(label)) unit = "lessons";
+          else if (/quiz/i.test(label)) unit = "quizzes";
+          else if (/time|study/i.test(label)) unit = "hours";
+
+          const target =
+            unit === "points"
+              ? targetPoints
+              : unit === "courses"
+              ? targetCourses
+              : unit === "lessons"
+              ? targetLessons
+              : unit === "quizzes"
+              ? targetQuizzes
+              : targetHours;
+          const current =
+            unit === "points"
+              ? currentPoints
+              : unit === "courses"
+              ? currentCourses
+              : unit === "lessons"
+              ? currentLessons
+              : unit === "quizzes"
+              ? currentQuizzes
+              : currentHours;
+
+          return {
+            id: String(g.id || label),
+            label,
+            current,
+            target,
+            unit,
+            deadline: g.deadline,
+          };
+        });
+        const sortedGoals = mappedGoals.sort((a, b) => {
+          const aDeadline = a.deadline ? new Date(a.deadline).getTime() : Number.POSITIVE_INFINITY;
+          const bDeadline = b.deadline ? new Date(b.deadline).getTime() : Number.POSITIVE_INFINITY;
+          if (aDeadline !== bDeadline) return aDeadline - bDeadline;
+          const aProgress = a.target > 0 ? a.current / a.target : 0;
+          const bProgress = b.target > 0 ? b.current / b.target : 0;
+          if (aProgress !== bProgress) return bProgress - aProgress;
+          return a.label.localeCompare(b.label);
+        });
+        setGoalList(sortedGoals);
+      } else {
+        setGoalList([]);
+      }
+    } catch (err) {
+      console.warn('Home: failed to load credit stats', err);
+      setGoalList([]);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadCreditMeta();
+    const unsub = creditService.subscribeToCreditUpdates(loadCreditMeta);
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [loadCreditMeta]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCreditMeta();
+    }, [loadCreditMeta])
+  );
+
   // Mock static data that doesn't require API calls
   const achievements: Achievement[] = [
     {
       id: '1',
       icon: 'flame',
       title: 'Day Streak',
-      value: 12,
+      value: streakDays || 0,
       color: Colors.streakCardBg,
       type: 'streak',
+      navigationTarget: 'LearningGoalScreen',
     },
     {
       id: '2',
       icon: 'trophy',
       title: 'Certificates',  
-      value: 3,
+      value: certCount,
       color: Colors.certificateCardBg,
       type: 'certificate',
+      navigationTarget: 'CertificatesScreen',
     },
   ];
-
-  const weeklyGoal: WeeklyGoalData = {
-    id: '1',
-    userId: '550e8400-e29b-41d4-a716-446655440101',
-    targetHours: 7,
-    currentHours: 5.8,
-    weekStartDate: '2024-12-02T00:00:00Z',
-    weekEndDate: '2024-12-08T23:59:59Z',
-  };
 
   // Handle refresh for all data
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       await Promise.all([
+        refreshCourses?.(),
         refreshMyCourses(),
-        refreshSuggested(),
+        refreshRecommended(),
       ]);
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -155,10 +340,10 @@ const HomeScreen: React.FC = () => {
   }, [myCoursesError]);
 
   useEffect(() => {
-    if (suggestedError) {
-      handleError(suggestedError, refreshSuggested, 'Suggested Courses');
+    if (recommendedError) {
+      handleError(recommendedError, refreshRecommended, 'Recommended Courses');
     }
-  }, [suggestedError]);
+  }, [recommendedError]);
 
   const handleTabPress = (tab: TabType) => {
     setActiveTab(tab);
@@ -182,6 +367,31 @@ const HomeScreen: React.FC = () => {
   // Handle course actions for swipeable cards
   const handleCourseComplete = (courseId: string) => {
     console.log('Course marked as completed:', courseId);
+    if (user?.id) {
+      creditService
+        .recordCreditEvent({
+          userId: user.id,
+          type: 'course_completed',
+          title: 'Course completed',
+          points: 120,
+          courseId,
+        })
+        .then(() =>
+          showToast({
+            title: 'Credits earned',
+            message: '+120 for completing a course',
+            type: 'success',
+          })
+        )
+        .catch((err) => {
+          console.warn('Failed to record course credit', err);
+          showToast({
+            title: 'Unable to record credits',
+            message: 'Something unexpected happened. Please try again later.',
+            type: 'error',
+          });
+        });
+    }
     // TODO: Update course completion status via API
   };
 
@@ -190,175 +400,233 @@ const HomeScreen: React.FC = () => {
     // TODO: Update course like status or mark as in-progress via API
   };
 
+  const handleRecommendationClick = async (course: Course) => {
+    if (user?.id) {
+      courseService.recordRecommendationEvent({
+        userId: user.id,
+        courseId: course.id,
+        eventType: 'click',
+        context: { placement: 'home_recommended' },
+      }).catch((err) => console.warn('Failed to record rec click', err));
+    }
+    navigation.navigate('CourseDetail', { courseId: course.id });
+  };
+
+  // Build recommended list: prefer API recs, fallback to non-enrolled
+  const recommendedList = React.useMemo(() => {
+    if (recommendedCourses?.length) return recommendedCourses;
+    const enrolledIds = new Set((myCoursesData ?? []).map((c) => c.id));
+    return (courses ?? []).filter((c) => !enrolledIds.has(c.id)).slice(0, 8);
+  }, [courses, myCoursesData, recommendedCourses]);
+
+  const recommendedListLoading = recommendedLoading || coursesLoading;
+
+  useEffect(() => {
+    if (user?.id && recommendedList.length > 0) {
+      courseService.recordRecommendationEvent({
+        userId: user.id,
+        eventType: 'impression',
+        context: {
+          placement: 'home_recommended',
+          courseIds: recommendedList.map((c) => c.id),
+        },
+      }).catch((err) => console.warn('Failed to record rec impression', err));
+    }
+  }, [user?.id, recommendedList]);
+
+  const getTop10Courses = (courses: Course[]): Course[] => {
+    // Sort by percentage completed descending and return top 10
+    return courses
+      .sort((a, b) => b.progress.percentage - a.progress.percentage)
+      .slice(0, 10);
+  }
+
   // Handle user loading state
   if (!user) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      <Screen
+        title=""
+        noHeader
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.purple400} />
           <Text style={styles.loadingText}>Loading user profile...</Text>
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-      
-      <ScrollView 
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={Colors.white}
-            colors={[Colors.purple400]}
-          />
-        }
-      >
-        {/* Combined Header with Profile, Welcome, and Notifications */}
-        <ProfileHeader 
-          user={user}
-          hasNotifications={true}
-          onNotificationPress={handleNotificationPress}
-        />
+    <Screen
+      title=""
+      noHeader
+      widescreen
+      customEdges={["top"]}
+      refreshing={isRefreshing}
+      onRefresh={handleRefresh}
+    >
+      {/* Combined Header with Profile, Welcome, and Notifications */}
+      <ProfileHeader 
+        user={user}
+        hasNotifications={true}
+        onNotificationPress={handleNotificationPress}
+      />
 
-        {/* Achievement Cards - Day Streak and Certificates */}
-        <ProgressSection achievements={achievements} currentHours={0} targetHours={10} />        
+          {/* Achievement Cards - Day Streak and Certificates */}
+          <ProgressSection
+            achievements={achievements}
+            current={goalProgress.current}
+            target={goalProgress.target || 10}
+            unit={goalProgress.unit}
+            label={goalProgress.label}
+            goals={goalList}
+            navigation={navigation}
+          />        
 
-        {/* My Courses Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>My Courses</Text>
-            <TouchableOpacity onPress={handleViewAllCourses}>
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {myCoursesLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.purple400} />
-              <Text style={styles.loadingText}>Loading your courses...</Text>
-            </View>
-          ) : myCoursesError ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{myCoursesError}</Text>
-              <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
-                <Text style={styles.retryText}>Retry</Text>
+          {/* My Courses Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[TextStyles.h4]}>
+                My Courses
+              </Text>
+              <TouchableOpacity onPress={handleViewAllCourses}>
+                <Text style={styles.viewAllText}>View All</Text>
               </TouchableOpacity>
             </View>
-          ) : (myCoursesData?.length ?? 0) === 0 ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>You haven't enrolled in any courses yet.</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Courses')}
-                style={styles.retryButton}
+            
+            {myCoursesLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.purple400} />
+                <Text style={styles.loadingText}>Loading your courses...</Text>
+              </View>
+            ) : myCoursesError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{myCoursesError}</Text>
+                <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (myCoursesData?.length ?? 0) === 0 ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>You haven't enrolled in any courses yet.</Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Courses')}
+                  style={styles.retryButton}
+                >
+                  <Text style={styles.retryText}>Browse courses</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+              {/* <SwipeableCourseCards 
+                courses={myCoursesData}
+                onCourseComplete={handleCourseComplete}
+                onCourseLike={handleCourseLike}
+                onToggleWishlist={toggleWishlist}
+                isWishlisted={(id) => isWishlisted?.(id) ?? false}
+              /> */}
+              <CourseCarousel
+                courses={getTop10Courses(myCoursesData)}
+                // onCourseLike={(courseId: string) => {console.log("Liked" + courseId)}}
+                onToggleWishlist={toggleWishlist}
+                isWishlisted={(id) => isWishlisted?.(id) ?? false}
+              />
+            </>
+            )}
+          </View>
+
+          {/* Wishlist Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[TextStyles.h4]}>
+                Wishlist
+              </Text>
+              <TouchableOpacity onPress={handleViewWishlist}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+
+            {wishlistLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.purple400} />
+                <Text style={styles.loadingText}>Loading wishlist...</Text>
+              </View>
+            ) : wishlistError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{wishlistError}</Text>
+                <TouchableOpacity onPress={refreshWishlist} style={styles.retryButton}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : wishlist.length === 0 ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>You haven't added any courses into your wishlist yet.</Text>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
               >
-                <Text style={styles.retryText}>Browse courses</Text>
-              </TouchableOpacity>
+                {wishlist.map((course) => (
+                  <CourseCard
+                    key={course.id}
+                    course={course}
+                    variant="compact"
+                    showInstructor={false}
+                    onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
+                  />
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
+          {/* Suggested Courses Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[TextStyles.h4]}>
+                Recommended for You
+              </Text>
             </View>
-          ) : (
-            <SwipeableCourseCards 
-              courses={myCoursesData}
-              onCourseComplete={handleCourseComplete}
-              onCourseLike={handleCourseLike}
-              onToggleWishlist={toggleWishlist}
-              isWishlisted={(id) => isWishlisted?.(id) ?? false}
-            />
-          )}
+
+            {recommendedListLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.purple400} />
+                <Text style={styles.loadingText}>Loading suggestions...</Text>
+              </View>
+            ) : recommendedError || coursesError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{recommendedError || coursesError}</Text>
+                <TouchableOpacity onPress={refreshRecommended} style={styles.retryButton}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
+              >
+                {recommendedList.map((course) => (
+                  <CourseCard
+                    key={course.id}
+                    course={course}
+                    variant="compact"
+                    showInstructor={false}
+                    onPress={(c) => handleRecommendationClick(c)}
+                  />
+                ))}
+              </ScrollView>
+            )}
         </View>
-
-        {/* Wishlist Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Wishlist</Text>
-            <TouchableOpacity onPress={handleViewWishlist}>
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {wishlistLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.purple400} />
-              <Text style={styles.loadingText}>Loading wishlist...</Text>
-            </View>
-          ) : wishlistError ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{wishlistError}</Text>
-              <TouchableOpacity onPress={refreshWishlist} style={styles.retryButton}>
-                <Text style={styles.retryText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : wishlist.length === 0 ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>You haven't added any courses into your wishlist yet.</Text>
-            </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
-            >
-              {wishlist.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                  variant="compact"
-                  showInstructor={false}
-                  onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
-                />
-              ))}
-            </ScrollView>
-          )}
-        </View>
-
-        {/* Suggested Courses Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Suggested for You</Text>
-          </View>
-
-          {suggestedLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.purple400} />
-              <Text style={styles.loadingText}>Loading suggestions...</Text>
-            </View>
-          ) : suggestedError ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{suggestedError}</Text>
-              <TouchableOpacity onPress={refreshSuggested} style={styles.retryButton}>
-                <Text style={styles.retryText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
-            >
-              {suggestedCoursesData.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                  variant="compact"
-                  showInstructor={false}
-                  onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
-                />
-              ))}
-            </ScrollView>
-          )}
-          </View>
-      </ScrollView>
+        <View style={{ height: 130 }} />
 
       {/* Bottom Navigation - Home, My Courses, Search, Settings */}
       {/* <BottomNavigation 
         activeTab={activeTab}
         onTabPress={handleTabPress}
       /> */}
-    </SafeAreaView>
+    </Screen>
   );
 };
 
@@ -371,14 +639,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.base,
   },
   sectionTitle: {
     fontFamily: TextStyles.h3.fontFamily,
@@ -387,8 +654,10 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontFamily: TextStyles.body.fontFamily,
-    fontSize: TextStyles.body.fontSize,
-    color: Colors.purple400,
+    fontSize: 13,
+    color: "#C4B5FD",
+    fontWeight: "600",
+    marginBottom: Spacing.sm,
   },
   loadingContainer: {
     flex: 1,
@@ -431,5 +700,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default HomeScreen;

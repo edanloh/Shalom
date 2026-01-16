@@ -11,6 +11,7 @@ import type { User } from '../../types';
 import { getAvatarUri } from '@/utils/avatar';
 import { Images } from '../../../assets';
 import { ImageWithFallback } from '../common';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // User interface matching the API structure
 
@@ -20,33 +21,25 @@ interface CombinedHeaderProps {
   onNotificationPress?: () => void;
 }
 
-const CombinedHeader: React.FC<CombinedHeaderProps> = ({
+export default function CombinedHeader({ 
   user,
   hasNotifications = false,
   onNotificationPress,
-}) => {
-  const uri = getAvatarUri(user as any);
+}: CombinedHeaderProps) {
+
+  let uri = getAvatarUri(user as any);
+  if (!uri) {
+    uri = `https://cmtfxsntlfoxgcznanpe.supabase.co/storage/v1/object/public/profilepics/${user.email}_avatar.png`
+  }
   const avatarSrc = uri ? { uri } : Images.profile;
 
   return (
     <View style={styles.container}>
-      {/* Top Header with Points and Notification */}
-      <View style={styles.topHeader}>
-        <View style={styles.pointsContainer}>
-          <Text style={styles.pointsIcon}>⭐</Text>
-          <Text style={styles.pointsText}>{user.points || 0} pts</Text>
-        </View>
-        
-        <TouchableOpacity 
-          style={styles.notificationButton} 
-          onPress={onNotificationPress}
-        >
-          <Text style={styles.notificationIcon}>🔔</Text>
-          {hasNotifications && <View style={styles.notificationBadge} />}
-        </TouchableOpacity>
-      </View>
-
       {/* Welcome Section with Avatar */}
+      <LinearGradient
+        colors={[Colors.purple850, Colors.secondary]}
+        style={{height: Spacing.lg}}
+      />
       <View style={styles.welcomeSection}>
         <View style={styles.avatarContainer}>
           <ImageWithFallback source={avatarSrc} fallback={Images.profile} style={styles.avatar} />
@@ -63,8 +56,8 @@ const CombinedHeader: React.FC<CombinedHeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.base,
+    // paddingHorizontal: Spacing.lg,
+    // paddingVertical: Spacing.base,
     marginBottom: Spacing.sm,
     backgroundColor: Colors.purple400,
   },
@@ -74,47 +67,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.lg,
   },
-  pointsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: 20,
-  },
-  pointsIcon: {
-    fontSize: 16,
-    marginRight: Spacing.xs,
-  },
-  pointsText: {
-    fontFamily: Typography.fontFamily.regular,
-    fontSize: 14,
-    color: Colors.black,
-  },
-  notificationButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.cardBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  notificationIcon: {
-    fontSize: 18,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.red,
-  },
   welcomeSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.base,
   },
   avatarContainer: {
     marginRight: Spacing.base,
@@ -141,5 +99,3 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
 });
-
-export default CombinedHeader;

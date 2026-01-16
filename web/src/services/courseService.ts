@@ -4,22 +4,26 @@
  */
 
 import apiService from './apiService';
+import { supabaseService } from './supabaseService';
 import { DEFAULT_COURSE_THUMBNAIL } from '@/constants/images';
 
 // Course service endpoints matching Lambda functions
 const ENDPOINTS = {
   COURSES: '/courses',
   COURSE_BY_ID: (courseId: string) => `/courses/${courseId}`,
-  COURSE_STUDENTS: (courseId: string) => `/courses/${courseId}/students`,
-  AVAILABLE_STUDENTS: (courseId: string) => `/courses/${courseId}/availableStudents`,
-  ALL_STUDENTS: '/students',
+  COURSE_STUDENTS: (courseId: string) => `/getCourseStudents/${courseId}`,
+  AVAILABLE_STUDENTS: (courseId: string) => `/getAvailableStudents/${courseId}`,
+  ALL_STUDENTS: '/getAllStudents',
   COURSE_REVIEWS: (courseId: string) => `/courses/${courseId}/reviews`,
   USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
   CREATE_COURSE: '/courses',
   UPDATE_COURSE: (courseId: string) => `/courses/${courseId}`,
   DELETE_COURSE: (courseId: string) => `/courses/${courseId}`,
   ENROLL_STUDENT: (courseId: string) => `/courses/${courseId}/enroll`,
-  INSTRUCTOR_STATS: (adminId: string) => `/admin/${adminId}/stats`,
+  INSTRUCTOR_STATS: (adminId: string) => `/getInstructorStats/${adminId}`,
+  COURSE_DUPLICATE: (courseId: string) => `/courseDuplicateHandler/${encodeURIComponent(courseId)}`,
+  RECOMMENDATIONS: '/recommendations',
+  RECOMMENDATION_EVENT: '/recommendations/events',
 };
 
 export interface CourseListParams {
@@ -51,6 +55,8 @@ export interface Course {
   lastUpdated: string;
   level?: string;
   tags?: string[];
+  recommendationReason?: string;
+  recommendationScore?: number;
 }
 
 export interface Module {
@@ -125,6 +131,26 @@ export interface EnrollmentCourse {
   completion_date_formatted: string | null;
 }
 
+export interface DuplicateCourseResponse {
+  success: boolean;
+  message: string;
+  data: {
+    originalCourseId: string;
+    duplicatedCourseId: string;
+    duplicatedCourse: any;
+    counts: {
+      sections: number;
+      videos: number;
+      quizzes: number;
+      resources: number;
+    };
+  };
+  meta: {
+    timestamp: string;
+    requestId: string;
+  };
+}
+
 // Helper function to convert AWS course format to web format
 const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course => {
   if (!awsCourse || typeof awsCourse !== 'object') {
@@ -156,6 +182,8 @@ const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course =
     lastUpdated: awsCourse.updated_at ? new Date(awsCourse.updated_at).toLocaleDateString() : 'N/A',
     level: awsCourse.level || 'beginner',
     tags: Array.isArray(awsCourse.tags) ? awsCourse.tags : [],
+    recommendationReason: awsCourse.recommendation_reason,
+    recommendationScore: awsCourse.recommendation_score,
   };
 };
 
@@ -165,20 +193,25 @@ class CourseService {
    */
   async getCourses(params?: CourseListParams): Promise<Course[]> {
     try {
-      const queryParams: Record<string, string> = {};
-      if (params?.limit) queryParams.limit = params.limit.toString();
-      if (params?.category) queryParams.category = params.category;
-      if (params?.level) queryParams.level = params.level;
-      if (params?.sortBy) queryParams.sortBy = params.sortBy;
-      if (params?.sortOrder) queryParams.sortOrder = params.sortOrder;
+      // Use Supabase Edge Function instead of AWS API Gateway
+      const queryParams = new URLSearchParams();
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      if (params?.category) queryParams.append('filterField', 'category_name');
+      if (params?.category) queryParams.append('filterValue', params.category);
+      if (params?.level) queryParams.append('filterField', 'level');
+      if (params?.level) queryParams.append('filterValue', params.level);
+      if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
-      const response = await apiService.get<any>(
-        ENDPOINTS.COURSES,
-        queryParams
+      // Call Supabase Edge Function (getAllCourse)
+      const response = await supabaseService.get<any>(
+        `getAllCourse?${queryParams.toString()}`
       );
 
       let coursesArray;
-      if (response.courses && Array.isArray(response.courses)) {
+      if (response.data && Array.isArray(response.data)) {
+        coursesArray = response.data;
+      } else if (response.courses && Array.isArray(response.courses)) {
         coursesArray = response.courses;
       } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
         coursesArray = response.data.courses;
@@ -384,6 +417,36 @@ class CourseService {
   }
 
   /**
+   * Create a new course with full module structure
+   */
+  async createCourseWithModules(courseData: {
+    title: string;
+    category: string;
+    description: string;
+    thumbnailUrl?: string | null;
+    level: string;
+    instructorId: string;
+    instructorName: string;
+    modules: any[];
+    outcomes: any[];
+    requirements: any[];
+  }): Promise<{ courseId: string }> {
+    try {
+      const response = await apiService.post<any>('/createCourse', courseData);
+      const courseId = response.data?.course?.id || response.data?.id || response.id;
+      
+      if (!courseId) {
+        throw new Error('Failed to get course ID from response');
+      }
+
+      return { courseId };
+    } catch (error) {
+      console.error('Error creating course with modules:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Update an existing course
    */
   async updateCourse(courseId: string, courseData: Partial<Course>): Promise<Course> {
@@ -450,6 +513,46 @@ class CourseService {
   }
 
   /**
+   * Get personalized recommendations
+   */
+  async getRecommendations(userId: string, limit = 6): Promise<Course[]> {
+    const uid = userId || '550e8400-e29b-41d4-a716-446655440201';
+    const response = await apiService.get<any>(ENDPOINTS.RECOMMENDATIONS, {
+      userId: uid,
+      limit: String(limit),
+    });
+
+    const recs = response?.data?.recommendations ?? response?.recommendations ?? [];
+    return recs.map((item: any) => {
+      const coursePayload = item.course || item;
+      const course = convertAWSCourseToWebCourse(coursePayload, coursePayload.statistics);
+      return {
+        ...course,
+        recommendationReason: item.reason || coursePayload.recommendation_reason,
+        recommendationScore: item.score || coursePayload.recommendation_score,
+      };
+    });
+  }
+
+  async recordRecommendationEvent(payload: {
+    userId?: string;
+    courseId?: string;
+    eventType: 'impression' | 'view' | 'click' | 'start' | 'complete' | 'dismiss' | 'save';
+    context?: Record<string, any>;
+    requestId?: string;
+  }): Promise<void> {
+    const body = {
+      userId: payload.userId || '550e8400-e29b-41d4-a716-446655440201',
+      courseId: payload.courseId ?? null,
+      eventType: payload.eventType,
+      context: payload.context || {},
+      requestId: payload.requestId,
+    };
+
+    await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
+  }
+
+  /**
    * Get instructor/admin statistics for dashboard
    */
   async getInstructorStats(adminId: string): Promise<any> {
@@ -463,6 +566,42 @@ class CourseService {
       return response.data;
     } catch (error) {
       console.error(`Error fetching instructor stats for ${adminId}:`, error);
+      throw error;
+    }
+  }
+
+
+  /**
+   * Duplicate a course
+   * POST /courseDuplicateHandler/{courseId}
+   * Creates a copy of the course with all its sections, videos, quizzes, and resources (PDFs)
+   */
+  async duplicateCourse(courseId: string): Promise<Course> {
+    try {
+      if (!courseId) throw new Error('Missing courseId');
+      
+      const url = ENDPOINTS.COURSE_DUPLICATE(courseId);
+      const response = await apiService.post<DuplicateCourseResponse>(url);
+      
+      const data = response?.data ?? response;
+      const duplicatedCourseData = data?.data?.duplicatedCourse ?? data?.duplicatedCourse;
+      
+      if (!duplicatedCourseData) {
+        throw new Error('Invalid API response when duplicating course');
+      }
+      
+      // Convert to app Course format
+      const duplicatedCourse = convertAWSCourseToAppCourse(duplicatedCourseData);
+      
+      // Clear relevant caches
+      await Promise.all([
+        CacheManager.clear(CACHE_CONFIG.COURSES_KEY),
+        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
+      ]);
+      
+      return duplicatedCourse;
+    } catch (error) {
+      console.error(`Error duplicating course ${courseId}:`, error);
       throw error;
     }
   }

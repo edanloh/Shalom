@@ -1,24 +1,130 @@
 // API-ready data types for the application
 
+import { Tokens } from '@/contexts/AuthContext';
+import { Session } from '@supabase/supabase-js';
+
+export interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  isResettingPassword: boolean;
+  session: Session | null;
+  login: ( email: string, password: string ) => Promise<{ success: boolean; error?: string }>;
+  register: ( email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  requestResetPassword: (email: string) => Promise<{ data: any; error: any; }>;
+  resetPassword: ( newPassword: string ) => Promise<{ success: boolean; error?: string }>;
+  // loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  changePassword: ( currentPassword: string, newPassword: string ) => Promise<{ success: boolean; error?: string }>;
+  fetchEmail: (email: string) => Promise<any>;
+  loginWithToken: (credentials: Tokens, path: string) => Promise<void>;
+  setIsResettingPassword: (value: boolean) => void;
+}
+
 export interface User {
   id: string;
   email: string;
-  username?: string;
   name: string;
-  role?: "learner" | "instructor";
-  avatar?: string;
-  bio?: string;
-  location?: string;
-  phone?: string;
-  authProvider?: string; // e.g., 'google', 'email'
-  accessToken?: string; // Store access token if needed
+  avatar_url?: string;
   points?: number; // For gamification features
-  joinedAt?: string; // ISO date string
-  profile?: {
-    bio?: string;
-    location?: string;
-    interests?: string[];
-  };
+  joined_at?: string; // ISO date string
+  last_login?: string; // ISO date string
+  is_active?: boolean;
+  auth_provider: string; // e.g., 'google', 'email'
+  // id uuid not null default gen_random_uuid (),
+  // email character varying(255) not null,
+  // name character varying(255) not null,
+  // avatar_url text null,
+  // points integer null default 0,
+  // joined_at timestamp with time zone null default CURRENT_TIMESTAMP,
+  // last_login timestamp with time zone null,
+  // is_active boolean null default true,
+  // created_at timestamp with time zone null default CURRENT_TIMESTAMP,
+  // updated_at timestamp with time zone null default CURRENT_TIMESTAMP,
+}
+
+export interface CreditBalance {
+  balance: number;
+  lastUpdated: string;
+}
+
+export interface CreditEvent {
+  id: string;
+  type: string;
+  title: string;
+  points: number;
+  courseId?: string;
+  timestamp: string;
+}
+
+export interface CreditEventPayload {
+  userId?: string;
+  type: string;
+  title: string;
+  points: number;
+  courseId?: string;
+  timestamp?: string;
+  referenceKey?: string;
+}
+
+export interface AchievementItem {
+  id: string;
+  icon: string;
+  label: string;
+  description?: string;
+  type?: string;
+  points?: number;
+  createdAt?: string;
+  earned?: boolean;
+  earnedAt?: string | null;
+}
+
+export interface LearningGoal {
+  id: string;
+  label: string;
+  targetHours: number;
+  currentHours: number;
+  targetLessons?: number;
+  currentLessons?: number;
+  targetQuizzes?: number;
+  currentQuizzes?: number;
+  streakDays?: number;
+  deadline?: string;
+  targetPoints?: number;
+  currentPoints?: number;
+  targetCourses?: number;
+  currentCourses?: number;
+  isActive?: boolean;
+  rewardPoints?: number;
+  completedAt?: string;
+  templateId?: string;
+  isExpired?: boolean;
+}
+
+export interface GoalTemplate {
+  id: string;
+  label: string;
+  description?: string | null;
+  difficulty?: "easy" | "medium" | "hard";
+  targetHours?: number;
+  targetCourses?: number;
+  targetPoints?: number;
+  targetLessons?: number;
+  targetQuizzes?: number;
+  durationDays?: number;
+  rewardPoints?: number;
+}
+
+export interface CertificateProgress {
+  id: string;
+  name: string;
+  requiredPoints: number;
+  earnedPoints: number;
+  requiredCourses: number;
+  completedCourses: number;
+  progressPercent: number;
+  durationHours?: number | null;
+  instructorName?: string | null;
 }
 
 export interface Achievement {
@@ -70,6 +176,9 @@ export interface Course {
   createdAt: string;
   updatedAt: string;
   isWishlisted?: boolean;
+  recommendationReason?: string;
+  recommendationScore?: number;
+  recommendationRank?: number;
 }
 
 export interface WeeklyGoal {
@@ -88,10 +197,20 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  type: 'course' | 'achievement' | 'reminder' | 'system';
+  type:
+    | 'course'
+    | 'achievement'
+    | 'reminder'
+    | 'system'
+    | 'streak_reminder'
+    | 'streak_broken'
+    | 'streak_hot'
+    | 'goal_completed'
+    | 'goal_expired';
   read: boolean;
   createdAt: string;
   actionUrl?: string;
+  iconUrl?: string;
 }
 
 // Navigation types
@@ -114,57 +233,57 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   };
 }
 
-// AWS API Gateway specific response structure
-export interface AWSApiResponse<T> {
-  success: boolean;
-  message: string;
-  data: T;
-}
+// // AWS API Gateway specific response structure
+// export interface AWSApiResponse<T> {
+//   success: boolean;
+//   message: string;
+//   data: T;
+// }
 
-export interface AWSCoursesResponse {
-  courses: AWSCourse[];
-  pagination: {
-    currentPageSize: number;
-    scannedCount: number;
-    hasMore: boolean;
-    nextPageToken: string | null;
-    limit: number;
-  };
-  filters: {
-    filterExpression: string | null;
-    filterValue: string | null;
-    sortBy: string | null;
-    sortOrder: string;
-  };
-  meta: {
-    timestamp: string;
-    requestId: string;
-  };
-}
+// export interface AWSCoursesResponse {
+//   courses: AWSCourse[];
+//   pagination: {
+//     currentPageSize: number;
+//     scannedCount: number;
+//     hasMore: boolean;
+//     nextPageToken: string | null;
+//     limit: number;
+//   };
+//   filters: {
+//     filterExpression: string | null;
+//     filterValue: string | null;
+//     sortBy: string | null;
+//     sortOrder: string;
+//   };
+//   meta: {
+//     timestamp: string;
+//     requestId: string;
+//   };
+// }
 
-export interface AWSCourse {
-  courseId: number;
-  title: string;
-  description: string;
-  instructor: {
-    id: string;
-    name: string;
-    avatar: string;
-    rating: number;
-  };
-  progress: {
-    completed: number;
-    total: number;
-    percentage: number;
-    lastAccessed: string;
-  };
-  duration: string;
-  rating: number;
-  image: string;
-  category: string;
-  level: string;
-  modules: number;
-}
+// export interface AWSCourse {
+//   courseId: number;
+//   title: string;
+//   description: string;
+//   instructor: {
+//     id: string;
+//     name: string;
+//     avatar: string;
+//     rating: number;
+//   };
+//   progress: {
+//     completed: number;
+//     total: number;
+//     percentage: number;
+//     lastAccessed: string;
+//   };
+//   duration: string;
+//   rating: number;
+//   image: string;
+//   category: string;
+//   level: string;
+//   modules: number;
+// }
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   pagination: {
@@ -196,33 +315,3 @@ export interface SearchQuery {
   sortBy?: 'rating' | 'price' | 'duration' | 'popularity';
   sortOrder?: 'asc' | 'desc';
 }
-
-// Navigation types
-export type TabParamList = {
-  Home: undefined;
-  Courses: undefined;
-  Search: undefined;
-  Profile: undefined;
-  Notifications: undefined;
-  Admin?: undefined;
-};
-
-export type MainStackParamList = {
-  Main: undefined;
-  CourseDetail: { courseId: string };
-  EditProfile: undefined;
-  Settings: undefined;
-  Notifications: undefined;
-  NotFound: undefined;
-  UserManagement?: undefined;
-  UserConfig?: undefined;
-  MyCourses?: undefined;
-  Auth?: undefined;
-};
-
-export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  ForgotPassword: undefined;
-  ConfirmSignUp: { email: string };
-};

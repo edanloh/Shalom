@@ -20,15 +20,24 @@ import { ImageWithFallback } from '../components/common';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { courseService } from '../services/courseService';
+import creditService from '../services/creditService';
 import { moduleService, ModuleDetailResponse, UserProgress, CourseSection } from '../services/moduleService';
 import { useFocusEffect } from '@react-navigation/native';
+import { useCourses } from '../contexts/CourseContext';
+import Screen from '../components/common/Screen';
+import ActionButton from '@/components/ActionButton';
+import { showToast } from '@/components/common/Toast';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 type Props = StackScreenProps<MainStackParamList, 'CourseDetail'>;
 type CourseContent = ModuleDetailResponse['data'];
 
-const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
+export default function CourseDetailScreen({
+  navigation,
+  route,
+}: StackScreenProps<MainStackParamList, "CourseDetail">) {
+  
   const { courseId } = route.params;
   const [courseDetail, setCourseDetail] = useState<ProcessedCourseDetail | null>(null);
   const [courseContent, setCourseContent] = useState<CourseContent | null>(null);
@@ -36,27 +45,36 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const userId = user?.id;
+  const fallbackUserId =
+    process.env.EXPO_PUBLIC_DEFAULT_USER_ID || "550e8400-e29b-41d4-a716-446655440101";
+  const effectiveUserId = userId || fallbackUserId;
 
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  
+  // Wishlist functionality
+  const { toggleWishlist, isWishlisted } = useCourses();
+  const wishlisted = isWishlisted(courseId);
 
   useFocusEffect(
     React.useCallback(() => {
-      loadCourseDetail();
-    }, [courseId])
+      if (userId) {
+        loadCourseDetail();
+      }
+    }, [courseId, userId])
   );
 
   useEffect(() => {
     (async () => {
-      if (!userId) return;          // user must be logged in
+      if (!effectiveUserId) return;
       try {
-        const enrolled = await courseService.isUserEnrolledInCourse(userId, courseId);
+        const enrolled = await courseService.isUserEnrolledInCourse(effectiveUserId, courseId);
         setIsEnrolled(enrolled);
       } catch (e) {
         console.log('Enroll status check failed:', e);
       }
     })();
-  }, [courseId, userId]);
+  }, [courseId, effectiveUserId]);
   const calculateCourseProgress = (): number => {
     if (!courseContent || !courseContent.userProgress) return 0;
     
@@ -68,6 +86,14 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         moduleService.isItemCompleted(item, courseContent.userProgress)
       ).length;
     }, 0);
+    
+    console.log('[CourseDetailScreen] Progress calculation:', {
+      completedItems,
+      totalItems,
+      percentage: Math.round((completedItems / totalItems) * 100),
+      sections: courseContent.sections.length,
+      completedSections: courseContent.sections.filter(s => s.module_is_completed).length
+    });
     
     return Math.round((completedItems / totalItems) * 100);
   };
@@ -85,9 +111,9 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       // Fetch both course detail and module detail with user progress
       const [detail, moduleData] = await Promise.all([
         courseDetailService.getCourseDetail(courseId),
-        moduleService.getModuleDetail(courseId, '550e8400-e29b-41d4-a716-446655440101') // TODO: Replace with actual user ID from auth context
+        moduleService.getModuleDetail(courseId, effectiveUserId)
       ]);
-      
+      console.log('[CourseDetailScreen] Loaded course detail and content:', { detail, moduleData });
       setCourseDetail(detail);
       setCourseContent(moduleData);
     } catch (err) {
@@ -116,28 +142,34 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const renderRatingBreakdown = (breakdown: Record<number, number>) => {
+    const totalReviews = Object.values(breakdown).reduce((sum, count) => sum + count, 0);
+    
     return (
       <View style={styles.ratingBreakdown}>
-        {[5, 4, 3, 2, 1].map((star) => (
-          <View key={star} style={styles.ratingRow}>
-            <Text style={styles.starNumber}>{star}</Text>
-            <View style={styles.ratingBar}>
-              <View 
-                style={[
-                  styles.ratingBarFill, 
-                  { width: `${breakdown[star] || 0}%` }
-                ]} 
-              />
+        {[5, 4, 3, 2, 1].map((star) => {
+          const count = breakdown[star] || 0;
+          const percentage = totalReviews > 0 ? (count / totalReviews) * 100 : 0;
+          
+          return (
+            <View key={star} style={styles.ratingRow}>
+              <Text style={styles.starNumber}>{star}</Text>
+              <View style={styles.ratingBar}>
+                <View 
+                  style={[
+                    styles.ratingBarFill, 
+                    { width: `${percentage}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.ratingPercentage}>{count}</Text>
             </View>
-            <Text style={styles.ratingPercentage}>{breakdown[star] || 0}%</Text>
-          </View>
-        ))}
+          );
+        })}
       </View>
     );
   };
 
-  const renderModule = (module: CourseModule, index: number) => {
-    const section = courseContent?.sections.find(s => s.id === module.id);
+  const renderModule = (section: CourseSection, index: number) => {
     const isCompleted = section?.module_is_completed || false;
     const completedAt = section?.module_completed_at;
 
@@ -155,19 +187,19 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       }
       navigation.navigate('ModuleDetail', {
         courseId: route.params.courseId,
-        sectionId: module.id,
+        sectionId: section.id,
         userId: userId ?? '',
       });
     };
 
     return (
-      <Pressable key={module.id} style={styles.moduleItem} onPress={onOpen}>
+      <Pressable key={section.id} style={styles.moduleItem} onPress={onOpen}>
         <View style={styles.moduleIcon}>
           <Ionicons name="book-outline" size={20} color={Colors.purple400} />
         </View>
         <View style={styles.moduleContent}>
           <View style={styles.moduleTitleRow}>
-            <Text style={styles.moduleTitle}>{module.title}</Text>
+            <Text style={styles.moduleTitle}>{section.title}</Text>
             {isCompleted && (
               <View style={styles.completedBadge}>
                 <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
@@ -175,8 +207,8 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             )}
           </View>
-          {!!module.description && (
-            <Text style={styles.moduleDescription}>{module.description}</Text>
+          {!!section.description && (
+            <Text style={styles.moduleDescription}>{section.description}</Text>
           )}
           {isCompleted && completedAt && (
             <Text style={styles.completedDate}>
@@ -218,12 +250,37 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       Alert.alert('Sign in required', 'Please sign in to leave a review.');
       return;
     }
+    
+    // Check if user is enrolled
+    if (!isEnrolled) {
+      Alert.alert(
+        'Enrollment Required',
+        'You must enroll in this course before leaving a review.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Enroll Now', onPress: handleEnroll },
+        ]
+      );
+      return;
+    }
+    
+    // Check if course is completed
+    const courseProgress = calculateCourseProgress();
+    if (courseProgress < 100) {
+      Alert.alert(
+        'Complete the Course First',
+        'You must complete all modules in this course before leaving a review.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
     navigation.navigate('LeaveReview', { courseId });
   };
 
   const handleEnroll = async () => {
     if (isEnrolling) return;
-    if (!userId) {
+    if (!effectiveUserId) {
       Alert.alert('Sign in required', 'Please sign in to enroll.');
       return;
     }
@@ -232,14 +289,65 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
     try {
       setIsEnrolling(true);
-      const { firstModuleId } = await courseService.enrollInCourse(userId, courseId);
+      const { firstModuleId } = await courseService.enrollInCourse(effectiveUserId, courseId);
 
-      // If you want to immediately take them somewhere after enroll, keep this:
-      // navigation.replace(
-      //   'CourseOutline',
-      //   firstModuleId ? { courseId, startAt: firstModuleId } : { courseId }
-      // );
-      // Otherwise, do nothing and let the screen re-render as enrolled.
+      // Mark as enrolled immediately so UI updates
+      setIsEnrolled(true);
+      // Refresh detail in background to pick up any progress/enrollment metadata
+      loadCourseDetail?.();
+
+      try {
+        await creditService.recordCreditEvent({
+          userId: effectiveUserId,
+          type: 'course_enrolled',
+          title: courseDetail?.title || 'Enrolled in course',
+          points: 20,
+          courseId,
+        });
+        showToast({
+          title: 'Enrolled',
+          message: 'Earned +20 credits for enrolling',
+          type: 'success',
+        });
+      } catch (err) {
+        console.warn('Failed to record credit for enrollment', err);
+        showToast({
+          title: 'Unable to record credits',
+          message: 'Something unexpected happened. Please try again later.',
+          type: 'error',
+        });
+      }
+
+      // Update enrolled state and reload course data
+      setIsEnrolled(true);
+      
+      // Reload course detail to fetch updated progress
+      await loadCourseDetail();
+
+      // Show success message
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        'Enrollment Successful!',
+        'You have been successfully enrolled in this course. Start learning now!',
+        [
+          {
+            text: 'Start Learning',
+            onPress: () => {
+              if (firstModuleId && courseContent) {
+                const firstSection = courseContent.sections[0];
+                if (firstSection) {
+                  navigation.navigate('ModuleDetail', {
+                    courseId: courseId,
+                    sectionId: firstSection.id,
+                    userId: userId,
+                  });
+                }
+              }
+            }
+          },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
     } catch (e: any) {
       const status = e?.statusCode ?? e?.response?.status;
       console.log('[Enroll] error', { status, code: e?.code, msg: e?.message, details: e?.details });
@@ -251,182 +359,222 @@ const CourseDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.purple400} />
-        <Text style={styles.loadingText}>Loading course details...</Text>
-      </SafeAreaView>
+      <Screen title="" noHeader customEdges={["top", "bottom"]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.purple400} />
+          <Text style={styles.loadingText}>Loading course details...</Text>
+        </View>
+      </Screen>
     );
   }
 
   if (error || !courseDetail) {
     return (
-      <SafeAreaView style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error || 'Course not found'}</Text>
-        <Pressable style={styles.retryButton} onPress={loadCourseDetail}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </SafeAreaView>
+      <Screen title="" noHeader customEdges={["top", "bottom"]}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'Course not found'}</Text>
+          <Pressable style={styles.retryButton} onPress={loadCourseDetail}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen
+      title=""
+      noHeader
+      widescreen
+      // Include top inset so back button isn't under the notch
+      customEdges={["top", "bottom"]}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
         </Pressable>
+        
+        {/* Wishlist Button */}
+        {courseDetail && (
+          <Pressable 
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              toggleWishlist({ 
+                id: courseDetail.id,
+                title: courseDetail.title,
+                description: courseDetail.description,
+                image: courseDetail.image,
+                instructor: courseDetail.instructor,
+                rating: courseDetail.rating,
+                duration: courseDetail.duration,
+                level: courseDetail.level,
+                category: courseDetail.category,
+              } as any);
+            }} 
+            style={styles.wishlistButton}
+          >
+            <Ionicons 
+              name={wishlisted ? "heart" : "heart-outline"} 
+              size={20} 
+              color={Colors.white} 
+            />
+          </Pressable>
+        )}
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Image */}
-        <View style={styles.heroContainer}>
-          <ImageWithFallback
-            source={{ uri: courseDetail.image }}
-            fallback={Images.placeholder}
-            style={styles.heroImage}
-          />
-          <View style={styles.heroOverlay} />
-        </View>
+      {/* Hero Image */}
+      <View style={styles.heroContainer}>
+        <ImageWithFallback
+          source={{ uri: courseDetail.image }}
+          fallback={Images.placeholder}
+          style={styles.heroImage}
+        />
+        <View style={styles.heroOverlay} />
+      </View>
 
-        {/* Content */}
-        <View style={styles.content}>
-          {/* Course Info */}
-          <Text style={styles.courseTitle}>{courseDetail.title}</Text>
-          
-          <Text style={styles.courseOverview}>Overview</Text>
-          <Text style={styles.courseDescription}>{courseDetail.description}</Text>
+      {/* Content */}
+      <View style={styles.content}>
+        {/* Course Info */}
+        <Text style={styles.courseTitle}>{courseDetail.title}</Text>
+        
+        <Text style={styles.courseOverview}>Overview</Text>
+        <Text style={styles.courseDescription}>{courseDetail.description}</Text>
 
-          {/* Course Progress Section */}
-          {courseContent && courseContent.userProgress && (
-            <>
-              <Text style={styles.sectionTitle}>Your Progress</Text>
-              <View style={styles.progressCard}>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>Course Progress</Text>
-                  <Text style={styles.progressPercentage}>{calculateCourseProgress()}%</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View style={styles.progressBarBackground}>
-                    <View 
-                      style={[
-                        styles.progressBarFill, 
-                        { width: `${calculateCourseProgress()}%` }
-                      ]} 
-                    />
-                  </View>
-                </View>
-                <View style={styles.progressStats}>
-                  <Text style={styles.progressStatsText}>
-                    {getCompletedModulesCount()} of {courseDetail.modules.length} modules completed
-                  </Text>
-                  {/* {calculateCourseProgress() === 100 && (
-                    <View style={styles.completedBadge}>
-                      <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
-                      <Text style={styles.completedBadgeText}>Course Completed!</Text>
-                    </View>
-                  )} */}
+        {/* Course Progress Section */}
+        {courseContent && courseContent.userProgress && (
+          <>
+            <Text style={styles.sectionTitle}>Your Progress</Text>
+            <View style={styles.progressCard}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>Course Progress</Text>
+                <Text style={styles.progressPercentage}>{calculateCourseProgress()}%</Text>
+              </View>
+              <View style={styles.progressBarContainer}>
+                <View style={styles.progressBarBackground}>
+                  <View 
+                    style={[
+                      styles.progressBarFill, 
+                      { width: `${calculateCourseProgress()}%` }
+                    ]} 
+                  />
                 </View>
               </View>
-            </>
-          )}
-
-          {/* Modules Section */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Modules</Text>
-            {courseContent && getCompletedModulesCount() === courseDetail.modules.length && courseDetail.modules.length > 0 && (
-              <View style={styles.completedBadge}>
-                <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
-                <Text style={styles.completedBadgeText}>All Completed</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.modulesList}>
-            {courseDetail.modules.length > 0 ? (
-              courseDetail.modules.map(renderModule)
-            ) : (
-              <View style={styles.noModulesContainer}>
-                <Text style={styles.noModulesText}>No modules available</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Instructor Section */}
-          <Text style={styles.sectionTitle}>Instructor</Text>
-          <View style={styles.instructorSection}>
-            <ImageWithFallback
-              source={{ uri: courseDetail.instructor.avatar }}
-              fallback={Images.defaultAvatar}
-              style={styles.instructorAvatar}
-            />
-            <View style={styles.instructorInfo}>
-              <Text style={styles.instructorName}>{courseDetail.instructor.name}</Text>
-              <Text style={styles.instructorRole}>Data Science Expert</Text>
-            </View>
-          </View>
-
-          {/* Course Reviews */}
-          <Text style={styles.sectionTitle}>Course Reviews</Text>
-          
-          {/* Rating Summary */}
-          <View style={styles.reviewsSectionCard}>
-            {/* Top row: Left summary (with button) + Right breakdown */}
-            <View style={styles.reviewsTopRow}>
-              {/* Left: summary + button */}
-              <View style={styles.reviewsSummaryCol}>
-                <Text style={styles.ratingNumber}>{courseDetail.rating.toFixed(1)}</Text>
-                <View style={styles.starsContainer}>
-                  {renderStarRating(courseDetail.rating)}
-                </View>
-                <Text style={styles.reviewCount}>
-                  {courseDetail.totalRatings} ratings · {courseDetail.reviews.length} reviews
+              <View style={styles.progressStats}>
+                <Text style={styles.progressStatsText}>
+                  {getCompletedModulesCount()} of {courseContent?.sections.length || 0} modules completed
                 </Text>
-
-                <Pressable style={styles.leaveReviewButton} onPress={handleLeaveReview}>
-                  <Text style={styles.leaveReviewButtonText}>Leave a Review</Text>
-                </Pressable>
+                {/* {calculateCourseProgress() === 100 && (
+                  <View style={styles.completedBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
+                    <Text style={styles.completedBadgeText}>Course Completed!</Text>
+                  </View>
+                )} */}
               </View>
-
-              {/* Right: rating breakdown (kept as-is) */}
-              {renderRatingBreakdown(courseDetail.ratingBreakdown)}
             </View>
+          </>
+        )}
 
-            {/* Divider */}
-            <View style={styles.reviewsDivider} />
-
-            {/* Reviews list (rows feel part of same section) */}
-            <View style={styles.reviewsListTight}>
-              {courseDetail.reviews.map(renderReview)}
-            </View>
-          </View>
-
-          {/* Enroll Button */}
-          {!isEnrolled && (
-            <View style={styles.enrollSection}>
-              <Pressable
-                style={[styles.enrollButton, isEnrolling && { opacity: 0.6 }]}
-                onPress={handleEnroll}
-                disabled={isEnrolling}
-              >
-                {isEnrolling ? (
-                  <ActivityIndicator color={Colors.white} />
-                ) : (
-                  <Text style={styles.enrollButtonText}>Enroll Now</Text>
-                )}
-              </Pressable>
+        {/* Modules Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Modules</Text>
+          {courseContent && getCompletedModulesCount() === courseContent.sections.length && courseContent.sections.length > 0 && (
+            <View style={styles.completedBadge}>
+              <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
+              <Text style={styles.completedBadgeText}>All Completed</Text>
             </View>
           )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        <View style={styles.modulesList}>
+          {courseContent && courseContent.sections.length > 0 ? (
+            courseContent.sections.map(renderModule)
+          ) : (
+            <View style={styles.noModulesContainer}>
+              <Text style={styles.noModulesText}>No modules available</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Instructor Section */}
+        <Text style={styles.sectionTitle}>Instructor</Text>
+        <View style={styles.instructorSection}>
+          <ImageWithFallback
+            source={{ uri: courseDetail.instructor.avatar }}
+            fallback={Images.defaultAvatar}
+            style={styles.instructorAvatar}
+          />
+          <View style={styles.instructorInfo}>
+            <Text style={styles.instructorName}>{courseDetail.instructor.name}</Text>
+            <Text style={styles.instructorRole}>Data Science Expert</Text>
+          </View>
+        </View>
+
+        {/* Course Reviews */}
+        <Text style={styles.sectionTitle}>Course Reviews</Text>
+        
+        {/* Rating Summary */}
+        <View style={styles.reviewsSectionCard}>
+          {/* Top row: Left summary (with button) + Right breakdown */}
+          <View style={styles.reviewsTopRow}>
+            {/* Left: summary + button */}
+            <View style={styles.reviewsSummaryCol}>
+              <Text style={styles.ratingNumber}>
+                {courseDetail?.reviews?.length ? courseDetail.rating.toFixed(1) : '0.0'}
+              </Text>
+              <View style={styles.starsContainer}>
+                {renderStarRating(courseDetail?.reviews?.length ? courseDetail.rating : 0)}
+              </View>
+              <Text style={styles.reviewCount}>
+                {courseDetail?.reviews?.length || 0} {courseDetail?.reviews?.length === 1 ? 'review' : 'reviews'}
+              </Text>
+
+              {isEnrolled && calculateCourseProgress() === 100 && (
+                <ActionButton
+                  onPress={handleLeaveReview}
+                  text={'Leave a Review'}
+                  style={{height: 42, padding: 12, paddingTop: 9, marginTop: Spacing.md, marginBottom: Spacing.xs}}
+                />
+              )}
+            </View>
+
+            {/* Right: rating breakdown */}
+            {courseDetail?.ratingBreakdown && renderRatingBreakdown(courseDetail.ratingBreakdown)}
+          </View>
+
+          {/* Divider */}
+          {courseDetail?.reviews?.length ? <View style={styles.reviewsDivider} /> : null}
+
+          {/* Reviews list or empty state */}
+          <View style={styles.reviewsListTight}>
+            {courseDetail?.reviews?.length ? (
+              courseDetail.reviews.map(renderReview)
+            ) : (
+              <View style={styles.noReviewsContainer}>
+                <Ionicons name="star-outline" size={48} color={Colors.textSecondary} />
+                <Text style={styles.noReviewsTitle}>No reviews yet</Text>
+                <Text style={styles.noReviewsText}>
+                  Be the first to share your experience with this course!
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Enroll Button */}
+        {!isEnrolled && (
+          <ActionButton
+            onPress={handleEnroll}
+            text={'Enroll Now'}
+            disabled={isEnrolling}
+            loading={isEnrolling}
+          />
+        )}
+      </View>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -464,11 +612,14 @@ const styles = StyleSheet.create({
   },
   header: {
     position: 'absolute',
-    top: 60,
+    top: Spacing.lg,
     left: 0,
     right: 0,
-    zIndex: 10,
+    zIndex: 1,
     paddingHorizontal: Spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   backButton: {
     width: 40,
@@ -477,6 +628,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  wishlistButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 6,
   },
   scrollView: {
     flex: 1,
@@ -504,8 +664,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     marginTop: -20,
     paddingTop: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
-    minHeight: '100%',
+    paddingHorizontal: Spacing.lg
   },
   courseTitle: {
     fontSize: 24,
@@ -745,25 +904,9 @@ const styles = StyleSheet.create({
     minWidth: 28,
     textAlign: 'right',
   },
-  leaveReviewButton: {
-    backgroundColor: Colors.purple400,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.sm,
-    alignSelf: 'flex-start',
-    flexShrink: 0,
-  },
-  leaveReviewButtonText: {
-    color: Colors.white,
-    fontWeight: '600',
-    fontSize: TextStyles.body.fontSize,
-  },
   reviewItem: {
-    backgroundColor: 'transparent',       // was Colors.textInputBg
-    paddingVertical: Spacing.md,          // a bit tighter
+    backgroundColor: 'transparent',      
+    paddingVertical: Spacing.md,         
     paddingHorizontal: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.gray500,
@@ -771,7 +914,7 @@ const styles = StyleSheet.create({
   reviewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.xs,             // was Spacing.sm
+    marginBottom: Spacing.xs,             
   },
   reviewerAvatar: {
     width: 32,
@@ -813,21 +956,22 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontStyle: 'italic',
   },
-  enrollSection: {
-    paddingVertical: Spacing.xl,
-    paddingBottom: 40,
-  },
-  enrollButton: {
-    backgroundColor: Colors.purple400,
-    paddingVertical: Spacing.lg,
-    borderRadius: 12,
+  noReviewsContainer: {
     alignItems: 'center',
+    paddingVertical: Spacing.xl * 1.5,
+    paddingHorizontal: Spacing.lg,
   },
-  enrollButtonText: {
-    fontSize: TextStyles.h3.fontSize,
+  noReviewsTitle: {
+    fontSize: TextStyles.h4.fontSize,
     fontWeight: '600',
-    color: Colors.white,
+    color: Colors.textPrimary,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  noReviewsText: {
+    fontSize: TextStyles.body.fontSize,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
-
-export default CourseDetailScreen;

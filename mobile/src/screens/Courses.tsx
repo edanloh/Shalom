@@ -1,27 +1,27 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
+  ScrollView,
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Image,
-  TextInput,
   Dimensions,
-  ScrollView,
   ActivityIndicator,
   RefreshControl,
+  DeviceEventEmitter,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useCourses } from "../contexts/CourseContext";
 import { useUser } from "../contexts/UserContext";
-import { Colors, Spacing, TextStyles } from "../constants";
+import { Colors, Spacing, TextStyles, Typography } from "../constants";
 import type { Course } from "../types";
 import { ImageWithFallback } from "@components/common";
 import { Images } from "../../assets";
+import Screen from "../components/common/Screen";
+import { CustomTextInput } from "@/components";
+import screenStyles from "@/styles/styles";
 const { width } = Dimensions.get("window");
 
 const CARD_BG = "#3A3A45";
@@ -53,8 +53,11 @@ function progressFrom(course: Course): number {
 export default function CoursesScreen({ navigation }: any) {
   const {
     courses = [],
+    recommendedCourses = [],
     loading,
+    recommendedLoading,
     refreshCourses,
+    refreshRecommended,
     wishlist = [],
     toggleWishlist,
   } = useCourses();
@@ -101,9 +104,9 @@ export default function CoursesScreen({ navigation }: any) {
 
   const recommended = useMemo(() => {
     if (query) return [];
-    // simple: first few not-enrolled
+    if (recommendedCourses.length) return recommendedCourses;
     return courses.filter((c) => !enrolledIds.has(c.id)).slice(0, 10);
-  }, [courses, enrolledIds, query]);
+  }, [courses, enrolledIds, query, recommendedCourses]);
 
   const popular = useMemo(() => {
     // Not enrolled, filtered by tag and query
@@ -141,16 +144,21 @@ export default function CoursesScreen({ navigation }: any) {
   };
 
   const [refreshing, setRefreshing] = useState(false);
+  const lastScrollY = useRef(0);
+  const tabHidden = useRef(false);
 
   const onRefresh = useCallback(async () => {
     if (!refreshCourses) return;
     try {
       setRefreshing(true);
-      await refreshCourses();
+      await Promise.all([
+        refreshCourses?.(),
+        refreshRecommended?.(),
+      ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refreshCourses]);
+  }, [refreshCourses, refreshRecommended]);
 
   const BadgeHeartRow = ({ item }: { item: Course }) => (
     <View style={styles.badgeRow}>
@@ -185,7 +193,16 @@ export default function CoursesScreen({ navigation }: any) {
   }: {
     item: Course;
     withProgress?: boolean;
-  }) => (
+  }) => {
+    const rankLabel =
+      item.recommendationRank || item.recommendationScore
+        ? `#${item.recommendationRank ?? "?"} • ${Number(
+            item.recommendationScore ?? 0
+          ).toFixed(1)}`
+        : null;
+    const reason = item.recommendationReason || "Recommended for you";
+
+    return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
@@ -198,11 +215,21 @@ export default function CoursesScreen({ navigation }: any) {
           style={styles.hImage}
         />
         <BadgeHeartRow item={item} />
+        {rankLabel ? (
+          <View style={styles.rankBadge}>
+            <Text style={styles.rankText}>{rankLabel}</Text>
+          </View>
+        ) : null}
       </View>
       <Text style={styles.hTitle} numberOfLines={2}>
         {item.title}
       </Text>
       <MetaRow rating={item.rating} modules={item.modules} />
+      {reason ? (
+        <Text style={styles.reason} numberOfLines={1}>
+          {reason}
+        </Text>
+      ) : null}
       {withProgress ? (
         <View style={{ marginTop: 8 }}>
           <ProgressBar value={progressFrom(item)} />
@@ -212,7 +239,8 @@ export default function CoursesScreen({ navigation }: any) {
         </View>
       ) : null}
     </TouchableOpacity>
-  );
+    );
+  };
 
   const GCard = ({ item }: { item: Course }) => (
     <TouchableOpacity
@@ -255,194 +283,181 @@ export default function CoursesScreen({ navigation }: any) {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      <StatusBar style="light" />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Browse</Text>
-      </View>
-
+    <Screen
+      title="Browse Courses"
+      customEdges={["top"]}
+      disableChildrenWrapper
+      useScrollView={false}
+    >
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: Spacing.lg * 2 }}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={screenStyles.fullScrollContent}
+        stickyHeaderIndices={[0]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={Colors.white} // iOS spinner color
-            colors={[Colors.purple400]} // Android spinner colors
+            tintColor={Colors.secondary}
+            colors={[Colors.secondary]}
           />
         }
-        alwaysBounceVertical={true} // iOS
-        overScrollMode="always" // Android
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          const y = e.nativeEvent.contentOffset.y;
+          const dy = y - lastScrollY.current;
+          if (Math.abs(dy) < 8) return;
+          if (dy > 0 && y > 40 && !tabHidden.current) {
+            tabHidden.current = true;
+            DeviceEventEmitter.emit("tabbar:toggle", { visible: false });
+          } else if (dy < 0 && tabHidden.current) {
+            tabHidden.current = false;
+            DeviceEventEmitter.emit("tabbar:toggle", { visible: true });
+          }
+          lastScrollY.current = y;
+        }}
       >
-        {/* Search */}
-        <View style={styles.searchWrap}>
-          <Ionicons name="search" size={18} color={Colors.textSecondary} />
-          <TextInput
+        <View style={styles.stickyControls}>
+          {/* Search */}
+          <CustomTextInput
+            placeholder="Search for courses"
             value={query}
             onChangeText={setQuery}
-            placeholder="Search for courses"
-            placeholderTextColor={Colors.textSecondary}
-            style={styles.searchInput}
+            autoCapitalize={"none"}
+            leftIconName="search"
             returnKeyType="search"
           />
-          {query ? (
-            <TouchableOpacity
-              onPress={() => setQuery("")}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close" size={18} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          ) : null}
+
+          {/* Tag chips (from course.tags, no duplicates) */}
+          <FlatList
+            data={tagChips}
+            keyExtractor={(t) => t}
+            renderItem={({ item }) => {
+              const active = item === selectedTag;
+              return (
+                <TouchableOpacity
+                  onPress={() => setSelectedTag(item)}
+                  activeOpacity={0.8}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+            style={styles.chipsList}
+          />
         </View>
 
-        {/* Tag chips (from course.tags, no duplicates) */}
-        <FlatList
-          data={tagChips}
-          keyExtractor={(t) => t}
-          renderItem={({ item }) => {
-            const active = item === selectedTag;
-            return (
-              <TouchableOpacity
-                onPress={() => setSelectedTag(item)}
-                activeOpacity={0.8}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text
-                  style={[styles.chipText, active && styles.chipTextActive]}
-                >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsRow}
-          style={{ marginTop: 4 }}
-        />
-
-        {/* Jump Back In */}
-        {jumpBackIn.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Jump Back In</Text>
-            <FlatList<Course>
-              data={jumpBackIn}
-              keyExtractor={(i) => i.id}
-              renderItem={({ item }) => <HCard item={item} withProgress />}
-              horizontal
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.hRow}
-              extraData={wishlist}
-            />
-          </>
-        )}
-
-        {/* Recommended (not enrolled) */}
-        {!query && (
-          <>
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.sm }]}>
-              Recommended
-            </Text>
-
-            {loading || refreshing ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.purple400} />
-                <Text style={styles.loadingText}>Loading recommended…</Text>
-              </View>
-            ) : recommended.length ? (
+        <View style={styles.contentWrap}>
+          {/* Jump Back In */}
+          {jumpBackIn.length > 0 && (
+            <>
+              <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>Jump Back In</Text>
               <FlatList<Course>
-                data={recommended}
+                data={jumpBackIn}
                 keyExtractor={(i) => i.id}
-                renderItem={({ item }) => <HCard item={item} />}
+                renderItem={({ item }) => <HCard item={item} withProgress />}
                 horizontal
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.hRow}
                 extraData={wishlist}
               />
-            ) : (
-              <EmptyState
-                icon="sparkles-outline"
-                message="No recommendations right now."
-                subtext="Pull down to refresh."
-              />
-            )}
-          </>
-        )}
+            </>
+          )}
 
-        {/* Popular Courses (clean grid, not enrolled, tag + query filtered) */}
-        <Text style={[styles.sectionTitle, { marginTop: Spacing.sm }]}>
-          Popular Courses
-        </Text>
-        {loading || refreshing ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.purple400} />
-            <Text style={styles.loadingText}>Loading popular courses…</Text>
-          </View>
-        ) : popular.length ? (
-          <FlatList<Course>
-            data={popular}
-            keyExtractor={(i) => i.id}
-            renderItem={({ item }) => <GCard item={item} />}
-            numColumns={2}
-            columnWrapperStyle={{ justifyContent: "space-between" }}
-            contentContainerStyle={styles.grid}
-            scrollEnabled={false}
-            extraData={wishlist}
-          />
-        ) : (
-          <EmptyState
-            icon="search-outline"
-            message="No courses match your filters"
-            subtext="Pull down to refresh."
-          />
-        )}
+          {/* Recommended (not enrolled) */}
+          {!query && (
+            <>
+              <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
+                Recommended
+              </Text>
+
+              {recommendedLoading || refreshing ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={Colors.purple400} />
+                  <Text style={styles.loadingText}>Loading recommended…</Text>
+                </View>
+              ) : recommended.length ? (
+                <FlatList<Course>
+                  data={recommended}
+                  keyExtractor={(i) => i.id}
+                  renderItem={({ item }) => <HCard item={item} />}
+                  horizontal
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.hRow}
+                  style={styles.hList}
+                  extraData={wishlist}
+                />
+              ) : (
+                <EmptyState
+                  icon="sparkles-outline"
+                  message="No recommendations right now."
+                  subtext="Pull down to refresh."
+                />
+              )}
+            </>
+          )}
+
+          {/* Popular Courses (clean grid, not enrolled, tag + query filtered) */}
+          <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
+            Popular Courses
+          </Text>
+          {loading || refreshing ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.purple400} />
+              <Text style={styles.loadingText}>Loading popular courses…</Text>
+            </View>
+          ) : popular.length ? (
+            <FlatList<Course>
+              data={popular}
+              keyExtractor={(i) => i.id}
+              renderItem={({ item }) => <GCard item={item} />}
+              numColumns={2}
+              columnWrapperStyle={{ justifyContent: "space-between" }}
+              scrollEnabled={false}
+              extraData={wishlist}
+            />
+          ) : (
+            <EmptyState
+              icon="search-outline"
+              message="No courses match your filters"
+              subtext="Pull down to refresh."
+            />
+          )}
+          <View style={{ height: 120 }} />
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.primary },
-
-  header: {
-    alignItems: "center",
-    paddingVertical: Spacing.sm,
-  },
-  headerTitle: {
-    fontFamily: TextStyles.h4.fontFamily,
-    fontSize: TextStyles.h4.fontSize,
-    color: Colors.textPrimary,
-    fontWeight: "700",
-  },
-
-  // Search
-  searchWrap: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
-    backgroundColor: "#3A3C46",
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  searchInput: {
-    flex: 1,
-    color: Colors.textPrimary,
-    marginLeft: 8,
-    fontSize: TextStyles.body.fontSize,
-    fontFamily: TextStyles.body.fontFamily,
-  },
-
   // Chips
   chipsRow: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
+  },
+  chipsList: {
+    maxHeight: 48,
+    marginTop: Spacing.sm,
+    marginHorizontal: -Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+  },
+  stickyControls: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.sm,
+  },
+  contentWrap: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl,
+  },
+  hList: {
+    marginHorizontal: -Spacing.xl,
   },
   chip: {
     paddingHorizontal: 14,
@@ -452,10 +467,14 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: CHIP_BORDER,
     marginRight: 10,
+    height: 38,
+    justifyContent: "center",
   },
   chipActive: {
     backgroundColor: Colors.purple400,
     borderColor: Colors.purple400,
+    height: 38,
+    justifyContent: "center",
   },
   chipText: {
     color: Colors.textSecondary,
@@ -465,17 +484,6 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: "#fff",
-  },
-
-  // Section title
-  sectionTitle: {
-    color: Colors.textPrimary,
-    fontFamily: TextStyles.h3.fontFamily,
-    fontSize: TextStyles.h4.fontSize,
-    fontWeight: "700",
-    marginTop: 6,
-    marginBottom: 12,
-    paddingHorizontal: Spacing.lg,
   },
 
   loadingContainer: {
@@ -516,7 +524,10 @@ const styles = StyleSheet.create({
   },
 
   // Horizontal cards
-  hRow: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
+  hRow: {
+    paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+  },
   hCard: {
     width: Math.min(width * 0.72, 300),
     marginRight: 12,
@@ -550,6 +561,20 @@ const styles = StyleSheet.create({
     fontFamily: TextStyles.body.fontFamily,
   },
   metaDot: { color: Colors.textSecondary, marginHorizontal: 4 },
+  rankBadge: {
+    position: "absolute",
+    left: Spacing.sm,
+    top: Spacing.sm,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  rankText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: Typography.fontFamily.medium,
+  },
 
   // Progress
   progressWrap: {
@@ -571,16 +596,15 @@ const styles = StyleSheet.create({
   },
 
   // Grid cards (Popular)
-  grid: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
   gCard: {
-    width: (width - Spacing.lg * 2 - 12) / 2,
+    width: (width - Spacing.lg * 2 - Spacing.lg) / 2,
     backgroundColor: "transparent",
     borderRadius: 16,
     marginBottom: Spacing.lg,
   },
   gImage: {
     width: "100%",
-    height: 110,
+    height: (width - Spacing.lg * 2 - Spacing.lg) / 5,
     backgroundColor: CARD_BG,
   },
   gTitle: {
@@ -627,5 +651,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 14,
     padding: 6,
+  },
+  reason: {
+    color: Colors.purple200,
+    fontSize: 12,
+    marginTop: 4,
+    paddingHorizontal: 2,
+    fontFamily: TextStyles.body.fontFamily,
   },
 });

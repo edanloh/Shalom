@@ -19,7 +19,7 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export default function UserProvider({ children }: { children: React.ReactNode }) {
   const [enrolledCourses, setEnrolledCourses] = useState<string[]>([]);
   const [progress, setProgress] = useState<UserProgress[]>([]);
   const [completedCourses, setCompletedCourses] = useState<string[]>([]);

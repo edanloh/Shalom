@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import styles from "@/styles/styles";
-import { Colors } from "@/constants";
+import { Colors, Spacing } from "@/constants";
 
 interface CustomTextInputProps {
   value: string;
@@ -18,7 +18,12 @@ interface CustomTextInputProps {
   showPassword?: boolean;
   onTogglePassword?: () => void;
   style?: any;
+  multiline?: boolean;
+  numberOfLines?: number;
+  textAlignVertical?: "auto" | "top" | "bottom";
+  maxLength?: number;
   inputContainerStyle?: any;
+  leftIconName?: keyof typeof Ionicons.glyphMap;
   eyeIconStyle?: any;
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   keyboardType?: KeyboardTypeOptions;
@@ -39,7 +44,7 @@ interface CustomTextInputProps {
     | "emergency-call";
 }
 
-const CustomTextInput: React.FC<CustomTextInputProps> = ({
+export default function CustomTextInput({ 
   value,
   onChangeText,
   placeholder,
@@ -47,7 +52,12 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
   showPassword,
   onTogglePassword,
   style,
+  multiline = false,
+  numberOfLines,
+  textAlignVertical,
+  maxLength,
   inputContainerStyle,
+  leftIconName,
   eyeIconStyle,
   autoCapitalize = "none",
   keyboardType,
@@ -55,7 +65,7 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
   warningTextColor,
   onSubmitEditing,
   returnKeyType = "default",
-}) => {
+}: CustomTextInputProps) {
   const inputMarginBottom = warningText ? 8 : 16;
   return (
     <View>
@@ -66,8 +76,19 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
           { marginBottom: inputMarginBottom },
         ]}
       >
+        {leftIconName && (
+          <Ionicons
+            name={leftIconName}
+            size={20}
+            color="white"
+            style={[
+              styles.inputIcon,
+              multiline && { alignSelf: "flex-start", paddingTop: Spacing.lg },
+            ]}
+          />
+        )}
         <TextInput
-          style={[styles.input, style]}
+          style={[styles.input, style, { outlineStyle: "none" }]}
           placeholder={placeholder}
           value={value}
           onChangeText={onChangeText}
@@ -81,7 +102,23 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
           placeholderTextColor={Colors.textSecondary}
           onSubmitEditing={onSubmitEditing}
           returnKeyType={returnKeyType}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          maxLength={maxLength}
+          textAlignVertical={textAlignVertical}
         />
+        {value.length > 0 && (
+          <TouchableOpacity
+            onPress={() => onChangeText("")}
+            style={[
+              styles.eyeIcon,
+              { paddingRight: onTogglePassword ? 0 : Spacing.md },
+              multiline && { alignSelf: "flex-start", paddingTop: Spacing.lg },
+            ]}
+          >
+            <Ionicons name={"close-circle-outline"} size={20} color="white" />
+          </TouchableOpacity>
+        )}
         {onTogglePassword && (
           <TouchableOpacity
             onPress={onTogglePassword}
@@ -110,5 +147,3 @@ const CustomTextInput: React.FC<CustomTextInputProps> = ({
     </View>
   );
 };
-
-export default CustomTextInput;

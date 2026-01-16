@@ -18,6 +18,13 @@ DROP TABLE IF EXISTS assignment_submissions CASCADE;
 DROP TABLE IF EXISTS assignments CASCADE;
 DROP TABLE IF EXISTS course_lessons CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS course_prereqs CASCADE;
+DROP TABLE IF EXISTS course_skills CASCADE;
+DROP TABLE IF EXISTS recommendation_feedback CASCADE;
+DROP TABLE IF EXISTS recommendation_events CASCADE;
+DROP TABLE IF EXISTS user_targets CASCADE;
+DROP TABLE IF EXISTS user_interests CASCADE;
+DROP TABLE IF EXISTS content_features CASCADE;
 DROP TABLE IF EXISTS user_preferences CASCADE;
 DROP TABLE IF EXISTS course_wishlist CASCADE;
 DROP TABLE IF EXISTS user_module_progress CASCADE;
@@ -33,6 +40,7 @@ DROP TABLE IF EXISTS user_achievements CASCADE;
 DROP TABLE IF EXISTS achievements CASCADE;
 DROP TABLE IF EXISTS course_enrollments CASCADE;
 DROP TABLE IF EXISTS course_ratings CASCADE;
+DROP TABLE IF EXISTS credit_events CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -54,6 +62,18 @@ CREATE TABLE users (
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Credit Events Table
+CREATE TABLE credit_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    points INTEGER NOT NULL,
+    course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
+    reference_key VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Categories Table
@@ -394,7 +414,11 @@ INSERT INTO achievements (id, name, description, icon, type, criteria, points, c
 ('550e8400-e29b-41d4-a716-446655441403', 'Course Completion', 'Complete your first course', 'certificate', 'certificate', '{"type": "courses_completed", "count": 1}', 500, '#8b5cf6', true),
 ('550e8400-e29b-41d4-a716-446655441404', 'Knowledge Seeker', 'Complete 5 courses', 'level', 'level', '{"type": "courses_completed", "count": 5}', 1000, '#3b82f6', true),
 ('550e8400-e29b-41d4-a716-446655441405', 'Quick Learner', 'Complete a course in under 7 days', 'badge', 'badge', '{"type": "course_completion_time", "days": 7}', 300, '#ef4444', true),
-('550e8400-e29b-41d4-a716-446655441406', 'Perfect Score', 'Get 100% on a quiz', 'badge', 'badge', '{"type": "quiz_score", "score": 100}', 150, '#10b981', true);
+('550e8400-e29b-41d4-a716-446655441406', 'Perfect Score', 'Get 100% on a quiz', 'badge', 'badge', '{"type": "quiz_score", "score": 100}', 150, '#10b981', true),
+('550e8400-e29b-41d4-a716-446655441407', 'Credit Collector', 'Earn 500 total credits', 'badge', 'badge', '{"type": "total_credits", "count": 500}', 200, '#22c55e', true),
+('550e8400-e29b-41d4-a716-446655441408', 'Credit Master', 'Earn 1000 total credits', 'level', 'level', '{"type": "total_credits", "count": 1000}', 400, '#14b8a6', true),
+('550e8400-e29b-41d4-a716-446655441409', 'Goal Getter', 'Hit 1 learning goal', 'badge', 'badge', '{"type": "goal_hits", "count": 1}', 150, '#f97316', true),
+('550e8400-e29b-41d4-a716-446655441410', 'Goal Streak', 'Hit 5 learning goals', 'level', 'level', '{"type": "goal_hits", "count": 5}', 350, '#f59e0b', true);
 
 -- Insert User Achievements
 INSERT INTO user_achievements (id, user_id, achievement_id, earned_at, value) VALUES
@@ -620,7 +644,91 @@ CREATE TABLE IF NOT EXISTS notifications (
     read_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Personalization: store per-user goals, interests, and interaction feedback
+CREATE TABLE IF NOT EXISTS user_targets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_certificate TEXT,
+    target_degree TEXT,
+    target_role TEXT,
+    current_level VARCHAR(20) DEFAULT 'Beginner' CHECK (current_level IN ('Beginner', 'Intermediate', 'Advanced')),
+    desired_skills TEXT[],
+    preferred_languages TEXT[],
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
+CREATE TABLE IF NOT EXISTS user_interests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    topic TEXT NOT NULL,
+    weight NUMERIC(6,3) DEFAULT 1.000,
+    source VARCHAR(50) DEFAULT 'declared', -- declared, behavior, inferred
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, topic)
+);
+
+-- Content features table keeps per-course signals (so we can evolve ranking without altering core courses table)
+CREATE TABLE IF NOT EXISTS content_features (
+    course_id UUID PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
+    tags TEXT[],
+    level VARCHAR(20) CHECK (level IN ('Beginner', 'Intermediate', 'Advanced')),
+    duration_minutes INTEGER,
+    popularity_score NUMERIC(6,3) DEFAULT 0.000,
+    freshness_score NUMERIC(6,3) DEFAULT 0.000,
+    quality_score NUMERIC(6,3) DEFAULT 0.000,
+    last_indexed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Knowledge graph edges: skills taught/required and prerequisites
+CREATE TABLE IF NOT EXISTS course_skills (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    skill TEXT NOT NULL,
+    proficiency VARCHAR(20) DEFAULT 'fundamentals', -- fundamentals, intermediate, advanced
+    UNIQUE(course_id, skill)
+);
+
+CREATE TABLE IF NOT EXISTS course_prereqs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    prereq_course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    UNIQUE(course_id, prereq_course_id)
+);
+
+-- Events emitted when recommendations are shown or interacted with
+CREATE TABLE IF NOT EXISTS recommendation_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+    event_type VARCHAR(30) NOT NULL CHECK (event_type IN ('impression', 'view', 'click', 'start', 'complete', 'dismiss', 'save')),
+    context JSONB,
+    request_id TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Explicit feedback so we can fine-tune ranking weights
+CREATE TABLE IF NOT EXISTS recommendation_feedback (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+    relevance_score INTEGER CHECK (relevance_score BETWEEN 1 AND 5),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_interests_user ON user_interests(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_interests_topic ON user_interests(topic);
+CREATE INDEX IF NOT EXISTS idx_content_features_popularity ON content_features(popularity_score DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_course_skills_skill ON course_skills(skill);
+CREATE INDEX IF NOT EXISTS idx_course_prereqs_course ON course_prereqs(course_id);
+CREATE INDEX IF NOT EXISTS idx_course_prereqs_prereq ON course_prereqs(prereq_course_id);
+CREATE INDEX IF NOT EXISTS idx_recommendation_events_user ON recommendation_events(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_recommendation_events_course ON recommendation_events(course_id);
+CREATE INDEX IF NOT EXISTS idx_recommendation_feedback_user ON recommendation_feedback(user_id);
 
 -- Course Content Enhancements - Support for lessons, assignments, and detailed content
 CREATE TABLE IF NOT EXISTS course_lessons (
@@ -872,6 +980,9 @@ DROP TRIGGER IF EXISTS update_discussions_updated_at ON course_discussions;
 DROP TRIGGER IF EXISTS update_discussion_replies_updated_at ON discussion_replies;
 DROP TRIGGER IF EXISTS update_learning_paths_updated_at ON learning_paths;
 DROP TRIGGER IF EXISTS update_learning_path_progress_updated_at ON user_learning_path_progress;
+DROP TRIGGER IF EXISTS update_user_targets_updated_at ON user_targets;
+DROP TRIGGER IF EXISTS update_user_interests_updated_at ON user_interests;
+DROP TRIGGER IF EXISTS update_content_features_updated_at ON content_features;
 
 CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_lessons_updated_at BEFORE UPDATE ON course_lessons FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -882,6 +993,9 @@ CREATE TRIGGER update_discussions_updated_at BEFORE UPDATE ON course_discussions
 CREATE TRIGGER update_discussion_replies_updated_at BEFORE UPDATE ON discussion_replies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_learning_paths_updated_at BEFORE UPDATE ON learning_paths FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_learning_path_progress_updated_at BEFORE UPDATE ON user_learning_path_progress FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_user_targets_updated_at BEFORE UPDATE ON user_targets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_user_interests_updated_at BEFORE UPDATE ON user_interests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_content_features_updated_at BEFORE UPDATE ON content_features FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Add some sample data for new tables to test functionality (using ON CONFLICT to handle duplicates)
 INSERT INTO user_preferences (user_id, email_notifications, push_notifications, theme_preference) VALUES
@@ -902,6 +1016,47 @@ INSERT INTO notifications (user_id, title, message, type, related_entity_type, r
 ('550e8400-e29b-41d4-a716-446655440101', 'New Assignment Available', 'A new assignment has been posted in Complete Web Development Bootcamp 2024', 'assignment', 'course', '550e8400-e29b-41d4-a716-446655440401'),
 ('550e8400-e29b-41d4-a716-446655440101', 'Course Completed!', 'Congratulations! You have completed Machine Learning Fundamentals with Python', 'achievement', 'course', '550e8400-e29b-41d4-a716-446655440402'),
 ('550e8400-e29b-41d4-a716-446655440103', 'Welcome to Shalom!', 'Welcome to Shalom Learning Platform. Start your learning journey today!', 'system', NULL, NULL);
+
+-- Sample personalization data
+INSERT INTO user_targets (id, user_id, target_certificate, target_role, current_level, desired_skills) VALUES
+('550e8400-e29b-41d4-a716-446655520101', '550e8400-e29b-41d4-a716-446655440101', 'Full-Stack Web Developer', 'Frontend Engineer', 'Intermediate', ARRAY['React', 'TypeScript', 'UI/UX']),
+('550e8400-e29b-41d4-a716-446655520102', '550e8400-e29b-41d4-a716-446655440103', 'Data Science Specialist', 'Data Analyst', 'Beginner', ARRAY['Python', 'SQL', 'Statistics'])
+ON CONFLICT (user_id) DO NOTHING;
+
+INSERT INTO user_interests (id, user_id, topic, weight, source) VALUES
+('550e8400-e29b-41d4-a716-446655520201', '550e8400-e29b-41d4-a716-446655440101', 'React', 2.500, 'declared'),
+('550e8400-e29b-41d4-a716-446655520202', '550e8400-e29b-41d4-a716-446655440101', 'TypeScript', 2.000, 'behavior'),
+('550e8400-e29b-41d4-a716-446655520203', '550e8400-e29b-41d4-a716-446655440103', 'Machine Learning', 2.700, 'declared')
+ON CONFLICT (user_id, topic) DO NOTHING;
+
+INSERT INTO content_features (course_id, tags, level, duration_minutes, popularity_score, freshness_score, quality_score) VALUES
+('550e8400-e29b-41d4-a716-446655440401', ARRAY['React', 'Frontend', 'TypeScript'], 'Intermediate', 720, 9.500, 7.200, 9.200),
+('550e8400-e29b-41d4-a716-446655440402', ARRAY['Python', 'Data Science', 'Machine Learning'], 'Beginner', 640, 9.800, 8.100, 9.000),
+('550e8400-e29b-41d4-a716-446655440404', ARRAY['Node', 'Backend', 'API'], 'Intermediate', 560, 8.900, 6.800, 8.700)
+ON CONFLICT (course_id) DO NOTHING;
+
+INSERT INTO course_skills (id, course_id, skill, proficiency) VALUES
+('550e8400-e29b-41d4-a716-446655520501', '550e8400-e29b-41d4-a716-446655440401', 'React', 'intermediate'),
+('550e8400-e29b-41d4-a716-446655520502', '550e8400-e29b-41d4-a716-446655440401', 'TypeScript', 'intermediate'),
+('550e8400-e29b-41d4-a716-446655520503', '550e8400-e29b-41d4-a716-446655440402', 'Python', 'fundamentals'),
+('550e8400-e29b-41d4-a716-446655520504', '550e8400-e29b-41d4-a716-446655440402', 'Machine Learning', 'fundamentals'),
+('550e8400-e29b-41d4-a716-446655520505', '550e8400-e29b-41d4-a716-446655440404', 'Node', 'intermediate'),
+('550e8400-e29b-41d4-a716-446655520506', '550e8400-e29b-41d4-a716-446655440404', 'APIs', 'intermediate')
+ON CONFLICT (course_id, skill) DO NOTHING;
+
+INSERT INTO course_prereqs (id, course_id, prereq_course_id) VALUES
+('550e8400-e29b-41d4-a716-446655520601', '550e8400-e29b-41d4-a716-446655440401', '550e8400-e29b-41d4-a716-446655440402') -- React course requires Python/ML fundamentals (example)
+ON CONFLICT (course_id, prereq_course_id) DO NOTHING;
+
+INSERT INTO recommendation_events (id, user_id, course_id, event_type, context, request_id) VALUES
+('550e8400-e29b-41d4-a716-446655520301', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440401', 'impression', '{"placement": "home_recs"}', 'req-recs-seed'),
+('550e8400-e29b-41d4-a716-446655520302', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440401', 'click', '{"placement": "home_recs"}', 'req-recs-seed')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO recommendation_feedback (id, user_id, course_id, relevance_score, notes) VALUES
+('550e8400-e29b-41d4-a716-446655520401', '550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440401', 5, 'Aligned with my React goal'),
+('550e8400-e29b-41d4-a716-446655520402', '550e8400-e29b-41d4-a716-446655440103', '550e8400-e29b-41d4-a716-446655440402', 4, 'Great for ML basics')
+ON CONFLICT (id) DO NOTHING;
 
 -- Sample course lessons
 INSERT INTO course_lessons (id, course_id, section_id, title, description, content_type, content_url, duration_minutes, order_index, is_required, points_value) VALUES

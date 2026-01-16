@@ -8,12 +8,12 @@ interface ImageWithFallbackProps {
   onError?: () => void;
 }
 
-const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({ 
+export default function ImageWithFallback({ 
   source, 
   fallback, 
   style, 
   onError 
-}) => {
+}: ImageWithFallbackProps) {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -41,5 +41,3 @@ const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     />
   );
 };
-
-export default ImageWithFallback;

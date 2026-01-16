@@ -1,6 +1,6 @@
 /**
  * Quiz Service - Handles all quiz-related API calls
- * Integrates with AWS Lambda backend for quiz taking and submission
+ * Integrates with Supabase backend for quiz taking and submission
  */
 
 import { apiService } from './apiService';
@@ -145,17 +145,20 @@ class QuizService {
 
   /**
    * Get quiz details with questions and user's previous attempts
-   * Endpoint: GET /courses/{courseId}/module/quizzes/{quizId}?userId={userId}
+   * Endpoint: GET /getQuizDetail/{quizId}?userId={userId}&courseId={courseId}
+   * Maps to getQuizDetail.mjs Lambda function
    */
   async getQuizDetail(courseId: string, quizId: string, userId?: string): Promise<QuizDetailResponse['data']> {
     try {      
-      const params: Record<string, string> = {};
+      const params: Record<string, string> = {
+        courseId: courseId,
+      };
       if (userId) {
         params.userId = userId;
       }
 
       const backendResponse = await apiService.get<BackendQuizDetailResponse>(
-        `/courses/${courseId}/module/quizzes/${quizId}`,
+        `/getQuizDetail/${quizId}`,
         params
       );
 
@@ -178,13 +181,18 @@ class QuizService {
 
   /**
    * Submit quiz answers and get results
-   * Endpoint: POST /courses/{courseId}/module/quizzes/{quizId}
+   * Endpoint: POST /submitQuiz/{quizId}
+   * Maps to submitQuiz Supabase Edge Function
    */
   async submitQuiz(courseId: string, quizId: string, request: SubmitQuizRequest): Promise<SubmitQuizResponse['data']> {
     try {
       const response = await apiService.post<SubmitQuizResponse>(
-        `/courses/${courseId}/module/quizzes/${quizId}`,
-        request
+        `/submitQuiz/${quizId}`,
+        { 
+          userId: request.userId,
+          answers: request.answers,
+          timeTakenMinutes: request.timeTakenMinutes
+        }
       );
 
       if (!response.success || !response.data) {

@@ -2,12 +2,24 @@ import React, { useState } from "react";
 import { X, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCourseBuilder } from "./CourseBuilderContext";
 import { useContentManagement } from "./useContentManagement";
+import { useVideoUpload } from "./useVideoUpload";
 import { Button } from "../ui/button";
 import { Colors } from "../../constants/Colors";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 
 /* ------------------------- MODULE EDITOR ------------------------- */
 const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
   const module = modules.find((m: any) => m.id === selectedItem.id);
+
+  // Extract the base title without "Module X:" prefix for editing
+  const baseTitle = module?.title?.replace(/^Module \d+:\s*/, "") || "";
 
   return (
     <div className="space-y-4">
@@ -17,10 +29,15 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
         </label>
         <input
           type="text"
-          value={module?.title || ""}
-          onChange={(e) =>
-            updateModule(selectedItem.id, { title: e.target.value })
-          }
+          value={baseTitle}
+          onChange={(e) => {
+            // Update with the user's input, the prefix will be added by the numbering system
+            const moduleNumber =
+              modules.findIndex((m: any) => m.id === selectedItem.id) + 1;
+            updateModule(selectedItem.id, {
+              title: `Module ${moduleNumber}: ${e.target.value}`,
+            });
+          }}
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
         />
       </div>
@@ -48,8 +65,8 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
           }
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
         >
-          <option value="draft">Draft</option>
           <option value="published">Published</option>
+          <option value="draft">Draft</option>
         </select>
       </div>
     </div>
@@ -63,40 +80,98 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
   );
   const lesson = module?.lessons.find((l: any) => l.id === selectedItem.id);
 
+  // Return null if lesson or module not found (e.g., after deletion)
+  if (!module || !lesson) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p style={{ color: Colors.textSecondary }}>Lesson not found. Please select a lesson from the sidebar.</p>
+      </div>
+    );
+  }
+
+  // Use the video upload hook for all video-related functionality
+  const {
+    isFetchingDuration,
+    isUploading,
+    uploadProgress,
+    thumbnailInputType,
+    setThumbnailInputType,
+    videoInputType,
+    setVideoInputType,
+    selectedThumbnailFile,
+    selectedVideoFile,
+    extractYouTubeId,
+    handleVideoUrlChange,
+    handleThumbnailFileChange,
+    handleVideoFileChange,
+    clearThumbnail,
+    clearVideo,
+  } = useVideoUpload(updateLesson, module.id, lesson.id, lesson);
+
+  // Check lesson type
+  const isPdfLesson = lesson?.type === 'pdf';
+
   return (
     <div className="space-y-4">
       <div>
-        <label 
+        <label
           style={{ color: Colors.textSecondary }}
           className="block text-sm font-medium mb-2"
         >
-          Lesson Title (User Input)
+          Lesson Type
         </label>
-        <div 
-          style={{ 
-            color: Colors.textMuted,
-            fontSize: '12px',
-            marginBottom: '8px'
+        <select
+          value={lesson?.type || 'video'}
+          onChange={(e) => {
+            const newType = e.target.value as 'video' | 'pdf';
+            updateLesson(module.id, lesson.id, { 
+              type: newType,
+              videoUrl: newType === 'pdf' ? '' : lesson?.videoUrl,
+              resourceUrl: newType === 'pdf' ? lesson?.resourceUrl || '' : undefined,
+              isDownloadable: newType === 'pdf' ? lesson?.isDownloadable ?? true : undefined,
+            });
           }}
+          style={{
+            backgroundColor: Colors.textInputBg,
+            borderColor: Colors.gray600,
+            color: Colors.textPrimary,
+          }}
+          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
         >
-          System prefix: {lesson?.title?.split(':')[0] || 'Lesson X.Y'}
-        </div>
+          <option value="video">Video Lesson</option>
+          <option value="pdf">PDF Document</option>
+        </select>
+      </div>
+      <div>
+        <label
+          style={{ color: Colors.textSecondary }}
+          className="block text-sm font-medium mb-2"
+        >
+          Lesson Title
+        </label>
+        <div
+          style={{
+            color: Colors.textMuted,
+            fontSize: "12px",
+            marginBottom: "8px",
+          }}
+        ></div>
         <input
           type="text"
           value={lesson?.baseTitle || ""}
           onChange={(e) =>
             updateLesson(module.id, lesson.id, { baseTitle: e.target.value })
           }
-          style={{ 
+          style={{
             backgroundColor: Colors.textInputBg,
             borderColor: Colors.gray600,
-            color: Colors.textPrimary
+            color: Colors.textPrimary,
           }}
           className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
         />
       </div>
       <div>
-        <label 
+        <label
           style={{ color: Colors.textSecondary }}
           className="block text-sm font-medium mb-2"
         >
@@ -108,85 +183,445 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             updateLesson(module.id, lesson.id, { content: e.target.value })
           }
           rows={8}
-          style={{ 
+          style={{
             backgroundColor: Colors.textInputBg,
             borderColor: Colors.gray600,
-            color: Colors.textPrimary
+            color: Colors.textPrimary,
           }}
           className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-none"
           placeholder="Enter lesson description..."
         />
       </div>
-      <div>
-        <label 
-          style={{ color: Colors.textSecondary }}
-          className="block text-sm font-medium mb-2"
-        >
-          Video URL (required)
-        </label>
-        <input
-          type="url"
-          value={lesson?.videoUrl || ""}
-          onChange={(e) =>
-            updateLesson(module.id, lesson.id, { videoUrl: e.target.value })
-          }
-          style={{ 
-            backgroundColor: Colors.textInputBg,
-            borderColor: Colors.gray600,
-            color: Colors.textPrimary
-          }}
-          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-          placeholder="https://..."
-        />
-      </div>
-      <div>
-        <label 
-          style={{ color: Colors.textSecondary }}
-          className="block text-sm font-medium mb-2"
-        >
-          Thumbnail URL (optional)
-        </label>
-        <input
-          type="url"
-          value={lesson?.thumbnailUrl || ""}
-          onChange={(e) =>
-            updateLesson(module.id, lesson.id, { thumbnailUrl: e.target.value })
-          }
-          style={{ 
-            backgroundColor: Colors.textInputBg,
-            borderColor: Colors.gray600,
-            color: Colors.textPrimary
-          }}
-          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-          placeholder="https://..."
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+      
+      {/* Conditional rendering based on lesson type */}
+      {isPdfLesson ? (
+        // PDF Upload Section
         <div>
-          <label 
+          <label
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-2"
           >
-            Duration (seconds)
+            PDF Document (required)
           </label>
-          <input
-            type="number"
-            value={lesson?.durationSeconds || 0}
-            onChange={(e) =>
-              updateLesson(module.id, lesson.id, { durationSeconds: parseInt(e.target.value) || 0 })
-            }
-            style={{ 
-              backgroundColor: Colors.textInputBg,
-              borderColor: Colors.gray600,
-              color: Colors.textPrimary
-            }}
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-            placeholder="0"
-            min="0"
-          />
+          
+          <div className="flex gap-2 mb-2">
+            <button
+              onClick={() => {
+                // Don't allow switching if there's a local file
+                if (lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]') {
+                  return;
+                }
+                if (lesson?.resourceUrl?.startsWith('[LOCAL_FILE:')) {
+                  updateLesson(module.id, lesson.id, { resourceUrl: '', fileSize: 0 });
+                  // Clear from cache
+                  const cacheKey = `${module.id}-${lesson.id}`;
+                  const existingCache = (window as any).__lessonFileCache?.get(cacheKey) || {};
+                  delete existingCache.pdfFile;
+                  (window as any).__lessonFileCache?.set(cacheKey, existingCache);
+                }
+              }}
+              disabled={lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]'}
+              style={{
+                backgroundColor: !lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') ? Colors.accent : Colors.gray800,
+                color: Colors.textPrimary,
+                opacity: (lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]') ? 0.5 : 1,
+                cursor: (lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]') ? 'not-allowed' : 'pointer',
+              }}
+              className="px-3 py-1 rounded text-sm"
+            >
+              URL
+            </button>
+            <button
+              onClick={() => {
+                // Don't allow switching if there's a URL
+                if (lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')) {
+                  return;
+                }
+                if (lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')) {
+                  updateLesson(module.id, lesson.id, { resourceUrl: '', fileSize: 0 });
+                }
+                // Force to upload mode by setting a placeholder if empty
+                if (!lesson?.resourceUrl) {
+                  updateLesson(module.id, lesson.id, { resourceUrl: '[LOCAL_FILE: ]' });
+                }
+              }}
+              disabled={lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')}
+              style={{
+                backgroundColor: lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') ? Colors.accent : Colors.gray800,
+                color: Colors.textPrimary,
+                opacity: (lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')) ? 0.5 : 1,
+                cursor: (lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')) ? 'not-allowed' : 'pointer',
+              }}
+              className="px-3 py-1 rounded text-sm"
+            >
+              Upload File
+            </button>
+          </div>
+          
+          {!lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') ? (
+            // URL Input
+            <div>
+              <input
+                type="url"
+                value={lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') ? '' : (lesson?.resourceUrl || "")}
+                onChange={(e) =>
+                  updateLesson(module.id, lesson.id, { resourceUrl: e.target.value })
+                }
+                style={{
+                  backgroundColor: Colors.textInputBg,
+                  borderColor: Colors.gray600,
+                  color: Colors.textPrimary,
+                }}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+                placeholder="https://example.com/document.pdf"
+              />
+              {lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:') && (
+                <>
+                  <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: Colors.gray800 }}>
+                    <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
+                      📄 PDF URL added
+                    </span>
+                    <button
+                      onClick={() => updateLesson(module.id, lesson.id, { resourceUrl: '' })}
+                      style={{ color: Colors.textSecondary }}
+                      className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
+                      title="Clear PDF"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="mt-3">
+                    <label
+                      style={{ color: Colors.textSecondary }}
+                      className="block text-sm font-medium mb-2"
+                    >
+                      PDF Preview
+                    </label>
+                    <div
+                      className="rounded overflow-hidden border"
+                      style={{
+                        borderColor: Colors.gray600,
+                        height: '500px'
+                      }}
+                    >
+                      <iframe
+                        src={lesson.resourceUrl}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          border: 'none'
+                        }}
+                        title="PDF preview"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            // File Upload
+            <div>
+              <input
+                key={`pdf-${lesson.id}`}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    // Store file reference with [LOCAL_FILE:] marker
+                    updateLesson(module.id, lesson.id, { 
+                      resourceUrl: `[LOCAL_FILE: ${file.name}]`,
+                      fileSize: file.size
+                    });
+                    
+                    // Cache the file
+                    const cacheKey = `${module.id}-${lesson.id}`;
+                    const existingCache = (window as any).__lessonFileCache?.get(cacheKey) || {};
+                    (window as any).__lessonFileCache?.set(cacheKey, {
+                      ...existingCache,
+                      pdfFile: file
+                    });
+                  }
+                }}
+                style={{
+                  backgroundColor: Colors.textInputBg,
+                  borderColor: Colors.gray600,
+                  color: Colors.textPrimary,
+                }}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+              />
+              {lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]' && (
+                <>
+                  <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: Colors.gray800 }}>
+                    <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
+                      📄 {lesson.resourceUrl.split('[LOCAL_FILE: ')[1]?.replace(']', '')}
+                      {lesson.fileSize && <span style={{ color: Colors.textMuted, marginLeft: '8px' }}>({(lesson.fileSize / (1024 * 1024)).toFixed(2)} MB)</span>}
+                    </span>
+                    <button
+                      onClick={() => {
+                        updateLesson(module.id, lesson.id, { resourceUrl: '', fileSize: 0 });
+                        // Clear from cache
+                        const cacheKey = `${module.id}-${lesson.id}`;
+                        const existingCache = (window as any).__lessonFileCache?.get(cacheKey) || {};
+                        delete existingCache.pdfFile;
+                        (window as any).__lessonFileCache?.set(cacheKey, existingCache);
+                      }}
+                      style={{ color: Colors.textSecondary }}
+                      className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
+                      title="Clear PDF"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {(() => {
+                    const cacheKey = `${module.id}-${lesson.id}`;
+                    const cachedFiles = (window as any).__lessonFileCache?.get(cacheKey);
+                    const pdfFile = cachedFiles?.pdfFile;
+                    if (pdfFile) {
+                      return (
+                        <div className="mt-3">
+                          <label
+                            style={{ color: Colors.textSecondary }}
+                            className="block text-sm font-medium mb-2"
+                          >
+                            PDF Preview
+                          </label>
+                          <div
+                            className="rounded overflow-hidden border"
+                            style={{
+                              borderColor: Colors.gray600,
+                              height: '500px'
+                            }}
+                          >
+                            <iframe
+                              src={URL.createObjectURL(pdfFile)}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                border: 'none'
+                              }}
+                              title="PDF preview"
+                            />
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </>
+              )}
+            </div>
+          )}
+          
+          {/* PDF Options */}
+          <div className="mt-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={lesson?.isDownloadable ?? true}
+                onChange={(e) =>
+                  updateLesson(module.id, lesson.id, { isDownloadable: e.target.checked })
+                }
+                className="w-4 h-4"
+              />
+              <span style={{ color: Colors.textSecondary, fontSize: '14px' }}>
+                Allow students to download this PDF
+              </span>
+            </label>
+          </div>
         </div>
+      ) : (
+        // Video Upload Section (existing code)
         <div>
-          <label 
+          <label
+            style={{ color: Colors.textSecondary }}
+            className="block text-sm font-medium mb-2"
+          >
+            Video (required)
+          </label>
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={() => {
+              // Clear local file when switching to URL mode (check BEFORE setting new mode)
+              if (videoInputType === 'upload' && (selectedVideoFile || lesson?.videoUrl?.startsWith('[LOCAL_FILE:'))) {
+                updateLesson(module.id, lesson.id, { videoUrl: '', durationSeconds: 0 });
+              }
+              setVideoInputType('url');
+            }}
+            style={{
+              backgroundColor: videoInputType === 'url' ? Colors.primary : 'transparent',
+              color: Colors.textPrimary,
+            }}
+            className="px-3 py-1 rounded text-sm"
+          >
+            URL
+          </button>
+          <button
+            onClick={() => {
+              // Clear URL when switching to upload mode (check BEFORE setting new mode)
+              if (videoInputType === 'url' && lesson?.videoUrl && !lesson.videoUrl.startsWith('[LOCAL_FILE:')) {
+                updateLesson(module.id, lesson.id, { videoUrl: '', durationSeconds: 0 });
+              }
+              setVideoInputType('upload');
+            }}
+            style={{
+              backgroundColor: videoInputType === 'upload' ? Colors.primary : 'transparent',
+              color: Colors.textPrimary,
+            }}
+            className="px-3 py-1 rounded text-sm"
+          >
+            Upload File
+          </button>
+        </div>
+        {videoInputType === 'url' ? (
+          <div>
+            <input
+              type="url"
+              value={lesson?.videoUrl?.startsWith('[LOCAL_FILE:') ? '' : (lesson?.videoUrl || "")}
+              onChange={(e) =>
+                handleVideoUrlChange(e.target.value)
+              }
+              style={{
+                backgroundColor: Colors.textInputBg,
+                borderColor: Colors.gray600,
+                color: Colors.textPrimary,
+              }}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+              placeholder="https://youtube.com/watch?v=... or any video URL"
+            />
+            {lesson?.videoUrl && !lesson.videoUrl.startsWith('[LOCAL_FILE:') && (
+              <>
+                <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: 'transparent' }}>
+                  <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
+                    🎥 Video URL added
+                  </span>
+                  <button
+                    onClick={clearVideo}
+                    style={{ color: Colors.textSecondary }}
+                    className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
+                    title="Clear video"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {(lesson.videoUrl.includes('youtube.com') || lesson.videoUrl.includes('youtu.be')) && (
+                  <p style={{ color: Colors.textMuted, fontSize: '12px', marginTop: '4px' }}>
+                    YouTube video detected - duration will be auto-fetched
+                  </p>
+                )}
+                {/* Video Preview */}
+                {extractYouTubeId(lesson.videoUrl) && (
+                  <div className="mt-4">
+                    <label
+                      style={{ color: Colors.textSecondary }}
+                      className="block text-sm font-medium mb-2"
+                    >
+                      Video Preview
+                    </label>
+                    <div 
+                      className="rounded overflow-hidden" 
+                      style={{ 
+                        backgroundColor: Colors.gray800,
+                        aspectRatio: '16/9',
+                        position: 'relative'
+                      }}
+                    >
+                      <iframe
+                        key={lesson.videoUrl}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          border: 'none'
+                        }}
+                        src={`https://www.youtube.com/embed/${extractYouTubeId(lesson.videoUrl)}`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title="Video preview"
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div>
+              <input
+                key={`video-${lesson.id}`}
+                type="file"
+                accept="video/*"
+                onChange={handleVideoFileChange}
+                disabled={isUploading}
+                style={{
+                  backgroundColor: Colors.textInputBg,
+                  borderColor: Colors.gray600,
+                  color: Colors.textPrimary,
+                }}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+              />
+              {(selectedVideoFile || lesson?.videoUrl?.startsWith('[LOCAL_FILE:')) && (
+                <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: 'transparent' }}>
+                  <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
+                    🎥 {selectedVideoFile?.name || lesson?.videoUrl?.split('[LOCAL_FILE: ')[1]?.replace(']', '')}
+                    {selectedVideoFile && <span style={{ color: Colors.textMuted, marginLeft: '8px' }}>({(selectedVideoFile.size / (1024 * 1024)).toFixed(2)} MB)</span>}
+                  </span>
+                  <button
+                    onClick={clearVideo}
+                    style={{ color: Colors.textSecondary }}
+                    className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
+                    title="Clear video"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      )}
+      
+      {/* Duration and Preview settings - show for both types */}
+      <div className="grid grid-cols-2 gap-4">
+        {!isPdfLesson && (
+          <div>
+            <label
+              style={{ color: Colors.textSecondary }}
+              className="block text-sm font-medium mb-2"
+            >
+              Duration (seconds)
+              {isFetchingDuration && (
+                <span className="ml-2 text-xs" style={{ color: Colors.textMuted }}>
+                  Fetching...
+                </span>
+              )}
+            </label>
+            <input
+              type="number"
+              value={lesson?.durationSeconds || 0}
+              onChange={(e) =>
+                updateLesson(module.id, lesson.id, {
+                  durationSeconds: parseInt(e.target.value) || 0,
+                })
+              }
+              style={{
+                backgroundColor: Colors.textInputBg,
+                borderColor: Colors.gray600,
+                color: Colors.textPrimary,
+              }}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+              placeholder="Auto-fetched from YouTube"
+              min="0"
+              disabled={isFetchingDuration}
+            />
+          </div>
+        )}
+        <div>
+          <label
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-2"
           >
@@ -197,10 +632,12 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
               type="checkbox"
               checked={lesson?.isPreview || false}
               onChange={(e) =>
-                updateLesson(module.id, lesson.id, { isPreview: e.target.checked })
+                updateLesson(module.id, lesson.id, {
+                  isPreview: e.target.checked,
+                })
               }
-              style={{ 
-                accentColor: Colors.secondary
+              style={{
+                accentColor: Colors.secondary,
               }}
               className="w-5 h-5 rounded"
             />
@@ -225,21 +662,32 @@ const QuizEditor = ({
   addOption,
   removeOption,
 }: any) => {
+  const { deleteQuiz } = useContentManagement();
   const module = modules.find((m: any) =>
     m.quizzes.some((q: any) => q.id === selectedItem.id)
   );
   const quiz = module?.quizzes.find((q: any) => q.id === selectedItem.id);
 
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Return null if quiz or module not found (e.g., after deletion)
+  if (!module || !quiz) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p style={{ color: Colors.textSecondary }}>Quiz not found. Please select a quiz from the sidebar.</p>
+      </div>
+    );
+  }
 
   const questions = quiz?.questions || [];
   const currentQuestion = questions[currentIndex];
 
   // Debug logging
-  console.log('QuizEditor - Quiz:', quiz?.title);
-  console.log('QuizEditor - Questions:', questions);
-  console.log('QuizEditor - Current Question:', currentQuestion);
-  console.log('QuizEditor - Current Question Text:', currentQuestion?.text);
+  console.log("QuizEditor - Quiz:", quiz?.title);
+  console.log("QuizEditor - Questions:", questions);
+  console.log("QuizEditor - Current Question:", currentQuestion);
+  console.log("QuizEditor - Current Question Text:", currentQuestion?.text);
 
   const handleNext = () => {
     if (currentIndex < questions.length - 1) setCurrentIndex(currentIndex + 1);
@@ -249,13 +697,35 @@ const QuizEditor = ({
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
   };
 
+  const handleDeleteQuestion = () => {
+    if (questions.length === 1) {
+      // Show confirmation dialog if this is the last question
+      setShowDeleteDialog(true);
+    } else {
+      // Delete question normally
+      deleteQuestion(module.id, quiz.id, currentQuestion.id);
+      // Adjust currentIndex if needed
+      if (currentIndex >= questions.length - 1 && currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
+      }
+    }
+  };
+
+  const handleConfirmDeleteQuiz = () => {
+    // Delete the entire quiz
+    deleteQuiz(module.id, quiz.id);
+    setShowDeleteDialog(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Quiz Header */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Quiz Title
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-slate-300">
+            Quiz Title
+          </label>
+        </div>
         <input
           type="text"
           value={quiz?.baseTitle || ""}
@@ -269,22 +739,32 @@ const QuizEditor = ({
 
       {/* Quiz Settings */}
       <div className="space-y-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">
-            Passing Score (%)
-          </label>
-          <input
-            type="number"
-            value={quiz?.passingScore || 70}
-            onChange={(e) =>
-              updateQuiz(module.id, quiz.id, {
-                passingScore: parseInt(e.target.value) || 70,
-              })
-            }
-            min="0"
-            max="100"
-            className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
-          />
+        <div className="flex items-center gap-4">
+          <div className="mr-4">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Passing Score (%)
+            </label>
+            <input
+              type="number"
+              value={quiz?.passingScore || 70}
+              onChange={(e) =>
+                updateQuiz(module.id, quiz.id, {
+                  passingScore: parseInt(e.target.value) || 70,
+                })
+              }
+              min="0"
+              max="100"
+              className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          <div className="ml-4">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Total Points
+            </label>
+            <div className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-slate-400">
+              {questions.reduce((sum, q) => sum + (q.points || 0), 0)} points
+            </div>
+          </div>
         </div>
       </div>
 
@@ -319,7 +799,10 @@ const QuizEditor = ({
         </button> */}
 
         <Button
-          onClick={() => addQuestion(module.id, quiz.id)}
+          onClick={() => {
+            addQuestion(module.id, quiz.id);
+            setCurrentIndex(questions.length);
+          }}
           className="w-auto gap-2 mt-2 mb-2"
         >
           <Plus className="h-4 w-4" />
@@ -342,9 +825,7 @@ const QuizEditor = ({
               Question {currentIndex + 1}
             </h3>
             <button
-              onClick={() =>
-                deleteQuestion(module.id, quiz.id, currentQuestion.id)
-              }
+              onClick={handleDeleteQuestion}
               className="text-red-400 hover:text-red-300"
             >
               <X className="h-4 w-4" />
@@ -601,7 +1082,8 @@ const QuizEditor = ({
           {currentQuestion.type === "short-answer" && (
             <div className="bg-yellow-900/20 border border-yellow-700/50 rounded p-3">
               <p className="text-xs text-yellow-300">
-                ⚠️ Short answer questions require manual grading. Use the explanation field above to provide grading guidelines.
+                ⚠️ Short answer questions require manual grading. Use the
+                explanation field above to provide grading guidelines.
               </p>
             </div>
           )}
@@ -731,7 +1213,8 @@ const QuizEditor = ({
               className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
             />
             <p className="text-xs text-slate-400 mt-1">
-              This explanation helps students understand why the answer is correct
+              This explanation helps students understand why the answer is
+              correct
             </p>
           </div>
 
@@ -756,6 +1239,39 @@ const QuizEditor = ({
           </div>
         </div>
       )}
+
+      {/* Delete Last Question Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              Delete Last Question
+            </DialogTitle>
+            <DialogDescription className="text-slate-300">
+              A quiz must have at least one question. If you delete this
+              question, the entire quiz will be{" "}
+              <strong className="font-bold">deleted</strong>. Are you sure you
+              want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDeleteQuiz}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete Quiz
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

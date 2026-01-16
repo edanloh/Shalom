@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   Pressable,
   StyleSheet,
   Switch,
   Alert,
-  ScrollView,
   Platform,
+  Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
+import * as Notifications from "expo-notifications";
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, TextStyles } from '../constants';
+import Screen from '../components/common/Screen';
+import CustomModal from "../components/common/CustomModal";
+import externalStyles from '../styles/styles';
 
 export default function SettingsScreen({ navigation }: any) {
   const [settings, setSettings] = useState({
@@ -23,11 +24,66 @@ export default function SettingsScreen({ navigation }: any) {
     socialActivity: false,
     systemUpdates: true,
     emailNotifications: true,
-    pushNotifications: true,
+    pushNotifications: false,
     darkMode: false,
     autoPlay: true,
     downloadOverWifi: true,
   });
+
+  const [activeModal, setActiveModal] = useState<
+    "help" | "terms" | "about" | null
+  >(null);
+
+  // Check notification permission status on mount
+  useEffect(() => {
+    checkNotificationPermission();
+  }, []);
+
+  const checkNotificationPermission = async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    setSettings((s) => ({ ...s, pushNotifications: status === "granted" }));
+  };
+
+  const handlePushNotificationToggle = async () => {
+    const { status: currentStatus } = await Notifications.getPermissionsAsync();
+
+    if (currentStatus === "granted") {
+      // User wants to turn off - direct them to settings
+      Alert.alert(
+        "Disable Notifications",
+        "To disable notifications, please go to your device settings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Open Settings",
+            onPress: () => Linking.openSettings(),
+          },
+        ]
+      );
+    } else {
+      // Request permission
+      const { status: newStatus } =
+        await Notifications.requestPermissionsAsync();
+      setSettings((s) => ({
+        ...s,
+        pushNotifications: newStatus === "granted",
+      }));
+
+      if (newStatus !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Please enable notifications in your device settings to receive updates.",
+          [
+            { text: "OK", style: "cancel" },
+            {
+              text: "Open Settings",
+              onPress: () => Linking.openSettings(),
+            },
+          ]
+        );
+      }
+    }
+  };
 
   const notificationSettings = [
     { key: 'courseUpdates',   title: 'Course Updates',     subtitle: 'Get notified about new lessons and course updates', icon: 'play-circle-outline' },
@@ -40,62 +96,65 @@ export default function SettingsScreen({ navigation }: any) {
   const generalSettings = [
     { key: 'emailNotifications', title: 'Email Notifications',  subtitle: 'Receive notifications via email',         icon: 'mail-outline' },
     { key: 'pushNotifications',  title: 'Push Notifications',   subtitle: 'Receive notifications on your device',    icon: 'notifications-outline' },
-    { key: 'darkMode',           title: 'Dark Mode',            subtitle: 'Use dark theme throughout the app',       icon: 'moon-outline' },
     { key: 'autoPlay',           title: 'Auto-play Videos',     subtitle: 'Automatically play video lessons',        icon: 'play-outline' },
     { key: 'downloadOverWifi',   title: 'Download over WiFi only', subtitle: 'Only download content when connected to WiFi', icon: 'wifi-outline' },
   ];
 
   const accountItems = [
-  {
+    {
     key: 'editProfile',
     icon: 'person-outline' as const,
     title: 'Edit Profile',
     subtitle: 'Update your personal information',
     onPress: () => navigation.navigate('EditProfile'),
-  },
-  {
+    },
+    {
     key: 'privacy',
     icon: 'shield-checkmark-outline' as const,
     title: 'Privacy & Security',
     subtitle: 'Manage your privacy settings',
     onPress: () => console.log('Privacy & Security'),
-  },
-  {
-    key: 'changePassword',
-    icon: 'lock-closed-outline' as const,
-    title: 'Change Password',
-    subtitle: 'Update your account password',
-    onPress: () => console.log('Change Password'),
-  },
-];
+    },
+    {
+      key: 'changePassword',
+      icon: 'lock-closed-outline' as const,
+      title: 'Change Password',
+      subtitle: 'Update your account password',
+      onPress: () => navigation.navigate('ChangePassword'),
+    },
+  ];
 
-const supportItems = [
-  {
+  const supportItems = [
+    {
     key: 'help',
     icon: 'help-circle-outline' as const,
     title: 'Help & Support',
     subtitle: 'Get help and contact support',
-    onPress: () => console.log('Help & Support'),
-  },
-  {
+    onPress: () => setActiveModal("help"),
+    },
+    {
     key: 'terms',
     icon: 'document-text-outline' as const,
     title: 'Terms & Conditions',
     subtitle: 'Read our terms of service',
-    onPress: () => console.log('Terms & Conditions'),
-  },
-  {
+    onPress: () => setActiveModal("terms"),
+    },
+    {
     key: 'about',
     icon: 'information-circle-outline' as const,
     title: 'About',
     subtitle: 'App version and information',
-    onPress: () => console.log('About'),
-  },
-];
+    onPress: () => setActiveModal("about"),
+    },
+  ];
 
-
-  const onToggle = (key: keyof typeof settings) =>
-    setSettings((s) => ({ ...s, [key]: !s[key] }));
+  const onToggle = (key: keyof typeof settings) => {
+    if (key === "pushNotifications") {
+      handlePushNotificationToggle();
+    } else {
+      setSettings((s) => ({ ...s, [key]: !s[key] }));
+    }
+  };
 
   const renderSettingItem = (item: any) => (
     <View key={item.key} style={styles.settingItem}>
@@ -124,23 +183,15 @@ const supportItems = [
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <StatusBar style="light" />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconHitbox}>
-          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <View style={styles.headerIconHitbox} />
-      </View>
-
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingBottom: Spacing.xl * 2 }}
-        showsVerticalScrollIndicator={false}
-      >
+    <Screen
+      title="Settings"
+      navigation={navigation}
+      headerLeftIcon="chevron-back"
+      onHeaderLeftPress={() => navigation.goBack()}
+      customEdges={["top", "bottom"]}
+      stickyHeader
+    >
+      <>
         {/* Notification Settings */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notification Preferences</Text>
@@ -253,61 +304,152 @@ const supportItems = [
           </View>
         </View>
 
-
         <Text style={styles.version}>Version 1.0.0</Text>
-      </ScrollView>
-    </SafeAreaView>
+
+        {/* Help & Support Modal */}
+        <CustomModal
+          visible={activeModal === "help"}
+          onClose={() => setActiveModal(null)}
+        >
+          <View>
+            <View style={styles.modalHeader}>
+              <Ionicons name="help-circle" size={32} color={Colors.white} />
+              <Text style={TextStyles.h3}>Help & Support</Text>
+            </View>
+            <Text style={TextStyles.caption}>
+              Need assistance? We're here to help!
+            </Text>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>Contact Us:</Text>
+              <Text style={TextStyles.caption}>
+                • Email: @gmail.com
+              </Text>
+              <Text style={TextStyles.caption}>• Phone: +65</Text>
+              <Text style={TextStyles.caption}>
+                • Hours: Mon-Fri, 9am-6pm
+              </Text>
+            </View>
+          </View>
+        </CustomModal>
+
+        {/* Terms & Conditions Modal */}
+        <CustomModal
+          visible={activeModal === "terms"}
+          onClose={() => setActiveModal(null)}
+        >
+          <View>
+            <View style={styles.modalHeader}>
+              <Ionicons
+                name="document-text"
+                size={32}
+                color={Colors.white}
+              />
+              <Text style={TextStyles.h3}>Terms & Conditions</Text>
+            </View>
+            <Text style={TextStyles.caption}>
+              Last updated: January 6, 2026
+            </Text>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>1. Acceptance of Terms</Text>
+              <Text style={TextStyles.caption}>
+                By accessing and using this app, you accept and agree to be
+                bound by the terms and provision of this agreement.
+              </Text>
+            </View>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>2. Use License</Text>
+              <Text style={TextStyles.caption}>
+                Permission is granted to temporarily access the materials for
+                personal, non-commercial use only.
+              </Text>
+            </View>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>
+                3. User Responsibilities
+              </Text>
+              <Text style={TextStyles.caption}>
+                You are responsible for maintaining the confidentiality of your
+                account and password.
+              </Text>
+            </View>
+            <Text
+              style={[
+                TextStyles.captionSmall,
+                { marginTop: Spacing.lg, fontStyle: "italic" },
+              ]}
+            >
+              For full terms and conditions, please visit our website.
+            </Text>
+          </View>
+        </CustomModal>
+
+        {/* About Modal */}
+        <CustomModal
+          visible={activeModal === "about"}
+          onClose={() => setActiveModal(null)}
+        >
+          <View>
+            <View style={styles.modalHeader}>
+              <Ionicons
+                name="information-circle"
+                size={32}
+                color={Colors.white}
+              />
+              <Text style={TextStyles.h3}>About</Text>
+            </View>
+            <Text style={TextStyles.caption}>Version 1.0.0</Text>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>Mission</Text>
+              <Text style={TextStyles.caption}>
+                ---
+              </Text>
+            </View>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>Features</Text>
+              <Text style={TextStyles.caption}>
+                • Interactive video courses
+              </Text>
+              <Text style={TextStyles.caption}>
+                • Progress tracking & analytics
+              </Text>
+              <Text style={TextStyles.caption}>
+                • Certificates of completion
+              </Text>
+              <Text style={TextStyles.caption}>• Community discussions</Text>
+            </View>
+            <View style={{ marginTop: Spacing.lg }}>
+              <Text style={TextStyles.bodyMedium}>Credits</Text>
+              <Text style={TextStyles.caption}>
+                Shalom. All rights reserved.
+              </Text>
+            </View>
+          </View>
+        </CustomModal>
+      </>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: Colors.primary, // dark app background
-  },
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    justifyContent: 'space-between',
-  },
-  headerIconHitbox: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: {
-    ...TextStyles.h3,
-    color: Colors.textPrimary,
-    fontSize: TextStyles.h4.fontSize,
-    fontWeight: 'bold',
-  },
-
   // Sections
-  section: { marginTop: Spacing.lg },
+  section: { marginTop: Spacing.base },
   sectionTitle: {
     ...TextStyles.body,
     color: Colors.textPrimary,
     opacity: 0.9,
     fontWeight: '600',
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
 
   // Cards
   card: {
-    marginHorizontal: Spacing.lg,
-    backgroundColor: '#2B2E36',
     borderRadius: 12,
     overflow: 'hidden',
   },
 
   // Rows
   settingItem: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -320,7 +462,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   row: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -329,11 +471,10 @@ const styles = StyleSheet.create({
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    marginLeft: Spacing.lg + 28, // indent under the icon
   },
 
   // Left chunk
-  settingLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  settingLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 },
   settingText: { marginLeft: 16, flex: 1 },
 
   // Typography
@@ -352,7 +493,7 @@ const styles = StyleSheet.create({
 
   // Danger
   dangerTitle: { ...TextStyles.body, color: '#ef4444', fontWeight: '700', marginBottom: 2 },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, marginRight: 12 },
   rowTextWrap: { marginLeft: 12, flexShrink: 1 },
   rowSub: {
     ...TextStyles.body,
@@ -370,4 +511,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     fontSize: 12,
   },
+  // Modal styles
+  modalHeader: {
+    flexDirection: "row",
+    gap: 12,
+  }
 });

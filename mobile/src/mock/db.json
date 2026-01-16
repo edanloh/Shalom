@@ -3,6 +3,153 @@
     "status": "healthy",
     "timestamp": "2025-01-11T10:00:00Z"
   },
+  "credits": {
+    "balance": 200,
+    "lastUpdated": "2026-01-07T07:25:44Z",
+    "history": [
+      {
+        "id": "evt-101",
+        "type": "course_enrolled",
+        "title": "Enrolled in Web Dev Bootcamp",
+        "points": 20,
+        "courseId": "550e8400-e29b-41d4-a716-446655440401",
+        "timestamp": "2026-01-07T07:26:00Z"
+      },
+      {
+        "id": "evt-102",
+        "type": "course_completed",
+        "title": "Completed React Native Fundamentals",
+        "points": 120,
+        "courseId": "550e8400-e29b-41d4-a716-446655440401",
+        "timestamp": "2026-01-07T06:10:00Z"
+      },
+      {
+        "id": "evt-103",
+        "type": "quiz_passed",
+        "title": "Perfect score on Module 2 Quiz",
+        "points": 50,
+        "courseId": "550e8400-e29b-41d4-a716-446655440401",
+        "timestamp": "2026-01-06T12:00:00Z"
+      },
+      {
+        "id": "evt-104",
+        "type": "streak",
+        "title": "7-day learning streak",
+        "points": 30,
+        "timestamp": "2026-01-05T08:15:00Z"
+      }
+    ],
+    "achievements": [
+      { "id": "550e8400-e29b-41d4-a716-446655441401", "icon": "trophy-outline", "label": "First Steps", "earned": true },
+      { "id": "550e8400-e29b-41d4-a716-446655441402", "icon": "flame", "label": "Learning Streak", "earned": true },
+      { "id": "550e8400-e29b-41d4-a716-446655441403", "icon": "ribbon-outline", "label": "Course Completion", "earned": false },
+      { "id": "550e8400-e29b-41d4-a716-446655441404", "icon": "ribbon-outline", "label": "Knowledge Seeker", "earned": false },
+      { "id": "550e8400-e29b-41d4-a716-446655441405", "icon": "trophy-outline", "label": "Quick Learner", "earned": false },
+      { "id": "550e8400-e29b-41d4-a716-446655441406", "icon": "trophy-outline", "label": "Perfect Score", "earned": false }
+    ],
+    "goals": [
+      {
+        "id": "goal-weekly-1",
+        "label": "Weekly Points Goal",
+        "targetHours": 0,
+        "currentHours": 0,
+        "targetPoints": 500,
+        "currentPoints": 320,
+        "streakDays": 6,
+        "deadline": "2026-01-12T23:59:59Z"
+      },
+      {
+        "id": "goal-weekly-2",
+        "label": "Weekly Study Time",
+        "targetHours": 10,
+        "currentHours": 6,
+        "streakDays": 4,
+        "deadline": "2026-01-12T23:59:59Z"
+      },
+      {
+        "id": "goal-monthly-1",
+        "label": "Monthly Course Goal",
+        "targetHours": 0,
+        "currentHours": 0,
+        "targetCourses": 3,
+        "currentCourses": 1,
+        "deadline": "2026-01-31T23:59:59Z"
+      }
+    ],
+    "certificates": [
+      {
+        "id": "c1111111-1111-4111-8111-111111111111",
+        "name": "Course Completion",
+        "requiredPoints": 500,
+        "earnedPoints": 500,
+        "requiredCourses": 1,
+        "completedCourses": 1,
+        "progressPercent": 100,
+        "issuedAt": "2026-01-07T07:25:44.436872+00:00",
+        "credentialUrl": "https://example.com/cred/CC-2025-001"
+      },
+      {
+        "id": "c2222222-2222-4222-8222-222222222222",
+        "name": "Fullstack Path",
+        "requiredPoints": 1200,
+        "earnedPoints": 800,
+        "requiredCourses": 6,
+        "completedCourses": 4,
+        "progressPercent": 66,
+        "issuedAt": "2026-01-07T07:25:44.436872+00:00",
+        "credentialUrl": "https://example.com/cred/LP-2025-010"
+      },
+      {
+        "id": "c3333333-3333-4333-8333-333333333333",
+        "name": "Cloud Specialization",
+        "requiredPoints": 900,
+        "earnedPoints": 450,
+        "requiredCourses": 5,
+        "completedCourses": 2,
+        "progressPercent": 50,
+        "issuedAt": "2026-01-07T07:25:44.436872+00:00",
+        "credentialUrl": "https://example.com/cred/CLD-2025-055"
+      }
+    ]
+  },
+  "recommendations": {
+    "success": true,
+    "message": "Mock recommendations",
+    "data": [
+      {
+        "id": "rec_1",
+        "rank": 1,
+        "score": 9.8,
+        "reason": "Similar to your interests",
+        "course": {
+          "id": "550e8400-e29b-41d4-a716-446655440401",
+          "title": "React Native Fundamentals",
+          "description": "Learn the basics of React Native development with hands-on projects and real-world applications.",
+          "level": "intermediate",
+          "rating": 4.5,
+          "duration_hours": 12,
+          "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+          "tags": ["react-native", "mobile", "javascript"]
+        }
+      },
+      {
+        "id": "rec_2",
+        "rank": 2,
+        "score": 8.9,
+        "reason": "Trending in your category",
+        "course": {
+          "id": "550e8400-e29b-41d4-a716-446655440404",
+          "title": "Cloud Architecture with AWS",
+          "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
+          "level": "intermediate",
+          "rating": 4.5,
+          "duration_hours": 20,
+          "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
+          "tags": ["aws", "cloud", "architecture"]
+        }
+      }
+    ]
+  },
   "courses": {
     "success": true,
     "message": "Courses retrieved successfully",
@@ -333,6 +480,181 @@
             "last_accessed_formatted": "3 weeks ago",
             "enrollment_date_formatted": "5 months ago",
             "completion_date_formatted": "3 weeks ago"
+          },{
+            "enrollment_id": "enr_003",
+            "enrollment_date": "2024-10-05T12:00:00Z",
+            "completion_date": null,
+            "progress_percentage": "100",
+            "is_completed": false,
+            "is_in_wishlist": true,
+            "last_accessed": "2025-01-09T11:20:00Z",
+            "total_watch_time_minutes": 0,
+            "course_id": "5",
+            "title": "Cloud Architecture with AWS",
+            "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
+            "level": "intermediate",
+            "duration_hours": 20,
+            "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
+            "rating": "4.5",
+            "student_count": 567,
+            "tags": ["aws", "cloud", "architecture"],
+            "category_name": "Cloud Computing",
+            "category_icon": "☁️",
+            "category_color": "#8B5CF6",
+            "instructor_name": "Alex Kumar",
+            "instructor_avatar": "https://ui-avatars.com/api/?name=Alex+Kumar&size=50&background=8B5CF6&color=fff",
+            "instructor_rating": "4.7",
+            "total_videos": "30",
+            "completed_videos": "30",
+            "video_watch_time_seconds": "0",
+            "total_quizzes": "8",
+            "passed_quizzes": "0",
+            "video_progress_percent": 100,
+            "quiz_progress_percent": 0,
+            "estimated_time_remaining_minutes": 1200,
+            "last_accessed_formatted": "1 day ago",
+            "enrollment_date_formatted": "3 months ago",
+            "completion_date_formatted": null
+          },{
+            "enrollment_id": "enr_004",
+            "enrollment_date": "2024-11-20T09:30:00Z",
+            "completion_date": null,
+            "progress_percentage": "50",
+            "is_completed": false,
+            "is_in_wishlist": true,
+            "last_accessed": "2025-01-08T13:10:00Z",
+            "total_watch_time_minutes": 0,
+            "course_id": "2",
+            "title": "Advanced TypeScript",
+            "description": "Master advanced TypeScript concepts including generics, decorators, and type manipulation techniques.",
+            "level": "advanced",
+            "duration_hours": 18,
+            "thumbnail_url": "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=400&h=250&fit=crop",
+            "rating": "4.7",
+            "student_count": 678,
+            "tags": ["typescript", "javascript", "programming"],
+            "category_name": "Web Development",
+            "category_icon": "🌐",
+            "category_color": "#10B981",
+            "instructor_name": "Michael Chen",
+            "instructor_avatar": "https://ui-avatars.com/api/?name=Michael+Chen&size=50&background=10B981&color=fff",
+            "instructor_rating": "4.9",
+            "total_videos": "27",
+            "completed_videos": "14",
+            "video_watch_time_seconds": "0",
+            "total_quizzes": "6",
+            "passed_quizzes": "0",
+            "video_progress_percent": 52,
+            "quiz_progress_percent": 0,
+            "estimated_time_remaining_minutes": 540,
+            "last_accessed_formatted": "3 days ago",
+            "enrollment_date_formatted": "2 months ago",
+            "completion_date_formatted": null
+          },{
+            "enrollment_id": "enr_005",
+            "enrollment_date": "2024-12-01T15:45:00Z",
+            "completion_date": null,
+            "progress_percentage": "20",
+            "is_completed": false,
+            "is_in_wishlist": true,
+            "last_accessed": "2025-01-07T10:05:00Z",
+            "total_watch_time_minutes": 0,
+            "course_id": "6",
+            "title": "Machine Learning Basics",
+            "description": "Introduction to machine learning concepts with practical implementations using popular frameworks.",
+            "level": "beginner",
+            "duration_hours": 16,
+            "thumbnail_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=250&fit=crop",
+            "rating": "4.8",
+            "student_count": 1456,
+            "tags": ["machine-learning", "ai", "python"],
+            "category_name": "Artificial Intelligence",
+            "category_icon": "🤖",
+            "category_color": "#EC4899",
+            "instructor_name": "Dr. Lisa Park",
+            "instructor_avatar": "https://ui-avatars.com/api/?name=Lisa+Park&size=50&background=EC4899&color=fff",
+            "instructor_rating": "4.9",
+            "total_videos": "20",
+            "completed_videos": "4",
+            "video_watch_time_seconds": "0",
+            "total_quizzes": "5",
+            "passed_quizzes": "0",
+            "video_progress_percent": 20,
+            "quiz_progress_percent": 0,
+            "estimated_time_remaining_minutes": 768,
+            "last_accessed_formatted": "4 days ago",
+            "enrollment_date_formatted": "1 month ago",
+            "completion_date_formatted": null
+          },{
+            "enrollment_id": "enr_006",
+            "enrollment_date": "2024-12-10T11:00:00Z",
+            "completion_date": null,
+            "progress_percentage": "10",
+            "is_completed": false,
+            "is_in_wishlist": false,
+            "last_accessed": "2025-01-06T09:00:00Z",
+            "total_watch_time_minutes": 0,
+            "course_id": "4",
+            "title": "Python for Data Science",
+            "description": "Comprehensive course covering data analysis, visualization, and machine learning with Python libraries.",
+            "level": "intermediate",
+            "duration_hours": 22,
+            "thumbnail_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=250&fit=crop",
+            "rating": "4.6",
+            "student_count": 890,
+            "tags": ["python", "data-science", "pandas"],
+            "category_name": "Data Science",
+            "category_icon": "📊",
+            "category_color": "#EF4444",
+            "instructor_name": "Dr. James Wilson",
+            "instructor_avatar": "https://ui-avatars.com/api/?name=James+Wilson&size=50&background=EF4444&color=fff",
+            "instructor_rating": "4.8",
+            "total_videos": "32",
+            "completed_videos": "3",
+            "video_watch_time_seconds": "0",
+            "total_quizzes": "9",
+            "passed_quizzes": "0",
+            "video_progress_percent": 9,
+            "quiz_progress_percent": 0,
+            "estimated_time_remaining_minutes": 1188,
+            "last_accessed_formatted": "5 days ago",
+            "enrollment_date_formatted": "1 month ago",
+            "completion_date_formatted": null
+          },{
+            "enrollment_id": "enr_007",
+            "enrollment_date": "2024-12-15T14:30:00Z",
+            "completion_date": null,
+            "progress_percentage": "5",
+            "is_completed": false,
+            "is_in_wishlist": false,
+            "last_accessed": "2025-01-05T08:30:00Z",
+            "total_watch_time_minutes": 0,
+            "course_id": "7",
+            "title": "Cloud Architecture with AWS",
+            "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
+            "level": "intermediate",
+            "duration_hours": 20,
+            "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
+            "rating": "4.5",
+            "student_count": 567,
+            "tags": ["aws", "cloud", "architecture"],
+            "category_name": "Cloud Computing",
+            "category_icon": "☁️",
+            "category_color": "#8B5CF6",
+            "instructor_name": "Alex Kumar",
+            "instructor_avatar": "https://ui-avatars.com/api/?name=Alex+Kumar&size=50&background=8B5CF6&color=fff",
+            "instructor_rating": "4.7",
+            "total_videos": "30",
+            "completed_videos": "2",
+            "video_watch_time_seconds": "0",
+            "total_quizzes": "8",
+            "passed_quizzes": "0",
+            "video_progress_percent": 7,
+            "quiz_progress_percent": 0,
+            "estimated_time_remaining_minutes": 1140,
+            "last_accessed_formatted": "6 days ago",
+            "enrollment_date_formatted": "4 weeks ago",
+            "completion_date_formatted": null
           }
         ],
         "statistics": {
@@ -475,9 +797,230 @@
             "createdAt": "2024-02-28T13:45:00Z",
             "updatedAt": "2024-09-18T15:20:00Z",
             "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_004",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "1",
+            "title": "React Native Fundamentals",
+            "description": "Learn the basics of React Native development with hands-on projects and real-world applications.",
+            "instructor": {
+              "id": "inst_001",
+              "name": "Sarah Johnson",
+              "avatar": "https://ui-avatars.com/api/?name=Sarah+Johnson&size=50&background=3B82F6&color=fff",
+              "category": "Mobile Development",
+              "rating": 4.8
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-12-10T10:00:00Z"
+            },
+            "duration": "12h",
+            "rating": 4.5,
+            "image": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+            "category": "Mobile Development",
+            "level": "beginner",
+            "modules": 12,
+            "tags": ["react-native", "mobile", "javascript", "ios", "android"],
+            "createdAt": "2024-01-15T08:00:00Z",
+            "updatedAt": "2024-10-01T14:30:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_005",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "3",
+            "title": "UI/UX Design Principles",
+            "description": "Learn fundamental design principles and create stunning user interfaces with practical design tools.",
+            "instructor": {
+              "id": "inst_003",
+              "name": "Emma Rodriguez",
+              "avatar": "https://ui-avatars.com/api/?name=Emma+Rodriguez&size=50&background=F59E0B&color=fff",
+              "category": "Design",
+              "rating": 4.6
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-11-20T14:00:00Z"
+            },
+            "duration": "14h",
+            "rating": 4.4,
+            "image": "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop",
+            "category": "Design",
+            "level": "beginner",
+            "modules": 10,
+            "tags": ["design", "ui", "ux", "figma", "creative"],
+            "createdAt": "2024-01-20T09:30:00Z",
+            "updatedAt": "2024-08-22T11:45:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_006",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "5",
+            "title": "Cloud Architecture with AWS",
+            "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
+            "instructor": {
+              "id": "inst_005",
+              "name": "Alex Kumar",
+              "avatar": "https://ui-avatars.com/api/?name=Alex+Kumar&size=50&background=8B5CF6&color=fff",
+              "category": "Cloud Computing",
+              "rating": 4.7
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-11-15T11:30:00Z"
+            },
+            "duration": "20h",
+            "rating": 4.5,
+            "image": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
+            "category": "Cloud Computing",
+            "level": "intermediate",
+            "modules": 15,
+            "tags": ["aws", "cloud", "architecture", "devops", "serverless"],
+            "createdAt": "2024-04-12T16:00:00Z",
+            "updatedAt": "2024-10-05T12:30:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_007",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "7",
+            "title": "Full Stack JavaScript",
+            "description": "Master full stack development with Node.js, Express, React, and MongoDB.",
+            "instructor": {
+              "id": "inst_007",
+              "name": "Tom Anderson",
+              "avatar": "https://ui-avatars.com/api/?name=Tom+Anderson&size=50&background=14B8A6&color=fff",
+              "category": "Web Development",
+              "rating": 4.7
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-12-05T09:00:00Z"
+            },
+            "duration": "25h",
+            "rating": 4.6,
+            "image": "https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=400&h=250&fit=crop",
+            "category": "Web Development",
+            "level": "intermediate",
+            "modules": 18,
+            "tags": ["javascript", "nodejs", "react", "mongodb", "fullstack"],
+            "createdAt": "2024-03-10T10:00:00Z",
+            "updatedAt": "2024-09-25T13:00:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_008",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "8",
+            "title": "Cybersecurity Fundamentals",
+            "description": "Learn essential cybersecurity concepts and protect systems from threats.",
+            "instructor": {
+              "id": "inst_008",
+              "name": "Rachel Kim",
+              "avatar": "https://ui-avatars.com/api/?name=Rachel+Kim&size=50&background=DC2626&color=fff",
+              "category": "Security",
+              "rating": 4.8
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-11-28T15:45:00Z"
+            },
+            "duration": "18h",
+            "rating": 4.7,
+            "image": "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&h=250&fit=crop",
+            "category": "Security",
+            "level": "beginner",
+            "modules": 14,
+            "tags": [
+              "security",
+              "cybersecurity",
+              "networking",
+              "ethical-hacking"
+            ],
+            "createdAt": "2024-05-08T11:00:00Z",
+            "updatedAt": "2024-10-12T14:20:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_009",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "9",
+            "title": "Mobile App Design with Figma",
+            "description": "Create beautiful mobile app designs using Figma's powerful design tools.",
+            "instructor": {
+              "id": "inst_009",
+              "name": "Jessica Lee",
+              "avatar": "https://ui-avatars.com/api/?name=Jessica+Lee&size=50&background=F97316&color=fff",
+              "category": "Design",
+              "rating": 4.5
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-12-03T13:20:00Z"
+            },
+            "duration": "10h",
+            "rating": 4.3,
+            "image": "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=400&h=250&fit=crop",
+            "category": "Design",
+            "level": "beginner",
+            "modules": 8,
+            "tags": ["figma", "design", "mobile", "ui", "prototyping"],
+            "createdAt": "2024-04-22T09:15:00Z",
+            "updatedAt": "2024-09-08T10:30:00Z",
+            "isWishlisted": true
+          },
+          {
+            "wishlist_id": "wish_010",
+            "user_id": "550e8400-e29b-41d4-a716-446655440101",
+            "id": "10",
+            "title": "Docker & Kubernetes Essentials",
+            "description": "Master container orchestration with Docker and Kubernetes for modern deployments.",
+            "instructor": {
+              "id": "inst_010",
+              "name": "Mark Peterson",
+              "avatar": "https://ui-avatars.com/api/?name=Mark+Peterson&size=50&background=0891B2&color=fff",
+              "category": "DevOps",
+              "rating": 4.9
+            },
+            "progress": {
+              "completed": 0,
+              "total": 100,
+              "percentage": 0,
+              "lastAccessed": "2024-11-30T16:00:00Z"
+            },
+            "duration": "22h",
+            "rating": 4.8,
+            "image": "https://images.unsplash.com/photo-1605745341112-85968b19335b?w=400&h=250&fit=crop",
+            "category": "DevOps",
+            "level": "intermediate",
+            "modules": 16,
+            "tags": [
+              "docker",
+              "kubernetes",
+              "devops",
+              "containers",
+              "orchestration"
+            ],
+            "createdAt": "2024-06-01T12:30:00Z",
+            "updatedAt": "2024-10-20T11:00:00Z",
+            "isWishlisted": true
           }
         ],
-        "count": 3,
+        "count": 10,
         "meta": {
           "timestamp": "2025-01-11T10:00:00Z",
           "requestId": "req_wishlist_456"
@@ -633,6 +1176,492 @@
           "timestamp": "2025-01-11T10:00:00Z",
           "requestId": "req_course_detail_789"
         }
+      }
+    }
+  },
+  "all-users-info": {
+    "success": true,
+    "message": "All users information retrieved successfully",
+    "data": {
+      "users": [
+        {
+          "id": "550e8400-e29b-41d4-a716-446655440101",
+          "email": "shalomfyp@gmail.com",
+          "username": "shalomfyp",
+          "name": "Shalom FYP",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=Shalom+FYP&size=50&background=6366F1&color=fff",
+          "bio": "Learning enthusiast exploring various courses",
+          "location": "Singapore",
+          "phone": "+65 9123 4567",
+          "authProvider": "email"
+        },
+        {
+          "id": "660e8400-e29b-41d4-a716-446655440102",
+          "email": "example2@gmail.com",
+          "username": "exampleuser2",
+          "name": "Example User2",
+          "role": "instructor",
+          "avatar": "https://ui-avatars.com/api/?name=Example+User2&size=50&background=10B981&color=fff",
+          "bio": "Passionate about teaching web development",
+          "location": "USA",
+          "phone": "+1 555 123 4567",
+          "authProvider": "google"
+        },
+        {
+          "id": "770e8400-e29b-41d4-a716-446655440103",
+          "email": "john.smith@gmail.com",
+          "username": "johnsmith",
+          "name": "John Smith",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=John+Smith&size=50&background=EF4444&color=fff",
+          "bio": "Software engineer looking to upgrade my skills",
+          "location": "United Kingdom",
+          "phone": "+44 20 7123 4567",
+          "authProvider": "email"
+        },
+        {
+          "id": "880e8400-e29b-41d4-a716-446655440104",
+          "email": "maria.garcia@gmail.com",
+          "username": "mariagarcia",
+          "name": "Maria Garcia",
+          "role": "instructor",
+          "avatar": "https://ui-avatars.com/api/?name=Maria+Garcia&size=50&background=F59E0B&color=fff",
+          "bio": "Data science educator with 10 years experience",
+          "location": "Spain",
+          "phone": "+34 91 123 4567",
+          "authProvider": "google"
+        },
+        {
+          "id": "990e8400-e29b-41d4-a716-446655440105",
+          "email": "david.chenbao@gmail.com",
+          "username": "davidchen",
+          "name": "David Chen",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=David+Chen&size=50&background=8B5CF6&color=fff",
+          "bio": "Student exploring AI and machine learning",
+          "location": "Canada",
+          "phone": "+1 416 555 7890",
+          "authProvider": "email"
+        },
+        {
+          "id": "aa0e8400-e29b-41d4-a716-446655440106",
+          "email": "sarah.wilson@gmail.com",
+          "username": "sarahwilson",
+          "name": "Sarah Wilson",
+          "role": "instructor",
+          "avatar": "https://ui-avatars.com/api/?name=Sarah+Wilson&size=50&background=EC4899&color=fff",
+          "bio": "UX/UI designer passionate about teaching design principles",
+          "location": "Australia",
+          "phone": "+61 2 9876 5432",
+          "authProvider": "google"
+        },
+        {
+          "id": "bb0e8400-e29b-41d4-a716-446655440107",
+          "email": "alex.kumar@gmail.com",
+          "username": "alexkumar",
+          "name": "Alex Kumar",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=Alex+Kumar&size=50&background=3B82F6&color=fff",
+          "bio": "Cloud architecture enthusiast and DevOps learner",
+          "location": "India",
+          "phone": "+91 98765 43210",
+          "authProvider": "email"
+        },
+        {
+          "id": "cc0e8400-e29b-41d4-a716-446655440108",
+          "email": "emma.brown@gmail.com",
+          "username": "emmabrown",
+          "name": "Emma Brown",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=Emma+Brown&size=50&background=14B8A6&color=fff",
+          "bio": "Marketing professional learning web development",
+          "location": "New Zealand",
+          "phone": "+64 9 123 4567",
+          "authProvider": "google"
+        },
+        {
+          "id": "dd0e8400-e29b-41d4-a716-446655440109",
+          "email": "james.park@gmail.com",
+          "username": "jamespark",
+          "name": "James Park",
+          "role": "instructor",
+          "avatar": "https://ui-avatars.com/api/?name=James+Park&size=50&background=F97316&color=fff",
+          "bio": "Full-stack developer teaching modern web technologies",
+          "location": "South Korea",
+          "phone": "+82 2 3456 7890",
+          "authProvider": "email"
+        },
+        {
+          "id": "ee0e8400-e29b-41d4-a716-446655440110",
+          "email": "lisa.anderson@gmail.com",
+          "username": "lisaanderson",
+          "name": "Lisa Anderson",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=Lisa+Anderson&size=50&background=06B6D4&color=fff",
+          "bio": "Career changer transitioning into tech",
+          "location": "Germany",
+          "phone": "+49 30 1234 5678",
+          "authProvider": "google"
+        },
+        {
+          "id": "ff0e8400-e29b-41d4-a716-446655440111",
+          "email": "michael.lee@gmail.com",
+          "username": "michaellee",
+          "name": "Michael Lee",
+          "role": "learner",
+          "avatar": "https://ui-avatars.com/api/?name=Michael+Lee&size=50&background=A855F7&color=fff",
+          "bio": "Mobile app developer expanding into cross-platform development",
+          "location": "Japan",
+          "phone": "+81 3 9876 5432",
+          "authProvider": "email"
+        },
+        {
+          "id": "1a0e8400-e29b-41d4-a716-446655440112",
+          "email": "sophia.martinez@gmail.com",
+          "username": "sophiamartinez",
+          "name": "Sophia Martinez",
+          "role": "instructor",
+          "avatar": "https://ui-avatars.com/api/?name=Sophia+Martinez&size=50&background=84CC16&color=fff",
+          "bio": "Python expert specializing in data analytics and visualization",
+          "location": "Mexico",
+          "phone": "+52 55 1234 5678",
+          "authProvider": "google"
+        }
+      ]
+    }
+  },
+  "module-details": {
+    "1": {
+      "success": true,
+      "message": "Module details retrieved successfully",
+      "data": {
+        "course": {
+          "id": "1",
+          "title": "React Native Fundamentals",
+          "description": "Learn the basics of React Native development",
+          "instructor_name": "Sarah Johnson",
+          "level": "beginner",
+          "duration_hours": 12,
+          "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+          "rating": "4.5",
+          "total_ratings": 145,
+          "student_count": 1250,
+          "is_published": true,
+          "is_featured": true,
+          "language": "English",
+          "tags": ["react-native", "mobile", "javascript"],
+          "created_at": "2024-01-15T08:00:00Z",
+          "updated_at": "2024-10-01T14:30:00Z",
+          "category_name": "Mobile Development",
+          "category_id": "cat_mobile",
+          "requirements": ["Basic JavaScript knowledge"],
+          "outcomes": ["Build mobile apps with React Native"]
+        },
+        "sections": [
+          {
+            "id": "sec_1",
+            "title": "Getting Started",
+            "description": "Introduction and environment setup",
+            "order_index": 1,
+            "lessons_count": 4,
+            "duration_minutes": 60,
+            "items": [
+              {
+                "id": "vid_1",
+                "type": "video",
+                "title": "Course Introduction",
+                "description": "Welcome to React Native Fundamentals",
+                "order_index": 1,
+                "video_url": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+                "duration_seconds": 600,
+                "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+                "is_preview": true,
+                "is_completed": true
+              },
+              {
+                "id": "vid_2",
+                "type": "video",
+                "title": "Setting up Development Environment",
+                "order_index": 2,
+                "video_url": "https://www.youtube.com/watch?v=ABFGKdKKKyg",
+                "duration_seconds": 1200,
+                "is_preview": false,
+                "is_completed": true
+              },
+              {
+                "id": "vid_3",
+                "type": "video",
+                "title": "Your First React Native App",
+                "order_index": 3,
+                "duration_seconds": 900,
+                "is_completed": false
+              },
+              {
+                "id": "quiz_1",
+                "type": "quiz",
+                "title": "Environment Setup Quiz",
+                "description": "Test your knowledge of the setup process",
+                "order_index": 4,
+                "passing_score": 80,
+                "time_limit_minutes": 10,
+                "max_attempts": 3,
+                "is_completed": false
+              },
+              {
+                "id": "pdf_1",
+                "type": "pdf",
+                "title": "Installing Required Tools",
+                "order_index": 5,
+                "is_completed": false
+              }
+            ],
+            "itemCount": 5,
+            "module_is_completed": false
+          },
+          {
+            "id": "sec_2",
+            "title": "Core Concepts",
+            "description": "Components, props, and state",
+            "order_index": 2,
+            "lessons_count": 6,
+            "duration_minutes": 120,
+            "items": [
+              {
+                "id": "vid_4",
+                "type": "video",
+                "title": "Understanding Components",
+                "order_index": 1,
+                "duration_seconds": 800,
+                "is_completed": false
+              },
+              {
+                "id": "vid_5",
+                "type": "video",
+                "title": "Props and State",
+                "order_index": 2,
+                "duration_seconds": 1000,
+                "is_completed": false
+              }
+            ],
+            "itemCount": 2
+          }
+        ],
+        "totalSections": 2,
+        "totalVideos": 5,
+        "totalQuizzes": 1,
+        "userProgress": {
+          "progress_percentage": 40,
+          "is_completed": false,
+          "current_video_id": "vid_3",
+          "total_watch_time_minutes": 30,
+          "enrollment_date": "2024-09-01T08:00:00Z",
+          "videoProgress": [
+            {
+              "video_id": "vid_1",
+              "watch_time_seconds": 600,
+              "is_completed": true,
+              "last_position_seconds": 600,
+              "completed_at": "2024-09-05T10:30:00Z"
+            },
+            {
+              "video_id": "vid_2",
+              "watch_time_seconds": 1200,
+              "is_completed": true,
+              "last_position_seconds": 1200,
+              "completed_at": "2024-09-06T14:20:00Z"
+            },
+            {
+              "video_id": "vid_3",
+              "watch_time_seconds": 450,
+              "is_completed": false,
+              "last_position_seconds": 450
+            }
+          ],
+          "quizAttempts": []
+        },
+        "meta": {
+          "timestamp": "2025-01-11T10:00:00Z",
+          "requestId": "req_module_123",
+          "userId": "550e8400-e29b-41d4-a716-446655440101"
+        }
+      }
+    }
+  },
+  "video-details": {
+    "vid_1": {
+      "success": true,
+      "message": "Video details retrieved successfully",
+      "data": {
+        "id": "vid_1",
+        "title": "Course Introduction",
+        "description": "Welcome to React Native Fundamentals. In this video, we'll overview what you'll learn.",
+        "video_url": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        "duration_seconds": 600,
+        "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
+        "is_preview": true,
+        "course": {
+          "id": "1",
+          "title": "React Native Fundamentals"
+        },
+        "section": {
+          "id": "sec_1",
+          "title": "Getting Started"
+        },
+        "navigation": {
+          "previousVideo": null,
+          "nextVideo": {
+            "id": "vid_2",
+            "title": "Setting up Development Environment"
+          }
+        },
+        "userProgress": {
+          "watch_time_seconds": 600,
+          "is_completed": true,
+          "last_position_seconds": 600,
+          "completed_at": "2024-09-05T10:30:00Z",
+          "updated_at": "2024-09-05T10:30:00Z"
+        }
+      }
+    },
+    "vid_2": {
+      "success": true,
+      "message": "Video details retrieved successfully",
+      "data": {
+        "id": "vid_2",
+        "title": "Setting up Development Environment",
+        "description": "Learn how to set up your React Native development environment",
+        "video_url": "https://www.youtube.com/watch?v=ABFGKdKKKyg",
+        "duration_seconds": 1200,
+        "is_preview": false,
+        "course": {
+          "id": "1",
+          "title": "React Native Fundamentals"
+        },
+        "section": {
+          "id": "sec_1",
+          "title": "Getting Started"
+        },
+        "navigation": {
+          "previousVideo": {
+            "id": "vid_1",
+            "title": "Course Introduction"
+          },
+          "nextVideo": {
+            "id": "vid_3",
+            "title": "Your First React Native App"
+          }
+        },
+        "userProgress": {
+          "watch_time_seconds": 1200,
+          "is_completed": true,
+          "last_position_seconds": 1200,
+          "completed_at": "2024-09-06T14:20:00Z",
+          "updated_at": "2024-09-06T14:20:00Z"
+        }
+      }
+    }
+  },
+  "quiz-details": {
+    "quiz_1": {
+      "success": true,
+      "message": "Quiz details retrieved successfully",
+      "data": {
+        "id": "quiz_1",
+        "title": "Environment Setup Quiz",
+        "description": "Test your knowledge of the React Native setup process",
+        "passing_score": 80,
+        "time_limit_minutes": 10,
+        "max_attempts": 3,
+        "course": {
+          "id": "1",
+          "title": "React Native Fundamentals"
+        },
+        "section": {
+          "id": "sec_1",
+          "title": "Getting Started"
+        },
+        "questions": [
+          {
+            "id": "q1",
+            "question_text": "What is React Native primarily used for?",
+            "question_type": "multiple-choice",
+            "options": [
+              "Building mobile applications",
+              "Building websites",
+              "Building desktop applications",
+              "Building backend services"
+            ],
+            "correct_answer": "Building mobile applications",
+            "explanation": "React Native is a framework for building native mobile applications using React.",
+            "points": 20,
+            "order_index": 1
+          },
+          {
+            "id": "q2",
+            "question_text": "Which command is used to create a new React Native project?",
+            "question_type": "multiple-choice",
+            "options": [
+              "npx react-native init",
+              "npm create react-native",
+              "react-native new",
+              "npx create-rn-app"
+            ],
+            "correct_answer": "npx react-native init",
+            "explanation": "The standard command to initialize a new React Native project is 'npx react-native init'.",
+            "points": 20,
+            "order_index": 2
+          },
+          {
+            "id": "q3",
+            "question_text": "Do you need to install Node.js to develop React Native apps?",
+            "question_type": "true-false",
+            "options": ["True", "False"],
+            "correct_answer": "True",
+            "explanation": "Node.js is required as it provides npm and the JavaScript runtime.",
+            "points": 20,
+            "order_index": 3
+          },
+          {
+            "id": "q4",
+            "question_text": "What does JSX stand for?",
+            "question_type": "multiple-choice",
+            "options": [
+              "JavaScript XML",
+              "Java Syntax Extension",
+              "JSON eXtension",
+              "JavaScript eXtension"
+            ],
+            "correct_answer": "JavaScript XML",
+            "explanation": "JSX stands for JavaScript XML and allows you to write HTML-like code in JavaScript.",
+            "points": 20,
+            "order_index": 4
+          },
+          {
+            "id": "q5",
+            "question_text": "Can React Native apps run on both iOS and Android?",
+            "question_type": "true-false",
+            "options": ["True", "False"],
+            "correct_answer": "True",
+            "explanation": "React Native enables cross-platform development for both iOS and Android.",
+            "points": 20,
+            "order_index": 5
+          }
+        ],
+        "userAttempts": []
+      }
+    }
+  },
+  "user-reviews": {
+    "550e8400-e29b-41d4-a716-446655440101_1": {
+      "success": true,
+      "data": {
+        "id": "review_user_001",
+        "rating": 5,
+        "review": "Great course! Very comprehensive and well-structured.",
+        "createdAt": "2024-12-01T10:30:00Z",
+        "reviewerName": "Shalom FYP",
+        "reviewerAvatar": "https://ui-avatars.com/api/?name=Shalom+FYP&size=40"
       }
     }
   }
