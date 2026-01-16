@@ -4,18 +4,18 @@ on:
   push:
     branches: [main, master]
     paths:
-      - "mobile/**"
+      - 'mobile/**'
 
   pull_request:
     branches: [main, master]
     paths:
-      - "mobile/**"
+      - 'mobile/**'
 
   workflow_dispatch:
     inputs:
       buildType:
         type: choice
-        description: "Build type to run"
+        description: 'Build type to run'
         options:
           - dev
           - all
@@ -23,10 +23,6 @@ on:
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
   NODE_OPTIONS: --openssl-legacy-provider
-
-defaults:
-  run:
-    working-directory: mobile
 
 jobs:
   check-skip:
@@ -43,7 +39,6 @@ jobs:
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-
     steps:
       - name: 🏗 Checkout repository
         uses: actions/checkout@v4
@@ -51,14 +46,35 @@ jobs:
       - name: 🏗 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "yarn"
-          cache-dependency-path: mobile/yarn.lock
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
 
       - name: 📦 Install dependencies
         run: |
-          yarn install --frozen-lockfile
-          yarn global add eas-cli@latest
+          npm ci
+          npm install -g eas-cli@latest
+        working-directory: mobile
+
+        # 🚀 HUGE SPEEDUP: cache Gradle
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('mobile/android/**/*.gradle*', 'mobile/android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # ⚡ Speed up JS bundling
+      - name: Cache Expo & Metro
+        uses: actions/cache@v3
+        with:
+          path: |
+            mobile/.expo
+            mobile/node_modules/.cache
+          key: expo-${{ hashFiles('mobile/package-lock.json') }}
 
       - name: 📱 Setup EAS build cache
         uses: actions/cache@v3
@@ -70,40 +86,17 @@ jobs:
 
       - name: 🔄 Verify EAS CLI
         run: eas --version
+        working-directory: mobile
 
-      - name: 📋 Fix package.json main entry
-        run: |
-          sudo apt-get update && sudo apt-get install -y jq
-          cp package.json package.json.bak
-          jq '.main = "node_modules/expo/AppEntry.js"' package.json > tmp.json && mv tmp.json package.json
-
-      - name: 📋 Ensure metro.config.js supports SVG
-        run: |
-          cat > metro.config.js << 'EOF'
-          /* eslint-disable @typescript-eslint/no-var-requires */
-          const { getDefaultConfig } = require('expo/metro-config');
-
-          const config = getDefaultConfig(__dirname);
-          const { transformer, resolver } = config;
-
-          config.transformer = {
-            ...transformer,
-            babelTransformerPath: require.resolve('react-native-svg-transformer/expo'),
-          };
-
-          config.resolver = {
-            ...resolver,
-            assetExts: resolver.assetExts.filter(ext => ext !== 'svg'),
-            sourceExts: [...resolver.sourceExts, 'svg'],
-          };
-
-          module.exports = config;
-          EOF
+      # - name: 📋 Fix package.json main entry
+      #   run: |
+      #     sudo apt-get update && sudo apt-get install -y jq
+      #     cp package.json package.json.bak
+      #     jq '.main = "node_modules/expo/AppEntry.js"' package.json > tmp.json && mv tmp.json package.json
+      #   working-directory: mobile
 
       - name: 📱 Build Development Android APK
-        if: github.event.inputs.buildType == 'all' ||
-            github.event.inputs.buildType == 'dev' ||
-            github.event_name == 'push'
+        if: github.event.inputs.buildType == 'all' || github.event.inputs.buildType == 'dev' || github.event_name == 'push'
         run: |
           export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
           eas build \
@@ -114,6 +107,7 @@ jobs:
             --output=app-dev.apk
         env:
           NODE_ENV: development
+        working-directory: mobile
 
       - name: 📦 Upload APK artifact
         uses: actions/upload-artifact@v4
