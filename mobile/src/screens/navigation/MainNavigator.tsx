@@ -15,13 +15,13 @@ import { useNavigationState } from "@react-navigation/native";
 // Screens
 import * as Screens from "../index";
 
-import { useAuth } from "../../contexts/AuthContext";
-import { useNotification } from "../../contexts/NotificationContext";
-import type { TabParamList, MainStackParamList } from "@/types/navigation";
-import { ADMIN_EMAIL, Colors } from "../../constants";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNotification } from "@/contexts/NotificationContext";
+import type { BottomTabNavParamList, MainStackParamList } from "@/types/navigation";
+import { ADMIN_EMAIL, Colors } from "@/constants";
 import { BlurView } from "expo-blur";
 
-const Tab = createBottomTabNavigator<TabParamList>();
+const BottomTabNav = createBottomTabNavigator<BottomTabNavParamList>();
 const Stack = createStackNavigator<MainStackParamList>();
 
 const tabBarBottomOffset = Platform.OS === "android" ? 50 : 20;
@@ -86,7 +86,7 @@ function TabNavigator() {
   });
 
   return (
-    <Tab.Navigator
+    <BottomTabNav.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           const iconSize = 22; // Custom icon size
@@ -105,9 +105,6 @@ function TabNavigator() {
             case "Profile":
               iconName = focused ? "person" : "person-outline";
               break;
-            // case "Admin":
-            //   iconName = focused ? "people" : "people-outline";
-            //   break;
             default:
               iconName = "ellipse";
           }
@@ -187,14 +184,11 @@ function TabNavigator() {
         </Animated.View>
       )}
     >
-      <Tab.Screen name="Home" component={Screens.HomeScreen} />
-      <Tab.Screen name="Courses" component={Screens.CoursesScreen} />
-      <Tab.Screen name="Notifications" component={Screens.Notification} />
-      <Tab.Screen name="Profile" component={Screens.UserProfile} />
-      {/* {user?.email === ADMIN_EMAIL && (
-        <Tab.Screen name="Admin" component={UserManagementScreen} />
-      )} */}
-    </Tab.Navigator>
+      <BottomTabNav.Screen name="Home" component={Screens.HomeScreen} />
+      <BottomTabNav.Screen name="Courses" component={Screens.CoursesScreen} />
+      <BottomTabNav.Screen name="Notifications" component={Screens.Notification} />
+      <BottomTabNav.Screen name="Profile" component={Screens.UserProfile} />
+    </BottomTabNav.Navigator>
   );
 }
 

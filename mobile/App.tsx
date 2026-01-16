@@ -18,7 +18,7 @@ import UserProvider from "./src/contexts/UserContext";
 import CourseProvider from "./src/contexts/CourseContext";
 import { NotificationProvider } from "./src/contexts/NotificationContext";
 import SplashScreen from "./src/screens/SplashScreen";
-import type { MainStackParamList } from "./src/types";
+import type { RootStackParamList } from "./src/types/navigation";
 import * as Linking from "expo-linking";
 import { parseSupabaseUrl } from "./src/utils/authUtils";
 import { supabase } from "./src/lib/supabase";
@@ -61,7 +61,7 @@ AppState.addEventListener('change', (state) => {
   }
 });
 
-const Root = createNativeStackNavigator<MainStackParamList>();
+const Root = createNativeStackNavigator<RootStackParamList>();
 
 // Navigation component that checks auth state
 const AppNavigator = () => {

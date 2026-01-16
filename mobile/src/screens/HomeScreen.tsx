@@ -31,7 +31,6 @@ import { showToast } from '@/components/common/Toast';
 
 // types
 import type { Course } from '../types';
-import type { MainStackParamList, TabParamList } from '../types/navigation';
 import CourseCarousel from '@/components/home/CourseCarousel';
 
 // Types for API-ready data structures
