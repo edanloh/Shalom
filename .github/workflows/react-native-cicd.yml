@@ -5,10 +5,6 @@ on:
     branches: [main, master]
     paths:
       - "mobile/**"
-    paths-ignore:
-      - "**.md"
-      - "LICENSE"
-      - "docs/**"
 
   pull_request:
     branches: [main, master]
