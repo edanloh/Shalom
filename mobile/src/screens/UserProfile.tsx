@@ -9,6 +9,7 @@ import {
   Image,
   RefreshControl,
   DeviceEventEmitter,
+  Platform,
 } from "react-native";
 import { Colors, Spacing, TextStyles } from "../constants";
 import { Ionicons } from "@expo/vector-icons";
@@ -657,15 +658,17 @@ const styles = StyleSheet.create({
   },
   avatarGoogleIcon: {
     position: "absolute",
-    bottom: 0,
+    bottom: 2,
     right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.white,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 3,
+    borderWidth: Platform.OS === "web" ? 3 : 0,
     borderColor: Colors.white,
+    outlineWidth: 3,
+    outlineColor: Colors.white,
   },
 });
