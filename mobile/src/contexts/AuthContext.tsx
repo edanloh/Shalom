@@ -1,14 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { API_BASE_URL } from 'react-native-dotenv';
-import { handleLogoutCleanup } from './NotificationContext';
 import { supabase } from '@/lib/supabase';
-import { AppState } from 'react-native';
-import { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { User, AuthContextType } from '@/types';
-import { useNavigation } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
-import { Platform } from 'react-native';
 import { makeRedirectUri } from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -53,6 +49,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       access_token,
       refresh_token,
     });
+    setIsLoading(true);
     const signIn = async () => {
       await supabase.auth.setSession({
         access_token,
@@ -88,17 +85,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
     }
     setSession(supabaseSession || null);
-  };
-
-  const backdoor = () => {
-    // Only enable for web or development
-    // const mockSession: Session = {
-    //   }
-    // } as any;
-    // const mockUser: User = {
-    // };
-    // setUser(mockUser);
-    // setSession(mockSession);
   };
 
   // // Set the below to skip auth during development
@@ -186,18 +172,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Supabase Google OAuth for Expo Android
   const loginWithGoogle = async () => {
-    setIsLoading(true);
     try {
       // Use a custom redirect URI for Expo (must be whitelisted in Supabase dashboard)
-      const redirectTo = makeRedirectUri({
-        scheme: 'com.shalom',
-        // native: 'com.shalom://',
-      });
+      const redirectTo = makeRedirectUri();
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo,
+          skipBrowserRedirect: true,
         },
       });
 
@@ -262,50 +245,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw error;
     }
   };
-
-  // const loginWithGoogle = async (tokens: AuthTokens) => {
-  //   try {
-  //     const googlePayload = tokens.id_token
-  //       ? JSON.parse(atob(tokens.id_token.split(".")[1]))
-  //       : null;
-
-  //     if (!googlePayload?.sub) {
-  //       throw new Error("Invalid Google token");
-  //     }
-
-  //     const response = await fetch(
-  //       `${API_BASE_URL}/dev/getUserInfo?username=${encodeURIComponent(
-  //         googlePayload.sub
-  //       )}`,
-  //       { method: "GET", headers: { "Content-Type": "application/json" } }
-  //     );
-
-  //     if (!response.ok) throw new Error("Failed to fetch user info");
-
-  //     const result = await response.json();
-  //     const userInfo = result.attributes || result.body?.attributes || {};
-
-  //     const userData: User = {
-  //       id: userInfo.sub || userInfo.email || googlePayload.sub,
-  //       email: userInfo.email,
-  //       username: userInfo.username || userInfo.email,
-  //       name:
-  //         userInfo.name ||
-  //         (userInfo.email ? userInfo.email.split("@")[0] : "GoogleUser"),
-  //       role: userInfo["custom:role"] || "learner",
-  //       avatar: userInfo.picture,
-  //       phone: userInfo.phone_number,
-  //       bio: userInfo.bio,
-  //       location: userInfo.locale || userInfo.location,
-  //       authProvider: "google",
-  //       accessToken: tokens.access_token,
-  //     };
-
-  //     await persistUser(userData);
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // };
 
   const changePassword = async (
     currentPassword: string,

@@ -206,7 +206,7 @@ export default function EditProfileScreen({ navigation }: any) {
             />
 
             {/* Location */}
-            <Text style={TextStyles.h5}>Location *</Text>
+            <Text style={TextStyles.h5}>Location</Text>
             <CustomTextInput
               placeholder="Enter your location"
               value={formData.location}

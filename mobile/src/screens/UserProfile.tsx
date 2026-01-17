@@ -220,6 +220,12 @@ export default function ProfileScreen({ navigation }: any) {
                 fallback={Images.profile}
                 style={externalStyles.avatar}
               />
+              {user?.auth_provider && user?.auth_provider == "google" && (
+                <Image
+                  source={require("@assets/google.png")}
+                  style={styles.avatarGoogleIcon}
+                />
+              )}
             </View>
             <View
               style={{
@@ -231,18 +237,6 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={[TextStyles.h3, { marginBottom: Spacing.xs }]}>
                 {displayName}
               </Text>
-              {user?.auth_provider && user?.auth_provider == "google" && (
-                <Image
-                  source={require("@assets/google.png")}
-                  style={{
-                    width: 24,
-                    height: 24,
-                    resizeMode: "contain",
-                    marginLeft: 12,
-                    marginBottom: 8,
-                  }}
-                />
-              )}
             </View>
             <Text style={TextStyles.bodyMedium}>{balance} points</Text>
           </View>
@@ -521,9 +515,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   emptyAchievementsText: {
+    ...TextStyles.body,
     textAlign: "center",
     color: Colors.textSecondary,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.base,
   },
   historyCard: {
     marginHorizontal: Spacing.lg,
@@ -659,5 +654,18 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
+  },
+  avatarGoogleIcon: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: Colors.white,
   },
 });
