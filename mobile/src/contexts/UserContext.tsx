@@ -74,15 +74,15 @@ export default function UserProvider({ children }: { children: React.ReactNode }
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      // Placeholder for fetching user data from an API or local storage
-      const data = await fetchUserProfile(authUser!.email);
-      setUser(data);
-    };
     if (authUser) {
-      fetchData();
+      fetchUser(authUser!.email);
     }
   }, [authUser]);
+
+  useEffect(() => {
+    console.log("userContext user", user)
+  }, [user])
+  
 
   const fetchUser = async (email: string): Promise<User> => {
     const data = await fetchUserProfile(email);

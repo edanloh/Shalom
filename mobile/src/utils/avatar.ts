@@ -6,5 +6,5 @@ export const getAvatarUri = () => {
   const uri = data?.avatar_url
     ? `https://cmtfxsntlfoxgcznanpe.supabase.co/storage/v1/object/public/profilepics/${data.avatar_url}`
     : Images.profile;
-  return uri;
+  return uri.toString();
 };
