@@ -15,6 +15,9 @@ import Screen from "../components/common/Screen";
 import { ActionButton, CustomTextInput } from "@/components";
 import * as ImagePicker from "expo-image-picker";
 import { useUser } from "@/contexts/UserContext";
+import { ImageWithFallback } from "@/components/common";
+import { getAvatarUri } from "@/utils/avatar";
+import { Images } from "@assets/index";
 
 export default function EditProfileScreen({ navigation }: any) {
   const { user, updateUser, uploadUserPic } = useUser();
@@ -140,16 +143,7 @@ export default function EditProfileScreen({ navigation }: any) {
           {/* Avatar */}
           <View style={styles.avatarSection}>
             <View>
-              <Image
-                source={
-                  user?.avatar_url
-                    ? {
-                        uri: `https://cmtfxsntlfoxgcznanpe.supabase.co/storage/v1/object/public/profilepics/${user.avatar_url}`,
-                      }
-                    : require("@assets/profile.png")
-                }
-                style={styles.avatar}
-              />
+              <ImageWithFallback source={{uri: getAvatarUri()}} fallback={Images.profile} style={styles.avatar} />
               <Pressable
                 style={styles.avatarEditButton}
                 onPress={handleChangeAvatar}
@@ -163,7 +157,7 @@ export default function EditProfileScreen({ navigation }: any) {
                 { textAlign: "center", marginTop: Spacing.md },
               ]}
             >
-              Tap to change photo
+              Tap to change profile picture
             </Text>
           </View>
 
