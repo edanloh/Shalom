@@ -5,6 +5,7 @@ import {
   fetchUserProfile,
   updateUserProfile,
   uploadProfilePic,
+  registerCheck
 } from '@/services/userService';
 
 interface UserProgress {
@@ -74,15 +75,14 @@ export default function UserProvider({ children }: { children: React.ReactNode }
   };
 
   useEffect(() => {
-    if (authUser) {
-      fetchUser(authUser!.email);
-    }
+    const fetchAndRegister = async () => {
+      if (authUser) {
+        await registerCheck(authUser);
+        fetchUser(authUser!.email);
+      }
+    };
+    fetchAndRegister();
   }, [authUser]);
-
-  useEffect(() => {
-    console.log("userContext user", user)
-  }, [user])
-  
 
   const fetchUser = async (email: string): Promise<User> => {
     const data = await fetchUserProfile(email);

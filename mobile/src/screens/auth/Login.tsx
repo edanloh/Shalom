@@ -1,17 +1,11 @@
 import { useState } from "react";
-import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 WebBrowser.maybeCompleteAuthSession();
-
-import { COGNITO_DOMAIN, COGNITO_CLIENT_ID } from "react-native-dotenv";
-
-const REDIRECT_URI = makeRedirectUri();
 
 import {
   View,
   Text,
   TouchableOpacity,
-  Alert,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -23,7 +17,6 @@ import ActionButton from "@components/ActionButton";
 import { useAuth } from "@contexts/AuthContext";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import externalStyles from "@styles/styles";
-import { useEffect } from "react";
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
@@ -40,14 +33,12 @@ export default function LoginScreen({ navigation }: any) {
     }
     setLoading(true);
     const result = await login(email, password);
-    setLoading(false);
     if (!result.success) {
       setLoginWarning(result.error || "Login failed. Please try again");
+      setLoading(false);
     }
     // Navigation will happen automatically when Supabase session state changes
   };
-
-  // Google login is now handled by AuthContext for both web and mobile
 
   return (
     <KeyboardAvoidingView

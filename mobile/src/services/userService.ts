@@ -34,3 +34,11 @@ export async function uploadProfilePic(name: string, avatar: Blob): Promise<any>
   const data: any = (resp as any)?.data ?? (resp as any);
   return data?.data ?? data;
 }
+
+export async function registerCheck(user: User): Promise<any> {
+  const url = '/registerCheck';
+  console.log("registerCheck userService", user);
+  const resp = await apiService.post<any>(url, { user });
+  const data: any = (resp as any)?.data ?? (resp as any);
+  return data?.data ?? data;
+}
