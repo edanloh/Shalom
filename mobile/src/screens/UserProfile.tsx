@@ -22,6 +22,7 @@ import CustomModal from "../components/common/CustomModal";
 import creditService from "../services/creditService";
 import { showToast } from "@/components/common/Toast";
 import { AchievementItem, CreditEvent } from "../types";
+import { useUser } from "@/contexts/UserContext";
 
 const CARD_BG = "#3A3A45";
 const TILE_BG = "#5B38E3";
@@ -50,12 +51,7 @@ export default function ProfileScreen({ navigation }: any) {
   const tabHidden = useRef(false);
 
   // Safe fallbacks so the UI renders even if some fields are missing
-  const displayName = user?.name ?? "User";
-  let avatarUri = getAvatarUri(user);
-  if (!avatarUri) {
-    avatarUri = `https://cmtfxsntlfoxgcznanpe.supabase.co/storage/v1/object/public/profilepics/${user?.email}_avatar.png`;
-  }
-  const avatarSrc = avatarUri ? { uri: avatarUri } : Images.profile;
+  const displayName = useUser().user?.name ?? "User";
 
   const quickActions = useMemo(
     () => [
@@ -220,7 +216,7 @@ export default function ProfileScreen({ navigation }: any) {
           <View style={[externalStyles.header, { marginBottom: 16 }]}>
             <View style={[externalStyles.logo, { marginBottom: 16 }]}>
               <ImageWithFallback
-                source={avatarSrc}
+                source={{uri: getAvatarUri()}}
                 fallback={Images.profile}
                 style={externalStyles.avatar}
               />

@@ -2,22 +2,11 @@
 // UserService for fetching and updating user profile and info
 
 import apiService from './apiService';
-
-export interface UserProfile {
-  id: string;
-  email: string;
-  name: string;
-  bio?: string;
-  avatar?: string;
-  location?: string;
-  phone?: string;
-  role?: string;
-  // Add other fields as needed
-}
+import { User } from '@/types';
 
 export async function fetchUserProfile(
   email: string,
-): Promise<UserProfile> {
+): Promise<User> {
   if (!email) throw new Error('email is required');
   const resp = await apiService.get<any>('/getUserInfo', {email});
   return resp?.data ?? resp ?? [];
@@ -25,23 +14,21 @@ export async function fetchUserProfile(
 
 export async function updateUserProfile(
   id: string,
-  payload: Partial<UserProfile>
-): Promise<UserProfile> {
+  payload: Partial<User>
+): Promise<User> {
   const url = '/updateUserInfo';
-  const resp = await apiService.patch<UserProfile>(url, { id, payload });
+  const resp = await apiService.patch<User>(url, { id, payload });
   const data: any = (resp as any)?.data ?? (resp as any);
   return data?.data ?? data;
 }
 
-export async function uploadProfilePic(id: string, avatar: File): Promise<any> {
+export async function uploadProfilePic(name: string, avatar: Blob): Promise<any> {
   const url = '/uploadProfilePic';
-  // Read the file as an ArrayBuffer
-  const arrayBuffer = await avatar.arrayBuffer();
-  // Set headers for filename, content-type, and user id
+  const arrayBuffer = await new Response(avatar).arrayBuffer();
   const resp = await apiService.post<any>(url, arrayBuffer, {
     headers: {
       'Content-Type': avatar.type,
-      'x-file-name': avatar.name,
+      'x-file-name': name,
     },
   });
   const data: any = (resp as any)?.data ?? (resp as any);

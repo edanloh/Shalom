@@ -25,6 +25,7 @@ import { supabase } from "./src/lib/supabase";
 import { Colors } from "./src/constants";
 import * as Screens from "./src/screens";
 import { AppState } from 'react-native';
+import { useUser } from "./src/contexts/UserContext";
 
 // Fix for web scrolling - override root height
 if (Platform.OS === "web") {
@@ -67,6 +68,7 @@ const Root = createNativeStackNavigator<RootStackParamList>();
 const AppNavigator = () => {
   const { session, isLoading, loginWithToken, user } =
     useAuth();
+  const { user: contextUser } = useUser();
 
   // --- Deep link handling ---
   const getInitialURL = async () => {
@@ -143,7 +145,7 @@ const AppNavigator = () => {
   return (
     <NavigationContainer>
       <Root.Navigator screenOptions={{ headerShown: false }}>
-        {session && user ? (
+        {session && user && contextUser ? (
           <Root.Screen
             name="Main"
             component={MainNavigator}

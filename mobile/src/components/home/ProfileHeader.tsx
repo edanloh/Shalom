@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { use, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,26 +12,21 @@ import { getAvatarUri } from '@/utils/avatar';
 import { Images } from '../../../assets';
 import { ImageWithFallback } from '../common';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useUser } from '@/contexts/UserContext';
 
 // User interface matching the API structure
 
 interface CombinedHeaderProps {
-  user: User;
   hasNotifications?: boolean;
   onNotificationPress?: () => void;
 }
 
 export default function CombinedHeader({ 
-  user,
   hasNotifications = false,
   onNotificationPress,
 }: CombinedHeaderProps) {
 
-  let uri = getAvatarUri(user as any);
-  if (!uri) {
-    uri = `https://cmtfxsntlfoxgcznanpe.supabase.co/storage/v1/object/public/profilepics/${user.email}_avatar.png`
-  }
-  const avatarSrc = uri ? { uri } : Images.profile;
+  const user = useUser().user;
 
   return (
     <View style={styles.container}>
@@ -42,12 +37,12 @@ export default function CombinedHeader({
       />
       <View style={styles.welcomeSection}>
         <View style={styles.avatarContainer}>
-          <ImageWithFallback source={avatarSrc} fallback={Images.profile} style={styles.avatar} />
+          <ImageWithFallback source={{uri: getAvatarUri()}} fallback={Images.profile} style={styles.avatar} />
         </View>
         
         <View style={styles.welcomeTextContainer}>
           <Text style={styles.welcomeText}>Welcome Back,</Text>
-          <Text style={styles.userName}>{user.name}</Text>
+          <Text style={styles.userName}>{user?.name || "User"}</Text>
         </View>
       </View>
     </View>

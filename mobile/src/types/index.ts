@@ -23,8 +23,13 @@ export interface AuthContextType {
 
 export interface User {
   id: string;
+  uuid?: string; // db users table id
   email: string;
   name: string;
+  bio?: string;
+  location?: string;
+  phone?: string;
+  role?: string;
   avatar_url?: string;
   points?: number; // For gamification features
   joined_at?: string; // ISO date string
