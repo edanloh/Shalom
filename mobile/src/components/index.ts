@@ -8,7 +8,6 @@ export { default as CourseCard } from './home/CourseCard';
 // Re-export commonly used components
 export { default as ActionButton } from './ActionButton';
 export { default as Categories } from './Categories';
-// export { default as CourseCard } from './[unused] CourseCard';
 export { default as CustomTextInput } from './CustomTextInput';
 export { default as FeaturedCourses } from './[unused] FeaturedCourses';
 export { default as Footer } from './[unused] Footer';

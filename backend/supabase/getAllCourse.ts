@@ -50,7 +50,7 @@ serve(async (req) => {
 
     // Build query
     let query = supabaseClient
-      .from('courses')
+      .from('courses_with_stats')
       .select(`
         *,
         categories (

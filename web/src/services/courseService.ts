@@ -161,13 +161,27 @@ const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course =
   // Use statistics if provided (from detailed course response)
   const stats = statistics || awsCourse.statistics || {};
 
-  return {
+  // Handle is_published - it's a boolean in the database
+  // Check for both direct boolean and string representations
+  let isPublished = false;
+  if (typeof awsCourse.is_published === 'boolean') {
+    isPublished = awsCourse.is_published;
+  } else if (typeof awsCourse.is_published === 'string') {
+    isPublished = awsCourse.is_published.toLowerCase() === 'true';
+  }
+  
+  const status: 'published' | 'draft' = isPublished ? 'published' : 'draft';
+
+  // Handle category - might be category_name or we need to use a default
+  const category = awsCourse.category_name || awsCourse.category || 'General';
+
+  const converted = {
     id: String(awsCourse.courseid || awsCourse.id || 'unknown'),
     title: awsCourse.title || 'Untitled Course',
     description: awsCourse.description || 'No description available',
     thumbnail: awsCourse.thumbnail_url || DEFAULT_COURSE_THUMBNAIL,
-    category: awsCourse.category_name || 'General',
-    status: awsCourse.is_published ? 'published' : 'draft',
+    category: category,
+    status: status,
     instructor: awsCourse.instructor_name || 'Unknown Instructor',
     instructorId: awsCourse.instructorid || awsCourse.instructor_id,
     enrolledCount: parseInt(awsCourse.student_count || '0'),
@@ -175,9 +189,21 @@ const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course =
     rating: parseFloat(awsCourse.rating || '4.0'),
     totalRatings: parseInt(awsCourse.total_ratings || '0'),
     duration: `${awsCourse.duration_hours || 0} weeks`,
-    modules: parseInt(stats.total_sections || awsCourse.total_modules || '0'),
-    lessons: parseInt(stats.total_videos || awsCourse.total_lessons || '0'),
-    quizzes: parseInt(stats.total_quizzes || awsCourse.total_quizzes || '0'),
+    modules: Number(
+      awsCourse.total_sections ??
+      stats.total_sections ??
+      0
+    ),
+    lessons: Number(
+      awsCourse.total_videos ??
+      stats.total_videos ??
+      0
+    ),
+    quizzes: Number(
+      awsCourse.total_quizzes ??
+      stats.total_quizzes ??
+      0
+    ),
     createdDate: awsCourse.created_at ? new Date(awsCourse.created_at).toLocaleDateString() : 'N/A',
     lastUpdated: awsCourse.updated_at ? new Date(awsCourse.updated_at).toLocaleDateString() : 'N/A',
     level: awsCourse.level || 'beginner',
@@ -185,6 +211,8 @@ const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course =
     recommendationReason: awsCourse.recommendation_reason,
     recommendationScore: awsCourse.recommendation_score,
   };
+
+  return converted;
 };
 
 class CourseService {
@@ -215,12 +243,15 @@ class CourseService {
         coursesArray = response.courses;
       } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
         coursesArray = response.data.courses;
+      } else if (Array.isArray(response)) {
+        // Sometimes the response itself is the array
+        coursesArray = response;
       } else {
         console.error('Invalid API response structure:', response);
         throw new Error('Invalid API response: courses array not found');
       }
-
-      return coursesArray.map(convertAWSCourseToWebCourse);
+      const convertedCourses = coursesArray.map(convertAWSCourseToWebCourse);
+      return convertedCourses;
     } catch (error) {
       console.error('Error fetching courses:', error);
       throw error;
@@ -590,14 +621,8 @@ class CourseService {
         throw new Error('Invalid API response when duplicating course');
       }
       
-      // Convert to app Course format
-      const duplicatedCourse = convertAWSCourseToAppCourse(duplicatedCourseData);
-      
-      // Clear relevant caches
-      await Promise.all([
-        CacheManager.clear(CACHE_CONFIG.COURSES_KEY),
-        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
-      ]);
+      // Convert to app Course format using the correct function name
+      const duplicatedCourse = convertAWSCourseToWebCourse(duplicatedCourseData);
       
       return duplicatedCourse;
     } catch (error) {

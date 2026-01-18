@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { StatsCard } from "@/components/StatsCard";
 import { CourseCard } from "@/components/CourseCard";
@@ -23,19 +23,26 @@ import { useAuth } from "@/contexts/AuthContext";
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const defaultUserId = user?.id || '550e8400-e29b-41d4-a716-446655440201';
+  const defaultUserId = user?.id || "550e8400-e29b-41d4-a716-446655440201";
 
   // State for API data
   const [courses, setCourses] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [highlightedCourseId, setHighlightedCourseId] = useState<string | null>(
+    null,
+  );
+
+  // Refs for scrolling to sections
+  const draftSectionRef = useRef<HTMLDivElement>(null);
+  const activeSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchDashboardData();
   }, [user]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (newlyDuplicatedCourseId?: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -45,19 +52,46 @@ const Index = () => {
 
       // Fetch courses and admin stats in parallel using courseService
       const [coursesData, statsData] = await Promise.all([
-        courseService.getCourses({ sortBy: 'updated_at', sortOrder: 'desc' }),
+        courseService.getCourses({ sortBy: "updated_at", sortOrder: "desc" }),
         courseService.getInstructorStats(adminId),
       ]);
 
       setCourses(coursesData);
       setStats(statsData);
+      console.log("✅ Dashboard data fetched successfully");
+      console.log(statsData);
+      // If we just duplicated a course, highlight it and scroll to it
+      if (newlyDuplicatedCourseId) {
+        setHighlightedCourseId(newlyDuplicatedCourseId);
+
+        // Scroll to draft section after courses are loaded
+        setTimeout(() => {
+          draftSectionRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 100);
+
+        // Remove highlight after 3 seconds
+        setTimeout(() => {
+          setHighlightedCourseId(null);
+        }, 3000);
+      }
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
+      console.error("Error fetching dashboard data:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch dashboard data",
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  // Separate courses into published and draft
+  const publishedCourses = courses.filter(
+    (course) => course.status === "published",
+  );
+  const draftCourses = courses.filter((course) => course.status === "draft");
 
   // Show loading state
   if (loading) {
@@ -93,13 +127,14 @@ const Index = () => {
 
         {/* Stats Grid */}
         {stats && (
-          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <section className="flex gap-6 overflow-hidden p-2">
             <StatsCard
               title="Total Students"
               value={stats.statistics.total_students.toLocaleString()}
               icon={Users}
               trend={`${stats.statistics.active_students} active`}
               variant="default"
+              className="flex-1 w-full min-w-[180px] max-w-[250px]"
             />
             <StatsCard
               title="Avg Completion"
@@ -107,20 +142,31 @@ const Index = () => {
               icon={TrendingUp}
               trend={`${stats.statistics.completed_courses} completed`}
               variant="success"
+              className="flex-1 w-full min-w-[180px] max-w-[250px]"
             />
             <StatsCard
               title="Course Rating"
               value={stats.statistics.average_rating}
               icon={Star}
               trend="Across all published courses"
-              variant="warning"
+              variant="secondary"
+              className="flex-1 w-full min-w-[180px] max-w-[250px]"
             />
             <StatsCard
-              title="New Enrollments"
-              value={stats.statistics.new_enrollments_this_month.toString()}
+              title="Enrollments (Published)"
+              value={stats.statistics.published_enrollments_last_30_days.toString()}
               icon={UserPlus}
-              trend="This month"
+              trend="Last 30 days"
               variant="accent"
+              className="flex-1 w-full min-w-[180px] max-w-[250px]"
+            />
+            <StatsCard
+              title="Enrollments (All Courses)"
+              value={stats.statistics.total_enrollments_last_30_days.toString()}
+              icon={DollarSign}
+              trend="Last 30 days"
+              variant="warning"
+              className="flex-1 w-full min-w-[180px] max-w-[250px]"
             />
           </section>
         )}
@@ -129,15 +175,13 @@ const Index = () => {
         <QuickActions />
 
         {/* Active Courses Section */}
-        <section className="space-y-4">
+        <section ref={activeSectionRef} className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-foreground">
                 Active Courses
               </h2>
-              <p className="text-muted-foreground">
-                Manage and monitor your course performance
-              </p>
+              <p className="text-muted-foreground">Your published courses</p>
             </div>
             <Button
               variant="outline"
@@ -149,34 +193,106 @@ const Index = () => {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {courses.map((course, index) => (
-              <CourseCard key={index} {...course} />
-            ))}
+          {publishedCourses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {publishedCourses.map((course) => (
+                <div
+                  key={course.id}
+                  className={`transition-all duration-500 ${
+                    highlightedCourseId === course.id
+                      ? "ring-4 ring-primary ring-offset-4 ring-offset-background rounded-lg"
+                      : ""
+                  }`}
+                >
+                  <CourseCard
+                    {...course}
+                    onCourseUpdated={(duplicatedCourseId) =>
+                      fetchDashboardData(duplicatedCourseId)
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 border-2 border-dashed border-border rounded-lg">
+              <p className="text-muted-foreground">No published courses yet</p>
+            </div>
+          )}
+        </section>
+
+        {/* Draft Courses Section */}
+        <section ref={draftSectionRef} className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground">
+                Draft Courses
+              </h2>
+              <p className="text-muted-foreground">Courses in development</p>
+            </div>
+            {draftCourses.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {draftCourses.length}{" "}
+                {draftCourses.length === 1 ? "draft" : "drafts"}
+              </span>
+            )}
           </div>
+
+          {draftCourses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {draftCourses.map((course) => (
+                <div
+                  key={course.id}
+                  className={`transition-all duration-500 ${
+                    highlightedCourseId === course.id
+                      ? "ring-4 ring-primary ring-offset-4 ring-offset-background rounded-lg"
+                      : ""
+                  }`}
+                >
+                  <CourseCard
+                    {...course}
+                    onCourseUpdated={(duplicatedCourseId) =>
+                      fetchDashboardData(duplicatedCourseId)
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 border-2 border-dashed border-border rounded-lg">
+              <p className="text-muted-foreground">No draft courses</p>
+            </div>
+          )}
         </section>
 
         {/* Bottom Grid - Activity & Insights */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            {stats && stats.recent_activity && stats.recent_activity.length > 0 ? (
+            {stats &&
+            stats.recent_activity &&
+            stats.recent_activity.length > 0 ? (
               <div className="gradient-card border-border rounded-xl p-6">
                 <h3 className="text-lg font-semibold mb-4 text-foreground">
                   Recent Activity
                 </h3>
                 <div className="space-y-3 max-h-[450px] overflow-y-auto pr-2">
-                  {stats.recent_activity.slice(0, 8).map((activity: any, index: number) => (
-                    <div key={index} className="flex items-center gap-4 p-3 rounded-lg bg-background/50">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          {activity.student_name} enrolled in {activity.course_title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {activity.formatted_date}
-                        </p>
+                  {stats.recent_activity
+                    .slice(0, 8)
+                    .map((activity: any, index: number) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-4 p-3 rounded-lg bg-background/50"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-foreground">
+                            {activity.student_name} enrolled in{" "}
+                            {activity.course_title}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {activity.formatted_date}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             ) : (
