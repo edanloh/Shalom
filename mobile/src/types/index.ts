@@ -170,7 +170,7 @@ export interface Course {
   image: string;
   category: string;
   level: 'beginner' | 'intermediate' | 'advanced';
-  modules: number;
+  // modules: number;
   tags?: string[];
   prerequisites?: string[];
   outcomes?: string[];

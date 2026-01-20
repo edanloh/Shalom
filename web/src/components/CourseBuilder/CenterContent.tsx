@@ -54,7 +54,7 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
         />
       </div>
-      <div>
+      {/* <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
           Status
         </label>
@@ -68,7 +68,7 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
           <option value="published">Published</option>
           <option value="draft">Draft</option>
         </select>
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -620,7 +620,7 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             />
           </div>
         )}
-        <div>
+        {/* <div>
           <label
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-2"
@@ -645,7 +645,7 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
               Allow preview without enrollment
             </span>
           </label>
-        </div>
+        </div> */}
       </div>
     </div>
   );

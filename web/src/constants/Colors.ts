@@ -55,4 +55,14 @@ export const Colors = {
   progressTrack: '#D1D5DB',
   progressFill: '#4F46E5',
   overlay: 'rgba(0,0,0,0.7)',
+
+  // Category Colors
+  category1: '#8B5CF6',
+  category2: '#2222dd',
+  category3: '#06B6D4',
+  category4: '#10B981',
+  categoryDefault: '#ec4899',
+  category6: '#EF4444',
+  category7: '#ff7d09',
+  category8: '#ffc647',
 };

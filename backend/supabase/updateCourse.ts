@@ -4,6 +4,8 @@
  * Purpose: Update existing course details with dynamic field updates and category management
  * Endpoint: PUT /updateCourse/{courseId}
  * Database: PostgreSQL (Supabase compatible)
+ * 
+ * UPDATED: Handles category by ID instead of name
  */
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -17,9 +19,9 @@ const corsHeaders = {
 
 const estimatePdfReadMinutes = (fileSizeBytes?: number | null) => {
   if (!Number.isFinite(fileSizeBytes) || (fileSizeBytes ?? 0) <= 0) return 0;
-  const bytesPerPage = 200 * 1024; // ~200KB/page heuristic
+  const bytesPerPage = 200 * 1024;
   const pages = Math.max(1, Math.round((fileSizeBytes as number) / bytesPerPage));
-  return Math.max(1, pages * 2); // ~2 minutes per page
+  return Math.max(1, pages * 2);
 };
 
 serve(async (req) => {
@@ -71,35 +73,61 @@ serve(async (req) => {
     if (courseFields.durationHours !== undefined) updateData.duration_hours = courseFields.durationHours;
     if (courseFields.tags !== undefined) updateData.tags = courseFields.tags;
     if (courseFields.isPublished !== undefined) updateData.is_published = courseFields.isPublished;
-
-    // Handle category update
-    if (courseFields.category) {
-      // Check if category exists
-      const { data: existingCategory } = await supabaseClient
-        .from('categories')
-        .select('id')
-        .eq('name', courseFields.category)
-        .single();
-
-      let categoryId;
-      if (existingCategory) {
-        categoryId = existingCategory.id;
-      } else {
-        // Create new category
-        const { data: newCategory, error: categoryError } = await supabaseClient
+    
+    console.log(courseFields);
+    // UPDATED: Handle category by ID instead of name
+    if (courseFields.category !== undefined) {
+      if (courseFields.category) {
+        // Validate that the category exists
+        const { data: categoryExists } = await supabaseClient
           .from('categories')
-          .insert({
-            name: courseFields.category,
-            description: `${courseFields.category} courses`,
-            color: '#6366F1'
-          })
           .select('id')
+          .eq('id', courseFields.category)
           .single();
 
-        if (categoryError) throw categoryError;
-        categoryId = newCategory.id;
+        if (!categoryExists) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: "Invalid category ID provided"
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+        
+        updateData.category_id = courseFields.category;
+      } else {
+        // If categoryId is null/empty, set to General category
+        let generalCategoryId;
+        const { data: generalCategory } = await supabaseClient
+          .from('categories')
+          .select('id')
+          .eq('name', 'General')
+          .single();
+
+        if (generalCategory) {
+          generalCategoryId = generalCategory.id;
+        } else {
+          // Create General category
+          const { data: newGeneral, error: generalError } = await supabaseClient
+            .from('categories')
+            .insert({
+              name: 'General',
+              color: '#6B7280',
+              course_count: 0
+            })
+            .select('id')
+            .single();
+
+          if (generalError) throw generalError;
+          generalCategoryId = newGeneral.id;
+        }
+        
+        updateData.category_id = generalCategoryId;
       }
-      updateData.category_id = categoryId;
     }
 
     // Update course if there are fields to update
@@ -171,7 +199,7 @@ serve(async (req) => {
         let sectionId;
 
         if (module.id && existingSectionIds.includes(module.id)) {
-          // UPDATE existing section - preserves user_module_progress
+          // UPDATE existing section
           await supabaseClient
             .from('course_sections')
             .update({
@@ -270,7 +298,7 @@ serve(async (req) => {
           } else {
             // Handle video lessons
             if (lesson.id && existingVideoIds.includes(lesson.id)) {
-              // UPDATE existing video - preserves user video progress
+              // UPDATE existing video
               await supabaseClient
                 .from('course_videos')
                 .update({
@@ -309,7 +337,7 @@ serve(async (req) => {
           }
         }
 
-        // Delete videos that were removed from this section
+        // Delete videos that were removed
         const videosToDelete = existingVideoIds.filter(id => !processedVideoIds.includes(id));
         if (videosToDelete.length > 0) {
           await supabaseClient
@@ -318,7 +346,7 @@ serve(async (req) => {
             .in('id', videosToDelete);
         }
 
-        // Delete PDF resources that were removed from this section
+        // Delete PDF resources that were removed
         const resourcesToDelete = existingResourceIds.filter(id => !processedResourceIds.includes(id));
         if (resourcesToDelete.length > 0) {
           await supabaseClient
@@ -342,7 +370,7 @@ serve(async (req) => {
           let quizId;
 
           if (quiz.id && existingQuizIds.includes(quiz.id)) {
-            // UPDATE existing quiz - preserves user_quiz_attempts
+            // UPDATE existing quiz
             await supabaseClient
               .from('course_quizzes')
               .update({
@@ -392,7 +420,6 @@ serve(async (req) => {
           for (let q = 0; q < questions.length; q++) {
             const question = questions[q];
 
-            // Normalize question type
             let questionType = question.type || 'multiple-choice';
             if (questionType === 'multiple-correct') {
               questionType = 'multiple-choice';
@@ -450,10 +477,9 @@ serve(async (req) => {
           }
         }
 
-        // Delete quizzes that were removed from this section
+        // Delete quizzes that were removed
         const quizzesToDelete = existingQuizIds.filter(id => !processedQuizIds.includes(id));
         if (quizzesToDelete.length > 0) {
-          // Delete quiz attempts for removed quizzes
           await supabaseClient
             .from('quiz_attempts')
             .delete()
@@ -469,7 +495,6 @@ serve(async (req) => {
       // Delete sections that were completely removed
       const sectionsToDelete = existingSectionIds.filter(id => !processedSectionIds.includes(id));
       if (sectionsToDelete.length > 0) {
-        // Cascade will handle videos and quizzes
         await supabaseClient
           .from('course_sections')
           .delete()
@@ -477,6 +502,7 @@ serve(async (req) => {
       }
     }
 
+    // Recompute duration if modules were updated but durationHours wasn't explicitly set
     if (modules && Array.isArray(modules) && courseFields.durationHours === undefined) {
       let computedDurationMinutes = 0;
       for (const module of modules) {

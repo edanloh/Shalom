@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/Colors';
 import { apiService } from './apiService';
 
 export interface CourseDetailResponse {
@@ -109,6 +110,7 @@ export interface ProcessedCourseDetail {
   duration: string;
   level: string;
   category: string;
+  categoryColor: string;
   tags: string[];
   modules: CourseModule[];
   reviews: Array<{
@@ -196,6 +198,7 @@ class CourseDetailService {
       duration: this.formatDuration(course.duration_hours || 0),
       level: course.level,
       category: course.category_name || 'Uncategorized',
+      categoryColor: course.category_color || Colors.accent,
       tags: course.tags || [],
       modules,
       reviews: processedReviews,

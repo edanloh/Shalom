@@ -35,14 +35,25 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { courseService, moduleService, Course, Module, Review, Student } from "@/services";
+import {
+  courseService,
+  moduleService,
+  Course,
+  Module,
+  Review,
+  Student,
+} from "@/services";
 import { supabaseService } from "@/services/supabaseService";
 
 const CourseDetail = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const locationState = location.state as { quizCompleted?: boolean; quizId?: string; isPassed?: boolean } | null;
+  const locationState = location.state as {
+    quizCompleted?: boolean;
+    quizId?: string;
+    isPassed?: boolean;
+  } | null;
   const { toast } = useToast();
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -67,7 +78,7 @@ const CourseDetail = () => {
   // Refresh data when returning from quiz
   useEffect(() => {
     if (locationState?.quizCompleted && courseId) {
-      console.log('Quiz completed, refreshing course data...');
+      console.log("Quiz completed, refreshing course data...");
       // Clear the location state to prevent refetching on subsequent renders
       window.history.replaceState({}, document.title);
       // Refetch course data to get updated progress
@@ -92,107 +103,25 @@ const CourseDetail = () => {
       setLoading(true);
       setError(null);
 
-      // Use instructor endpoint to get full course details
-      // TODO: Get actual admin ID from auth context
-      const adminId = '550e8400-e29b-41d4-a716-446655440101';
-      
-      // Call Supabase Edge Function with path parameters
-      const fullData = await supabaseService.post<{
-        success: boolean;
-        data?: { course: any; totalSections?: number; totalVideos?: number; totalQuizzes?: number };
-        message?: string;
-      }>(`getModuleDetailInstructor/${adminId}/${courseId}`, {});
-      
-      if (!fullData.success || !fullData.data) {
-        throw new Error(fullData.message || 'Course not found');
-      }
+      // Get actual admin ID from auth context
+      // TODO: Replace with actual auth context
+      const adminId = "550e8400-e29b-41d4-a716-446655440101";
 
-      const courseData = fullData.data.course;
-      
-      // Get actual enrolled count from API (will be fetched separately below)
-      let actualEnrolledCount = parseInt(courseData.student_count) || 0;
-      
-      const response = {
-        id: courseData.id,
-        title: courseData.title,
-        description: courseData.description || '',
-        thumbnail: courseData.thumbnail_url || '',
-        category: courseData.category_name || 'Uncategorized',
-        status: courseData.is_published ? 'published' : 'draft',
-        instructor: courseData.instructor_name || 'Unknown',
-        instructorId: courseData.instructor_id,
-        enrolledCount: actualEnrolledCount,
-        completionRate: 0, // Will be calculated after fetching students
-        // Use the calculated rating from reviews (not the database rating)
-        rating: parseFloat(courseData.rating) || 0, // This is the calculated average from reviews
-        totalRatings: parseInt(courseData.totalRatings) || 0, // This is the count of reviews
-        duration: `${courseData.duration_hours || 0}h`,
-        modules: fullData.data.totalSections || 0,
-        lessons: fullData.data.totalVideos || 0,
-        quizzes: fullData.data.totalQuizzes || 0,
-        createdDate: courseData.created_at ? new Date(courseData.created_at).toLocaleDateString() : 'N/A',
-        lastUpdated: courseData.updated_at ? new Date(courseData.updated_at).toLocaleDateString() : 'N/A'
-      };
+      // Fetch all course data using the service
+      const { course, modules, reviews, enrolledStudents, availableStudents } =
+        await courseService.getCourseDetailData(courseId, adminId);
 
-      // Note: setCourse will be called after fetching students to get accurate stats
-      
-      // Set sections (modules) from the instructor API response
-      if (fullData.data && fullData.data.sections) {
-        setModules(fullData.data.sections);
-      } else {
-        setModules([]);
-      }
-
-      // Set reviews from the API response (if available)
-      // Reviews are nested under course.reviews in the API response
-      if (courseData && courseData.reviews) {
-        const reviewsData = courseData.reviews.map((review: any, index: number) => ({
-          id: review.id || index,
-          studentName: review.reviewerName || review.reviewer_name || review.student_name || 'Anonymous',
-          rating: parseFloat(review.rating || '5'),
-          date: review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 
-                review.created_at ? new Date(review.created_at).toLocaleDateString() : 'N/A',
-          comment: review.review || review.comment || '',
-        }));
-        setReviews(reviewsData);
-      } else {
-        setReviews([]);
-      }
-
-      // Fetch enrolled students separately and update stats
-      try {
-        const studentsData = await courseService.getCourseStudents(courseId);
-        setEnrolledStudents(studentsData);
-        
-        // Update the actual enrolled count
-        response.enrolledCount = studentsData.length;
-        
-        // Calculate actual completion rate
-        if (studentsData.length > 0) {
-          const completedCount = studentsData.filter(s => s.progress === 100).length;
-          response.completionRate = Math.round((completedCount / studentsData.length) * 100);
-        }
-        
-        // Update course state with real stats
-        setCourse(response);
-      } catch (err) {
-        console.error('Error fetching students:', err);
-        setEnrolledStudents([]);
-        // Still set course even if student fetch fails
-        setCourse(response);
-      }
-
-      // Fetch available students (not enrolled)
-      try {
-        const availableData = await courseService.getAvailableStudents(courseId);
-        setAvailableStudents(availableData);
-      } catch (err) {
-        console.error('Error fetching available students:', err);
-        setAvailableStudents([]);
-      }
+      // Set all state from the service response
+      setCourse(course);
+      setModules(modules);
+      setReviews(reviews);
+      setEnrolledStudents(enrolledStudents);
+      setAvailableStudents(availableStudents);
     } catch (err) {
-      console.error('Error fetching course data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch course data');
+      console.error("Error fetching course data:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch course data",
+      );
       toast({
         title: "Error",
         description: "Failed to load course details. Please try again.",
@@ -204,164 +133,207 @@ const CourseDetail = () => {
   };
 
   // Transform API sections to UI-friendly format
-  const modulesList = modules.length > 0 ? modules.map((section: any) => {
-    const items = section.items || [];
-    const videos = items.filter((item: any) => item.type === 'video');
-    const pdfs = items.filter((item: any) => item.type === 'pdf');
-    const quizzes = items.filter((item: any) => item.type === 'quiz');
-    
-    return {
-      id: section.id,
-      title: section.title,
-      lessons: videos.length + pdfs.length,
-      quizzes: quizzes.length,
-      duration: section.total_duration_seconds 
-        ? `${Math.floor(section.total_duration_seconds / 60)} min`
-        : section.duration_minutes
-        ? `${section.duration_minutes} min`
-        : 'N/A',
-      isCompleted: false,
-      completedAt: null,
-      // Map items directly to preserve order_index sequence from backend
-      items: items.map((item: any) => {
-        if (item.type === 'video') {
+  const modulesList =
+    modules.length > 0
+      ? modules.map((section: any) => {
+          const items = section.items || [];
+          const videos = items.filter((item: any) => item.type === "video");
+          const pdfs = items.filter((item: any) => item.type === "pdf");
+          const quizzes = items.filter((item: any) => item.type === "quiz");
+
           return {
-            id: item.id,
-            type: 'lesson' as const,
-            title: item.title,
-            duration: item.duration_seconds 
-              ? `${Math.floor(item.duration_seconds / 60)} min`
-              : 'N/A',
+            id: section.id,
+            title: section.title,
+            lessons: videos.length + pdfs.length,
+            quizzes: quizzes.length,
+            duration: section.total_duration_seconds
+              ? `${Math.floor(section.total_duration_seconds / 60)} min`
+              : section.duration_minutes
+                ? `${section.duration_minutes} min`
+                : "N/A",
+            isCompleted: false,
+            completedAt: null,
+            // Map items directly to preserve order_index sequence from backend
+            items: items.map((item: any) => {
+              if (item.type === "video") {
+                return {
+                  id: item.id,
+                  type: "lesson" as const,
+                  title: item.title,
+                  duration: item.duration_seconds
+                    ? `${Math.floor(item.duration_seconds / 60)} min`
+                    : "N/A",
+                };
+              } else if (item.type === "pdf") {
+                return {
+                  id: item.id,
+                  type: "pdf" as const,
+                  title: item.title,
+                  fileSize: item.file_size_bytes
+                    ? `${(item.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+                    : "N/A",
+                };
+              } else {
+                return {
+                  id: item.id,
+                  type: "quiz" as const,
+                  title: item.title,
+                  questions: item.questions?.length || 0,
+                };
+              }
+            }),
           };
-        } else if (item.type === 'pdf') {
-          return {
-            id: item.id,
-            type: 'pdf' as const,
-            title: item.title,
-            fileSize: item.file_size_bytes 
-              ? `${(item.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
-              : 'N/A',
-          };
-        } else {
-          return {
-            id: item.id,
-            type: 'quiz' as const,
-            title: item.title,
-            questions: item.questions?.length || 0,
-          };
-        }
-      }),
-    };
-  }) : [
-    {
-      id: 1,
-      title: "Introduction to Data Science",
-      lessons: 5,
-      quizzes: 1,
-      duration: "2 hours",
-      isCompleted: true,
-      completedAt: "2025-02-01",
-      items: [
-        {
-          id: 1,
-          type: "lesson",
-          title: "What is Data Science?",
-          duration: "15 min",
-        },
-        {
-          id: 2,
-          type: "lesson",
-          title: "Data Science Tools",
-          duration: "20 min",
-        },
-        {
-          id: 3,
-          type: "lesson",
-          title: "Industry Applications",
-          duration: "18 min",
-        },
-        { id: 4, type: "lesson", title: "Getting Started", duration: "12 min" },
-        { id: 5, type: "lesson", title: "Best Practices", duration: "22 min" },
-        { id: 6, type: "quiz", title: "Introduction Quiz", questions: 10 },
-      ],
-    },
-    {
-      id: 2,
-      title: "Python for Data Science",
-      lessons: 6,
-      quizzes: 1,
-      duration: "3 hours",
-      isCompleted: false,
-      completedAt: null,
-      items: [
-        { id: 1, type: "lesson", title: "Python Basics", duration: "25 min" },
-        {
-          id: 2,
-          type: "lesson",
-          title: "Data Types & Structures",
-          duration: "30 min",
-        },
-        { id: 3, type: "lesson", title: "Control Flow", duration: "22 min" },
-        { id: 4, type: "lesson", title: "Functions", duration: "28 min" },
-        {
-          id: 5,
-          type: "lesson",
-          title: "Libraries Overview",
-          duration: "35 min",
-        },
-        {
-          id: 6,
-          type: "lesson",
-          title: "Practice Projects",
-          duration: "40 min",
-        },
-        {
-          id: 7,
-          type: "quiz",
-          title: "Python Fundamentals Quiz",
-          questions: 15,
-        },
-      ],
-    },
-    {
-      id: 3,
-      title: "Data Analysis with Pandas",
-      lessons: 5,
-      quizzes: 1,
-      duration: "2.5 hours",
-      isCompleted: false,
-      completedAt: null,
-      items: [
-        {
-          id: 1,
-          type: "lesson",
-          title: "Introduction to Pandas",
-          duration: "20 min",
-        },
-        { id: 2, type: "lesson", title: "DataFrames", duration: "25 min" },
-        { id: 3, type: "lesson", title: "Data Cleaning", duration: "30 min" },
-        {
-          id: 4,
-          type: "lesson",
-          title: "Data Transformation",
-          duration: "28 min",
-        },
-        {
-          id: 5,
-          type: "lesson",
-          title: "Advanced Operations",
-          duration: "32 min",
-        },
-        { id: 6, type: "quiz", title: "Pandas Mastery Quiz", questions: 12 },
-      ],
-    },
-  ];
+        })
+      : [
+          {
+            id: 1,
+            title: "Introduction to Data Science",
+            lessons: 5,
+            quizzes: 1,
+            duration: "2 hours",
+            isCompleted: true,
+            completedAt: "2025-02-01",
+            items: [
+              {
+                id: 1,
+                type: "lesson",
+                title: "What is Data Science?",
+                duration: "15 min",
+              },
+              {
+                id: 2,
+                type: "lesson",
+                title: "Data Science Tools",
+                duration: "20 min",
+              },
+              {
+                id: 3,
+                type: "lesson",
+                title: "Industry Applications",
+                duration: "18 min",
+              },
+              {
+                id: 4,
+                type: "lesson",
+                title: "Getting Started",
+                duration: "12 min",
+              },
+              {
+                id: 5,
+                type: "lesson",
+                title: "Best Practices",
+                duration: "22 min",
+              },
+              {
+                id: 6,
+                type: "quiz",
+                title: "Introduction Quiz",
+                questions: 10,
+              },
+            ],
+          },
+          {
+            id: 2,
+            title: "Python for Data Science",
+            lessons: 6,
+            quizzes: 1,
+            duration: "3 hours",
+            isCompleted: false,
+            completedAt: null,
+            items: [
+              {
+                id: 1,
+                type: "lesson",
+                title: "Python Basics",
+                duration: "25 min",
+              },
+              {
+                id: 2,
+                type: "lesson",
+                title: "Data Types & Structures",
+                duration: "30 min",
+              },
+              {
+                id: 3,
+                type: "lesson",
+                title: "Control Flow",
+                duration: "22 min",
+              },
+              { id: 4, type: "lesson", title: "Functions", duration: "28 min" },
+              {
+                id: 5,
+                type: "lesson",
+                title: "Libraries Overview",
+                duration: "35 min",
+              },
+              {
+                id: 6,
+                type: "lesson",
+                title: "Practice Projects",
+                duration: "40 min",
+              },
+              {
+                id: 7,
+                type: "quiz",
+                title: "Python Fundamentals Quiz",
+                questions: 15,
+              },
+            ],
+          },
+          {
+            id: 3,
+            title: "Data Analysis with Pandas",
+            lessons: 5,
+            quizzes: 1,
+            duration: "2.5 hours",
+            isCompleted: false,
+            completedAt: null,
+            items: [
+              {
+                id: 1,
+                type: "lesson",
+                title: "Introduction to Pandas",
+                duration: "20 min",
+              },
+              {
+                id: 2,
+                type: "lesson",
+                title: "DataFrames",
+                duration: "25 min",
+              },
+              {
+                id: 3,
+                type: "lesson",
+                title: "Data Cleaning",
+                duration: "30 min",
+              },
+              {
+                id: 4,
+                type: "lesson",
+                title: "Data Transformation",
+                duration: "28 min",
+              },
+              {
+                id: 5,
+                type: "lesson",
+                title: "Advanced Operations",
+                duration: "32 min",
+              },
+              {
+                id: 6,
+                type: "quiz",
+                title: "Pandas Mastery Quiz",
+                questions: 12,
+              },
+            ],
+          },
+        ];
 
   const toggleModule = (moduleId: string) => {
     setExpandedModules((prev) =>
       prev.includes(moduleId)
         ? prev.filter((id) => id !== moduleId)
-        : [...prev, moduleId]
+        : [...prev, moduleId],
     );
   };
 
@@ -371,9 +343,9 @@ const CourseDetail = () => {
     try {
       // Enroll students in parallel
       await Promise.all(
-        studentIds.map(studentId => 
-          courseService.enrollStudent(courseId, studentId.toString())
-        )
+        studentIds.map((studentId) =>
+          courseService.enrollStudent(courseId, studentId.toString()),
+        ),
       );
 
       toast({
@@ -387,7 +359,7 @@ const CourseDetail = () => {
       const updatedStudents = await courseService.getCourseStudents(courseId);
       setEnrolledStudents(updatedStudents);
     } catch (error) {
-      console.error('Error enrolling students:', error);
+      console.error("Error enrolling students:", error);
       toast({
         title: "Error",
         description: "Failed to enroll students. Please try again.",
@@ -428,8 +400,12 @@ const CourseDetail = () => {
         <main className="container mx-auto px-6 py-8">
           <div className="text-center py-12">
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <p className="text-destructive mb-4">{error || "Course not found"}</p>
-            <Button onClick={() => navigate("/courses")}>Back to Courses</Button>
+            <p className="text-destructive mb-4">
+              {error || "Course not found"}
+            </p>
+            <Button onClick={() => navigate("/courses")}>
+              Back to Courses
+            </Button>
           </div>
         </main>
       </div>
@@ -457,18 +433,29 @@ const CourseDetail = () => {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h1 className="text-[32px] font-bold pr-2">{course.title}</h1>
-                  <p className="text-muted-foreground mb-2">
+                  <p className="text-muted-foreground mt-1 mb-2">
                     by {course.instructor}
                   </p>
-                  <Badge variant="outline" className="my-2 py-2 px-2">
+                  <Badge
+                    className="my-2 py-2 px-3"
+                    style={{ backgroundColor: course.categoryColor }}
+                  >
                     {course.category}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={course.status === 'published' ? "status-badge-published" : "status-badge-draft"}>
+                  <Badge
+                    className={
+                      course.status === "published"
+                        ? "status-badge-published py-2 px-3"
+                        : "status-badge-draft py-2 px-1"
+                    }
+                  >
                     {course.status.toUpperCase()}
                   </Badge>
-                  <Button onClick={() => navigate(`/course-builder/${courseId}`)}>
+                  <Button
+                    onClick={() => navigate(`/course-builder/${courseId}`)}
+                  >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Course
                   </Button>
@@ -492,10 +479,12 @@ const CourseDetail = () => {
                 <div className="flex items-center gap-2">
                   <Star className="h-5 w-5 text-warning" />
                   <div>
-                    <div className="text-2xl font-bold">{course.rating}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {course.totalRatings} ratings
+                    <div className="text-2xl font-bold">
+                      {course.totalRatings > 0
+                        ? `${course.rating} (${course.totalRatings})`
+                        : "-"}
                     </div>
+                    <div className="text-xs text-muted-foreground">Ratings</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -523,10 +512,10 @@ const CourseDetail = () => {
           </div>
         </div>
 
-          <div className="grid grid-cols-3 gap-6">
-            {/* Course Content */}
-            <div className="col-span-2 space-y-6">
-              <div className="gradient-card border border-border rounded-xl p-6">
+        <div className="grid grid-cols-3 gap-6">
+          {/* Course Content */}
+          <div className="col-span-2 space-y-6">
+            <div className="gradient-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold">Course Content</h2>
                 <div className="text-sm text-muted-foreground">
@@ -549,7 +538,9 @@ const CourseDetail = () => {
                         <BookOpen className="h-5 w-5 text-primary" />
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold">{module.title}</span>
+                            <span className="font-semibold">
+                              {module.title}
+                            </span>
                             {module.isCompleted && (
                               <Badge className="bg-success/20 text-success hover:bg-success/30 border-success/30">
                                 <Award className="h-3 w-3 mr-1" />
@@ -558,9 +549,15 @@ const CourseDetail = () => {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            {module.lessons} lessons • {module.quizzes} quiz • {module.duration}
+                            {module.lessons} lessons • {module.quizzes} quiz •{" "}
+                            {module.duration}
                             {module.isCompleted && module.completedAt && (
-                              <span className="ml-2">• Completed on {new Date(module.completedAt).toLocaleDateString()}</span>
+                              <span className="ml-2">
+                                • Completed on{" "}
+                                {new Date(
+                                  module.completedAt,
+                                ).toLocaleDateString()}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -594,8 +591,8 @@ const CourseDetail = () => {
                               {item.type === "lesson"
                                 ? item.duration
                                 : item.type === "pdf"
-                                ? item.fileSize
-                                : `${item.questions} questions`}
+                                  ? item.fileSize
+                                  : `${item.questions} questions`}
                             </span>
                           </div>
                         ))}
@@ -661,11 +658,14 @@ const CourseDetail = () => {
                         };
                         const percentage = distribution[rating];
                         const count = Math.round(
-                          (course.totalRatings * percentage) / 100
+                          (course.totalRatings * percentage) / 100,
                         );
 
                         return (
-                          <div key={rating} className="flex items-center gap-3 max-h-4">
+                          <div
+                            key={rating}
+                            className="flex items-center gap-3 max-h-4"
+                          >
                             <div className="flex items-center gap-1 w-10">
                               <span className="text-sm font-medium mr-1 justify-center text-center min-w-[12px]">
                                 {rating}
@@ -794,11 +794,14 @@ const CourseDetail = () => {
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={() => navigate(`/course/${courseId}/students`, { 
-                    state: { courseName: course.title } 
-                  })}
+                  onClick={() =>
+                    navigate(`/course/${courseId}/students`, {
+                      state: { courseName: course.title },
+                    })
+                  }
                 >
-                View Enrolled Students
+                  View Enrolled Students{" "}
+                  {course.enrolledCount > 0 ? `(${course.enrolledCount})` : ""}
                 </Button>
               </div>
             </div>
@@ -838,18 +841,12 @@ const CourseDetail = () => {
                   <span className="text-muted-foreground">Last Updated</span>
                   <span className="font-medium">{course.lastUpdated}</span>
                 </div>
-                <div className="flex justify-between">
+                {/* <div className="flex justify-between">
                   <span className="text-muted-foreground">
                     Total Enrollments
                   </span>
                   <span className="font-medium">{course.enrolledCount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Avg. Completion Time
-                  </span>
-                  <span className="font-medium">8.5 weeks</span>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>

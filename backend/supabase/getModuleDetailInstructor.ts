@@ -68,7 +68,8 @@ serve(async (req) => {
         created_at, updated_at,
         categories (
           id,
-          name
+          name, 
+          color
         )
       `)
       .eq('id', courseId)
@@ -318,6 +319,7 @@ serve(async (req) => {
         ...course,
         category_name: course.categories?.name,
         category_id: course.categories?.id,
+        category_color: course.categories?.color,
         requirements: (requirements || []).map((r: any) => r.requirement),
         outcomes: (outcomes || []).map((o: any) => o.outcome),
         rating: averageRating,

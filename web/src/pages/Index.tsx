@@ -58,8 +58,6 @@ const Index = () => {
 
       setCourses(coursesData);
       setStats(statsData);
-      console.log("✅ Dashboard data fetched successfully");
-      console.log(statsData);
       // If we just duplicated a course, highlight it and scroll to it
       if (newlyDuplicatedCourseId) {
         setHighlightedCourseId(newlyDuplicatedCourseId);

@@ -118,6 +118,21 @@ COMMENT ON FUNCTION "public"."calculate_course_progress"("p_user_id" "uuid", "p_
 
 
 
+CREATE OR REPLACE FUNCTION "public"."get_courses_by_category"("category_uuid" "uuid") RETURNS TABLE("id" "uuid", "title" character varying)
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT c.id, c.title
+  FROM courses c
+  WHERE c.category_id = category_uuid;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_courses_by_category"("category_uuid" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."get_section_completion"("p_user_id" "uuid", "p_section_id" "uuid") RETURNS TABLE("completed_videos" bigint, "passed_quizzes" bigint, "completed_pdfs" bigint)
     LANGUAGE "plpgsql"
     AS $$
@@ -227,6 +242,68 @@ COMMENT ON FUNCTION "public"."is_section_completed"("p_user_id" "uuid", "p_secti
 
 
 
+CREATE OR REPLACE FUNCTION "public"."update_category_count_on_course_change"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  -- Update old category count if category changed
+  IF TG_OP = 'UPDATE' AND OLD.category_id IS DISTINCT FROM NEW.category_id THEN
+    UPDATE categories
+    SET course_count = (
+      SELECT COUNT(*)
+      FROM courses
+      WHERE category_id = OLD.category_id
+    )
+    WHERE id = OLD.category_id;
+  END IF;
+
+  -- Update new category count
+  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+    UPDATE categories
+    SET course_count = (
+      SELECT COUNT(*)
+      FROM courses
+      WHERE category_id = NEW.category_id
+    )
+    WHERE id = NEW.category_id;
+  END IF;
+
+  -- Update old category count on delete
+  IF TG_OP = 'DELETE' THEN
+    UPDATE categories
+    SET course_count = (
+      SELECT COUNT(*)
+      FROM courses
+      WHERE category_id = OLD.category_id
+    )
+    WHERE id = OLD.category_id;
+  END IF;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_category_count_on_course_change"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_category_counts"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  UPDATE categories
+  SET course_count = (
+    SELECT COUNT(*)
+    FROM courses
+    WHERE courses.category_id = categories.id
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_category_counts"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."update_course_resources_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -322,7 +399,6 @@ ALTER TABLE "public"."assignments" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."categories" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "name" character varying(100) NOT NULL,
-    "description" "text",
     "color" character varying(7),
     "course_count" integer DEFAULT 0,
     "created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
@@ -1505,6 +1581,10 @@ CREATE OR REPLACE TRIGGER "course_resources_updated_at_trigger" BEFORE UPDATE ON
 
 
 
+CREATE OR REPLACE TRIGGER "trigger_update_category_count" AFTER INSERT OR DELETE OR UPDATE ON "public"."courses" FOR EACH ROW EXECUTE FUNCTION "public"."update_category_count_on_course_change"();
+
+
+
 CREATE OR REPLACE TRIGGER "update_assignments_updated_at" BEFORE UPDATE ON "public"."assignments" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 
@@ -1869,6 +1949,12 @@ GRANT ALL ON FUNCTION "public"."calculate_course_progress"("p_user_id" "uuid", "
 
 
 
+GRANT ALL ON FUNCTION "public"."get_courses_by_category"("category_uuid" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_courses_by_category"("category_uuid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_courses_by_category"("category_uuid" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."get_section_completion"("p_user_id" "uuid", "p_section_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_section_completion"("p_user_id" "uuid", "p_section_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_section_completion"("p_user_id" "uuid", "p_section_id" "uuid") TO "service_role";
@@ -1884,6 +1970,18 @@ GRANT ALL ON FUNCTION "public"."get_section_totals"("p_section_id" "uuid") TO "s
 GRANT ALL ON FUNCTION "public"."is_section_completed"("p_user_id" "uuid", "p_section_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_section_completed"("p_user_id" "uuid", "p_section_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_section_completed"("p_user_id" "uuid", "p_section_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_category_count_on_course_change"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_category_count_on_course_change"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_category_count_on_course_change"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_category_counts"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_category_counts"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_category_counts"() TO "service_role";
 
 
 

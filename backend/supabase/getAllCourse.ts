@@ -55,7 +55,6 @@ serve(async (req) => {
         *,
         categories (
           name,
-          description,
           color
         )
       `, { count: 'exact' })
@@ -68,7 +67,10 @@ serve(async (req) => {
         query = query.ilike('categories.name', `%${filterValue}%`);
       } else if (filterField === "instructor_name") {
         query = query.ilike('instructor_name', `%${filterValue}%`);
-      } else {
+      } else if (filterField === "category_color") {
+        query = query.ilike('categories.color', `%${filterValue}%`);
+      } 
+      else {
         query = query.ilike(filterField, `%${filterValue}%`);
       }
     }

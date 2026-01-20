@@ -1,9 +1,11 @@
 // supabase/functions/createCourse/index.ts
 /**
  * Supabase Edge Function: createCourse
- * Purpose: Create a new course with category auto-creation and instructor assignment
+ * Purpose: Create a new course with category handling and instructor assignment
  * Endpoint: POST /createCourse
  * Database: PostgreSQL (Supabase compatible)
+ * 
+ * UPDATED: Handles category by ID instead of name
  */
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -41,16 +43,16 @@ serve(async (req) => {
     const {
       title,
       description,
-      category,
+      category,  
       level = "Beginner",
       instructorId,
       instructorName,
       thumbnailUrl,
       durationHours = 0,
       tags = [],
-      modules = [], // Array of modules with lessons and quizzes
-      outcomes = [], // Learning outcomes
-      requirements = [] // Prerequisites
+      modules = [],
+      outcomes = [],
+      requirements = []
     } = body;
 
     let computedDurationMinutes = 0;
@@ -86,31 +88,53 @@ serve(async (req) => {
       );
     }
 
-    // Get or create category
-    let categoryId;
-    if (category) {
-      const { data: existingCategory } = await supabaseClient
+    // Handle category - use provided categoryId or null
+    let finalCategoryId = category || null;
+
+    // If no category provided, use or create "General" category
+    if (!finalCategoryId) {
+      const { data: generalCategory } = await supabaseClient
         .from('categories')
         .select('id')
-        .eq('name', category)
+        .eq('name', 'General')
         .single();
 
-      if (existingCategory) {
-        categoryId = existingCategory.id;
+      if (generalCategory) {
+        finalCategoryId = generalCategory.id;
       } else {
-        // Create new category
-        const { data: newCategory, error: categoryError } = await supabaseClient
+        // Create General category
+        const { data: newGeneral, error: generalError } = await supabaseClient
           .from('categories')
           .insert({
-            name: category,
-            description: `${category} courses`,
-            color: '#6366F1' // Default purple color
+            name: 'General',
+            color: '#6B7280',
+            course_count: 0
           })
           .select('id')
           .single();
 
-        if (categoryError) throw categoryError;
-        categoryId = newCategory.id;
+        if (generalError) throw generalError;
+        finalCategoryId = newGeneral.id;
+      }
+    } else {
+      // Validate that the provided category exists
+      const { data: categoryExists } = await supabaseClient
+        .from('categories')
+        .select('id')
+        .eq('id', finalCategoryId)
+        .single();
+
+      if (!categoryExists) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Invalid category ID provided"
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
       }
     }
 
@@ -120,7 +144,7 @@ serve(async (req) => {
       .insert({
         title,
         description: description || '',
-        category_id: categoryId,
+        category_id: finalCategoryId,
         level,
         instructor_name: instructorName || 'Shalom Instructor',
         thumbnail_url: thumbnailUrl || null,
@@ -159,12 +183,10 @@ serve(async (req) => {
       const lessons = module.lessons || [];
       for (let j = 0; j < lessons.length; j++) {
         const lesson = lessons[j];
-
-        // Determine lesson type - default to 'video' for backward compatibility
         const lessonType = lesson.type || 'video';
 
         if (lessonType === 'pdf') {
-          // Insert PDF resource into course_resources table
+          // Insert PDF resource
           const { data: resourceData, error: resourceError } = await supabaseClient
             .from('course_resources')
             .insert({
@@ -187,7 +209,7 @@ serve(async (req) => {
           if (resourceError) throw resourceError;
           createdLessons.push(resourceData);
         } else {
-          // Insert video lesson into course_videos table
+          // Insert video lesson
           const { data: lessonData, error: lessonError } = await supabaseClient
             .from('course_videos')
             .insert({
@@ -215,7 +237,6 @@ serve(async (req) => {
       for (let k = 0; k < quizzes.length; k++) {
         const quiz = quizzes[k];
 
-        // Create quiz without questions column (use normalized table)
         const { data: quizData, error: quizError } = await supabaseClient
           .from('course_quizzes')
           .insert({
@@ -239,7 +260,6 @@ serve(async (req) => {
         for (let q = 0; q < questions.length; q++) {
           const question = questions[q];
 
-          // Normalize question type: 'multiple-correct' -> 'multiple-choice' (DB uses hyphens)
           let questionType = question.type || 'multiple-choice';
           if (questionType === 'multiple-correct') {
             questionType = 'multiple-choice';
@@ -256,7 +276,7 @@ serve(async (req) => {
               question: question.text || '',
               question_type: questionType,
               options: question.options || [],
-              correct_answer: String(question.correctAnswer || ''), // Convert to string
+              correct_answer: String(question.correctAnswer || ''),
               explanation: question.explanation || question.sampleAnswer || '',
               points: question.points || 1,
               order_index: q
@@ -305,11 +325,11 @@ serve(async (req) => {
 
     // Get category details
     let categoryDetails = null;
-    if (categoryId) {
+    if (finalCategoryId) {
       const { data } = await supabaseClient
         .from('categories')
         .select('name, color')
-        .eq('id', categoryId)
+        .eq('id', finalCategoryId)
         .single();
       categoryDetails = data;
     }

@@ -25,6 +25,7 @@ interface CourseCardProps {
   id?: string;
   title: string;
   category: string;
+  categoryColor: string;
   thumbnail: string;
   enrolledCount: number;
   rating: number;
@@ -39,6 +40,7 @@ export const CourseCard = ({
   id = "1",
   title,
   category,
+  categoryColor,
   thumbnail,
   enrolledCount,
   rating,
@@ -159,8 +161,8 @@ export const CourseCard = ({
 
       <div className="p-6 space-y-4 flex flex-col flex-grow">
         <div className="flex-grow">
-          <Badge variant="secondary" className="mb-2 text-xs">
-            {category}
+          <Badge variant="secondary" className="mb-2 text-xs" style={{backgroundColor: categoryColor}}>
+            {category} 
           </Badge>
           <h3 className="text-lg font-semibold text-foreground line-clamp-2 min-h-[3.5rem]">
             {title}
