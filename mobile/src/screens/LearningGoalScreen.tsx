@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     fontSize: TextStyles.h4.fontSize,
     color: Colors.textPrimary,
     fontWeight: "700",
-    marginBottom: Spacing.md,
+    // marginBottom: Spacing.md,
   },
   goalCard: {
     backgroundColor: CARD_BG,

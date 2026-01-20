@@ -341,13 +341,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   //   }
   // };
 
-  const updateProfile = async (data: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...data };
-      // await persistUser(updatedUser);
-    }
-  };
-
   const changePassword = async (
     currentPassword: string,
     newPassword: string
@@ -385,7 +378,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         requestResetPassword,
         resetPassword,
         loginWithGoogle,
-        updateProfile,
         changePassword,
         fetchEmail,
         loginWithToken,

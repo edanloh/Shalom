@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 import { useCourses } from '../contexts/CourseContext';
-import type { MainStackParamList } from '../types';
+import type { MainStackParamList } from '@/types/navigation';
 import { Colors, Typography, Spacing, TextStyles } from '../constants';
 import { ImageWithFallback } from '../components/common';
 import { Images } from '../../assets';

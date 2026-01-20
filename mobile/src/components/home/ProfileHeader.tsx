@@ -27,7 +27,10 @@ export default function CombinedHeader({
   onNotificationPress,
 }: CombinedHeaderProps) {
 
-  const uri = getAvatarUri(user as any);
+  let uri = getAvatarUri(user as any);
+  if (!uri) {
+    uri = `https://cmtfxsntlfoxgcznanpe.supabase.co/storage/v1/object/public/profilepics/${user.email}_avatar.png`
+  }
   const avatarSrc = uri ? { uri } : Images.profile;
 
   return (

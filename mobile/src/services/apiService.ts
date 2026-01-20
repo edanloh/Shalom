@@ -148,13 +148,24 @@ class ApiService {
           ...(SUPABASE_KEY ? { apikey: SUPABASE_KEY } : {}),
         };
       }
-      // Always add Content-Type header
-      config.headers = {
-        ...config.headers,
-        'Content-Type': 'application/json',
-        'apikey': API_CONFIG.SUPABASE_ANON_KEY,
-      };
-      
+      // Only set Content-Type: application/json if not sending File, Blob, or ArrayBuffer
+      if (
+        !(config.body instanceof File) &&
+        !(config.body instanceof Blob) &&
+        !(config.body instanceof ArrayBuffer)
+      ) {
+        config.headers = {
+          ...config.headers,
+          'Content-Type': 'application/json',
+          'apikey': API_CONFIG.SUPABASE_ANON_KEY,
+        };
+      } else {
+        // Use whatever Content-Type is set in config.headers (from caller)
+        config.headers = {
+          ...config.headers,
+          'apikey': API_CONFIG.SUPABASE_ANON_KEY,
+        };
+      }
       // Add Authorization if we have a token
       if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
@@ -278,7 +289,13 @@ class ApiService {
     };
 
     if (body && method !== 'GET') {
-      requestOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
+      if (config.body instanceof File ||
+          config.body instanceof Blob ||
+          config.body instanceof ArrayBuffer) {
+        requestOptions.body = body; // send as is
+      } else {
+        requestOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
+      }
     }
 
     // Retry logic

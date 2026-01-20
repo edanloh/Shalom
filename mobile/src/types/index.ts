@@ -1,7 +1,7 @@
 // API-ready data types for the application
 
 import { Tokens } from '@/contexts/AuthContext';
-import { Session, AuthChangeEvent, AuthResponse } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 
 export interface AuthContextType {
   user: User | null;
@@ -15,7 +15,6 @@ export interface AuthContextType {
   resetPassword: ( newPassword: string ) => Promise<{ success: boolean; error?: string }>;
   // loginWithGoogle: (tokens: AuthTokens) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  updateProfile: (data: Partial<User>) => Promise<void>;
   changePassword: ( currentPassword: string, newPassword: string ) => Promise<{ success: boolean; error?: string }>;
   fetchEmail: (email: string) => Promise<any>;
   loginWithToken: (credentials: Tokens, path: string) => Promise<void>;
@@ -234,57 +233,57 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   };
 }
 
-// AWS API Gateway specific response structure
-export interface AWSApiResponse<T> {
-  success: boolean;
-  message: string;
-  data: T;
-}
+// // AWS API Gateway specific response structure
+// export interface AWSApiResponse<T> {
+//   success: boolean;
+//   message: string;
+//   data: T;
+// }
 
-export interface AWSCoursesResponse {
-  courses: AWSCourse[];
-  pagination: {
-    currentPageSize: number;
-    scannedCount: number;
-    hasMore: boolean;
-    nextPageToken: string | null;
-    limit: number;
-  };
-  filters: {
-    filterExpression: string | null;
-    filterValue: string | null;
-    sortBy: string | null;
-    sortOrder: string;
-  };
-  meta: {
-    timestamp: string;
-    requestId: string;
-  };
-}
+// export interface AWSCoursesResponse {
+//   courses: AWSCourse[];
+//   pagination: {
+//     currentPageSize: number;
+//     scannedCount: number;
+//     hasMore: boolean;
+//     nextPageToken: string | null;
+//     limit: number;
+//   };
+//   filters: {
+//     filterExpression: string | null;
+//     filterValue: string | null;
+//     sortBy: string | null;
+//     sortOrder: string;
+//   };
+//   meta: {
+//     timestamp: string;
+//     requestId: string;
+//   };
+// }
 
-export interface AWSCourse {
-  courseId: number;
-  title: string;
-  description: string;
-  instructor: {
-    id: string;
-    name: string;
-    avatar: string;
-    rating: number;
-  };
-  progress: {
-    completed: number;
-    total: number;
-    percentage: number;
-    lastAccessed: string;
-  };
-  duration: string;
-  rating: number;
-  image: string;
-  category: string;
-  level: string;
-  modules: number;
-}
+// export interface AWSCourse {
+//   courseId: number;
+//   title: string;
+//   description: string;
+//   instructor: {
+//     id: string;
+//     name: string;
+//     avatar: string;
+//     rating: number;
+//   };
+//   progress: {
+//     completed: number;
+//     total: number;
+//     percentage: number;
+//     lastAccessed: string;
+//   };
+//   duration: string;
+//   rating: number;
+//   image: string;
+//   category: string;
+//   level: string;
+//   modules: number;
+// }
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   pagination: {
@@ -316,34 +315,3 @@ export interface SearchQuery {
   sortBy?: 'rating' | 'price' | 'duration' | 'popularity';
   sortOrder?: 'asc' | 'desc';
 }
-
-// Navigation types
-export type TabParamList = {
-  Home: undefined;
-  Courses: undefined;
-  Search: undefined;
-  Profile: undefined;
-  Notifications: undefined;
-  Admin?: undefined;
-};
-
-export type MainStackParamList = {
-  Main: undefined;
-  CourseDetail: { courseId: string };
-  EditProfile: undefined;
-  Settings: undefined;
-  Notifications: undefined;
-  NotFound: undefined;
-  UserManagement?: undefined;
-  UserConfig?: undefined;
-  MyCourses?: undefined;
-  Auth?: undefined;
-  ResetPassword?: undefined;
-};
-
-export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  ForgotPassword: undefined;
-  ConfirmSignUp: { email: string };
-};

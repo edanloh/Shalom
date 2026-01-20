@@ -1,7 +1,7 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
 export type MainStackParamList = {
-  MainTabs: NavigatorScreenParams<TabParamList>;
+  MainTabs: NavigatorScreenParams<BottomTabNavParamList>;
   CourseDetail: { courseId: string };
   ModuleDetail: {
     courseId: string;
@@ -26,9 +26,7 @@ export type MainStackParamList = {
   UserManagement: undefined;
   UserConfig: undefined;
   TestScreen: undefined;
-  // SearchScreen: undefined;
   PointsHistory: undefined;
-  // NotificationSettings: undefined;
   AchievementsScreen: undefined;
   CertificatesScreen: undefined;
   LearningGoalScreen: undefined;
@@ -36,7 +34,7 @@ export type MainStackParamList = {
   ResetPassword: undefined;
 };
 
-export type TabParamList = {
+export type BottomTabNavParamList = {
   Home: undefined;
   Courses: undefined;
   Notifications: undefined;
@@ -45,8 +43,9 @@ export type TabParamList = {
 };
 
 export type RootStackParamList = {
+  Main: undefined;
   Auth: undefined;
-  MainScreens: NavigatorScreenParams<MainStackParamList>;
+  ResetPassword: undefined;
   NotFound: undefined;
 };
 
@@ -54,5 +53,5 @@ export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
-  ConfirmSignUp: { email?: string } | undefined;
+  ConfirmSignUp: undefined;
 };
