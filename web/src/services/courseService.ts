@@ -5,13 +5,12 @@
 
 import { Colors } from '@/constants/Colors';
 import apiService from './apiService';
-import { supabaseService } from './supabaseService';
 import { DEFAULT_COURSE_THUMBNAIL } from '@/constants/images';
 
 // Course service endpoints matching Lambda functions
 const ENDPOINTS = {
-  COURSES: '/courses',
-  COURSE_BY_ID_INSTRUCTOR: (adminId: string, courseId: string) => `getModuleDetailInstructor/${adminId}/${courseId}`,
+  COURSES: '/getAllCourse',
+  COURSE_BY_ID_INSTRUCTOR: (adminId: string, courseId: string) => `/getModuleDetailInstructor/${adminId}/${courseId}`,
   COURSE_STUDENTS: (courseId: string) => `/getCourseStudents/${courseId}`,
   AVAILABLE_STUDENTS: (courseId: string) => `/getAvailableStudents/${courseId}`,
   ALL_STUDENTS: '/getAllStudents',
@@ -358,11 +357,8 @@ class CourseService {
       if (params?.level) queryParams.append('filterValue', params.level);
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
-
-      // Call Supabase Edge Function (getAllCourse)
-      const response = await supabaseService.get<any>(
-        `getAllCourse?${queryParams.toString()}`
-      );
+      
+      const response = await apiService.get<any>(ENDPOINTS.COURSES + `?${queryParams.toString()}`);    
 
       let coursesArray;
       if (response.data && Array.isArray(response.data)) {
@@ -397,7 +393,7 @@ class CourseService {
   async getCourseDetailData(courseId: string, adminId: string): Promise<CourseDetailResponse> {
     try {
       // Fetch main course data with modules
-      const fullData = await supabaseService.post<{
+      const fullData = await apiService.post<{
         success: boolean;
         data?: {
           course: any;
@@ -650,9 +646,7 @@ class CourseService {
     try {
       console.log("CourseService: Fetching course builder data for courseId:", courseId);
 
-      const response = await apiService.get<any>(
-        `/getModuleDetailInstructor/${adminId}/${courseId}`
-      );
+      const response = await apiService.get<any>(ENDPOINTS.COURSE_BY_ID_INSTRUCTOR(adminId, courseId), {});
 
       if (!response || !response.data) {
         throw new Error(`Course with ID ${courseId} not found`);
@@ -873,12 +867,14 @@ class CourseService {
     try {
       console.log('CourseService: Fetching course sections for:', courseId, 'with adminId:', adminId);
       
-      const response = await apiService.get<{
-        data?: {
-          sections?: CourseSection[];
-        };
-      }>(`/getModuleDetailInstructor/${adminId}/${courseId}`);
+      // const response = await apiService.get<{
+      //   data?: {
+      //     sections?: CourseSection[];
+      //   };
+      // }>(`/getModuleDetailInstructor/${adminId}/${courseId}`);
       
+      const response = await apiService.get<any>(ENDPOINTS.COURSE_BY_ID_INSTRUCTOR(adminId, courseId), {});
+
       console.log('CourseService: API Response:', response);
       console.log('CourseService: Response data:', response?.data);
       console.log('CourseService: Sections:', response?.data?.sections);
@@ -919,11 +915,13 @@ class CourseService {
       console.log('CourseService: Fetching quiz data for:', { courseId, moduleId, quizId, adminId });
       
       // Fetch course sections (which includes all quizzes)
-      const response = await apiService.get<{
-        data?: {
-          sections?: CourseSection[];
-        };
-      }>(`/getModuleDetailInstructor/${adminId}/${courseId}`);
+      // const response = await apiService.get<{
+      //   data?: {
+      //     sections?: CourseSection[];
+      //   };
+      // }>(`/getModuleDetailInstructor/${adminId}/${courseId}`);
+
+      const response = await apiService.get<any>(ENDPOINTS.COURSE_BY_ID_INSTRUCTOR(adminId, courseId), {});
       
       if (!response?.data?.sections) {
         throw new Error('No sections found in course');

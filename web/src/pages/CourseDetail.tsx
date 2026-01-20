@@ -43,7 +43,6 @@ import {
   Review,
   Student,
 } from "@/services";
-import { supabaseService } from "@/services/supabaseService";
 
 const CourseDetail = () => {
   const { courseId } = useParams();
