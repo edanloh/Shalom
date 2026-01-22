@@ -8,12 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX } from "lucide-react";
+import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
 import { disableStudent } from "@/lib/disableStudent";
 import { Colors } from "@/constants";
 import { courseService, studentService } from "@/services";
+import { useToast } from "@/hooks/use-toast";
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,6 +29,7 @@ const Students = () => {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { toast } = useToast();
 
 	const fetchStudents = async () => {
 		setLoading(true);
@@ -541,68 +543,130 @@ const Students = () => {
                                 Send Message
                               </Button>
                               
-                              {activeProfile.enabled ? (
-                                <Button
-                                  className="w-full gap-2"
-                                  variant="destructive"
-                                  onClick={async () => {
-                                    try {
-                                      const result = await disableStudent({
-                                        studentId: activeProfile.email,
-                                        status: false,
-                                      });
-                                      if (result) {
+                            {activeProfile.enabled ? (
+                              <Button
+                                className="w-full gap-2"
+                                variant="destructive"
+                                onClick={async () => {
+                                  try {
+                                    const toastInstance = toast({
+                                      title: "Disabling user",
+                                      description: (
+                                        <span className="inline-flex items-center gap-2">
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          Updating access...
+                                        </span>
+                                      ),
+                                    });
+                                    const result = await disableStudent({
+                                      studentId: activeProfile.email,
+                                      status: false,
+                                    });
+                                    if (result) {
                                         // Update local state immediately
                                         setSelectedStudent({ ...activeProfile, enabled: false });
-                                        setProfileCache((prev) => ({
-                                          ...prev,
-                                          [activeProfile.id]: { ...activeProfile, enabled: false },
-                                        }));
-                                        // Refresh the full list
-                                        fetchStudents();
-                                        setIsSheetOpen(false);
-                                      } else {
-                                        console.error("disableStudent failed:", result);
-                                      }
-                                    } catch (err) {
-                                      console.error("Failed to disable student:", err);
+                                      setProfileCache((prev) => ({
+                                        ...prev,
+                                        [activeProfile.id]: { ...activeProfile, enabled: false },
+                                      }));
+                                      setStudents((prev) =>
+                                        prev.map((student) =>
+                                          student.id === activeProfile.id
+                                            ? { ...student, enabled: false }
+                                            : student
+                                        )
+                                      );
+                                      // Refresh the full list
+                                      fetchStudents();
+                                      setIsSheetOpen(false);
+                                      toastInstance.update({
+                                        title: "User disabled",
+                                        description: `${activeProfile.email} can no longer log in.`,
+                                      });
+                                    } else {
+                                      console.error("disableStudent failed:", result);
+                                      toastInstance.update({
+                                        title: "Disable failed",
+                                        description: "Unable to update user status.",
+                                        variant: "destructive",
+                                      });
                                     }
-                                  }}
-                                >
-                                  <UserX className="h-4 w-4" />
-                                  Disable User
+                                  } catch (err) {
+                                    const message =
+                                      err instanceof Error ? err.message : "Unable to update user status.";
+                                    toast({
+                                      title: "Disable failed",
+                                      description: message,
+                                      variant: "destructive",
+                                    });
+                                  }
+                                }}
+                              >
+                                <UserX className="h-4 w-4" />
+                                Disable User
                                 </Button>
                               ) : (
-                                <Button
-                                  className="w-full gap-2"
-                                  style={{backgroundColor: Colors.purple600}}
-                                  variant="default"
-                                  onClick={async () => {
-                                    try {
-                                      const result = await disableStudent({
-                                        studentId: activeProfile.email,
-                                        status: true,
-                                      });
-                                      if (result) {
+                              <Button
+                                className="w-full gap-2"
+                                style={{backgroundColor: Colors.purple600}}
+                                variant="default"
+                                onClick={async () => {
+                                  try {
+                                    const toastInstance = toast({
+                                      title: "Enabling user",
+                                      description: (
+                                        <span className="inline-flex items-center gap-2">
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          Restoring access...
+                                        </span>
+                                      ),
+                                    });
+                                    const result = await disableStudent({
+                                      studentId: activeProfile.email,
+                                      status: true,
+                                    });
+                                    if (result) {
                                         // Update local state immediately
                                         setSelectedStudent({ ...activeProfile, enabled: true });
-                                        setProfileCache((prev) => ({
-                                          ...prev,
-                                          [activeProfile.id]: { ...activeProfile, enabled: true },
-                                        }));
-                                        // Refresh the full list
-                                        fetchStudents();
-                                        setIsSheetOpen(false);
-                                      } else {
-                                        console.error("enableStudent failed:", result);
-                                      }
-                                    } catch (err) {
-                                      console.error("Failed to enable student:", err);
+                                      setProfileCache((prev) => ({
+                                        ...prev,
+                                        [activeProfile.id]: { ...activeProfile, enabled: true },
+                                      }));
+                                      setStudents((prev) =>
+                                        prev.map((student) =>
+                                          student.id === activeProfile.id
+                                            ? { ...student, enabled: true }
+                                            : student
+                                        )
+                                      );
+                                      // Refresh the full list
+                                      fetchStudents();
+                                      setIsSheetOpen(false);
+                                      toastInstance.update({
+                                        title: "User enabled",
+                                        description: `${activeProfile.email} can log in again.`,
+                                      });
+                                    } else {
+                                      console.error("enableStudent failed:", result);
+                                      toastInstance.update({
+                                        title: "Enable failed",
+                                        description: "Unable to update user status.",
+                                        variant: "destructive",
+                                      });
                                     }
-                                  }}
-                                >
-                                  <UserX className="h-4 w-4" />
-                                  Enable User
+                                  } catch (err) {
+                                    const message =
+                                      err instanceof Error ? err.message : "Unable to update user status.";
+                                    toast({
+                                      title: "Enable failed",
+                                      description: message,
+                                      variant: "destructive",
+                                    });
+                                  }
+                                }}
+                              >
+                                <UserX className="h-4 w-4" />
+                                Enable User
                                 </Button>
                               )}
                             </div>
