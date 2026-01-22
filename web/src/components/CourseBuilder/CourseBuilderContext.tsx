@@ -6,8 +6,6 @@ import {
   ReactNode,
 } from "react";
 import courseService from "../../services/courseService";
-import moduleService from "../../services/moduleService";
-import apiService from "../../services/apiService";
 import categoryService from "@/services/categoryService";
 import { useAuth } from "../../contexts/AuthContext";
 import { StorageService } from "../../services/storageService";
@@ -881,8 +879,6 @@ export const CourseBuilderProvider = ({
         }
       } else {
         console.log("Updating course with modules:", currentCourseId);
-
-        // Use moduleService.updateCourse which calls /updateCourse endpoint
         const updateData = {
           title: courseName,
           description: courseDescription,
@@ -894,7 +890,7 @@ export const CourseBuilderProvider = ({
 
         console.log("check course category:", courseCategory);
 
-        await moduleService.updateCourse(currentCourseId, updateData);
+        await courseService.updateCourseWithModules(currentCourseId, updateData);
         console.log("Course updated successfully");
       }
 

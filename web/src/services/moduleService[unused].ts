@@ -4,42 +4,42 @@
 
 import apiService from './apiService';
 
-export interface ModuleDetail {
-  id: number;
-  title: string;
-  description: string;
-  order_index: number;
-  lessons: Lesson[];
-  quizzes: Quiz[];
-}
+// export interface ModuleDetail {
+//   id: number;
+//   title: string;
+//   description: string;
+//   order_index: number;
+//   lessons: Lesson[];
+//   quizzes: Quiz[];
+// }
 
-export interface Lesson {
-  id: number;
-  title: string;
-  content: string;
-  video_url?: string;
-  thumbnail_url?: string;
-  duration: string;
-  duration_seconds?: number;
-  is_preview?: boolean;
-  order_index: number;
-}
+// export interface Lesson {
+//   id: number;
+//   title: string;
+//   content: string;
+//   video_url?: string;
+//   thumbnail_url?: string;
+//   duration: string;
+//   duration_seconds?: number;
+//   is_preview?: boolean;
+//   order_index: number;
+// }
 
-export interface Quiz {
-  id: number;
-  title: string;
-  description: string;
-  questions: Question[];
-}
+// export interface Quiz {
+//   id: number;
+//   title: string;
+//   description: string;
+//   questions: Question[];
+// }
 
-export interface Question {
-  id: number;
-  question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'short_answer';
-  options?: string[];
-  correct_answer: string;
-  explanation?: string;
-}
+// export interface Question {
+//   id: number;
+//   question_text: string;
+//   question_type: 'multiple_choice' | 'true_false' | 'short_answer';
+//   options?: string[];
+//   correct_answer: string;
+//   explanation?: string;
+// }
 
 class ModuleService {
   /**
@@ -204,32 +204,6 @@ class ModuleService {
       return response;
     } catch (error) {
       console.error(`Error updating course ${courseId}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Submit quiz answers for grading
-   * @param quizId - The quiz ID
-   * @param userId - The user ID submitting the quiz
-   * @param answers - Array of answers: [{ questionId: string, answer: string }]
-   * @param timeTakenMinutes - Optional time taken to complete the quiz
-   */
-  async submitQuiz(
-    quizId: string,
-    userId: string,
-    answers: Array<{ questionId: string; answer: string }>,
-    timeTakenMinutes?: number
-  ): Promise<any> {
-    try {
-      const response = await apiService.post(`/submitQuiz/${quizId}`, {
-        userId,
-        answers,
-        timeTakenMinutes
-      });
-      return response;
-    } catch (error) {
-      console.error(`Error submitting quiz ${quizId}:`, error);
       throw error;
     }
   }

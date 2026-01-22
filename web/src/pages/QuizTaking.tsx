@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress";
 import { ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { moduleService } from "@/services/moduleService";
 import courseService, {
   CourseSection,
   Quiz,
@@ -166,77 +165,6 @@ const QuizTaking = () => {
   const handlePrevious = () => {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!user?.sub || !quizId) {
-      toast({
-        title: "Error",
-        description: "User information or quiz ID is missing",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const answersArray = Object.entries(answers).map(([index, answer]) => ({
-        questionId: quiz.questions[parseInt(index)].id.toString(),
-        answer: answer,
-      }));
-
-      const timeTakenMinutes = Math.floor(
-        (quiz.timeLimit! * 60 - timeRemaining) / 60,
-      );
-
-      const result = await moduleService.submitQuiz(
-        quizId,
-        user.sub,
-        answersArray,
-        timeTakenMinutes,
-      );
-
-      toast({
-        title: "Quiz Submitted Successfully",
-        description: `You scored ${result.data.score}% (${result.data.correctAnswers}/${result.data.totalQuestions} correct)`,
-        variant: result.data.isPassed ? "default" : "destructive",
-      });
-
-      if (result.data.isPassed) {
-        const nextItem = findNextItemAcrossModules();
-
-        if (nextItem) {
-          if (nextItem.item.type === "video" || nextItem.item.type === "pdf") {
-            navigate(
-              `/course/${courseId}/module/${nextItem.sectionId}/lesson/${nextItem.item.id}`,
-            );
-          } else if (nextItem.item.type === "quiz") {
-            navigate(
-              `/course/${courseId}/module/${nextItem.sectionId}/quiz/${nextItem.item.id}`,
-            );
-          }
-        } else {
-          navigate(`/course/${courseId}`, {
-            state: { quizCompleted: true, quizId, isPassed: true },
-          });
-        }
-      } else {
-        navigate(`/course/${courseId}`, {
-          state: { quizCompleted: true, quizId, isPassed: false },
-        });
-      }
-    } catch (error: any) {
-      console.error("Error submitting quiz:", error);
-      toast({
-        title: "Submission Failed",
-        description:
-          error.message || "Failed to submit quiz. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

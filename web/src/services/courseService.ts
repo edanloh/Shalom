@@ -17,7 +17,7 @@ const ENDPOINTS = {
   COURSE_REVIEWS: (courseId: string) => `/courses/${courseId}/reviews`,
   USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
   CREATE_COURSE: '/courses',
-  UPDATE_COURSE: (courseId: string) => `/courses/${courseId}`,
+  UPDATE_COURSE: (courseId: string) => `//updateCourse/${courseId}`,
   DELETE_COURSE: (courseId: string) => `/courses/${courseId}`,
   ENROLL_STUDENT: (courseId: string) => `/courses/${courseId}/enroll`,
   INSTRUCTOR_STATS: (adminId: string) => `/getInstructorStats/${adminId}`,
@@ -77,6 +77,36 @@ export interface ModuleItem {
   title: string;
   duration?: string;
   questions?: number;
+}
+
+export interface ModuleDetail {
+  id: number;
+  title: string;
+  description: string;
+  order_index: number;
+  lessons: Lesson[];
+  quizzes: Quiz[];
+}
+
+export interface Lesson {
+  id: number;
+  title: string;
+  content: string;
+  video_url?: string;
+  thumbnail_url?: string;
+  duration: string;
+  duration_seconds?: number;
+  is_preview?: boolean;
+  order_index: number;
+}
+
+export interface Question {
+  id: number;
+  question_text: string;
+  question_type: 'multiple_choice' | 'true_false' | 'short_answer';
+  options?: string[];
+  correct_answer: string;
+  explanation?: string;
 }
 
 export interface Review {
@@ -240,11 +270,11 @@ export interface QuizQuestion {
 }
 
 export interface Quiz {
-  id: string;
+  id: string | number;
   title: string;
   description?: string;
-  totalQuestions: number;
-  passingScore: number;
+  totalQuestions?: number;
+  passingScore?: number;
   passing_score?: number; // Backend format
   timeLimit?: number;
   time_limit?: number; // Backend format
@@ -1092,23 +1122,40 @@ class CourseService {
   /**
    * Update an existing course
    */
-  async updateCourse(courseId: string, courseData: Partial<Course>): Promise<Course> {
+  // async updateCourse(courseId: string, courseData: Partial<Course>): Promise<Course> {
+  //   try {
+  //     const response = await apiService.put<any>(
+  //       ENDPOINTS.UPDATE_COURSE(courseId),
+  //       courseData
+  //     );
+
+  //     if (!response || !response.course) {
+  //       throw new Error('Failed to update course');
+  //     }
+
+  //     return convertAWSCourseToWebCourse(response.course);
+  //   } catch (error) {
+  //     console.error(`Error updating course ${courseId}:`, error);
+  //     throw error;
+  //   }
+  // }
+  /**
+   * Update a course with its modules, lessons, and quizzes
+   * This is used by CourseBuilder to save the complete course structure
+   * @param courseId - The course ID to update
+   * @param courseData - Complete course data including modules
+   */
+  async updateCourseWithModules(courseId: string, courseData: any): Promise<any> {
     try {
-      const response = await apiService.put<any>(
-        ENDPOINTS.UPDATE_COURSE(courseId),
-        courseData
-      );
-
-      if (!response || !response.course) {
-        throw new Error('Failed to update course');
-      }
-
-      return convertAWSCourseToWebCourse(response.course);
+      // const response = await apiService.post(`/updateCourse/${courseId}`, courseData);
+       const response = await apiService.post(`${ENDPOINTS.UPDATE_COURSE(courseId)}`, courseData);
+      return response;
     } catch (error) {
-      console.error(`Error updating course ${courseId}:`, error);
+      console.error(`Error updating course with modules ${courseId}:`, error);
       throw error;
     }
   }
+
 
   /**
    * Delete a course
