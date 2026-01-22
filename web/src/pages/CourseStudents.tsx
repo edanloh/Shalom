@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Pagination } from "@/components/Pagination";
 import { disableStudent } from "@/lib/disableStudent";
 import { Colors } from "@/constants";
-import { courseService } from "@/services";
+import { courseService, studentService } from "@/services";
 import { useToast } from "@/hooks/use-toast";
 
 interface Student {
@@ -50,6 +50,8 @@ const CourseStudents = () => {
   const [itemsPerPage] = useState(10);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
+  const [profileCache, setProfileCache] = useState<Record<string, any>>({});
+  const [profileLoadingId, setProfileLoadingId] = useState<string | null>(null);
 
   const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
   const [availableStudents, setAvailableStudents] = useState<any[]>([]);
@@ -110,6 +112,29 @@ const CourseStudents = () => {
   useEffect(() => {
     fetchCourseStudents();
   }, [courseId]);
+
+  const activeProfile = selectedStudent
+    ? profileCache[selectedStudent.id] || selectedStudent
+    : null;
+  const activeProfileLoading = selectedStudent
+    ? profileLoadingId === selectedStudent.id
+    : false;
+
+  const loadStudentProfile = async (studentId: string) => {
+    if (profileCache[studentId]) return;
+    setProfileLoadingId(studentId);
+    try {
+      const profile = await studentService.getStudentProfile(studentId);
+      setProfileCache((prev) => ({ ...prev, [studentId]: profile }));
+      if (selectedStudent?.id === studentId) {
+        setSelectedStudent(profile);
+      }
+    } catch (err) {
+      console.error("Failed to load student profile:", err);
+    } finally {
+      setProfileLoadingId(null);
+    }
+  };
 
   const filteredStudents = enrolledStudents.filter(student =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -325,83 +350,98 @@ const CourseStudents = () => {
                       <TableCell className="text-right">
                         <Sheet open={isSheetOpen && selectedStudent?.id === student.id} onOpenChange={setIsSheetOpen}>
                           <SheetTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => setSelectedStudent(student)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedStudent(student);
+                                loadStudentProfile(student.id);
+                              }}
+                            >
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </SheetTrigger>
-                          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+                          <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
                             <SheetHeader>
                               <SheetTitle>Student Profile</SheetTitle>
                             </SheetHeader>
-                            {selectedStudent && (
-                              <div className="space-y-6 mt-6">
+                            {activeProfile && (
+                              <>
+                              <div className="space-y-6 mt-6 flex flex-col min-h-0">
                                 {/* Header */}
                                 <div className="flex items-center gap-4 pb-6 border-b border-border">
                                   <Avatar className="h-20 w-20">
                                     <AvatarFallback className="text-2xl bg-primary">
-                                      {selectedStudent.name.split(' ').map((n: string) => n[0]).join('')}
+                                      {activeProfile.name.split(' ').map((n: string) => n[0]).join('')}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="flex-1">
-                                    <h3 className="font-semibold text-2xl text-foreground">{selectedStudent.name}</h3>
-                                    <p className="text-sm text-muted-foreground mb-2">{selectedStudent.email}</p>
+                                    <h3 className="font-semibold text-2xl text-foreground">{activeProfile.name}</h3>
+                                    <p className="text-sm text-muted-foreground mb-2">{activeProfile.email}</p>
                                     <div className="flex gap-2">
-                                      <Badge variant={selectedStudent.enabled ? "default" : "destructive"}>
-                                        {selectedStudent.enabled ? "Active" : "Inactive"}
+                                      <Badge
+                                        variant={activeProfile.enabled ? "default" : "destructive"}
+                                      >
+                                        {activeProfile.enabled ? "Active" : "Inactive"}
                                       </Badge>
-                                      <Badge variant="outline">Course Progress: {selectedStudent.progress}%</Badge>
+                                      <Badge variant="outline">
+                                        Course Progress: {activeProfile.progress}%
+                                      </Badge>
                                     </div>
                                   </div>
                                 </div>
+                                {activeProfileLoading && (
+                                  <div className="text-sm text-muted-foreground">Loading profile details...</div>
+                                )}
 
                                 {/* Quick Stats Grid */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                   <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                                     <Target className="h-5 w-5 text-primary mb-2" />
-                                    <p className="text-2xl font-bold">{selectedStudent.averageScore}%</p>
+                                    <p className="text-2xl font-bold">{activeProfile.averageScore}%</p>
                                     <p className="text-xs text-muted-foreground">Avg Score</p>
                                   </div>
                                   <div className="p-4 rounded-lg bg-success/10 border border-success/20">
                                     <CheckCircle className="h-5 w-5 text-success mb-2" />
-                                    <p className="text-2xl font-bold">{selectedStudent.progress >= 100 ? "Yes" : "No"}</p>
+                                    <p className="text-2xl font-bold">{activeProfile.progress >= 100 ? "Yes" : "No"}</p>
                                     <p className="text-xs text-muted-foreground">Completed</p>
                                   </div>
                                   <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
                                     <Clock className="h-5 w-5 text-warning mb-2" />
-                                    <p className="text-2xl font-bold">{selectedStudent.totalHours}h</p>
+                                    <p className="text-2xl font-bold">{activeProfile.totalHours}h</p>
                                     <p className="text-xs text-muted-foreground">Study Time</p>
                                   </div>
                                   <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
                                     <Award className="h-5 w-5 text-accent mb-2" />
-                                    <p className="text-2xl font-bold">{selectedStudent.badges}</p>
+                                    <p className="text-2xl font-bold">{activeProfile.badges}</p>
                                     <p className="text-xs text-muted-foreground">Badges</p>
                                   </div>
                                 </div>
 
                                 {/* Tabs for detailed information */}
-                                <Tabs defaultValue="performance" className="w-full">
+                                <Tabs defaultValue="performance" className="w-full flex flex-col flex-1 min-h-0">
                                   <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="performance">Performance</TabsTrigger>
                                     <TabsTrigger value="activity">Activity</TabsTrigger>
                                   </TabsList>
 
-                                  <TabsContent value="performance" className="space-y-4 mt-4">
+                                  <TabsContent value="performance" className="space-y-4 mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
                                     <div className="grid grid-cols-2 gap-4">
                                       <div className="p-4 rounded-lg bg-background/50 border border-border">
                                         <div className="flex items-center gap-2 mb-2">
                                           <TrendingUp className="h-4 w-4 text-primary" />
                                           <span className="text-sm font-medium">Course Progress</span>
                                         </div>
-                                        <Progress value={selectedStudent.progress} className="h-2 mb-2" />
-                                        <p className="text-2xl font-bold">{selectedStudent.progress}%</p>
+                                        <Progress value={activeProfile.progress} className="h-2 mb-2" />
+                                        <p className="text-2xl font-bold">{activeProfile.progress}%</p>
                                       </div>
                                       <div className="p-4 rounded-lg bg-background/50 border border-border">
                                         <div className="flex items-center gap-2 mb-2">
                                           <Star className="h-4 w-4 text-warning" />
                                           <span className="text-sm font-medium">Engagement</span>
                                         </div>
-                                        <Progress value={selectedStudent.engagement} className="h-2 mb-2" />
-                                        <p className="text-2xl font-bold">{selectedStudent.engagement}%</p>
+                                        <Progress value={activeProfile.engagement} className="h-2 mb-2" />
+                                        <p className="text-2xl font-bold">{activeProfile.engagement}%</p>
                                       </div>
                                     </div>
 
@@ -411,33 +451,36 @@ const CourseStudents = () => {
                                         <div>
                                           <p className="text-muted-foreground">Status</p>
                                           <p className="font-medium">
-                                            {selectedStudent.progress >= 100 ? "Completed" : 
-                                             selectedStudent.progress >= 50 ? "On Track" : "Needs Support"}
+                                            {activeProfile.progress >= 100
+                                              ? "Completed"
+                                              : activeProfile.progress >= 50
+                                              ? "On Track"
+                                              : "Needs Support"}
                                           </p>
                                         </div>
                                         <div>
                                           <p className="text-muted-foreground">Last Active</p>
-                                          <p className="font-medium">{selectedStudent.lastActive}</p>
+                                          <p className="font-medium">{activeProfile.lastActivity}</p>
                                         </div>
                                       </div>
                                     </div>
                                   </TabsContent>
 
-                                  <TabsContent value="activity" className="space-y-4 mt-4">
+                                  <TabsContent value="activity" className="space-y-4 mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
                                     <div className="grid grid-cols-2 gap-4">
                                       <div className="p-4 rounded-lg bg-background/50 border border-border">
                                         <div className="flex items-center gap-2 mb-2">
                                           <Clock className="h-4 w-4 text-warning" />
                                           <span className="text-sm font-medium">Last Activity</span>
                                         </div>
-                                        <p className="text-xl font-bold">{selectedStudent.lastActivity}</p>
+                                        <p className="text-xl font-bold">{activeProfile.lastActivity}</p>
                                       </div>
                                       <div className="p-4 rounded-lg bg-background/50 border border-border">
                                         <div className="flex items-center gap-2 mb-2">
                                           <TrendingUp className="h-4 w-4 text-success" />
                                           <span className="text-sm font-medium">Current Streak</span>
                                         </div>
-                                        <p className="text-xl font-bold">{selectedStudent.streak} days</p>
+                                        <p className="text-xl font-bold">{activeProfile.streak} days</p>
                                       </div>
                                     </div>
 
@@ -446,33 +489,44 @@ const CourseStudents = () => {
                                       <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                           <span className="text-sm">Total Study Hours</span>
-                                          <span className="font-bold">{selectedStudent.totalHours}h</span>
+                                          <span className="font-bold">{activeProfile.totalHours}h</span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                           <span className="text-sm">Course Progress</span>
-                                          <span className="font-medium">{selectedStudent.progress}%</span>
+                                          <span className="font-medium">{activeProfile.progress}%</span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                           <span className="text-sm">Badges Earned</span>
-                                          <span className="font-medium">{selectedStudent.badges}</span>
+                                          <span className="font-medium">{activeProfile.badges}</span>
                                         </div>
                                       </div>
                                     </div>
 
                                     <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                                       <h4 className="font-semibold mb-2 text-sm">Activity Status</h4>
-                                      <Badge className={selectedStudent.engagement && selectedStudent.engagement >= 70 ? "status-badge-published" : "status-badge-draft"}>
-                                        {selectedStudent.engagement && selectedStudent.engagement >= 70 ? "Highly Engaged" : "Needs Attention"}
+                                      <Badge
+                                        className={
+                                          activeProfile.engagement >= 70
+                                            ? "status-badge-published"
+                                            : "status-badge-draft"
+                                        }
+                                      >
+                                        {activeProfile.engagement >= 70 ? "Highly Engaged" : "Needs Attention"}
                                       </Badge>
                                     </div>
                                   </TabsContent>
                                 </Tabs>
 
-                                <Button className="w-full gap-2">
-                                  <Mail className="h-4 w-4" />
-                                  Send Message
-                                </Button>
                               </div>
+                              <div className="mt-auto border-t border-border bg-background/95 backdrop-blur">
+                                <div className="flex flex-col gap-2 p-4">
+                                  <Button className="w-full gap-2">
+                                    <Mail className="h-4 w-4" />
+                                    Send Message
+                                  </Button>
+                                </div>
+                              </div>
+                              </>
                             )}
                           </SheetContent>
                         </Sheet>
