@@ -14,12 +14,12 @@ const ENDPOINTS = {
   COURSE_STUDENTS: (courseId: string) => `/getCourseStudents/${courseId}`,
   AVAILABLE_STUDENTS: (courseId: string) => `/getAvailableStudents/${courseId}`,
   ALL_STUDENTS: '/getAllStudents',
-  COURSE_REVIEWS: (courseId: string) => `/courses/${courseId}/reviews`,
-  USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
-  CREATE_COURSE: '/courses',
-  UPDATE_COURSE: (courseId: string) => `//updateCourse/${courseId}`,
-  DELETE_COURSE: (courseId: string) => `/courses/${courseId}`,
-  ENROLL_STUDENT: (courseId: string) => `/courses/${courseId}/enroll`,
+  // COURSE_REVIEWS: (courseId: string) => `/courses/${courseId}/reviews`,
+  // USER_ENROLLMENTS: (uid: string) => `/courses/enrollment/${encodeURIComponent(uid)}`,
+  // CREATE_COURSE: '/courses',
+  UPDATE_COURSE: (courseId: string) => `/updateCourse/${courseId}`,
+  // DELETE_COURSE: (courseId: string) => `/courses/${courseId}`,
+  ENROLL_STUDENT: (userId: string) => `/postUserEnrollment/${userId}`,
   INSTRUCTOR_STATS: (adminId: string) => `/getInstructorStats/${adminId}`,
   COURSE_DUPLICATE: (courseId: string) => `/courseDuplicateHandler/${encodeURIComponent(courseId)}`,
   RECOMMENDATIONS: '/recommendations',
@@ -98,6 +98,13 @@ export interface Lesson {
   duration_seconds?: number;
   is_preview?: boolean;
   order_index: number;
+}
+
+export interface Quiz {
+  id: number;
+  title: string;
+  description?: string;
+  questions: Question[];
 }
 
 export interface Question {
@@ -270,11 +277,11 @@ export interface QuizQuestion {
 }
 
 export interface Quiz {
-  id: string | number;
+  id: string;
   title: string;
   description?: string;
-  totalQuestions?: number;
-  passingScore?: number;
+  totalQuestions: number;
+  passingScore: number;
   passing_score?: number; // Backend format
   timeLimit?: number;
   time_limit?: number; // Backend format
@@ -1174,9 +1181,10 @@ class CourseService {
    */
   async enrollStudent(courseId: string, studentId: string): Promise<void> {
     try {
-      await apiService.post(`/courses/${courseId}/enroll`, {
-        userId: studentId,
+      await apiService.post(ENDPOINTS.ENROLL_STUDENT(studentId), {
+        courseId: courseId,
       });
+
     } catch (error) {
       console.error(`Error enrolling student ${studentId} in course ${courseId}:`, error);
       throw error;

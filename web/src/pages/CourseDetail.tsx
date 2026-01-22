@@ -56,13 +56,23 @@ const CourseDetail = () => {
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [isEnrolling, setIsEnrolling] = useState(false);
 
   // API state
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<any[]>([]); // Use any[] for now to handle different module structures
   const [reviews, setReviews] = useState<Review[]>([]);
   const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
-  const [availableStudents, setAvailableStudents] = useState<Student[]>([]);
+  const [availableStudents, setAvailableStudents] = useState<
+    Array<{
+      id: string;
+      name: string;
+      email: string;
+      totalEnrollments?: number;
+      averageProgress?: number;
+    }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,16 +93,6 @@ const CourseDetail = () => {
       fetchCourseData();
     }
   }, [locationState?.quizCompleted]);
-
-  // Refresh data when returning from quiz
-  useEffect(() => {
-    if (locationState?.quizCompleted && courseId) {
-      // Clear the location state to prevent refetching on subsequent renders
-      window.history.replaceState({}, document.title);
-      // Refetch course data to get updated progress
-      fetchCourseData();
-    }
-  }, [locationState?.quizCompleted, courseId]);
 
   const fetchCourseData = async () => {
     if (!courseId) return;
@@ -335,27 +335,45 @@ const CourseDetail = () => {
     );
   };
 
-  const handleEnrollStudents = async (studentIds: number[]) => {
-    if (!courseId) return;
+  const toggleStudentSelection = (studentId: string) => {
+    setSelectedStudents((prev) =>
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId],
+    );
+  };
+
+  const handleEnrollStudents = async () => {
+    if (!courseId || selectedStudents.length === 0) {
+      toast({
+        title: "No Students Selected",
+        description: "Please select at least one student to enroll.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
+      setIsEnrolling(true);
+      
       // Enroll students in parallel
       await Promise.all(
-        studentIds.map((studentId) =>
-          courseService.enrollStudent(courseId, studentId.toString()),
+        selectedStudents.map((studentId) =>
+          courseService.enrollStudent(courseId, studentId),
         ),
       );
 
       toast({
-        title: "Students Enrolled",
-        description: `${studentIds.length} student(s) enrolled successfully`,
+        title: "Success!",
+        description: `${selectedStudents.length} student${selectedStudents.length > 1 ? 's' : ''} enrolled successfully`,
       });
 
+      // Reset selection and close dialog
+      setSelectedStudents([]);
       setIsEnrollDialogOpen(false);
 
-      // Refresh students list
-      const updatedStudents = await courseService.getCourseStudents(courseId);
-      setEnrolledStudents(updatedStudents);
+      // Refresh course data to update student lists
+      await fetchCourseData();
     } catch (error) {
       console.error("Error enrolling students:", error);
       toast({
@@ -363,6 +381,8 @@ const CourseDetail = () => {
         description: "Failed to enroll students. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsEnrolling(false);
     }
   };
 
@@ -375,6 +395,13 @@ const CourseDetail = () => {
       navigate(`/course/${courseId}/module/${module.id}/quiz/${item.id}`);
     }
   };
+
+  // Filter available students based on search query
+  const filteredAvailableStudents = availableStudents.filter(
+    (student) =>
+      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   // Show loading state
   if (loading) {
@@ -446,7 +473,7 @@ const CourseDetail = () => {
                     className={
                       course.status === "published"
                         ? "status-badge-published py-2 px-3"
-                        : "status-badge-draft py-2 px-1"
+                        : "status-badge-draft py-2 px-3"
                     }
                   >
                     {course.status.toUpperCase()}
@@ -766,27 +793,92 @@ const CourseDetail = () => {
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
                       <div className="max-h-96 overflow-y-auto space-y-2">
-                        {availableStudents.map((student) => (
-                          <div
-                            key={student.id}
-                            className="flex items-center justify-between p-3 border border-border rounded hover:bg-muted/10"
-                          >
-                            <div>
-                              <div className="font-medium">{student.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {student.email}
+                        {filteredAvailableStudents.length === 0 ? (
+                          <div className="text-center py-8">
+                            <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+                            <p className="text-muted-foreground">
+                              {searchQuery
+                                ? "No students found matching your search"
+                                : "No available students to enroll"}
+                            </p>
+                          </div>
+                        ) : (
+                          filteredAvailableStudents.map((student) => (
+                            <div
+                              key={student.id}
+                              className={`flex items-center justify-between p-3 border rounded cursor-pointer transition-colors ${
+                                selectedStudents.includes(student.id)
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border hover:bg-muted/10"
+                              }`}
+                              onClick={() => toggleStudentSelection(student.id)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                    selectedStudents.includes(student.id)
+                                      ? "border-primary bg-primary"
+                                      : "border-muted-foreground"
+                                  }`}
+                                >
+                                  {selectedStudents.includes(student.id) && (
+                                    <svg
+                                      className="w-3 h-3 text-white"
+                                      fill="none"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium">
+                                    {student.name}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {student.email}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleEnrollStudents([student.id])}
-                            >
-                              Enroll
-                            </Button>
-                          </div>
-                        ))}
+                          ))
+                        )}
                       </div>
                     </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEnrollDialogOpen(false);
+                          setSelectedStudents([]);
+                          setSearchQuery("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleEnrollStudents}
+                        disabled={selectedStudents.length === 0 || isEnrolling}
+                      >
+                        {isEnrolling ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Enrolling...
+                          </>
+                        ) : (
+                          <>
+                            Enroll {selectedStudents.length}{" "}
+                            {selectedStudents.length === 1
+                              ? "Student"
+                              : "Students"}
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
                   </DialogContent>
                 </Dialog>
                 <Button
@@ -807,24 +899,37 @@ const CourseDetail = () => {
             {/* Enrolled Students Preview */}
             <div className="gradient-card border border-border rounded-xl p-6">
               <h3 className="font-semibold mb-4">Recently Active Students</h3>
-              <div className="space-y-3">
-                {enrolledStudents.slice(0, 5).map((student) => (
-                  <div key={student.id} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{student.name}</span>
-                      <span className="text-muted-foreground">
-                        {student.progress}%
-                      </span>
+              {enrolledStudents.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-muted-foreground text-sm">
+                    No students enrolled yet
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use the "Enroll Students" button to add students to this
+                    course
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {enrolledStudents.slice(0, 5).map((student) => (
+                    <div key={student.id} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{student.name}</span>
+                        <span className="text-muted-foreground">
+                          {student.progress || 0}%
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <Progress value={student.progress || 0} />
+                      </div>
+                      <div className="text-xs text-muted-foreground mb-2">
+                        Last active: {student.lastActive || "Never"}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <Progress value={student.progress} />
-                    </div>
-                    <div className="text-xs text-muted-foreground mb-2">
-                      Last active: {student.lastActive}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Course Stats */}
@@ -839,12 +944,6 @@ const CourseDetail = () => {
                   <span className="text-muted-foreground">Last Updated</span>
                   <span className="font-medium">{course.lastUpdated}</span>
                 </div>
-                {/* <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Total Enrollments
-                  </span>
-                  <span className="font-medium">{course.enrolledCount}</span>
-                </div> */}
               </div>
             </div>
           </div>
