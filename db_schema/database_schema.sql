@@ -92,6 +92,7 @@ CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(500) NOT NULL,
     description TEXT NOT NULL,
+    instructor_id UUID REFERENCES users(id),
     instructor_name VARCHAR(255) DEFAULT 'Shalom Instructor', -- Single instructor
     category_id UUID NOT NULL REFERENCES categories(id),
     level VARCHAR(20) NOT NULL CHECK (level IN ('Beginner', 'Intermediate', 'Advanced')),

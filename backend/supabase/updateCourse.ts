@@ -24,6 +24,72 @@ const estimatePdfReadMinutes = (fileSizeBytes?: number | null) => {
   return Math.max(1, pages * 2);
 };
 
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+const resolveInstructorId = async (supabaseClient: any, course: any) => {
+  if (!course) return null;
+  if (course.instructor_id) return { id: course.instructor_id, name: course.instructor_name };
+  if (!course.instructor_name) return null;
+  const { data: instructor } = await supabaseClient
+    .from('users')
+    .select('id,name')
+    .eq('name', course.instructor_name)
+    .in('role', ['instructor', 'admin'])
+    .limit(1)
+    .maybeSingle();
+  if (!instructor?.id) return null;
+  return { id: instructor.id, name: instructor.name };
+};
+
+const sendNotification = async (supabaseClient: any, payload: Record<string, unknown>) => {
+  const data = payload as any;
+  const insertPayload = {
+    user_id: data.userId || data.user_id,
+    title: data.title,
+    message: data.message,
+    type: data.type || 'system',
+    action_url: data.actionUrl || data.action_url || null,
+    related_entity_type: data.relatedEntityType || data.related_entity_type || null,
+    related_entity_id: data.relatedEntityId || data.related_entity_id || null,
+    priority: data.priority || 'normal',
+    expires_at: data.expiresAt || data.expires_at || null,
+    created_at: data.createdAt || data.created_at || new Date().toISOString(),
+  };
+
+  const insertDirect = async () => {
+    const { error } = await supabaseClient.from('notifications').insert(insertPayload);
+    if (error) {
+      console.error('Direct notification insert failed:', error);
+    }
+  };
+
+  if (!supabaseUrl || !serviceKey) {
+    await insertDirect();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postNotification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postNotification failed:', res.status, text);
+      await insertDirect();
+    }
+  } catch (error) {
+    console.error('Failed to send notification:', error);
+    await insertDirect();
+  }
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -56,6 +122,25 @@ serve(async (req) => {
       );
     }
 
+    const { data: existingCourse, error: existingError } = await supabaseClient
+      .from('courses')
+      .select('id,is_published,instructor_id,instructor_name,title')
+      .eq('id', courseId)
+      .single();
+
+    if (existingError || !existingCourse) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Course not found"
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const body = await req.json();
     console.log('Update course request:', courseId);
 
@@ -69,6 +154,7 @@ serve(async (req) => {
     if (courseFields.description !== undefined) updateData.description = courseFields.description;
     if (courseFields.level !== undefined) updateData.level = courseFields.level;
     if (courseFields.instructorName !== undefined) updateData.instructor_name = courseFields.instructorName;
+    if (courseFields.instructorId !== undefined) updateData.instructor_id = courseFields.instructorId;
     if (courseFields.thumbnailUrl !== undefined) updateData.thumbnail_url = courseFields.thumbnailUrl;
     if (courseFields.durationHours !== undefined) updateData.duration_hours = courseFields.durationHours;
     if (courseFields.tags !== undefined) updateData.tags = courseFields.tags;
@@ -159,27 +245,40 @@ serve(async (req) => {
 
       course = updatedCourse;
     } else {
-      // Just fetch existing course if no updates
-      const { data: existingCourse, error: fetchError } = await supabaseClient
-        .from('courses')
-        .select()
-        .eq('id', courseId)
-        .single();
-
-      if (fetchError || !existingCourse) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: "Course not found"
-          }),
-          {
-            status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-
       course = existingCourse;
+    }
+
+    if (updateData.is_published === true && existingCourse.is_published === false && course?.is_published) {
+      const instructor = await resolveInstructorId(supabaseClient, course);
+      if (instructor?.id) {
+        await sendNotification(supabaseClient, {
+          userId: instructor.id,
+          title: "Course published",
+          message: `Your course "${course.title}" is now published.`,
+          type: "course",
+          actionUrl: "/courses",
+          relatedEntityType: "course",
+          relatedEntityId: course.id,
+        });
+      }
+    } else if (
+      updateData.is_published === false &&
+      existingCourse.is_published === true &&
+      course &&
+      course.is_published === false
+    ) {
+      const instructor = await resolveInstructorId(supabaseClient, course);
+      if (instructor?.id) {
+        await sendNotification(supabaseClient, {
+          userId: instructor.id,
+          title: "Course unpublished",
+          message: `Your course "${course.title}" has been moved back to draft.`,
+          type: "course",
+          actionUrl: "/courses",
+          relatedEntityType: "course",
+          relatedEntityId: course.id,
+        });
+      }
     }
 
     // Update modules if provided - PRESERVE STUDENT PROGRESS

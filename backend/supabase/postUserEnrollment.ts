@@ -15,6 +15,72 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
 };
 
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+const resolveInstructorId = async (supabaseClient: any, course: any) => {
+  if (!course) return null;
+  if (course.instructor_id) return { id: course.instructor_id, name: course.instructor_name };
+  if (!course.instructor_name) return null;
+  const { data: instructor } = await supabaseClient
+    .from('users')
+    .select('id,name')
+    .eq('name', course.instructor_name)
+    .in('role', ['instructor', 'admin'])
+    .limit(1)
+    .maybeSingle();
+  if (!instructor?.id) return null;
+  return { id: instructor.id, name: instructor.name };
+};
+
+const sendNotification = async (supabaseClient: any, payload: Record<string, unknown>) => {
+  const data = payload as any;
+  const insertPayload = {
+    user_id: data.userId || data.user_id,
+    title: data.title,
+    message: data.message,
+    type: data.type || 'system',
+    action_url: data.actionUrl || data.action_url || null,
+    related_entity_type: data.relatedEntityType || data.related_entity_type || null,
+    related_entity_id: data.relatedEntityId || data.related_entity_id || null,
+    priority: data.priority || 'normal',
+    expires_at: data.expiresAt || data.expires_at || null,
+    created_at: data.createdAt || data.created_at || new Date().toISOString(),
+  };
+
+  const insertDirect = async () => {
+    const { error } = await supabaseClient.from('notifications').insert(insertPayload);
+    if (error) {
+      console.error('Direct notification insert failed:', error);
+    }
+  };
+
+  if (!supabaseUrl || !serviceKey) {
+    await insertDirect();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postNotification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postNotification failed:', res.status, text);
+      await insertDirect();
+    }
+  } catch (error) {
+    console.error('Failed to send notification:', error);
+    await insertDirect();
+  }
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -100,7 +166,7 @@ serve(async (req) => {
     // 0) Ensure user exists (strict mode: no auto-create)
     const { data: user, error: userError } = await supabaseClient
       .from('users')
-      .select('id')
+      .select('id,name,email')
       .eq('id', userId)
       .single();
 
@@ -125,6 +191,7 @@ serve(async (req) => {
         id,
         title,
         description,
+        instructor_id,
         instructor_name,
         level,
         duration_hours,
@@ -283,6 +350,20 @@ serve(async (req) => {
       .update({ student_count: enrollmentCount ?? 0 })
       .eq('id', courseId);
     if (studentCountError) throw studentCountError;
+
+    const instructor = await resolveInstructorId(supabaseClient, course);
+    if (instructor?.id) {
+      const studentName = user?.name || user?.email || "A student";
+      await sendNotification(supabaseClient, {
+        userId: instructor.id,
+        title: "New student enrolled",
+        message: `${studentName} enrolled in ${course.title}`,
+        type: "course",
+        actionUrl: `/course/${course.id}/students`,
+        relatedEntityType: "course",
+        relatedEntityId: course.id,
+      });
+    }
 
     return new Response(
       JSON.stringify({

@@ -1,21 +1,19 @@
+import { useEffect, useState } from "react";
 import {
   Bell,
-  Search,
   Star,
   Home,
   BookOpen,
   BarChart3,
   Users,
   ClipboardCheck,
-  MessageSquare,
   Settings,
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { notificationService } from "@/services";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +27,35 @@ export const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const userId =
+    user?.id ||
+    (user as any)?.sub ||
+    (user as any)?.["cognito:username"] ||
+    "550e8400-e29b-41d4-a716-446655440201";
+
+  useEffect(() => {
+    let isActive = true;
+    const loadUnreadCount = async () => {
+      try {
+        const items = await notificationService.getNotifications(userId, 50);
+        if (!isActive) return;
+        setUnreadCount(items.filter((item) => !item.read).length);
+      } catch (error) {
+        console.error("Failed to load notification count:", error);
+        if (isActive) setUnreadCount(0);
+      }
+    };
+
+    if (userId) {
+      loadUnreadCount();
+    }
+
+    return () => {
+      isActive = false;
+    };
+  }, [userId, location.pathname]);
 
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/" },
@@ -81,9 +108,11 @@ export const Header = () => {
               onClick={() => navigate("/notifications")}
             >
               <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-accent text-xs flex items-center justify-center text-accent-foreground font-semibold">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-accent text-xs flex items-center justify-center text-accent-foreground font-semibold">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </Button>
 
             <Button

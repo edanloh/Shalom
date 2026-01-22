@@ -146,6 +146,7 @@ serve(async (req) => {
         description: description || '',
         category_id: finalCategoryId,
         level,
+        instructor_id: instructorId,
         instructor_name: instructorName || 'Shalom Instructor',
         thumbnail_url: thumbnailUrl || null,
         duration_hours: durationHours > 0 ? durationHours : computedDurationHours,
