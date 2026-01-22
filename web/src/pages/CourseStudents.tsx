@@ -17,6 +17,7 @@ import { disableStudent } from "@/lib/disableStudent";
 import { Colors } from "@/constants";
 import { courseService } from "@/services";
 import { useToast } from "@/hooks/use-toast";
+import { postNotification } from "@/services/notificationService";
 
 interface Student {
   id: string;
@@ -50,6 +51,12 @@ const CourseStudents = () => {
   const [itemsPerPage] = useState(10);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
+
+  const [isMessageAllDialogOpen, setIsMessageAllDialogOpen] = useState(false);
+  const [messageToAll, setMessageToAll] = useState("");
+
+  const [isMessageStudentDialogOpen, setIsMessageStudentDialogOpen] = useState(false);
+  const [messageStudent, setMessageStudent] = useState("");
 
   const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
   const [availableStudents, setAvailableStudents] = useState<any[]>([]);
@@ -156,6 +163,32 @@ const CourseStudents = () => {
     student.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const sendMessageToAll = async () => {
+    // Ensure message is not empty
+    if (!messageToAll.trim()) {
+      toast({
+        title: "Error",
+        description: "Message cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+    console.log("Sending message to all students:", messageToAll);
+    console.log(enrolledStudents);
+    await postNotification({
+      userIds: enrolledStudents.map(student => student.id),
+      title: `${courseName}`,
+      message: messageToAll,
+      type: "course_announcement"
+    });
+    toast({
+      title: "Message Sent",
+      description: "Your message has been sent to all students.",
+    });
+    setIsMessageAllDialogOpen(false);
+    setMessageToAll("");
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -235,11 +268,94 @@ const CourseStudents = () => {
                 </div>
               </DialogContent>
             </Dialog>
-            
-            <Button variant="outline" className="gap-2">
-              <Mail className="h-4 w-4" />
-              Message All
-            </Button>
+
+            <Dialog open={isMessageAllDialogOpen} onOpenChange={setIsMessageAllDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Mail className="h-4 w-4" />
+                  Message All
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Message All Students</DialogTitle>
+                  <DialogDescription>
+                    Send a notification to all students enrolled in this course.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <textarea
+                    value={messageToAll || ""}
+                    onChange={(e) =>
+                      setMessageToAll(e.target.value)
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                  <Button
+                    onClick={() => {
+                      sendMessageToAll();
+                    }}
+                    className="w-full gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                      Message All
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog
+              open={isMessageStudentDialogOpen}
+              onOpenChange={setIsMessageStudentDialogOpen}
+            >
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Message {selectedStudent?.name}</DialogTitle>
+                  <DialogDescription>
+                    Send a notification to {selectedStudent?.name}.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <textarea
+                    value={messageStudent || ''}
+                    onChange={(e) => setMessageStudent(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                  <Button
+                    onClick={async () => {
+                      if (!messageStudent.trim() || !selectedStudent) {
+                        toast({
+                          title: 'Error',
+                          description: !messageStudent.trim()
+                            ? 'Message cannot be empty.'
+                            : 'No student selected.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      await postNotification({
+                        userIds: [selectedStudent.id],
+                        title: courseName,
+                        message: messageStudent,
+                        type: 'course_announcement',
+                      });
+                      toast({
+                        title: 'Message Sent',
+                        description: `Your message has been sent to ${selectedStudent.name}.`,
+                      });
+                      setIsMessageStudentDialogOpen(false);
+                      setMessageStudent('');
+                    }}
+                    className="w-full gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Send Message
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -468,7 +584,13 @@ const CourseStudents = () => {
                                   </TabsContent>
                                 </Tabs>
 
-                                <Button className="w-full gap-2">
+                                <Button
+                                  className="w-full gap-2"
+                                  onClick={() => {
+                                    setSelectedStudent(selectedStudent);
+                                    setIsMessageStudentDialogOpen(true);
+                                  }}
+                                >
                                   <Mail className="h-4 w-4" />
                                   Send Message
                                 </Button>
