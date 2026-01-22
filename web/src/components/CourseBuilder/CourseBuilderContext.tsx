@@ -1,3 +1,26 @@
+/*
+COURSE BUILDER VALIDATION RULES
+1. COURSE LEVEL (2 Rules)
+Title Required - Must have non-empty title
+≥1 Module Required - Course must have at least one module
+
+2. MODULE LEVEL (1 Rule)
+No Empty Modules - Each module must have ≥1 lesson OR ≥1 quiz
+
+3. LESSON LEVEL (2 Rules)
+Video Lesson - Must have video URL or uploaded file
+PDF Lesson - Must have PDF URL or uploaded file
+
+4. QUIZ LEVEL (1 Rule)
+≥1 Question Required - Each quiz must have at least one question
+
+5. QUESTION LEVEL (4 Rules)
+Question Text Required - Every question must have text
+Options Required - Multiple choice/True-False must have options
+Correct Answer Required - Must select a correct answer
+Multiple Correct - At least one answer must be selected
+*/
+
 import {
   createContext,
   useContext,
@@ -10,6 +33,7 @@ import categoryService from "@/services/categoryService";
 import { useAuth } from "../../contexts/AuthContext";
 import { StorageService } from "../../services/storageService";
 import { useCategories } from "../../hooks/useCategories";
+import { Colors } from "@/constants";
 
 // Types
 export interface Question {
@@ -161,6 +185,7 @@ interface CourseBuilderContextType {
     success: boolean;
     courseId?: string;
     message?: string;
+    validationErrors?: string[];
   }>;
   currentCourseId: string | undefined;
   isSaving: boolean;
@@ -221,68 +246,68 @@ export const CourseBuilderProvider = ({
 
   // Fetch course data when courseId is provided (editing existing course)
   useEffect(() => {
-  const fetchCourseData = async () => {
-    if (!courseId || courseId === "new") {
-      // No courseId or 'new' means we're creating a new course, keep empty state
-      console.log(
-        "CourseBuilder: Creating new course (no courseId or courseId=new)",
-      );
-      return;
-    }
+    const fetchCourseData = async () => {
+      if (!courseId || courseId === "new") {
+        // No courseId or 'new' means we're creating a new course, keep empty state
+        console.log(
+          "CourseBuilder: Creating new course (no courseId or courseId=new)",
+        );
+        return;
+      }
 
-    console.log("CourseBuilder: Loading course data for courseId:", courseId);
-    setIsLoadingCourse(true);
-    
-    try {
-      const adminId = user?.id || "550e8400-e29b-41d4-a716-446655440101";
-      
-      // Fetch all course data using the service
-      const courseBuilderData = await courseService.getCourseBuilderData(
-        courseId,
-        adminId
-      );
+      console.log("CourseBuilder: Loading course data for courseId:", courseId);
+      setIsLoadingCourse(true);
 
-      console.log("CourseBuilder: Course data loaded:", courseBuilderData);
+      try {
+        const adminId = user?.id || "550e8400-e29b-41d4-a716-446655440101";
 
-      // Set course basic info
-      setCourseName(courseBuilderData.courseName);
-      setCourseDescription(courseBuilderData.courseDescription);
-      setCourseThumbnailUrl(courseBuilderData.courseThumbnailUrl);
-      setCourseStatus(courseBuilderData.courseStatus);
-      
-      // Set category
-      setCourseCategory(courseBuilderData.courseCategory);
-      setOriginalCourseCategory(courseBuilderData.courseCategory); // Save for revert
-      console.log("Loaded category:", courseBuilderData.courseCategory);
+        // Fetch all course data using the service
+        const courseBuilderData = await courseService.getCourseBuilderData(
+          courseId,
+          adminId,
+        );
 
-      // Set modules with all transformations already applied
-      setModules(courseBuilderData.modules);
-      
-      console.log(
-        "CourseBuilder: Quiz questions check:",
-        courseBuilderData.modules.map((m) => ({
-          moduleTitle: m.title,
-          quizzes: m.quizzes.map((q) => ({
-            quizTitle: q.title,
-            questionsCount: q.questions?.length || 0,
-            questions: q.questions,
+        console.log("CourseBuilder: Course data loaded:", courseBuilderData);
+
+        // Set course basic info
+        setCourseName(courseBuilderData.courseName);
+        setCourseDescription(courseBuilderData.courseDescription);
+        setCourseThumbnailUrl(courseBuilderData.courseThumbnailUrl);
+        setCourseStatus(courseBuilderData.courseStatus);
+
+        // Set category
+        setCourseCategory(courseBuilderData.courseCategory);
+        setOriginalCourseCategory(courseBuilderData.courseCategory); // Save for revert
+        console.log("Loaded category:", courseBuilderData.courseCategory);
+
+        // Set modules with all transformations already applied
+        setModules(courseBuilderData.modules);
+
+        console.log(
+          "CourseBuilder: Quiz questions check:",
+          courseBuilderData.modules.map((m) => ({
+            moduleTitle: m.title,
+            quizzes: m.quizzes.map((q) => ({
+              quizTitle: q.title,
+              questionsCount: q.questions?.length || 0,
+              questions: q.questions,
+            })),
           })),
-        })),
-      );
+        );
 
-      console.log(
-        "CourseBuilder: Course data loaded with numbering:",
-        courseBuilderData.modules,
-      );
-    } catch (error) {
-      console.error("CourseBuilder: Error fetching course data:", error);
-    } finally {
-      setIsLoadingCourse(false);
-    }
-  };
+        console.log(
+          "CourseBuilder: Course data loaded with numbering:",
+          courseBuilderData.modules,
+        );
+      } catch (error) {
+        console.error("CourseBuilder: Error fetching course data:", error);
+      } finally {
+        setIsLoadingCourse(false);
+      }
+    };
 
-  fetchCourseData();
-}, [courseId]);
+    fetchCourseData();
+  }, [courseId]);
 
   useEffect(() => {
     if (categories.length > 0 && localCategories.length === 0) {
@@ -697,15 +722,152 @@ export const CourseBuilderProvider = ({
     clearPendingCategoryChanges();
   };
 
+  /**
+   * Validate course data before saving
+   * Returns an array of error messages, empty array if valid
+   */
+  const validateCourseData = (): string[] => {
+    const errors: string[] = [];
+
+    // 1. Course must have a title
+    if (!courseName || !courseName.trim()) {
+      errors.push("❌ Course title is required");
+    }
+
+    // 2. Course must have at least one module
+    if (modules.length === 0) {
+      errors.push("❌ Course must have at least one module");
+    }
+
+    // 3. Validate each module
+    modules.forEach((module, moduleIndex) => {
+      const moduleNumber = moduleIndex + 1;
+
+      // Check if module is empty (no lessons and no quizzes)
+      if (module.lessons.length === 0 && module.quizzes.length === 0) {
+        errors.push(
+          `❌ Module ${moduleNumber} "${module.title}" is empty. ` +
+            `Please add at least one lesson or quiz, or delete the module.`,
+        );
+      }
+
+      // Validate lessons in this module
+      module.lessons.forEach((lesson, lessonIndex) => {
+        const lessonNumber = lessonIndex + 1;
+        const lessonTitle = lesson.baseTitle || lesson.title;
+        const lessonIdentifier = `Lesson ${moduleNumber}.${lessonNumber} "${lessonTitle}"`;
+
+        if (lesson.type === "video") {
+          // Video lessons must have a video URL or uploaded file
+          const hasVideo =
+            lesson.videoUrl &&
+            lesson.videoUrl.trim() !== "" &&
+            lesson.videoUrl !== "[LOCAL_FILE: ]";
+
+          if (!hasVideo) {
+            errors.push(
+              `❌ ${lessonIdentifier}: Video is required. ` +
+                `Please add a video URL or upload a video file.`,
+            );
+          }
+        } else if (lesson.type === "pdf") {
+          // PDF lessons must have a resource URL or uploaded file
+          const hasPDF =
+            lesson.resourceUrl &&
+            lesson.resourceUrl.trim() !== "" &&
+            lesson.resourceUrl !== "[LOCAL_FILE: ]";
+
+          if (!hasPDF) {
+            errors.push(
+              `❌ ${lessonIdentifier}: PDF document is required. ` +
+                `Please add a PDF URL or upload a PDF file.`,
+            );
+          }
+        }
+      });
+
+      // Validate quizzes in this module
+      module.quizzes.forEach((quiz, quizIndex) => {
+        const quizNumber = quizIndex + 1;
+        const quizTitle = quiz.baseTitle || quiz.title;
+        const quizIdentifier = `Quiz ${moduleNumber}.${quizNumber} "${quizTitle}"`;
+
+        // Quiz must have at least one question
+        if (!quiz.questions || quiz.questions.length === 0) {
+          errors.push(`❌ ${quizIdentifier}: Must have at least one question.`);
+        }
+
+        // Validate each question
+        quiz.questions.forEach((question, qIndex) => {
+          const questionNumber = qIndex + 1;
+          const questionIdentifier = `${quizIdentifier} - Question ${questionNumber}`;
+
+          // Question must have text
+          if (!question.text || !question.text.trim()) {
+            errors.push(`❌ ${questionIdentifier}: Question text is required.`);
+          }
+
+          // Validate based on question type
+          if (
+            question.type === "multiple-choice" ||
+            question.type === "multiple-correct" ||
+            question.type === "true-false"
+          ) {
+            // Must have options
+            if (!question.options || question.options.length === 0) {
+              errors.push(
+                `❌ ${questionIdentifier}: Must have answer options.`,
+              );
+            }
+
+            // Must have a correct answer selected
+            if (
+              question.correctAnswer === undefined ||
+              question.correctAnswer === null
+            ) {
+              errors.push(
+                `❌ ${questionIdentifier}: Must select a correct answer.`,
+              );
+            }
+
+            // For multiple-correct, ensure at least one answer is selected
+            if (
+              question.type === "multiple-correct" &&
+              Array.isArray(question.correctAnswer) &&
+              question.correctAnswer.length === 0
+            ) {
+              errors.push(
+                `❌ ${questionIdentifier}: Must select at least one correct answer.`,
+              );
+            }
+          }
+        });
+      });
+    });
+
+    return errors;
+  };
+
   const saveCourse = async (): Promise<{
     success: boolean;
     courseId?: string;
     message?: string;
+    validationErrors?: string[];
   }> => {
-    if (!courseName.trim()) {
-      return { success: false, message: "Please enter a course name" };
+    // STEP 0: VALIDATE BEFORE DOING ANYTHING
+    const validationErrors = validateCourseData();
+
+    if (validationErrors.length > 0) {
+      return {
+        success: false,
+        message: `Validation failed: ${validationErrors.length} error(s) found`,
+        validationErrors: validationErrors, // ← Return array
+      };
     }
 
+    console.log("[saveCourse] ✓ Validation passed!");
+
+    // Continue with existing save logic...
     setIsSaving(true);
     try {
       // Step 0 - Process category changes FIRST
@@ -890,7 +1052,10 @@ export const CourseBuilderProvider = ({
 
         console.log("check course category:", courseCategory);
 
-        await courseService.updateCourseWithModules(currentCourseId, updateData);
+        await courseService.updateCourseWithModules(
+          currentCourseId,
+          updateData,
+        );
         console.log("Course updated successfully");
       }
 

@@ -137,6 +137,23 @@ export const RightSidebar = () => {
     setIsResizing(null);
   };
 
+  /**
+   * Helper function: Check if the currently selected category is General
+   * This updates reactively when courseCategory or localCategories change
+   */
+  const isCurrentCategoryGeneral = React.useCallback((): boolean => {
+    // If no category selected, it defaults to General
+    if (!courseCategory || courseCategory === "") return true;
+
+    // Find the current category in localCategories
+    const currentCategory = localCategories.find(
+      (cat) => cat.id === courseCategory,
+    );
+
+    // Check if the name is "General" (case-insensitive)
+    return currentCategory?.name.toLowerCase() === "general";
+  }, [courseCategory, localCategories]); // ← Re-runs when these change!
+
   React.useEffect(() => {
     if (isResizing === "right") {
       document.addEventListener("mousemove", handleMouseMove);
@@ -326,9 +343,19 @@ export const RightSidebar = () => {
       }));
     }
 
-    // If the deleted category was selected, clear selection
+    // If the deleted category was selected, clear selection (defaults to General)
     if (courseCategory === editingCategoryId) {
-      setCourseCategory("");
+      // Find General category ID from localCategories
+      const generalCategory = localCategories.find(
+        (cat) => cat.name.toLowerCase() === "general",
+      );
+
+      if (generalCategory) {
+        setCourseCategory(generalCategory.id); // ✅ Use actual ID!
+      } else {
+        // Fallback: set to empty string (backend will use General)
+        setCourseCategory("");
+      }
     }
 
     setHasUnsavedChanges(true);
@@ -356,10 +383,15 @@ export const RightSidebar = () => {
       categoryIdToDelete || editingCategoryId || courseCategory;
 
     // Validate category ID before proceeding
-    if (!categoryId || categoryId.trim() === "") {
-      console.error("[openDeleteConfirm] No valid category ID!");
-      alert("Please select a category to delete");
-      return; 
+    const category = localCategories.find((cat) => cat.id === categoryId);
+    const isGeneral = category?.name.toLowerCase() === "general";
+
+    if (!categoryId || categoryId.trim() === "" || isGeneral) {
+      console.error(
+        "[openDeleteConfirm] Cannot delete General category or no valid category ID!",
+      );
+      alert("General category cannot be deleted");
+      return;
     }
 
     // Update editingCategoryId for use in handleDeleteCategory
@@ -483,7 +515,7 @@ export const RightSidebar = () => {
           />
         </div>
 
-        {/* Course Category - Improved UI */}
+        {/* Course Category - Improved UI with General as default */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label
@@ -519,7 +551,13 @@ export const RightSidebar = () => {
               {/* Enhanced Category Selection Dropdown */}
               <div className="relative">
                 <select
-                  value={courseCategory}
+                  value={
+                    courseCategory ||
+                    localCategories.find(
+                      (cat) => cat.name.toLowerCase() === "general",
+                    )?.id ||
+                    ""
+                  }
                   onChange={(e) => {
                     setCourseCategory(e.target.value);
                     setHasUnsavedChanges(true);
@@ -531,27 +569,44 @@ export const RightSidebar = () => {
                       : Colors.gray600,
                     borderWidth: selectedCategory ? "2px" : "1px",
                     color: Colors.textPrimary,
-                    paddingLeft: selectedCategory ? "2.5rem" : "0.75rem",
+                    paddingLeft:
+                      selectedCategory &&
+                      selectedCategory.name.toLowerCase() !== "general"
+                        ? "2.5rem"
+                        : "0.75rem",
                   }}
                   className="w-full px-3 py-2.5 border rounded focus:outline-none focus:ring-2 focus:ring-opacity-50 appearance-none cursor-pointer"
                 >
-                  <option value="">Select a category</option>
-                  {localCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
+                  {/* ALWAYS show General as first option */}
+                  <option
+                    value={
+                      localCategories.find(
+                        (cat) => cat.name.toLowerCase() === "general",
+                      )?.id || ""
+                    }
+                  >
+                    General (Default)
+                  </option>
+                  {/* Show other categories, excluding General if it's in the list */}
+                  {localCategories
+                    .filter((cat) => cat.name.toLowerCase() !== "general")
+                    .map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
                 </select>
 
-                {/* Color indicator badge */}
-                {selectedCategory && (
-                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    <div
-                      style={{ backgroundColor: selectedCategory.color }}
-                      className="w-4 h-4 rounded-full"
-                    />
-                  </div>
-                )}
+                {/* Color indicator badge - only for non-General categories */}
+                {selectedCategory &&
+                  selectedCategory.name.toLowerCase() !== "general" && (
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <div
+                        style={{ backgroundColor: selectedCategory.color }}
+                        className="w-4 h-4 rounded-full"
+                      />
+                    </div>
+                  )}
 
                 {/* Dropdown arrow icon */}
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -584,7 +639,8 @@ export const RightSidebar = () => {
               )}
 
               {/* Show indicator when no category selected after deletion */}
-              {courseCategory === "" &&
+              {(courseCategory === "" ||
+                selectedCategory?.name.toLowerCase() === "general") &&
                 pendingCategoryChanges.deleted.length > 0 && (
                   <div
                     style={{
@@ -599,58 +655,64 @@ export const RightSidebar = () => {
                   </div>
                 )}
 
-              {/* Edit/Delete buttons for selected category */}
-              {courseCategory && !isCurrentCategoryBeingDeleted && (
-                <div className="flex gap-2 w-full mt-2">
-                  <button
-                    onClick={openEditModal}
-                    style={{
-                      backgroundColor: Colors.gray800,
-                      color: Colors.accent,
-                      borderColor: Colors.accent,
-                    }}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border rounded text-sm font-medium hover:opacity-80 transition-opacity"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => { 
-                      if (!courseCategory) {
-                        alert("Please select a category first");
-                        return;
-                      }
-
-                      openDeleteConfirm(courseCategory);
-                    }}
-                    style={{
-                      backgroundColor: Colors.gray800,
-                      color: "#EF4444",
-                      borderColor: "#EF4444",
-                    }}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border rounded text-sm font-medium hover:opacity-80 transition-opacity"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </button>
-                  {/* Revert Button - only show if there are pending changes */}
-                  {(pendingCategoryChanges.created.length > 0 ||
-                    pendingCategoryChanges.updated.length > 0 ||
-                    pendingCategoryChanges.deleted.length > 0) && (
+              {/* Edit/Delete buttons - ONLY for non-General categories */}
+              {courseCategory &&
+                courseCategory !== "" &&
+                selectedCategory?.name.toLowerCase() !== "general" &&
+                !isCurrentCategoryBeingDeleted && (
+                  <div className="flex gap-2 w-full mt-2">
                     <button
-                      onClick={handleRevertCategoryChanges}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border rounded text-sm font-medium hover:opacity-80 transition-opacity"
+                      onClick={openEditModal}
                       style={{
                         backgroundColor: Colors.gray800,
-                        borderColor: Colors.yellow,
-                        color: Colors.starGold,
+                        color: Colors.accent,
+                        borderColor: Colors.accent,
                       }}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border rounded text-sm font-medium hover:opacity-80 transition-opacity"
                     >
-                      <Undo className="h-4 w-4" />
-                      Revert
+                      <Edit2 className="h-4 w-4" />
+                      Edit
                     </button>
-                  )}
-                </div>
+                    <button
+                      onClick={() => {
+                        if (
+                          !courseCategory ||
+                          selectedCategory?.name.toLowerCase() === "general"
+                        ) {
+                          alert("General category cannot be deleted");
+                          return;
+                        }
+                        openDeleteConfirm(courseCategory);
+                      }}
+                      style={{
+                        backgroundColor: Colors.gray800,
+                        color: "#EF4444",
+                        borderColor: "#EF4444",
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border rounded text-sm font-medium hover:opacity-80 transition-opacity"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
+                  </div>
+                )}
+
+              {/* Revert Button - only show if there are pending changes */}
+              {(pendingCategoryChanges.created.length > 0 ||
+                pendingCategoryChanges.updated.length > 0 ||
+                pendingCategoryChanges.deleted.length > 0) && (
+                <button
+                  onClick={handleRevertCategoryChanges}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 border rounded text-sm font-medium hover:opacity-80 transition-opacity mt-2"
+                  style={{
+                    backgroundColor: Colors.gray800,
+                    borderColor: Colors.yellow,
+                    color: Colors.starGold,
+                  }}
+                >
+                  <Undo className="h-4 w-4" />
+                  Revert All Changes
+                </button>
               )}
 
               {/* Info notice about category changes */}
@@ -670,6 +732,25 @@ export const RightSidebar = () => {
                   </p>
                 </div>
               )}
+
+              {/* Info box for General category */}
+              {(courseCategory === "" || courseCategory === "general") &&
+                pendingCategoryChanges.deleted.length === 0 && (
+                  <div
+                    style={{
+                      backgroundColor: Colors.textInputBg,
+                      borderColor: Colors.gray600,
+                      color: Colors.textSecondary,
+                    }}
+                    className="mt-2 px-3 py-2 border rounded text-xs flex items-center gap-2"
+                  >
+                    <Info className="h-4 w-4 flex-shrink-0" />
+                    <span>
+                      <strong>General</strong> is the default category. It
+                      cannot be edited or deleted.
+                    </span>
+                  </div>
+                )}
 
               {categoriesError && (
                 <p style={{ color: "#EF4444" }} className="text-xs">
@@ -896,53 +977,148 @@ export const RightSidebar = () => {
           )}
         </div>
 
-        {/* Course Status */}
+        {/* Course Status - TOGGLE VERSION */}
         <div>
-          <label
-            style={{ color: Colors.textSecondary }}
-            className="block text-sm font-medium mb-2"
-          >
-            Publication Status
-          </label>
-          <div className="space-y-3">
-            <select
-              value={courseStatus}
-              onChange={(e) => {
-                setCourseStatus(e.target.value);
-                setHasUnsavedChanges(true);
-              }}
-              style={{
-                backgroundColor: Colors.textInputBg,
-                borderColor: Colors.gray600,
-                color: Colors.textPrimary,
-              }}
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+          <div className="flex items-center justify-between mb-3">
+            <label
+              style={{ color: Colors.textSecondary }}
+              className="block text-sm font-medium"
             >
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-            </select>
+              Publication Status
+            </label>
+            {/* Status Badge */}
+            <div
+              className="flex items-center gap-2 text-xs font-medium px-3 py-1 rounded-full"
+              style={{
+                backgroundColor:
+                  courseStatus === "published"
+                    ? "rgba(34, 197, 94, 0.1)"
+                    : "rgba(251, 191, 36, 0.1)",
+                color:
+                  courseStatus === "published" ? Colors.green : Colors.yellow,
+                border: `1px solid ${courseStatus === "published" ? Colors.green : Colors.yellow}`,
+              }}
+            >
+              {courseStatus === "draft" && <Clock className="h-3 w-3" />}
+              {courseStatus === "published" && <Globe className="h-3 w-3" />}
+              <span>{courseStatus === "draft" ? "Draft" : "Published"}</span>
+            </div>
+          </div>
 
-            <div className="flex items-center gap-2 text-sm">
-              {courseStatus === "draft" && (
-                <>
-                  <Clock className="h-4 w-4" style={{ color: Colors.yellow }} />
-                  <span style={{ color: Colors.yellow }}>In Development</span>
-                </>
+          {/* Toggle Switch - Clickable Card */}
+          <div
+            onClick={() => {
+              const newStatus =
+                courseStatus === "draft" ? "published" : "draft";
+              setCourseStatus(newStatus);
+              setHasUnsavedChanges(true);
+            }}
+            className="cursor-pointer"
+          >
+            <div
+              className="flex items-center justify-between w-full p-4 rounded-lg border transition-all hover:shadow-md"
+              style={{
+                backgroundColor:
+                  courseStatus === "published"
+                    ? "rgba(34, 197, 94, 0.05)"
+                    : Colors.textInputBg,
+                borderColor:
+                  courseStatus === "published" ? Colors.green : Colors.gray600,
+                borderWidth: courseStatus === "published" ? "2px" : "1px",
+              }}
+            >
+              <div className="flex items-center gap-3">
+                {/* Toggle Switch */}
+                <div
+                  className="relative w-12 h-6 rounded-full transition-colors"
+                  style={{
+                    backgroundColor:
+                      courseStatus === "published"
+                        ? Colors.green
+                        : Colors.gray600,
+                  }}
+                >
+                  <div
+                    className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-in-out"
+                    style={{
+                      transform:
+                        courseStatus === "published"
+                          ? "translateX(24px)"
+                          : "translateX(0)",
+                    }}
+                  />
+                </div>
+
+                {/* Text */}
+                <div>
+                  <div
+                    className="font-medium text-sm"
+                    style={{ color: Colors.textPrimary }}
+                  >
+                    {courseStatus === "published" ? "Published" : "Draft"}
+                  </div>
+                  <div
+                    className="text-xs"
+                    style={{ color: Colors.textSecondary }}
+                  >
+                    {courseStatus === "draft"
+                      ? "Hidden from students"
+                      : "Visible to students"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Icon */}
+              {courseStatus === "draft" ? (
+                <Clock className="h-5 w-5" style={{ color: Colors.yellow }} />
+              ) : (
+                <Globe className="h-5 w-5" style={{ color: Colors.green }} />
               )}
-              {courseStatus === "published" && (
+            </div>
+          </div>
+
+          {/* Info Box */}
+          <div
+            className="mt-3 p-3 rounded-lg text-xs"
+            style={{
+              backgroundColor:
+                courseStatus === "published"
+                  ? "rgba(34, 197, 94, 0.05)"
+                  : "rgba(251, 191, 36, 0.05)",
+              borderLeft: `3px solid ${courseStatus === "published" ? Colors.green : Colors.yellow}`,
+            }}
+          >
+            <div className="flex items-start gap-2">
+              {courseStatus === "draft" ? (
                 <>
-                  <Globe className="h-4 w-4" style={{ color: Colors.green }} />
-                  <span style={{ color: Colors.green }}>Live & Available</span>
+                  <Clock
+                    className="h-4 w-4 flex-shrink-0 mt-0.5"
+                    style={{ color: Colors.yellow }}
+                  />
+                  <div style={{ color: Colors.textSecondary }}>
+                    <p className="font-medium mb-1">Development Mode</p>
+                    <p>
+                      Your course is in draft mode. Students cannot see or
+                      enroll in this course. Click to publish when ready.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Globe
+                    className="h-4 w-4 flex-shrink-0 mt-0.5"
+                    style={{ color: Colors.green }}
+                  />
+                  <div style={{ color: Colors.textSecondary }}>
+                    <p className="font-medium mb-1">Live Course</p>
+                    <p>
+                      Your course is published and visible to all students. They
+                      can browse, enroll, and start learning.
+                    </p>
+                  </div>
                 </>
               )}
             </div>
-
-            <p style={{ color: Colors.textSecondary }} className="text-xs">
-              {courseStatus === "draft" &&
-                "Course is in development and not visible to students"}
-              {courseStatus === "published" &&
-                "Course is live and available to students"}
-            </p>
           </div>
         </div>
 

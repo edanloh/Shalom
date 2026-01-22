@@ -27,11 +27,12 @@ export const CourseBuilderHeader = () => {
 
   const handleSave = async () => {
     showModal({
-      title: 'Save Course?',
-      message: 'Are you sure you want to save your changes? This will update the course for all students.',
-      type: 'warning',
-      confirmText: 'Save Changes',
-      cancelText: 'Cancel',
+      title: "Save Course?",
+      message:
+        "Are you sure you want to save your changes? This will update the course for all students.",
+      type: "warning",
+      confirmText: "Save Changes",
+      cancelText: "Cancel",
       showCancel: true,
       onConfirm: async () => {
         try {
@@ -43,37 +44,64 @@ export const CourseBuilderHeader = () => {
 
           // Call saveCourse - it will handle category changes internally
           const result = await saveCourse();
+          // Check for validation errors
+          if (
+            !result.success &&
+            result.validationErrors &&
+            result.validationErrors.length > 0
+          ) {
+            showModal({
+              title: "Save Failed",
+              message: (
+                <div style={{ textAlign: "left" }}>
+                  {/* Each error on its own line */}
+                  {result.validationErrors.map((error, index) => (
+                    <div key={index} style={{ marginBottom: "8px" }}>
+                      <span style={{ color: "#EF4444" }}></span> {error}
+                    </div>
+                  ))}
+                </div>
+              ),
+              type: "error",
+              confirmText: "OK",
+              showCancel: false,
+            });
+            return; 
+          }
 
           // Handle result
-          if (result.success) {            
+          if (result.success) {
             showModal({
-              title: 'Success!',
-              message: 'Course saved successfully!',
-              type: 'success',
-              confirmText: 'OK',
+              title: "Success!",
+              message: "Course saved successfully!",
+              type: "success",
+              confirmText: "OK",
               showCancel: false,
               onConfirm: () => {
                 if (result.courseId) {
                   navigate(`/course/${result.courseId}`);
                 }
-              }
+              },
             });
           } else {
             showModal({
-              title: 'Save Failed',
-              message: result.message || 'Failed to save course. Please try again.',
-              type: 'error',
-              confirmText: 'OK',
+              title: "Save Failed",
+              message:
+                result.message || "Failed to save course. Please try again.",
+              type: "error",
+              confirmText: "OK",
               showCancel: false,
             });
           }
         } catch (error) {
-          console.error('Error in save process:', error);
+          console.error("Error in save process:", error);
           showModal({
-            title: 'Save Failed',
-            message: error?.message || 'An unexpected error occurred. Please try again.',
-            type: 'error',
-            confirmText: 'OK',
+            title: "Save Failed",
+            message:
+              error?.message ||
+              "An unexpected error occurred. Please try again.",
+            type: "error",
+            confirmText: "OK",
             showCancel: false,
           });
         }
