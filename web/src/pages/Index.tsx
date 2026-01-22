@@ -23,7 +23,8 @@ import { useAuth } from "@/contexts/AuthContext";
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const defaultUserId = user?.id || '550e8400-e29b-41d4-a716-446655440201';
+  // const defaultUserId = user?.id || '550e8400-e29b-41d4-a716-446655440201';
+  const defaultUserId = '550e8400-e29b-41d4-a716-446655440201';
 
   // State for API data
   const [courses, setCourses] = useState<any[]>([]);

@@ -4,63 +4,89 @@ import {
   useState,
   useEffect,
   ReactNode,
-} from "react";
+} from 'react';
 
-import { AuthTokens, User, AuthContextType } from "@/types";
-import { parseJwt } from "../lib/utils";
-import { AUTH_STORAGE_KEY } from "@/env";
+import { supabase } from '@/lib/supabase';
+
+interface SupabaseUser {
+  id: string;
+  email: string;
+  [key: string]: any;
+}
+
+interface AuthContextType {
+  user: SupabaseUser | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [tokens, setTokens] = useState<AuthTokens | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore tokens from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setTokens(parsed);
-        // Optionally decode JWT for user info
-        setUser(parseJwt(parsed.IdToken));
-      } catch {
-        // Failed to parse stored tokens, ignore and continue
+    const getSession = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUser({ id: "550e8400-e29b-41d4-a716-446655440105", email: data.user.email, ...data.user });
+        // setUser({ id: data.user.id, email: data.user.email, ...data.user });
+      } else {
+        setUser(null);
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+    getSession();
+    // Listen for auth state changes
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) {
+          setUser({
+            id: "550e8400-e29b-41d4-a716-446655440105",
+            // id: session.user.id,
+            email: session.user.email,
+            ...session.user,
+          });
+        } else {
+          setUser(null);
+        }
+      },
+    );
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
   }, []);
 
-  // Store tokens in localStorage when set
-  useEffect(() => {
-    if (tokens) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(tokens));
-      setUser(parseJwt(tokens.IdToken));
-    } else {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-      setUser(null);
-    }
-  }, [tokens]);
-
-  const login = (newTokens: AuthTokens) => {
-    setTokens(newTokens);
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+    if (data?.user)
+      setUser({ id: "550e8400-e29b-41d4-a716-446655440105", email: data.user.email, ...data.user });
+      // setUser({ id: data.user.id, email: data.user.email, ...data.user });
+    setIsLoading(false);
   };
 
-  const logout = () => {
-    setTokens(null);
+  const logout = async () => {
+    setIsLoading(true);
+    await supabase.auth.signOut();
     setUser(null);
-    // Optionally redirect to login page
-    window.location.href = "/login";
+    setIsLoading(false);
+    window.location.href = '/login';
   };
 
   return (
     <AuthContext.Provider
       value={{
-        tokens,
         user,
-        isAuthenticated: !!tokens,
+        isAuthenticated: !!user,
         isLoading,
         login,
         logout,
@@ -73,6 +99,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 };

@@ -1,149 +1,46 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
-import {
-  CognitoIdentityProviderClient,
-  InitiateAuthCommand,
-  RespondToAuthChallengeCommand,
-} from "@aws-sdk/client-cognito-identity-provider";
-
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { COGNITO_CLIENT_ID, COGNITO_REGION } from "@/env";
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [tokens, setTokens] = useState(null);
-  const [challenge, setChallenge] = useState<null | {
-    session: string;
-    username: string;
-  }>(null);
-  const [newPassword, setNewPassword] = useState("");
+  const [error, setError] = useState('');
 
   const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   React.useEffect(() => {
     // Only redirect if auth check is complete and user is authenticated
     if (!isLoading && isAuthenticated) {
-      navigate("/", { replace: true });
+      navigate('/', { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setError('');
     try {
-      console.log("🔐 Login attempt for:", email);
-      console.log("📍 Cognito Region:", COGNITO_REGION);
-      console.log("🆔 Client ID:", COGNITO_CLIENT_ID ? "Set" : "Missing");
-      
-      if (!COGNITO_REGION || !COGNITO_CLIENT_ID) {
-        throw new Error("Cognito configuration is missing. Please check environment variables.");
-      }
-
-      const client = new CognitoIdentityProviderClient({
-        region: COGNITO_REGION,
-      });
-      const command = new InitiateAuthCommand({
-        AuthFlow: "USER_PASSWORD_AUTH",
-        ClientId: COGNITO_CLIENT_ID,
-        AuthParameters: {
-          USERNAME: email,
-          PASSWORD: password,
-        },
-      });
-      console.log("📤 Sending authentication request...");
-      const response = await client.send(command);
-      console.log("📥 Response received:", response.ChallengeName || "Success");
-      if (response.AuthenticationResult) {
-        setTokens(response.AuthenticationResult);
-        login({
-          IdToken: response.AuthenticationResult.IdToken!,
-          AccessToken: response.AuthenticationResult.AccessToken!,
-          RefreshToken: response.AuthenticationResult.RefreshToken,
-        });
-        // Redirect handled by useEffect
-      } else if (response.ChallengeName === "NEW_PASSWORD_REQUIRED") {
-        setChallenge({ session: response.Session!, username: email });
+      await login(email, password);
+      // Redirect handled by useEffect
+    } catch (err: any) {
+      if (err?.message?.includes('Invalid login credentials')) {
+        setError('Incorrect email or password.');
+      } else if (err?.message?.includes('User not found')) {
+        setError('No account found with this email.');
       } else {
-        setError("Authentication failed. Please check your credentials.");
-      }
-    } catch (err: unknown) {
-      console.error("Login error:", err);
-      if (err instanceof Error) {
-        // Check for specific Cognito error codes
-        const errorMessage = err.message || "An error occurred during login.";
-        if (errorMessage.includes("User does not exist")) {
-          setError("No account found with this email.");
-        } else if (errorMessage.includes("Incorrect username or password")) {
-          setError("Incorrect email or password.");
-        } else if (errorMessage.includes("NotAuthorizedException")) {
-          setError("Incorrect email or password.");
-        } else if (errorMessage.includes("UserNotFoundException")) {
-          setError("No account found with this email.");
-        } else if (errorMessage.includes("TooManyRequestsException")) {
-          setError("Too many login attempts. Please try again later.");
-        } else if (errorMessage.includes("NetworkError") || errorMessage.includes("network")) {
-          setError("Network error. Please check your internet connection.");
-        } else {
-          setError(`Login failed: ${errorMessage}`);
-        }
-      } else {
-        setError("An error occurred during login. Please try again.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNewPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!challenge) return;
-    setLoading(true);
-    setError("");
-    try {
-      const client = new CognitoIdentityProviderClient({
-        region: COGNITO_REGION,
-      });
-      const command = new RespondToAuthChallengeCommand({
-        ClientId: COGNITO_CLIENT_ID,
-        ChallengeName: "NEW_PASSWORD_REQUIRED",
-        Session: challenge.session,
-        ChallengeResponses: {
-          USERNAME: challenge.username,
-          NEW_PASSWORD: newPassword,
-        },
-      });
-      const response = await client.send(command);
-      if (response.AuthenticationResult) {
-        setTokens(response.AuthenticationResult);
-        setChallenge(null);
-        setNewPassword("");
-        login({
-          IdToken: response.AuthenticationResult.IdToken!,
-          AccessToken: response.AuthenticationResult.AccessToken!,
-          RefreshToken: response.AuthenticationResult.RefreshToken,
-        });
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(
-          err.message || "An error occurred while setting new password."
-        );
-      } else {
-        setError("An error occurred while setting new password.");
+        setError(err?.message || 'Login failed. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -167,78 +64,45 @@ const Login = () => {
             Sign in to Shalom
           </CardTitle>
           <CardDescription className="text-center">
-            {challenge
-              ? "Set a new password to continue"
-              : "Enter your email and password"}
+            Enter your email and password
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {challenge ? (
-            <form className="space-y-4" onSubmit={handleNewPassword}>
-              <Input
-                type="password"
-                placeholder="New Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                autoFocus
-              />
-              {error && (
-                <div className="text-sm text-destructive text-center">
-                  {error}
-                </div>
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+            />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            {error && (
+              <div className="text-sm text-destructive text-center">
+                {error}
+              </div>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              variant="default"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+              ) : (
+                'Sign In'
               )}
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                variant="default"
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-                ) : (
-                  "Set New Password"
-                )}
-              </Button>
-            </form>
-          ) : (
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoFocus
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              {error && (
-                <div className="text-sm text-destructive text-center">
-                  {error}
-                </div>
-              )}
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                variant="default"
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-                ) : (
-                  "Sign In"
-                )}
-              </Button>
-            </form>
-          )}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>
