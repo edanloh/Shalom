@@ -88,30 +88,27 @@ jobs:
         run: eas --version
         working-directory: mobile
 
-      # - name: 📋 Fix package.json main entry
-      #   run: |
-      #     sudo apt-get update && sudo apt-get install -y jq
-      #     cp package.json package.json.bak
-      #     jq '.main = "node_modules/expo/AppEntry.js"' package.json > tmp.json && mv tmp.json package.json
-      #   working-directory: mobile
-
       - name: 📱 Build Development Android APK
-        if: github.event.inputs.buildType == 'all' || github.event.inputs.buildType == 'dev' || github.event_name == 'push'
+        working-directory: mobile
         run: |
+          # Fix the permission issue for the pre-install script
+          chmod +x eas-pre-install.sh
+          
           export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
+          
           eas build \
             --platform android \
             --profile development \
             --local \
             --non-interactive \
-            --output=app-dev.apk
+            --output=../app-dev.apk
         env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           NODE_ENV: development
-        working-directory: mobile
 
       - name: 📦 Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-dev-apk
-          path: mobile/app-dev.apk
+          path: app-dev.apk
           retention-days: 7

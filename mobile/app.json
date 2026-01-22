@@ -48,7 +48,8 @@
     },
     "android": {
       "package": "com.jasmine02.shalom",
-      "permissions": ["POST_NOTIFICATIONS"]
+      "permissions": ["POST_NOTIFICATIONS"],
+      "googleServicesFile": "./google-services.json"
     },
     "runtimeVersion": {
       "policy": "appVersion"
