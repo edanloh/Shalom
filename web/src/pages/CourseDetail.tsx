@@ -35,13 +35,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import {
-  courseService,
-  Course,
-  Module,
-  Review,
-  Student,
-} from "@/services";
+import { courseService, Course, Module, Review, Student } from "@/services";
 
 const CourseDetail = () => {
   const { courseId } = useParams();
@@ -355,7 +349,7 @@ const CourseDetail = () => {
 
     try {
       setIsEnrolling(true);
-      
+
       // Enroll students in parallel
       await Promise.all(
         selectedStudents.map((studentId) =>
@@ -365,7 +359,7 @@ const CourseDetail = () => {
 
       toast({
         title: "Success!",
-        description: `${selectedStudents.length} student${selectedStudents.length > 1 ? 's' : ''} enrolled successfully`,
+        description: `${selectedStudents.length} student${selectedStudents.length > 1 ? "s" : ""} enrolled successfully`,
       });
 
       // Reset selection and close dialog
@@ -673,18 +667,14 @@ const CourseDetail = () => {
                     {/* Rating Breakdown */}
                     <div className="space-y-3">
                       {[5, 4, 3, 2, 1].map((rating) => {
-                        // Mock data for rating distribution
-                        const distribution: Record<number, number> = {
-                          5: 65,
-                          4: 20,
-                          3: 10,
-                          2: 3,
-                          1: 2,
-                        };
-                        const percentage = distribution[rating];
-                        const count = Math.round(
-                          (course.totalRatings * percentage) / 100,
-                        );
+                        // Calculate actual rating distribution from reviews
+                        const count = reviews.filter(
+                          (review) => Math.round(review.rating) === rating,
+                        ).length;
+                        const percentage =
+                          course.totalRatings > 0
+                            ? Math.round((count / course.totalRatings) * 100)
+                            : 0;
 
                         return (
                           <div
@@ -704,7 +694,7 @@ const CourseDetail = () => {
                               />
                             </div>
                             <span className="text-sm text-muted-foreground w-10 text-right">
-                              {percentage}%
+                              {count}
                             </span>
                           </div>
                         );

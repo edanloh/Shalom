@@ -19,7 +19,6 @@ import { ActionButton, Screen } from '@/components';
 // components (values)
 import ProfileHeader from '../components/home/ProfileHeader';
 import ProgressSection from '../components/home/ProgressSection';
-import SwipeableCourseCards from '../components/home/SwipeableCourseCards';
 import CourseCard from '../components/home/CourseCard';
 
 // Import hooks and types
@@ -364,41 +363,6 @@ export default function HomeScreen({ navigation, route }: any) {
     navigation.navigate('Wishlist');
   };
 
-  // Handle course actions for swipeable cards
-  const handleCourseComplete = (courseId: string) => {
-    console.log('Course marked as completed:', courseId);
-    if (user?.id) {
-      creditService
-        .recordCreditEvent({
-          userId: user.id,
-          type: 'course_completed',
-          title: 'Course completed',
-          points: 120,
-          courseId,
-        })
-        .then(() =>
-          showToast({
-            title: 'Credits earned',
-            message: '+120 for completing a course',
-            type: 'success',
-          })
-        )
-        .catch((err) => {
-          console.warn('Failed to record course credit', err);
-          showToast({
-            title: 'Unable to record credits',
-            message: 'Something unexpected happened. Please try again later.',
-            type: 'error',
-          });
-        });
-    }
-    // TODO: Update course completion status via API
-  };
-
-  const handleCourseLike = (courseId: string) => {
-    console.log('Course liked/continued:', courseId);
-    // TODO: Update course like status or mark as in-progress via API
-  };
 
   const handleRecommendationClick = async (course: Course) => {
     if (user?.id) {
@@ -518,13 +482,6 @@ export default function HomeScreen({ navigation, route }: any) {
               </View>
             ) : (
               <>
-              {/* <SwipeableCourseCards 
-                courses={myCoursesData}
-                onCourseComplete={handleCourseComplete}
-                onCourseLike={handleCourseLike}
-                onToggleWishlist={toggleWishlist}
-                isWishlisted={(id) => isWishlisted?.(id) ?? false}
-              /> */}
               <CourseCarousel
                 courses={getTop10Courses(myCoursesData)}
                 // onCourseLike={(courseId: string) => {console.log("Liked" + courseId)}}

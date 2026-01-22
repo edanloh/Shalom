@@ -21,11 +21,11 @@ const CACHE_CONFIG = {
 
 // Course service endpoints - Supabase Edge Functions
 const ENDPOINTS = {
-  COURSES: '/getAllCourse', // Maps to getAllCourse.mjs
-  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, // Maps to getUserEnrollment.mjs
-  COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, // Maps to getModuleDetail.mjs
-  COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, // Maps to courseReviewHandler
-  POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, // Maps to postUserEnrollment.mjs
+  COURSES: '/getAllPublishedCourse', 
+  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, 
+  COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, 
+  COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, 
+  POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, 
   RECOMMENDATIONS: '/getRecommendations',
   RECOMMENDATION_EVENT: '/postRecommendationEvent',
 };
@@ -33,7 +33,7 @@ const ENDPOINTS = {
 
 // Wishlist endpoints - Supabase Edge Functions
 const WISHLIST = {
-  BASE: (uid: string) => `/wishlistHandler/${encodeURIComponent(uid)}`, // Maps to wishlistHandler.mjs
+  BASE: (uid: string) => `/wishlistHandler/${encodeURIComponent(uid)}`,
   ITEM: (uid: string, courseId: string) =>
     `/wishlistHandler/${encodeURIComponent(uid)}?courseId=${encodeURIComponent(courseId)}`,
 };

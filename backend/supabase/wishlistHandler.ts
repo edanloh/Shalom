@@ -110,7 +110,7 @@ serve(async (req) => {
         .from('course_wishlist')
         .select(`
           created_at,
-          courses (
+          courses!inner ( 
             id,
             title,
             description,
@@ -122,6 +122,7 @@ serve(async (req) => {
             total_ratings,
             student_count,
             tags,
+            is_published,
             categories (
               name,
               color
@@ -129,6 +130,7 @@ serve(async (req) => {
           )
         `)
         .eq('user_id', userId)
+        .eq('courses.is_published', true) 
         .order('created_at', { ascending: false });
 
       if (wishlistError) throw wishlistError;
@@ -176,10 +178,11 @@ serve(async (req) => {
         .from('courses')
         .select('id')
         .eq('id', courseIdQueryParam)
+        .eq('is_published', true)
         .single();
 
       if (courseError || !course) {
-        return notFound("Course not found");
+        return notFound("Course not found or not published");
       }
 
       // Check if already in wishlist
