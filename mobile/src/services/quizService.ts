@@ -32,6 +32,7 @@ export interface QuizQuestion {
   options: QuizOption[];
   explanation?: string;
   points: number;
+  correct_answer?: string;
   image_url?: string; // Optional question image
 }
 
@@ -58,7 +59,11 @@ interface BackendQuizDetailResponse {
     userAttempts: Array<{
       attempt_number: number;
       score: number;
+      total_questions?: number;
+      correct_answers?: number;
+      time_taken_minutes?: number | null;
       is_passed: boolean;
+      answers?: Record<string, string> | null;
       completed_at: string;
     }>;
   };
@@ -87,7 +92,11 @@ export interface QuizDetailResponse {
     userAttempts: Array<{
       attempt_number: number;
       score: number;
+      total_questions?: number;
+      correct_answers?: number;
+      time_taken_minutes?: number | null;
       is_passed: boolean;
+      answers?: Record<string, string> | null;
       completed_at: string;
     }>;
   };
@@ -140,6 +149,7 @@ class QuizService {
       })),
       explanation: backendQuestion.explanation,
       points: backendQuestion.points,
+      correct_answer: backendQuestion.correct_answer,
     };
   }
 
