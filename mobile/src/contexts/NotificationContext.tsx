@@ -3,7 +3,7 @@ import { Platform, Alert, DeviceEventEmitter } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
-import { useAuth } from "./AuthContext";
+import { useUser } from "./UserContext";
 import notificationService from "../services/notificationService";
 import { CREDIT_EVENT_CHANNEL } from "../services/creditService";
 import { TOAST_CHANNEL, showToast, type ToastPayload } from "../components/common/Toast";
@@ -146,6 +146,7 @@ interface NotificationContextType {
   markAllNotificationsRead: () => Promise<void>;
   clearNotifications: () => Promise<void>;
   deleteNotification: (id: string) => void;
+  requestAndRegisterPushToken: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -164,6 +165,7 @@ const NotificationContext = createContext<NotificationContextType>({
   markAllNotificationsRead: async () => {},
   clearNotifications: async () => {},
   deleteNotification: () => {},
+  requestAndRegisterPushToken: async () => {},
 });
 
 export const NotificationProvider = ({
@@ -171,7 +173,7 @@ export const NotificationProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const { user } = useAuth();
+  const { user } = useUser();
   const [expoPushToken, setExpoPushToken] = useState("");
   const [notification, setNotification] = useState<
     Notifications.Notification | undefined
@@ -198,7 +200,7 @@ export const NotificationProvider = ({
   }, [user, expoPushToken]);
 
   const reloadNotifications = async () => {
-    if (!user?.id) {
+    if (!user?.uuid) {
       setInAppNotifications([]);
       setHasMoreNotifications(false);
       setNextOffset(0);
@@ -208,7 +210,7 @@ export const NotificationProvider = ({
     }
     try {
       setIsLoadingNotifications(true);
-      const items = await notificationService.getNotifications(user.id, {
+      const items = await notificationService.getNotifications(user.uuid, {
         limit: NOTIFICATION_PAGE_SIZE,
         offset: 0,
       });
@@ -243,14 +245,15 @@ export const NotificationProvider = ({
 
   useEffect(() => {
     reloadNotifications();
-  }, [user?.id]);
+  }, [user?.uuid]);
 
   const loadMoreNotifications = async () => {
-    if (!user?.id || isLoadingMoreNotifications || !hasMoreNotifications) return;
+    if (!user?.uuid || isLoadingMoreNotifications || !hasMoreNotifications)
+      return;
     try {
       setIsLoadingMoreNotifications(true);
       const startOffset = nextOffset;
-      const items = await notificationService.getNotifications(user.id, {
+      const items = await notificationService.getNotifications(user.uuid, {
         limit: NOTIFICATION_PAGE_SIZE,
         offset: startOffset,
       });
@@ -271,18 +274,20 @@ export const NotificationProvider = ({
     }
   };
 
-  // Register for push notifications
-  useEffect(() => {
-    registerForPushNotificationsAsync()
-      .then(async (token) => {
-        setExpoPushToken(token ?? "");
-        // Store token in SecureStore for logout cleanup
-        if (token) {
-          await SecureStore.setItemAsync("@expo_push_token", token);
-        }
-      })
-      .catch((error: any) => setExpoPushToken(`${error}`));
+  // Expose a function to request and register push token on demand
+  const requestAndRegisterPushToken = async () => {
+    const token = await registerForPushNotificationsAsync();
+    setExpoPushToken(token ?? "");
+    if (token) {
+      await SecureStore.setItemAsync("@expo_push_token", token);
+      if (user && !token.includes("error")) {
+        await registerTokenWithBackend();
+      }
+    }
+  };
 
+  // Only set up notification listeners on mount
+  useEffect(() => {
     const notificationListener = Notifications.addNotificationReceivedListener(
       (notification) => {
         setNotification(notification);
@@ -316,8 +321,8 @@ export const NotificationProvider = ({
     input: Omit<InAppNotification, "id" | "userId" | "createdAt"> &
       Partial<Pick<InAppNotification, "createdAt">>
   ) => {
-    if (!input?.message || !input?.title || !user?.id) return;
-    const userId = user.id;
+    if (!input?.message || !input?.title || !user?.uuid) return;
+    const userId = user.uuid;
     const optimistic: InAppNotification = {
       id: `local_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       userId,
@@ -370,15 +375,15 @@ export const NotificationProvider = ({
           payload.type === "success"
             ? "achievement"
             : payload.type === "error"
-            ? "system"
-            : "system";
+              ? "system"
+              : "system";
         const notificationTitle =
           payload.title ||
           (payload.type === "success"
             ? "Success"
             : payload.type === "error"
-            ? "Error"
-            : "Update");
+              ? "Error"
+              : "Update");
         pushInAppNotification({
           title: notificationTitle,
           message: payload.message,
@@ -400,29 +405,29 @@ export const NotificationProvider = ({
   }, [reloadNotifications, user?.id]);
 
   const registerTokenWithBackend = async () => {
-    if (!user?.id || !expoPushToken) return;
+    if (!user?.uuid || !expoPushToken) return;
 
     try {
-      await notificationService.registerPushToken(user.id, expoPushToken);
-      console.log("Push token registered with backend for user:", user.id);
+      await notificationService.registerPushToken(user.uuid, expoPushToken);
+      console.log("Push token registered with backend for user:", user.uuid);
     } catch (error) {
       console.error("Failed to register push token with backend:", error);
     }
   };
 
   const removeTokenFromBackend = async () => {
-    if (!user?.id || !expoPushToken) return;
+    if (!user?.uuid || !expoPushToken) return;
 
     try {
-      await notificationService.removePushToken(user.id, expoPushToken);
-      console.log("Push token removed from backend for user:", user.id);
+      await notificationService.removePushToken(user.uuid, expoPushToken);
+      console.log("Push token removed from backend for user:", user.uuid);
     } catch (error) {
       console.error("Failed to remove push token from backend:", error);
     }
   };
 
   const markNotificationRead = (id: string, userIdOverride?: string) => {
-    const userId = userIdOverride || user?.id;
+    const userId = userIdOverride || user?.uuid;
     if (!userId) return;
     setInAppNotifications((prev) =>
       prev.map((item) => (item.id === id ? { ...item, read: true } : item))
@@ -435,8 +440,8 @@ export const NotificationProvider = ({
   };
 
   const markAllNotificationsRead = async () => {
-    if (!user?.id) return;
-    const userId = user.id;
+    if (!user?.uuid) return;
+    const userId = user.uuid;
     setInAppNotifications((prev) =>
       prev.map((item) => (item.read ? item : { ...item, read: true }))
     );
@@ -449,8 +454,8 @@ export const NotificationProvider = ({
   };
 
   const clearNotifications = async () => {
-    if (!user?.id) return;
-    const userId = user.id;
+    if (!user?.uuid) return;
+    const userId = user.uuid;
     setInAppNotifications([]);
     try {
       await notificationService.clearNotifications(userId);
@@ -461,8 +466,8 @@ export const NotificationProvider = ({
   };
 
   const deleteNotification = (id: string) => {
-    if (!user?.id) return;
-    const userId = user.id;
+    if (!user?.uuid) return;
+    const userId = user.uuid;
     setInAppNotifications((prev) => prev.filter((item) => item.id !== id));
     if (id.startsWith("local_")) return;
     notificationService.deleteNotification(userId, id).catch((error) => {
@@ -489,6 +494,7 @@ export const NotificationProvider = ({
         markAllNotificationsRead,
         clearNotifications,
         deleteNotification,
+        requestAndRegisterPushToken,
       }}
     >
       {children}

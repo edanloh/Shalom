@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { courseDetailService, ProcessedCourseDetail, CourseModule } from '../ser
 import type { MainStackParamList } from '../types/navigation';
 import { ImageWithFallback } from '../components/common';
 import * as Haptics from 'expo-haptics';
-import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
 import { courseService } from '../services/courseService';
 import creditService from '../services/creditService';
 import { moduleService, ModuleDetailResponse, UserProgress, CourseSection } from '../services/moduleService';
@@ -43,8 +43,8 @@ export default function CourseDetailScreen({
   const [courseContent, setCourseContent] = useState<CourseContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user } = useUser();
+  const userId = user?.uuid;
   const fallbackUserId =
     process.env.EXPO_PUBLIC_DEFAULT_USER_ID || "550e8400-e29b-41d4-a716-446655440101";
   const effectiveUserId = userId || fallbackUserId;

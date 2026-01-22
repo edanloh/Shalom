@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '../contexts/NotificationContext';
 import {
   View,
   Text,
@@ -17,6 +18,8 @@ import CustomModal from "../components/common/CustomModal";
 import externalStyles from '../styles/styles';
 
 export default function SettingsScreen({ navigation }: any) {
+  const { expoPushToken, reloadNotifications, requestAndRegisterPushToken } =
+    useNotification();
   const [settings, setSettings] = useState({
     courseUpdates: true,
     achievements: true,
@@ -69,7 +72,13 @@ export default function SettingsScreen({ navigation }: any) {
         pushNotifications: newStatus === "granted",
       }));
 
-      if (newStatus !== "granted") {
+      if (newStatus === 'granted') {
+        // Immediately trigger push token registration
+        if (typeof requestAndRegisterPushToken === 'function') {
+          requestAndRegisterPushToken();
+        }
+        // Optionally, you can also show a toast or feedback here
+      } else {
         Alert.alert(
           "Permission Denied",
           "Please enable notifications in your device settings to receive updates.",
@@ -102,18 +111,18 @@ export default function SettingsScreen({ navigation }: any) {
 
   const accountItems = [
     {
-    key: 'editProfile',
-    icon: 'person-outline' as const,
-    title: 'Edit Profile',
-    subtitle: 'Update your personal information',
-    onPress: () => navigation.navigate('EditProfile'),
+      key: 'editProfile',
+      icon: 'person-outline' as const,
+      title: 'Edit Profile',
+      subtitle: 'Update your personal information',
+      onPress: () => navigation.navigate('EditProfile'),
     },
     {
-    key: 'privacy',
-    icon: 'shield-checkmark-outline' as const,
-    title: 'Privacy & Security',
-    subtitle: 'Manage your privacy settings',
-    onPress: () => console.log('Privacy & Security'),
+      key: 'privacy',
+      icon: 'shield-checkmark-outline' as const,
+      title: 'Privacy & Security',
+      subtitle: 'Manage your privacy settings',
+      onPress: () => console.log('Privacy & Security'),
     },
     {
       key: 'changePassword',
@@ -126,24 +135,24 @@ export default function SettingsScreen({ navigation }: any) {
 
   const supportItems = [
     {
-    key: 'help',
-    icon: 'help-circle-outline' as const,
-    title: 'Help & Support',
-    subtitle: 'Get help and contact support',
+      key: 'help',
+      icon: 'help-circle-outline' as const,
+      title: 'Help & Support',
+      subtitle: 'Get help and contact support',
     onPress: () => setActiveModal("help"),
     },
     {
-    key: 'terms',
-    icon: 'document-text-outline' as const,
-    title: 'Terms & Conditions',
-    subtitle: 'Read our terms of service',
+      key: 'terms',
+      icon: 'document-text-outline' as const,
+      title: 'Terms & Conditions',
+      subtitle: 'Read our terms of service',
     onPress: () => setActiveModal("terms"),
     },
     {
-    key: 'about',
-    icon: 'information-circle-outline' as const,
-    title: 'About',
-    subtitle: 'App version and information',
+      key: 'about',
+      icon: 'information-circle-outline' as const,
+      title: 'About',
+      subtitle: 'App version and information',
     onPress: () => setActiveModal("about"),
     },
   ];

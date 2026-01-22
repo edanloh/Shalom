@@ -61,6 +61,7 @@ export const notificationService = {
    * Maps to pushNotificationHandler.mjs Lambda function
    */
   async registerPushToken(userId: string, pushToken: string) {
+    console.log("Registering push token for user:", userId, pushToken);
     try {
       const response = await apiService.post("/pushNotificationHandler/register", {
         userId,
