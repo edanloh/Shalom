@@ -3,7 +3,8 @@
  * Updated to work with Supabase endpoints
  */
 
-import { Course, AWSApiResponse, AWSCoursesResponse, AWSCourse } from '../types';
+import { Colors } from '@/constants';
+import { Course } from '../types';
 import apiService from './apiService';
 import * as SecureStore from 'expo-secure-store';
 
@@ -16,6 +17,7 @@ const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID || '550e8400-e29
 // Cache configuration
 const CACHE_CONFIG = {
   COURSES_KEY: 'cached_courses',
+  CATEGORIES_KEY: 'cached_categories',
   CACHE_DURATION: 5 * 60 * 1000, // 5 minutes in milliseconds
 };
 
@@ -26,6 +28,7 @@ const ENDPOINTS = {
   COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, 
   COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, 
   POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, 
+  CATEGORIES: '/categoryHandler',
   RECOMMENDATIONS: '/getRecommendations',
   RECOMMENDATION_EVENT: '/postRecommendationEvent',
 };
@@ -160,12 +163,29 @@ export interface AddReviewApiResponse {
   data?: CourseReview;
 }
 
-// services/courseService.ts
 export interface UpdateReviewPayload {
   userId: string;
   rating: number;
   review: string;
   isAnonymous?: boolean;
+}
+
+// Category types
+export interface Category {
+  id: string;
+  name: string;
+  color: string;
+  course_count: number;
+  created_at: string;
+}
+
+export interface CategoryApiResponse {
+  success: boolean;
+  data: Category[];
+  meta: {
+    timestamp: string;
+    count: number;
+  };
 }
 
 // Cache utility functions
@@ -238,7 +258,7 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
     if (!name) return 'https://via.placeholder.com/50x50';
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=50&background=3B82F6&color=fff`;
   };
-  
+
   return {
     id: String(awsCourse.courseid || awsCourse.id || 'unknown'),
     title: awsCourse.title || 'Untitled Course',
@@ -264,6 +284,7 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
       awsCourse.image ||
       'https://via.placeholder.com/400x250',
     category: awsCourse.category_name || 'General',
+    categoryColor: awsCourse.category_color || Colors.categoryDefault,
     level: mapLevel(awsCourse.level),
     modules: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
     tags: Array.isArray(awsCourse.tags) ? awsCourse.tags : [],
@@ -275,79 +296,39 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   };
 };
 
-// Helper function to convert enrollment data to Course format
-// const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
-//   // Use section counts if available (after backend redeploy), otherwise calculate from items
-//   const totalSections = enrollment.total_sections || 0;
-//   const completedSections = enrollment.completed_sections || 0;
-  
-//   // Calculate from video/quiz data for accurate item-level tracking
-//   const totalVideos = parseInt(enrollment.total_videos) || 0;
-//   const completedVideos = parseInt(enrollment.completed_videos) || 0;
-//   const totalQuizzes = parseInt(enrollment.total_quizzes) || 0;
-//   const passedQuizzes = parseInt(enrollment.passed_quizzes) || 0;
-  
-//   const totalItems = totalVideos + totalQuizzes;
-//   const completedItems = completedVideos + passedQuizzes;
-  
-//   // Calculate progress percentage from actual completion data
-//   // Don't trust the API's progress_percentage as it may be stale
-//   const calculatedPercentage = totalItems > 0 
-//     ? Math.round((completedItems / totalItems) * 100) 
-//     : 0;
-  
-//   // For display counts, use section counts if available, otherwise use item counts
-//   const progressTotal = totalSections > 0 ? totalSections : totalItems;
-//   const progressCompleted = totalSections > 0 ? completedSections : completedItems;
-  
-//   // Generate avatar from instructor name
-//   const generateAvatar = (name: string): string => {
-//     if (!name) return 'https://via.placeholder.com/50x50';
-//     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=50&background=3B82F6&color=fff`;
-//   };
 
-//   // Map level to lowercase format
-//   const mapLevel = (level: string): 'beginner' | 'intermediate' | 'advanced' => {
-//     const levelLower = level?.toLowerCase();
-//     switch (levelLower) {
-//       case 'intermediate': return 'intermediate';
-//       case 'advanced': return 'advanced';
-//       default: return 'beginner';
-//     }
-//   };
+/**
+ * Fetch all categories from the API
+ * @returns Promise<Category[]> - Array of categories
+ */
+export const getAllCategories = async (): Promise<Category[]> => {
+  try {
+    // Check cache first
+    const cached = await CacheManager.get<Category[]>(CACHE_CONFIG.CATEGORIES_KEY);
+    if (cached) {
+      return cached;
+    }
 
-//   return {
-//     id: enrollment.course_id,
-//     title: enrollment.title,
-//     description: enrollment.description,
-//     instructor: {
-//       id: `instructor-${enrollment.instructor_name.replace(/\s+/g, '-').toLowerCase()}`,
-//       name: enrollment.instructor_name,
-//       avatar: enrollment.instructor_avatar || generateAvatar(enrollment.instructor_name),
-//       category: enrollment.category_name,
-//       rating: parseFloat(enrollment.instructor_rating),
-//       bio: `Expert ${enrollment.category_name} instructor`,
-//     },
-//     progress: {
-//       completed: progressCompleted,
-//       total: progressTotal,
-//       percentage: calculatedPercentage,
-//       lastAccessed: enrollment.last_accessed,
-//     },
-//     duration: `${enrollment.duration_hours}h`,
-//     rating: parseFloat(enrollment.rating),
-//     image: enrollment.thumbnail_url,
-//     category: enrollment.category_name,
-//     level: mapLevel(enrollment.level),
-//     modules: progressTotal,
-//     tags: enrollment.tags || [],
-//     prerequisites: [],
-//     outcomes: [],
-//     createdAt: enrollment.enrollment_date,
-//     updatedAt: enrollment.last_accessed,
-//     isWishlisted: Boolean(enrollment.is_in_wishlist),
-//   };
-// };
+    // Fetch from API
+    const response = await apiService.get<CategoryApiResponse>(ENDPOINTS.CATEGORIES);
+    const categories = unwrap<Category[]>(response);
+
+    // Cache the results
+    await CacheManager.set(CACHE_CONFIG.CATEGORIES_KEY, categories);
+
+    return categories;
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    throw error;
+  }
+};
+
+/**
+ * Clear categories cache (useful after category updates)
+ */
+export const clearCategoriesCache = async (): Promise<void> => {
+  await CacheManager.clear(CACHE_CONFIG.CATEGORIES_KEY);
+};
 
 // Helper function to convert enrollment data to Course format
 const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
@@ -374,16 +355,16 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     ? Math.round((progressCompleted / progressTotal) * 100) 
     : 0;
   
-  console.log(`[courseService] Converting enrollment for "${enrollment.title}":`, {
-    hasSectionData,
-    totalSections,
-    completedSections,
-    totalItems,
-    completedItems,
-    progressTotal,
-    progressCompleted,
-    calculatedPercentage,
-  });
+  // console.log(`[courseService] Converting enrollment for "${enrollment.title}":`, {
+  //   hasSectionData,
+  //   totalSections,
+  //   completedSections,
+  //   totalItems,
+  //   completedItems,
+  //   progressTotal,
+  //   progressCompleted,
+  //   calculatedPercentage,
+  // });
   
   // Generate avatar from instructor name
   const generateAvatar = (name: string): string => {
@@ -423,6 +404,7 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     rating: parseFloat(enrollment.rating),
     image: enrollment.thumbnail_url,
     category: enrollment.category_name,
+    categoryColor: enrollment.category_color || Colors.categoryDefault,
     level: mapLevel(enrollment.level),
     modules: progressTotal,
     tags: enrollment.tags || [],
@@ -436,7 +418,7 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
 
 class CourseService {
   /**
-   * Get all courses from AWS API Gateway
+   * Get all courses
    */
   async getCourses(params?: CourseListParams): Promise<Course[]> {
     try {
@@ -459,7 +441,6 @@ class CourseService {
         ENDPOINTS.COURSES,
         queryParams
       );
-
       // Safety check: ensure response exists
       if (!response) {
         throw new Error('No response received from API');
@@ -484,7 +465,7 @@ class CourseService {
         console.error('Invalid API response structure:', JSON.stringify(response).slice(0, 500));
         throw new Error('Invalid API response: courses array not found');
       }
-
+      
       // Convert AWS course format to our app format
       const courses = coursesArray.map(convertAWSCourseToAppCourse);
 

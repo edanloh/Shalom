@@ -484,7 +484,6 @@ export default function HomeScreen({ navigation, route }: any) {
               <>
               <CourseCarousel
                 courses={getTop10Courses(myCoursesData)}
-                // onCourseLike={(courseId: string) => {console.log("Liked" + courseId)}}
                 onToggleWishlist={toggleWishlist}
                 isWishlisted={(id) => isWishlisted?.(id) ?? false}
               />

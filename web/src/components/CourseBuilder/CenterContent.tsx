@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCourseBuilder } from "./CourseBuilderContext";
 import { useContentManagement } from "./useContentManagement";
@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+import StyledPDFViewer from "@/components/pdf/StyledPDFViewer";
 
 /* ------------------------- MODULE EDITOR ------------------------- */
 const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
@@ -54,21 +55,6 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
         />
       </div>
-      {/* <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Status
-        </label>
-        <select
-          value={module?.status || "draft"}
-          onChange={(e) =>
-            updateModule(selectedItem.id, { status: e.target.value })
-          }
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
-        >
-          <option value="published">Published</option>
-          <option value="draft">Draft</option>
-        </select>
-      </div> */}
     </div>
   );
 };
@@ -371,23 +357,10 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
                       >
                         PDF Preview
                       </label>
-                      <div
-                        className="rounded overflow-hidden border"
-                        style={{
-                          borderColor: Colors.gray600,
-                          height: "500px",
-                        }}
-                      >
-                        <iframe
-                          src={`https://docs.google.com/viewer?url=${encodeURIComponent(lesson.resourceUrl)}&embedded=true`} 
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            border: "none",
-                          }}
-                          title="PDF preview"
-                        />
-                      </div>
+                      <StyledPDFViewer 
+                        pdfUrl={lesson.resourceUrl}
+                        title={lesson.baseTitle || "PDF Preview"}
+                      />
                     </div>
                   </>
                 )}
@@ -821,12 +794,6 @@ const QuizEditor = ({
   const questions = quiz?.questions || [];
   const currentQuestion = questions[currentIndex];
 
-  // Debug logging
-  console.log("QuizEditor - Quiz:", quiz?.title);
-  console.log("QuizEditor - Questions:", questions);
-  console.log("QuizEditor - Current Question:", currentQuestion);
-  console.log("QuizEditor - Current Question Text:", currentQuestion?.text);
-
   const handleNext = () => {
     if (currentIndex < questions.length - 1) setCurrentIndex(currentIndex + 1);
   };
@@ -928,14 +895,6 @@ const QuizEditor = ({
           </button>
         </div>
 
-        {/* <button
-          onClick={() => addQuestion(module.id, quiz.id)}
-          className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Question
-        </button> */}
-
         <Button
           onClick={() => {
             addQuestion(module.id, quiz.id);
@@ -951,7 +910,7 @@ const QuizEditor = ({
       {/* Empty State */}
       {!currentQuestion && (
         <div className="text-slate-400 text-center py-8">
-          No questions yet. Click “Add Question” to begin.
+          No questions yet. Click "Add Question" to begin.
         </div>
       )}
 

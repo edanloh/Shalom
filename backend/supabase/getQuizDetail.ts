@@ -136,7 +136,11 @@ serve(async (req) => {
           .select(`
             attempt_number,
             score,
+            total_questions,
+            correct_answers,
+            time_taken_minutes,
             is_passed,
+            answers,
             completed_at
           `)
           .eq('user_id', userId)

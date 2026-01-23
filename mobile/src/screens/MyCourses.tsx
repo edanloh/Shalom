@@ -1,14 +1,28 @@
-import { useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useMyCourses } from '../hooks';
-import { useAuth } from '../contexts/AuthContext';
-import { ImageWithFallback } from '../components/common';
-import { Images } from '../../assets';
-import { Colors, Spacing, TextStyles, BorderRadius, Shadows } from '../constants';
-import type { Course } from '../types';
-import { useCourses } from '../contexts/CourseContext';
-import { ActionButton, Screen } from '@/components';
+import { useMemo, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Dimensions,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useMyCourses } from "../hooks";
+import { useAuth } from "../contexts/AuthContext";
+import { ImageWithFallback } from "../components/common";
+import { Images } from "../../assets";
+import {
+  Colors,
+  Spacing,
+  TextStyles,
+  BorderRadius,
+  Shadows,
+} from "../constants";
+import type { Course } from "../types";
+import { useCourses } from "../contexts/CourseContext";
+import { ActionButton, Screen } from "@/components";
 
 const ProgressBar = ({ percent }: { percent: number }) => {
   const p = Math.max(0, Math.min(100, percent));
@@ -21,45 +35,46 @@ const ProgressBar = ({ percent }: { percent: number }) => {
 
 export default function MyCourses({ navigation }: any) {
   const { user } = useAuth();
-  const { courses, loading, error, refreshing, refresh, retry } = useMyCourses();
+  const { courses, loading, error, refreshing, refresh, retry } =
+    useMyCourses();
   const { wishlist = [], toggleWishlist } = useCourses();
 
-  const wishIds = useMemo(() => new Set(wishlist.map(c => c.id)), [wishlist]);
+  const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
   const isWishlisted = (c: Course) => wishIds.has(c.id);
 
-  useEffect(() => {
-    console.log('MyCourses - Current user from AuthContext:', user);
-    if (user) {
-      console.log('MyCourses - User ID for enrollment fetch:', user.id);
-    }
-  }, [user]);
+  // useEffect(() => {
+  //   console.log("MyCourses - Current user from AuthContext:", user);
+  //   if (user) {
+  //     console.log("MyCourses - User ID for enrollment fetch:", user.id);
+  //   }
+  // }, [user]);
 
   // Filter courses into categories
   const { continueWatching, completed, notStarted } = useMemo(() => {
     const allCourses = courses || [];
-    
+
     // Continue Watching: courses with progress > 0% but < 100%
-    const cw = allCourses.filter(c => {
+    const cw = allCourses.filter((c) => {
       const progress = c.progress?.percentage ?? 0;
       return progress > 0 && progress < 100;
     });
-    
+
     // Completed: courses with 100% progress
-    const comp = allCourses.filter(c => {
+    const comp = allCourses.filter((c) => {
       const progress = c.progress?.percentage ?? 0;
       return progress >= 100;
     });
-    
+
     // Not Started: courses with 0% progress
-    const ns = allCourses.filter(c => (c.progress?.percentage ?? 0) === 0);
-    
-    console.log('MyCourses - Filtered courses:', { 
-      total: allCourses.length, 
-      continueWatching: cw.length, 
+    const ns = allCourses.filter((c) => (c.progress?.percentage ?? 0) === 0);
+
+    console.log("MyCourses - Filtered courses:", {
+      total: allCourses.length,
+      continueWatching: cw.length,
       completed: comp.length,
-      notStarted: ns.length 
+      notStarted: ns.length,
     });
-    
+
     return { continueWatching: cw, completed: comp, notStarted: ns };
   }, [courses]);
 
@@ -70,17 +85,18 @@ export default function MyCourses({ navigation }: any) {
 
   const getModuleLabel = (course: Course): string => {
     const completed = course?.progress?.completed ?? 0;
-    const total     = course?.progress?.total ?? 1;
-    const pct       = course?.progress?.percentage ?? 0;
+    const total = course?.progress?.total ?? 1;
+    const pct = course?.progress?.percentage ?? 0;
 
     const isDone = pct >= 100 || completed >= total;
-    const index  = isDone 
-        ? Math.max(1, Math.min(completed, total))
-        : Math.max(1, Math.min(completed + 1, total));
+    const index = isDone
+      ? Math.max(1, Math.min(completed, total))
+      : Math.max(1, Math.min(completed + 1, total));
 
-    const raw = typeof course.progress?.currentModule === 'string'
+    const raw =
+      typeof course.progress?.currentModule === "string"
         ? course.progress!.currentModule!.trim()
-        : '';
+        : "";
 
     if (!raw) return `Module ${index}`;
     if (/^module\s*\d+/i.test(raw)) return raw;
@@ -96,7 +112,9 @@ export default function MyCourses({ navigation }: any) {
         stickyHeader
       >
         <View style={styles.centerContainer}>
-          <Text style={TextStyles.body}>Please log in to view your courses</Text>
+          <Text style={TextStyles.body}>
+            Please log in to view your courses
+          </Text>
         </View>
       </Screen>
     );
@@ -113,30 +131,39 @@ export default function MyCourses({ navigation }: any) {
         {/* Continue Watching Section - Only show if there are courses in progress */}
         {continueWatching.length > 0 && (
           <>
-            <Text style={[ TextStyles.h5, { marginVertical: Spacing.md, marginBottom: Spacing.base }]}>
+            <Text
+              style={[
+                TextStyles.h5,
+                { marginVertical: Spacing.md, marginBottom: Spacing.base },
+              ]}
+            >
               Continue Watching
             </Text>
-            
+
             <FlatList
               data={continueWatching}
               keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}
-              ItemSeparatorComponent={() => <View style={{ width: Spacing.md }} />}
+              ItemSeparatorComponent={() => (
+                <View style={{ width: Spacing.md }} />
+              )}
               extraData={wishlist}
               renderItem={({ item }) => {
                 const moduleLabel = getModuleLabel(item);
                 return (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.cwCard}
-                    onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
+                    onPress={() =>
+                      navigation.navigate("CourseDetail", { courseId: item.id })
+                    }
                   >
                     <View style={styles.cwThumbWrapper}>
-                      <ImageWithFallback 
-                        source={{ uri: item.image }} 
+                      <ImageWithFallback
+                        source={{ uri: item.image }}
                         fallback={Images.coursePlaceholder}
-                        style={styles.cwThumb} 
-                      /> 
+                        style={styles.cwThumb}
+                      />
 
                       <View style={styles.progressOverlay}>
                         <Text style={styles.progressText}>
@@ -145,8 +172,12 @@ export default function MyCourses({ navigation }: any) {
                       </View>
                     </View>
 
-                    <Text style={TextStyles.bodyMedium} numberOfLines={2}>{item.title}</Text>
-                    <Text style={TextStyles.caption} numberOfLines={1}>{moduleLabel}</Text>
+                    <Text style={TextStyles.bodyMedium} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    <Text style={TextStyles.caption} numberOfLines={1}>
+                      {moduleLabel}
+                    </Text>
                   </TouchableOpacity>
                 );
               }}
@@ -155,10 +186,15 @@ export default function MyCourses({ navigation }: any) {
         )}
 
         {/* All My Courses Section */}
-        <Text style={[ TextStyles.h5, { marginTop: Spacing.xl, marginBottom: Spacing.base }]}>
+        <Text
+          style={[
+            TextStyles.h5,
+            { marginTop: Spacing.xl, marginBottom: Spacing.base },
+          ]}
+        >
           My Courses
         </Text>
-        
+
         {loading && !refreshing ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={Colors.purple400} />
@@ -167,15 +203,14 @@ export default function MyCourses({ navigation }: any) {
         ) : error ? (
           <View style={styles.centerContainer}>
             <Text style={styles.errorMessage}>Error: {error}</Text>
-            <ActionButton
-              text="Retry"
-              onPress={retry}
-            />
+            <ActionButton text="Retry" onPress={retry} />
           </View>
         ) : courses.length === 0 ? (
           <View style={styles.centerContainer}>
             <Text style={TextStyles.body}>No enrolled courses</Text>
-            <Text style={TextStyles.caption}>Enroll in a course to get started!</Text>
+            <Text style={TextStyles.caption}>
+              Enroll in a course to get started!
+            </Text>
           </View>
         ) : (
           <View>
@@ -186,11 +221,15 @@ export default function MyCourses({ navigation }: any) {
                 <TouchableOpacity
                   key={item.id}
                   activeOpacity={0.9}
-                  onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
+                  onPress={() =>
+                    navigation.navigate("CourseDetail", { courseId: item.id })
+                  }
                   style={styles.ipCard}
                 >
                   <View style={styles.ipLeft}>
-                    <Text style={styles.ipTitle} numberOfLines={2}>{item.title}</Text>
+                    <Text style={styles.ipTitle} numberOfLines={2}>
+                      {item.title}
+                    </Text>
 
                     <View style={styles.ipMetaRow}>
                       <Ionicons name="star" size={12} color="#FACC15" />
@@ -198,10 +237,15 @@ export default function MyCourses({ navigation }: any) {
                         {(item.rating as any)?.toFixed?.(1) ?? item.rating}
                       </Text>
                       <Text style={styles.ipMetaDot}>•</Text>
-                      <Text style={styles.ipMetaText}>{item.modules ?? 12} modules</Text>
+                      <Text style={styles.ipMetaText}>
+                        {item.modules ?? 12} modules
+                      </Text>
                     </View>
 
                     <View style={styles.ipPercentRow}>
+                      <View style={styles.categoryBadge}>
+                        <Text style={styles.categoryText}>{item.category}</Text>
+                      </View>
                       <Text style={styles.ipMetaText}>{pct}% complete</Text>
                     </View>
 
@@ -215,20 +259,24 @@ export default function MyCourses({ navigation }: any) {
                       style={styles.ipImage}
                     />
                     <View style={styles.badgeRow}>
-                      <View style={styles.levelBadge}>
-                        <Text style={styles.levelText}>{item.level}</Text>
-                      </View>
                       <TouchableOpacity
-                        onPress={(e) => { e.stopPropagation(); toggleWishlist?.(item); }}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleWishlist?.(item);
+                        }}
                         hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
                         style={styles.heartBtn}
                         accessibilityRole="button"
                         accessibilityLabel={
-                          wishIds.has(item.id) ? 'Remove from wishlist' : 'Add to wishlist'
+                          wishIds.has(item.id)
+                            ? "Remove from wishlist"
+                            : "Add to wishlist"
                         }
                       >
                         <Ionicons
-                          name={wishIds.has(item.id) ? 'heart' : 'heart-outline'}
+                          name={
+                            wishIds.has(item.id) ? "heart" : "heart-outline"
+                          }
                           size={20}
                           color="#fff"
                         />
@@ -264,84 +312,85 @@ const styles = StyleSheet.create({
   // Continue Watching (horizontal)
   cwCard: {
     width: Math.min(w * 0.72, 300),
-    gap: Spacing.sm
+    gap: Spacing.sm,
   },
   cwThumbWrapper: {
     borderRadius: CARD_RADIUS,
-    overflow: 'hidden',
+    overflow: "hidden",
     backgroundColor: Colors.loadingBackdrop,
     ...Shadows.medium,
   },
   // Image fills wrapper; NO borderRadius here
   cwThumb: {
-    width: '100%',
+    width: "100%",
     height: 150,
-    paddingBottom: Spacing.sm
+    paddingBottom: Spacing.sm,
   },
   badgeRow: {
-    position: 'absolute',
+    position: "absolute",
     top: Spacing.sm,
     right: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
-  levelBadge: {
+  categoryBadge: {
     backgroundColor: Colors.purple400,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: 8,
     marginRight: 8,
+    marginBottom: Spacing.xs,
   },
-  levelText: {
+  categoryText: {
     color: Colors.white,
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   heartBtn: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 14,
     padding: 6,
   },
 
   // In Progress (vertical cards)
   ipCard: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: Colors.cardDark,
     borderRadius: CARD_RADIUS,
     marginBottom: Spacing.md,
-    overflow: 'hidden',
+    overflow: "hidden",
     minHeight: 100,
     maxHeight: 150,
   },
   ipLeft: {
     flex: 1,
     padding: Spacing.md,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingRight: Spacing.md,
     flexShrink: 1,
   },
   ipRight: {
     width: 150,
-    alignSelf: 'stretch',
-    backgroundColor: '#E7F0EC',
-    position: 'relative',
-    overflow: 'hidden',
+    alignSelf: "stretch",
+    backgroundColor: "#E7F0EC",
+    position: "relative",
+    overflow: "hidden",
   },
   ipImage: {
     flex: 1,
     width: 150,
-    resizeMode: 'cover',
+    resizeMode: "cover",
   },
   ipTitle: {
     ...TextStyles.bodyMedium,
     color: Colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: 15,
     marginBottom: 6,
   },
   ipMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingTop: 2,
     marginBottom: 6,
@@ -349,18 +398,19 @@ const styles = StyleSheet.create({
   ipMetaText: {
     color: Colors.textSecondary,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
-  ipMetaDot: { 
-    color: Colors.textSecondary, 
-    marginHorizontal: 4 
+  ipMetaDot: {
+    color: Colors.textSecondary,
+    marginHorizontal: 4,
   },
   ipSubtitle: {
     ...TextStyles.caption,
     marginBottom: 4,
   },
   ipPercentRow: {
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginVertical: 6,
   },
 
@@ -369,18 +419,18 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: Colors.progressTrack,
     borderRadius: BorderRadius.base,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   pbFill: {
-    height: '100%',
+    height: "100%",
     backgroundColor: Colors.progressFill,
   },
 
   // New styles for better UX
   centerContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.lg,
     gap: Spacing.md,
@@ -389,16 +439,16 @@ const styles = StyleSheet.create({
     ...TextStyles.body,
     color: Colors.textSecondary,
     marginTop: Spacing.md,
-    textAlign: 'center',
+    textAlign: "center",
   },
   errorMessage: {
     ...TextStyles.body,
     color: Colors.red,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Spacing.md,
   },
   progressOverlay: {
-    position: 'absolute',
+    position: "absolute",
     bottom: Spacing.base,
     right: Spacing.base,
     backgroundColor: Colors.overlay,
@@ -409,6 +459,6 @@ const styles = StyleSheet.create({
   progressText: {
     ...TextStyles.small,
     color: Colors.white,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

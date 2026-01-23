@@ -37,8 +37,10 @@ const chunk = <T,>(items: T[], size: number) => {
 
 const sendExpoPush = async (payloads: Record<string, unknown>[]) => {
   if (!payloads.length) return { sent: 0, results: [] as unknown[] };
+
   const results: unknown[] = [];
   const batches = chunk(payloads, MAX_EXPO_TOKENS_PER_BATCH);
+
   for (const batch of batches) {
     const res = await fetch(EXPO_PUSH_URL, {
       method: "POST",
@@ -49,9 +51,11 @@ const sendExpoPush = async (payloads: Record<string, unknown>[]) => {
       },
       body: JSON.stringify(batch),
     });
+
     const body = await res.json().catch(() => ({}));
     results.push(body);
   }
+
   return { sent: payloads.length, results };
 };
 
@@ -60,17 +64,32 @@ serve(async (req) => {
   if (req.method !== "POST") return fail("Method not allowed", 405);
 
   try {
-    const body = await req.json();
-    const userId = body.userId || body.user_id;
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return fail("Invalid JSON body", 400);
+    }
+
+    console.log("📌 CRON BODY:", body);
+
+    const userIds: string[] = body.userIds || body.user_ids;
     const title = body.title;
     const message = body.message;
     const type = body.type || "system";
 
-    if (!userId || !title || !message) {
-      return fail("userId, title, and message are required", 400);
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return fail("userIds must be a non-empty array", 400);
     }
 
-    const payload = {
+    if (!title || !message) {
+      return fail("title and message are required", 400);
+    }
+
+    const createdAt = body.createdAt || body.created_at || new Date().toISOString();
+
+    // 1️⃣ Insert notifications (one per user)
+    const notificationsPayload = userIds.map((userId) => ({
       user_id: userId,
       title,
       message,
@@ -80,58 +99,68 @@ serve(async (req) => {
       related_entity_id: body.relatedEntityId || body.related_entity_id || null,
       priority: body.priority || "normal",
       expires_at: body.expiresAt || body.expires_at || null,
-      created_at: body.createdAt || body.created_at || new Date().toISOString(),
-    };
+      created_at: createdAt,
+    }));
 
-    const { data, error } = await supabase
+    const { data: notifications, error: insertError } = await supabase
       .from("notifications")
-      .insert(payload)
-      .select("id,user_id,title,message,type,is_read,created_at,action_url")
-      .single();
+      .insert(notificationsPayload)
+      .select("id,user_id,title,message,type,created_at");
 
-    if (error) throw error;
+    if (insertError) throw insertError;
 
-    // Fetch push tokens and send an Expo push for this notification.
+    // 2️⃣ Fetch all push tokens for these users
     let push = { sent: 0, results: [] as unknown[] };
+
     try {
-      const { data: tokenRow, error: tokenError } = await supabase
+      const { data: tokenRows, error: tokenError } = await supabase
         .from("push_notification_tokens")
-        .select("tokens")
-        .eq("user_id", userId)
-        .maybeSingle();
+        .select("user_id,tokens")
+        .in("user_id", userIds);
 
-      if (tokenError && tokenError.code !== "PGRST116") {
-        throw tokenError;
+      if (tokenError) throw tokenError;
+
+      const payloads: Record<string, unknown>[] = [];
+
+      for (const row of tokenRows ?? []) {
+        const userNotifications = notifications.filter(
+          (n) => n.user_id === row.user_id
+        );
+
+        const validTokens = (row.tokens ?? []).filter(
+          (t: string) => t && isExpoPushToken(t)
+        );
+
+        for (const token of validTokens) {
+          for (const notif of userNotifications) {
+            payloads.push({
+              to: token,
+              sound: "default",
+              title,
+              body: message,
+              priority: body.priority === "high" ? "high" : "default",
+              data: {
+                notificationId: notif.id,
+                type,
+                ...(typeof body.data === "object" ? body.data : {}),
+              },
+            });
+          }
+        }
       }
 
-      const tokens = (tokenRow?.tokens ?? []).filter(
-        (token: string) => token && isExpoPushToken(token)
-      );
-
-      if (tokens.length) {
-        const extraData =
-          body.data && typeof body.data === "object" ? body.data : {};
-        const payloads = tokens.map((token: string) => ({
-          to: token,
-          sound: "default",
-          title,
-          body: message,
-          data: {
-            notificationId: data.id,
-            type,
-            ...extraData,
-          },
-          priority: body.priority === "high" ? "high" : "default",
-        }));
-        push = await sendExpoPush(payloads);
-      }
-    } catch (pushError: any) {
-      console.error("Failed to send push notification:", pushError);
+      push = await sendExpoPush(payloads);
+    } catch (pushError) {
+      console.error("❌ Push notification failed:", pushError);
     }
 
-    return ok({ success: true, data, push });
+    return ok({
+      success: true,
+      notifications,
+      push,
+    });
   } catch (err: any) {
     console.error("postNotification error", err);
-    return fail("Failed to create notification", 500, { error: err.message });
+    return fail("Failed to create notifications", 500, { error: err.message });
   }
 });
