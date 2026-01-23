@@ -40,7 +40,7 @@ serve(async (req) => {
   const { data: earnedRows, error } = await supabase
     .from("user_achievements")
     .select(
-      "earned_at, created_at, achievements!inner(id, name, description, icon, type, points, created_at, is_active)"
+      "earned_at, achievements!inner(id, name, description, icon, type, points, created_at, is_active)"
     )
     .eq("user_id", userId)
     .eq("achievements.is_active", true)
@@ -64,7 +64,7 @@ serve(async (req) => {
       points: row.achievements?.points,
       createdAt: row.achievements?.created_at,
       earned: true,
-      earnedAt: row.earned_at ?? row.created_at ?? null,
+      earnedAt: row.earned_at ?? null,
     })) ?? [];
 
   return new Response(JSON.stringify({ success: true, data: payload }), {

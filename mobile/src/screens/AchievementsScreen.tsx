@@ -109,10 +109,12 @@ export default function AchievementsScreen({ navigation }: any) {
     }
     setLoading(true);
     try {
-      const remote = await creditService.getAchievements(user.id, {
+      const remote = await creditService
+        .getAchievements(user.id, {
         limit: PAGE_SIZE,
         offset: 0,
-      }).catch(() => []);
+      })
+        .catch(() => []);
       const normalized = mapAchievements(remote);
       setAchievements(normalized);
       setNextOffset(normalized.length);
@@ -192,10 +194,12 @@ export default function AchievementsScreen({ navigation }: any) {
     setLoadingMore(true);
     try {
       const startOffset = nextOffset;
-      const remote = await creditService.getAchievements(user.id, {
+      const remote = await creditService
+        .getAchievements(user.id, {
         limit: PAGE_SIZE,
         offset: startOffset,
-      }).catch(() => []);
+      })
+        .catch(() => []);
       const normalized = mapAchievements(remote);
       setAchievements((prev) => {
         const existing = new Set(prev.map((item) => item.id));
