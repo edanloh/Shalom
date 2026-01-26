@@ -149,6 +149,73 @@ serve(async (req) => {
       (e: any) => !e.is_completed
     ).length;
 
+    const upcomingAssignmentsEnd = new Date(
+      now.getTime() + 30 * 24 * 60 * 60 * 1000
+    );
+
+    const { data: upcomingAssignments, error: upcomingError } =
+      publishedCourseIds.length > 0
+        ? await supabaseClient
+            .from("assignments")
+            .select("id, title, due_date, course_id")
+            .in("course_id", publishedCourseIds)
+            .gte("due_date", now.toISOString())
+            .lte("due_date", upcomingAssignmentsEnd.toISOString())
+            .order("due_date", { ascending: true })
+            .limit(5)
+        : { data: [], error: null };
+
+    if (upcomingError) throw upcomingError;
+
+    const { count: pendingSubmissionsCount, error: submissionsError } =
+      publishedCourseIds.length > 0
+        ? await supabaseClient
+            .from("assignment_submissions")
+            .select("id, assignments!inner(course_id)", {
+              count: "exact",
+              head: true,
+            })
+            .eq("submission_status", "submitted")
+            .in("assignments.course_id", publishedCourseIds)
+        : { count: 0, error: null };
+
+    if (submissionsError) throw submissionsError;
+
+    const { data: manualTasks, error: manualTasksError } = await supabaseClient
+      .from("instructor_tasks")
+      .select("id, title, count, status, due_at")
+      .eq("instructor_id", adminId)
+      .in("status", ["pending", "overdue"])
+      .order("due_at", { ascending: true })
+      .limit(5);
+
+    if (manualTasksError) {
+      console.warn("Failed to load instructor_tasks:", manualTasksError);
+    }
+
+    const { data: completedTasks, error: completedTasksError } =
+      await supabaseClient
+        .from("instructor_tasks")
+        .select("id, title, count, status, due_at")
+        .eq("instructor_id", adminId)
+        .eq("status", "completed")
+        .order("due_at", { ascending: false })
+        .limit(10);
+
+    if (completedTasksError) {
+      console.warn("Failed to load completed instructor_tasks:", completedTasksError);
+    }
+
+    const { count: unreadMessagesCount, error: unreadMessagesError } =
+      await supabaseClient
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", adminId)
+        .eq("is_read", false)
+        .eq("type", "message");
+
+    if (unreadMessagesError) throw unreadMessagesError;
+
     // Get recent activity for PUBLISHED courses only
     const { data: recentEnrollments, error: recentError } =
       await supabaseClient
@@ -236,6 +303,62 @@ serve(async (req) => {
         formatted_date: new Date(
           activity.enrollment_date
         ).toLocaleDateString(),
+      })),
+      upcoming_sessions: (upcomingAssignments || [])
+        .filter((assignment: any) => assignment.due_date)
+        .map((assignment: any) => ({
+          id: `assignment_${assignment.id}`,
+          title: assignment.title,
+          starts_at: assignment.due_date,
+          location: null,
+          formatted_date: new Date(assignment.due_date).toLocaleDateString(),
+          formatted_time: new Date(assignment.due_date).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        }))
+        .sort(
+          (a, b) =>
+            new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()
+        )
+        .slice(0, 5),
+      pending_tasks: [
+        ...(manualTasks || []).map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          count: Number(task.count || 0),
+          status: task.status,
+          due_at: task.due_at,
+          formatted_due: task.due_at
+            ? new Date(task.due_at).toLocaleDateString()
+            : null,
+        })),
+        {
+          id: "assignment_grading",
+          title: "Assignments to Grade",
+          count: Number(pendingSubmissionsCount || 0),
+          status: "pending",
+          due_at: null,
+          formatted_due: null,
+        },
+        {
+          id: "unread_messages",
+          title: "Unread Messages",
+          count: Number(unreadMessagesCount || 0),
+          status: "pending",
+          due_at: null,
+          formatted_due: null,
+        },
+      ],
+      completed_tasks: (completedTasks || []).map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        count: Number(task.count || 0),
+        status: task.status,
+        due_at: task.due_at,
+        formatted_due: task.due_at
+          ? new Date(task.due_at).toLocaleDateString()
+          : null,
       })),
       courses_performance: coursesPerformance,
       meta: {

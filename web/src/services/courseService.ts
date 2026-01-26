@@ -619,30 +619,33 @@ class CourseService {
   }> {
     try {
       const response = await apiService.get<any>(ENDPOINTS.ALL_STUDENTS);
-      
-      // API response: { success, data: { students, statistics } }
+
+      const payload = response?.data ?? response;
+      const students = Array.isArray(payload?.students) ? payload.students : [];
+      const statistics = payload?.statistics || {
+        total_students: 0,
+        active_students: 0,
+        engaged_students: 0,
+        at_risk_students: 0,
+        average_progress: 0,
+        average_engagement: 0
+      };
+
       return {
-        students: response.data.students.map((student: any) => ({
+        students: students.map((student: any) => ({
           id: student.id,
           name: student.name,
           email: student.email,
           enrolledDate: student.enrolledDate,
-          progress: student.progress || 0,
+          progress: Number(student.progress ?? 0),
           lastActivity: student.lastActivity || 'Never',
-          engagement: student.engagement || 0,
-          coursesEnrolled: student.coursesEnrolled || 0,
-          completedCourses: student.completedCourses || 0,
-          totalHours: student.totalHours || 0,
+          engagement: Number(student.engagement ?? 0),
+          coursesEnrolled: Number(student.coursesEnrolled ?? 0),
+          completedCourses: Number(student.completedCourses ?? 0),
+          totalHours: Number(student.totalHours ?? 0),
           enabled: student.enabled
         })),
-        statistics: response.data.statistics || {
-          total_students: 0,
-          active_students: 0,
-          engaged_students: 0,
-          at_risk_students: 0,
-          average_progress: 0,
-          average_engagement: 0
-        }
+        statistics
       };
     } catch (error) {
       console.error('Error fetching all students:', error);

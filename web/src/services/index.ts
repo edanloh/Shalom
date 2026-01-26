@@ -7,6 +7,7 @@ export { courseService } from './courseService';
 export { lessonService } from './lessonService';
 export { notificationService } from './notificationService';
 export { studentService } from './studentService';
+export { instructorTaskService } from './instructorTaskService';
 
 export type { Course, CourseListParams, Module, ModuleItem, Review, Student, ModuleDetail, Lesson, Quiz, Question } from './courseService';
 // export type { ModuleDetail, Lesson, Quiz, Question } from './moduleService';

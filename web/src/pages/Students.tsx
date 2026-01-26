@@ -12,7 +12,6 @@ import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
 import { disableStudent } from "@/lib/disableStudent";
-import { Colors } from "@/constants";
 import { courseService, studentService } from "@/services";
 import { useToast } from "@/hooks/use-toast";
 
@@ -49,15 +48,6 @@ const Students = () => {
 				coursesEnrolled: student.coursesEnrolled || 0,
 				completedCourses: student.completedCourses || 0,
 				totalHours: student.totalHours || 0,
-				// Mock data for detailed view (will be fetched when viewing individual student)
-				currentCourses: [
-					{ id: 1, name: "Loading...", progress: 0, grade: 0 }
-				],
-				completedCoursesData: [],
-				quizResults: [],
-				streak: Math.floor(student.engagement / 10) || 0,
-				badges: Math.floor(student.completedCourses * 2) || 0,
-				averageScore: student.progress || 0,
 				enabled: student.enabled !== false, // Get from API, default to true if null/undefined
 			}));
 			
@@ -73,8 +63,11 @@ const Students = () => {
     fetchStudents();
   }, []);
 
-  const activeProfile = selectedStudent
+  const activeProfileBase = selectedStudent
     ? profileCache[selectedStudent.id] || selectedStudent
+    : null;
+  const activeProfile = selectedStudent
+    ? profileCache[selectedStudent.id] || null
     : null;
   const activeProfileLoading = selectedStudent
     ? profileLoadingId === selectedStudent.id
@@ -316,31 +309,44 @@ const Students = () => {
                         <SheetHeader>
                           <SheetTitle>Student Profile</SheetTitle>
                         </SheetHeader>
-                        {activeProfile && (
+                        {activeProfileBase && (
                           <>
                           <div className="space-y-6 mt-6 flex flex-col min-h-0">
                             {/* Header */}
                             <div className="flex items-center gap-4 pb-6 border-b border-border">
                               <Avatar className="h-20 w-20">
                                 <AvatarFallback className="text-2xl bg-primary">
-                                  {activeProfile.name.split(' ').map((n: string) => n[0]).join('')}
+                                  {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1">
-                                <h3 className="font-semibold text-2xl text-foreground">{activeProfile.name}</h3>
-                                <p className="text-sm text-muted-foreground mb-2">{activeProfile.email}</p>
+                                <h3 className="font-semibold text-2xl text-foreground">{activeProfileBase.name}</h3>
+                                <p className="text-sm text-muted-foreground mb-2">{activeProfileBase.email}</p>
                                 <div className="flex gap-2">
-                                  <Badge variant={activeProfile.enabled ? "default" : "destructive"}>
-                                    {activeProfile.enabled ? "Active" : "Inactive"}
+                                  <Badge variant={activeProfileBase.enabled ? "default" : "destructive"}>
+                                    {activeProfileBase.enabled ? "Active" : "Inactive"}
                                   </Badge>
-                                  <Badge variant="outline">{activeProfile.coursesEnrolled} Courses</Badge>
+                                  <Badge variant="outline">{activeProfileBase.coursesEnrolled} Courses</Badge>
                                 </div>
                               </div>
                             </div>
                             {activeProfileLoading && (
-                              <div className="text-sm text-muted-foreground">Loading profile details...</div>
+                              <div className="flex items-center justify-center py-12">
+                                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                  Loading profile details...
+                                </div>
+                              </div>
                             )}
 
+                            {!activeProfile && !activeProfileLoading && (
+                              <div className="text-sm text-muted-foreground">
+                                Profile details are not available yet.
+                              </div>
+                            )}
+
+                            {activeProfile && (
+                              <>
                             {/* Quick Stats Grid */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                               <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
@@ -535,7 +541,10 @@ const Students = () => {
                                 </div>
                               </TabsContent>
                             </Tabs>
+                            </>
+                            )}
                           </div>
+                          {activeProfile && (
                           <div className="mt-auto border-t border-border bg-background/95 backdrop-blur">
                             <div className="flex flex-col gap-2 p-4">
                               <Button className="w-full gap-2">
@@ -580,12 +589,14 @@ const Students = () => {
                                       fetchStudents();
                                       setIsSheetOpen(false);
                                       toastInstance.update({
+                                        id: toastInstance.id,
                                         title: "User disabled",
                                         description: `${activeProfile.email} can no longer log in.`,
                                       });
                                     } else {
                                       console.error("disableStudent failed:", result);
                                       toastInstance.update({
+                                        id: toastInstance.id,
                                         title: "Disable failed",
                                         description: "Unable to update user status.",
                                         variant: "destructive",
@@ -597,18 +608,17 @@ const Students = () => {
                                     toast({
                                       title: "Disable failed",
                                       description: message,
-                                      variant: "destructive",
-                                    });
-                                  }
-                                }}
+                                variant: "destructive",
+                              });
+                            }
+                          }}
                               >
                                 <UserX className="h-4 w-4" />
                                 Disable User
                                 </Button>
                               ) : (
                               <Button
-                                className="w-full gap-2"
-                                style={{backgroundColor: Colors.purple600}}
+                                className="w-full gap-2 bg-primary hover:bg-primary/90"
                                 variant="default"
                                 onClick={async () => {
                                   try {
@@ -643,12 +653,14 @@ const Students = () => {
                                       fetchStudents();
                                       setIsSheetOpen(false);
                                       toastInstance.update({
+                                        id: toastInstance.id,
                                         title: "User enabled",
                                         description: `${activeProfile.email} can log in again.`,
                                       });
                                     } else {
                                       console.error("enableStudent failed:", result);
                                       toastInstance.update({
+                                        id: toastInstance.id,
                                         title: "Enable failed",
                                         description: "Unable to update user status.",
                                         variant: "destructive",
@@ -662,15 +674,16 @@ const Students = () => {
                                       description: message,
                                       variant: "destructive",
                                     });
-                                  }
-                                }}
+                                }
+                              }}
                               >
-                                <UserX className="h-4 w-4" />
-                                Enable User
-                                </Button>
-                              )}
+                              <UserX className="h-4 w-4" />
+                              Enable User
+                              </Button>
+                            )}
                             </div>
                           </div>
+                          )}
                           </>
                         )}
                       </SheetContent>

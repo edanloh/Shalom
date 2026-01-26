@@ -31,7 +31,7 @@ export const studentService = {
   async getStudentProfile(userId: string): Promise<StudentProfile> {
     const resp = await apiService.get<any>(ENDPOINTS.STUDENT_PROFILE(userId));
     const payload = resp?.data ?? resp;
-    if (!payload) {
+    if (!payload || resp?.success === false) {
       throw new Error("Failed to load student profile");
     }
     return payload as StudentProfile;
