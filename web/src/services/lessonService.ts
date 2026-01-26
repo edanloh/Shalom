@@ -46,6 +46,7 @@ export interface LessonDetail {
     } | null;
   };
   userProgress?: {
+    progress_percentage: number;
     watch_time_seconds: number;
     is_completed: boolean;
     last_position_seconds: number;

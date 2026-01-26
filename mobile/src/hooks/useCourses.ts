@@ -18,7 +18,7 @@ export interface UseCoursesReturn {
   retry: () => Promise<void>;
 }
 
-export interface UseMyCOursesReturn {
+export interface UseMyCoursesReturn {
   courses: Course[];
   loading: boolean;
   error: string | null;
@@ -132,7 +132,7 @@ export const useCourses = (params?: CourseListParams): UseCoursesReturn => {
 /**
  * Hook for fetching and managing user's enrolled courses
  */
-export const useMyCourses = (): UseMyCOursesReturn => {
+export const useMyCourses = (): UseMyCoursesReturn => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -148,7 +148,6 @@ export const useMyCourses = (): UseMyCOursesReturn => {
   }, []);
 
   const fetchMyCourses = useCallback(async () => {
-    console.log('useMyCourses - fetchMyCourses called, user:', user);
     // REMOVE LATER - Temporary override for testing
     if (user) {
       user.id = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
@@ -159,14 +158,13 @@ export const useMyCourses = (): UseMyCOursesReturn => {
       return;
     }
 
-    console.log('useMyCourses - Fetching enrollments for user ID:', user.id);
 
     try {
       // Use the new enrollment endpoint with user ID
       const coursesData = await courseService.getUserEnrollments(user.id);
       
       if (!isMountedRef.current) return;
-      console.log('useMyCourses - Course titles:', coursesData.map(c => c.title));
+
       setCourses(coursesData);
       setError(null);
     } catch (err) {

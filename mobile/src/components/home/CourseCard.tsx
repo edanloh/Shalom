@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ImageWithFallback } from "../common"; // adjust path if needed
-import { Colors, Spacing, Typography } from "../../constants";
+import { Colors, Spacing, TextStyles, Typography } from "../../constants";
 import { Images } from "../../../assets";
 import type { Course } from "../../types";
 import { useCourses } from "../../contexts/CourseContext";
@@ -32,7 +32,7 @@ const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
   </View>
 );
 
-export default function CourseCard({ 
+export default function CourseCard({
   course,
   onPress,
   variant = "compact",
@@ -65,10 +65,6 @@ export default function CourseCard({
         />
 
         <View style={styles.badgeRow}>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>{course.level}</Text>
-          </View>
-
           <TouchableOpacity
             onPress={(e) => {
               e.stopPropagation();
@@ -94,6 +90,16 @@ export default function CourseCard({
             <Text style={styles.rankText}>{rankLabel}</Text>
           </View>
         ) : null}
+      </View>
+
+      {/* Category Badge */}
+      <View
+        style={[
+          styles.catBadge,
+          { backgroundColor: course.categoryColor || Colors.categoryDefault },
+        ]}
+      >
+        <Text style={TextStyles.bodySmall}>{course.category}</Text>
       </View>
 
       {/* Text/content */}
@@ -123,7 +129,7 @@ export default function CourseCard({
                   {
                     width: `${Math.max(
                       0,
-                      Math.min(100, course.progress?.percentage ?? 0)
+                      Math.min(100, course.progress?.percentage ?? 0),
                     )}%`,
                   },
                 ]}
@@ -137,7 +143,7 @@ export default function CourseCard({
       </View>
     </TouchableOpacity>
   );
-};
+}
 
 const w = Dimensions.get("window").width;
 
@@ -179,16 +185,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  levelBadge: {
-    backgroundColor: Colors.purple400,
+  catBadge: {
+    width: "auto",
+    alignSelf: "flex-start",
+    marginTop: Spacing.md,
+    backgroundColor: Colors.categoryDefault,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  levelText: {
-    fontFamily: Typography.fontFamily.medium,
-    fontSize: Typography.fontSize.xs,
-    color: Colors.white,
+    paddingVertical: Spacing.xs,
+    borderRadius: Spacing.md,
   },
   heartBtn: {
     backgroundColor: "rgba(0,0,0,0.55)",
@@ -211,7 +215,7 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    paddingVertical: Spacing.xs,
+    paddingBottom: Spacing.xs,
   },
   title: {
     color: Colors.textPrimary,

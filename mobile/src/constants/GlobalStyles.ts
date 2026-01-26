@@ -145,7 +145,7 @@ export const TextStyles = {
   } as TextStyle,
 
   bodySmall: {
-    fontFamily: Typography.fontFamily.regular,
+    fontFamily: Typography.fontFamily.semiBold,
     fontSize: Typography.fontSize.sm,
     lineHeight: Typography.fontSize.sm * Typography.lineHeight.normal,
     color: Colors.textPrimary,

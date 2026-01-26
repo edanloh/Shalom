@@ -50,7 +50,7 @@ export default function CourseDetailScreen({
   const [courseDetail, setCourseDetail] =
     useState<ProcessedCourseDetail | null>(null);
   const [courseContent, setCourseContent] = useState<CourseContent | null>(
-    null
+    null,
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +73,7 @@ export default function CourseDetailScreen({
       if (userId) {
         loadCourseDetail();
       }
-    }, [courseId, userId])
+    }, [courseId, userId]),
   );
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export default function CourseDetailScreen({
       try {
         const enrolled = await courseService.isUserEnrolledInCourse(
           effectiveUserId,
-          courseId
+          courseId,
         );
         setIsEnrolled(enrolled);
       } catch (e) {
@@ -99,7 +99,7 @@ export default function CourseDetailScreen({
 
     // Count only modules that are marked as completed
     const completedModules = courseContent.sections.filter(
-      (section) => section.module_is_completed === true
+      (section) => section.module_is_completed === true,
     ).length;
 
     console.log("[CourseDetailScreen] Progress calculation:", {
@@ -114,7 +114,7 @@ export default function CourseDetailScreen({
   const getCompletedModulesCount = (): number => {
     if (!courseContent) return 0;
     return courseContent.sections.filter(
-      (section) => section.module_is_completed
+      (section) => section.module_is_completed,
     ).length;
   };
 
@@ -152,11 +152,11 @@ export default function CourseDetailScreen({
         stars.push(<Ionicons key={i} name="star" size={16} color="#FFD700" />);
       } else if (i === fullStars + 1 && hasHalfStar) {
         stars.push(
-          <Ionicons key={i} name="star-half" size={16} color="#FFD700" />
+          <Ionicons key={i} name="star-half" size={16} color="#FFD700" />,
         );
       } else {
         stars.push(
-          <Ionicons key={i} name="star-outline" size={16} color="#FFD700" />
+          <Ionicons key={i} name="star-outline" size={16} color="#FFD700" />,
         );
       }
     }
@@ -166,7 +166,7 @@ export default function CourseDetailScreen({
   const renderRatingBreakdown = (breakdown: Record<number, number>) => {
     const totalReviews = Object.values(breakdown).reduce(
       (sum, count) => sum + count,
-      0
+      0,
     );
 
     return (
@@ -204,7 +204,7 @@ export default function CourseDetailScreen({
           [
             { text: "Cancel", style: "cancel" },
             { text: "Enroll now", onPress: handleEnroll },
-          ]
+          ],
         );
         return;
       }
@@ -291,7 +291,7 @@ export default function CourseDetailScreen({
         [
           { text: "Cancel", style: "cancel" },
           { text: "Enroll Now", onPress: handleEnroll },
-        ]
+        ],
       );
       return;
     }
@@ -302,7 +302,7 @@ export default function CourseDetailScreen({
       Alert.alert(
         "Complete the Course First",
         "You must complete all modules in this course before leaving a review.",
-        [{ text: "OK", style: "default" }]
+        [{ text: "OK", style: "default" }],
       );
       return;
     }
@@ -323,7 +323,7 @@ export default function CourseDetailScreen({
       setIsEnrolling(true);
       const { firstModuleId } = await courseService.enrollInCourse(
         effectiveUserId,
-        courseId
+        courseId,
       );
 
       // Mark as enrolled immediately so UI updates
@@ -381,7 +381,7 @@ export default function CourseDetailScreen({
             },
           },
           { text: "OK", style: "cancel" },
-        ]
+        ],
       );
     } catch (e: any) {
       const status = e?.statusCode ?? e?.response?.status;
@@ -393,7 +393,7 @@ export default function CourseDetailScreen({
       });
       Alert.alert(
         `Enrollment failed ${status ? `(${status})` : ""}`,
-        e?.details?.message || e?.message || "Try again."
+        e?.details?.message || e?.message || "Try again.",
       );
     } finally {
       setIsEnrolling(false);
@@ -483,6 +483,19 @@ export default function CourseDetailScreen({
       <View style={styles.content}>
         {/* Course Info */}
         <Text style={styles.courseTitle}>{courseDetail.title}</Text>
+
+        {/* Category Badge */}
+        <View
+          style={[
+            styles.catBadge,
+            {
+              backgroundColor:
+                courseDetail.categoryColor || Colors.categoryDefault,
+            },
+          ]}
+        >
+          <Text style={TextStyles.bodySmall}>{courseDetail.category}</Text>
+        </View>
 
         <Text style={styles.courseOverview}>Overview</Text>
         <Text style={styles.courseDescription}>{courseDetail.description}</Text>
@@ -582,7 +595,7 @@ export default function CourseDetailScreen({
               </Text>
               <View style={styles.starsContainer}>
                 {renderStarRating(
-                  courseDetail?.reviews?.length ? courseDetail.rating : 0
+                  courseDetail?.reviews?.length ? courseDetail.rating : 0,
                 )}
               </View>
               <Text style={styles.reviewCount}>
@@ -733,6 +746,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: "rgba(0,0,0,0.3)",
   },
+  catBadge: {
+    width: "auto",
+    alignSelf: "flex-start",
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.categoryDefault,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Spacing.md,
+  },
   content: {
     backgroundColor: Colors.primary,
     borderTopLeftRadius: 20,
@@ -752,7 +774,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.textPrimary,
     marginBottom: Spacing.sm,
-    marginTop: Spacing.lg,
+    marginTop: Spacing.md,
   },
   courseDescription: {
     fontSize: TextStyles.body.fontSize,

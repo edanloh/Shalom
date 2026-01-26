@@ -168,8 +168,9 @@ export interface Course {
   rating: number;
   image: string;
   category: string;
+  categoryColor?: string;
   level: 'beginner' | 'intermediate' | 'advanced';
-  // modules: number;
+  modules: number;
   tags?: string[];
   prerequisites?: string[];
   outcomes?: string[];

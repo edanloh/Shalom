@@ -57,6 +57,8 @@ export const Colors = {
   progressTrack: '#D1D5DB',      // Progress bar track
   progressFill: '#4F46E5',       // Progress bar fill
   overlay: 'rgba(0,0,0,0.7)',    // Dark overlay for text on images
+
+  categoryDefault: '#ec4899',    // Default category color
 } as const;
 
 export type ColorKeys = keyof typeof Colors;

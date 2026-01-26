@@ -48,7 +48,7 @@ export default function CourseCarousel({
 
   const CARD_WIDTH = useMemo(
     () => Math.min(screenWidth * 0.7, 400),
-    [screenWidth]
+    [screenWidth],
   );
 
   const scrollHandler = useAnimatedScrollHandler({
@@ -68,7 +68,10 @@ export default function CourseCarousel({
         decelerationRate="fast"
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingRight: (screenWidth - CARD_WIDTH) / 2, paddingLeft: Spacing["3xl"]},
+          {
+            paddingRight: (screenWidth - CARD_WIDTH) / 2,
+            paddingLeft: Spacing["3xl"],
+          },
         ]}
       >
         {courses.map((course, index) => {
@@ -77,7 +80,7 @@ export default function CourseCarousel({
             index * (CARD_WIDTH + Spacing.md),
             (index + 1) * (CARD_WIDTH + Spacing.md),
           ];
-
+          
           return (
             <CourseCardItem
               key={course.id}
@@ -146,14 +149,14 @@ function CourseCardItem({
       scrollX.value,
       inputRange,
       [0.92, 1.05, 0.92],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     const opacity = interpolate(
       scrollX.value,
       inputRange,
       [0.6, 1, 0.6],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     return {
@@ -163,7 +166,7 @@ function CourseCardItem({
   });
 
   const wishlisted = isWishlisted?.(course.id) ?? false;
-
+  
   return (
     <Animated.View style={[styles.card, animatedStyle, { width: cardWidth }]}>
       <Pressable onPress={onPress} style={{ flex: 1 }}>
@@ -176,9 +179,9 @@ function CourseCardItem({
           />
 
           {/* Category Badge - Top Left */}
-          <View style={styles.catBadge}>
+          <View style={[styles.catBadge, { backgroundColor: course.categoryColor }]}>
             <Text style={TextStyles.bodySmall}>
-              {course.category || course.level}
+              {course.category}
             </Text>
           </View>
 
@@ -292,14 +295,14 @@ function PaginationDot({
       scrollX.value,
       inputRange,
       [8, 24, 8],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     const opacity = interpolate(
       scrollX.value,
       inputRange,
       [0.3, 1, 0.3],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     return {
@@ -329,14 +332,14 @@ function LimitedPaginationDots({
       {Array.from({ length: MAX_DOTS }).map((_, i) => {
         const animatedDotStyle = useAnimatedStyle(() => {
           const currentIndex = Math.round(
-            scrollX.value / (cardWidth + Spacing.md)
+            scrollX.value / (cardWidth + Spacing.md),
           );
 
           // Calculate which dots to show based on current position
           let startIndex = Math.max(0, currentIndex - Math.floor(MAX_DOTS / 2));
           const endIndex = Math.min(
             totalCourses - 1,
-            startIndex + MAX_DOTS - 1
+            startIndex + MAX_DOTS - 1,
           );
 
           // Adjust start if we're near the end
@@ -361,14 +364,14 @@ function LimitedPaginationDots({
             scrollX.value,
             inputRange,
             [8, 24, 8],
-            Extrapolation.CLAMP
+            Extrapolation.CLAMP,
           );
 
           const opacity = interpolate(
             scrollX.value,
             inputRange,
             [0.3, 1, 0.3],
-            Extrapolation.CLAMP
+            Extrapolation.CLAMP,
           );
 
           return {
@@ -445,7 +448,6 @@ const styles = StyleSheet.create({
     top: 12,
     left: 14,
     zIndex: 10,
-    backgroundColor: Colors.purple400,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
