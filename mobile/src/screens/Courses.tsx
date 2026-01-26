@@ -275,7 +275,13 @@ export default function CoursesScreen({ navigation }: any) {
         <View
           style={[styles.catBadge, { backgroundColor: item.categoryColor }]}
         >
-          <Text style={TextStyles.bodySmall}>{item.category}</Text>
+          <Text
+            style={[TextStyles.bodySmall, styles.catBadgeText]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {item.category}
+          </Text>
         </View>
         <BadgeHeartRow item={item} />
       </View>
@@ -609,9 +615,15 @@ const styles = StyleSheet.create({
     top: 12,
     left: 14,
     zIndex: 10,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    maxWidth: 96,
+  },
+  catBadgeText: {
+    fontSize: 9.5,
+    fontWeight: "600",
+    letterSpacing: 0.1,
   },
   rankText: {
     color: "#fff",
@@ -676,19 +688,6 @@ const styles = StyleSheet.create({
     right: Spacing.sm,
     flexDirection: "row",
     alignItems: "flex-start",
-  },
-  levelBadge: {
-    backgroundColor: Colors.purple400,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  levelText: {
-    color: Colors.white,
-    fontFamily: TextStyles.body.fontFamily,
-    fontSize: 11,
-    fontWeight: "700",
   },
   heartBtn: {
     backgroundColor: "rgba(0,0,0,0.55)",

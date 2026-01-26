@@ -40,12 +40,42 @@
       }
     ],
     "achievements": [
-      { "id": "550e8400-e29b-41d4-a716-446655441401", "icon": "trophy-outline", "label": "First Steps", "earned": true },
-      { "id": "550e8400-e29b-41d4-a716-446655441402", "icon": "flame", "label": "Learning Streak", "earned": true },
-      { "id": "550e8400-e29b-41d4-a716-446655441403", "icon": "ribbon-outline", "label": "Course Completion", "earned": false },
-      { "id": "550e8400-e29b-41d4-a716-446655441404", "icon": "ribbon-outline", "label": "Knowledge Seeker", "earned": false },
-      { "id": "550e8400-e29b-41d4-a716-446655441405", "icon": "trophy-outline", "label": "Quick Learner", "earned": false },
-      { "id": "550e8400-e29b-41d4-a716-446655441406", "icon": "trophy-outline", "label": "Perfect Score", "earned": false }
+      {
+        "id": "550e8400-e29b-41d4-a716-446655441401",
+        "icon": "trophy-outline",
+        "label": "First Steps",
+        "earned": true
+      },
+      {
+        "id": "550e8400-e29b-41d4-a716-446655441402",
+        "icon": "flame",
+        "label": "Learning Streak",
+        "earned": true
+      },
+      {
+        "id": "550e8400-e29b-41d4-a716-446655441403",
+        "icon": "ribbon-outline",
+        "label": "Course Completion",
+        "earned": false
+      },
+      {
+        "id": "550e8400-e29b-41d4-a716-446655441404",
+        "icon": "ribbon-outline",
+        "label": "Knowledge Seeker",
+        "earned": false
+      },
+      {
+        "id": "550e8400-e29b-41d4-a716-446655441405",
+        "icon": "trophy-outline",
+        "label": "Quick Learner",
+        "earned": false
+      },
+      {
+        "id": "550e8400-e29b-41d4-a716-446655441406",
+        "icon": "trophy-outline",
+        "label": "Perfect Score",
+        "earned": false
+      }
     ],
     "goals": [
       {
@@ -125,11 +155,14 @@
           "id": "550e8400-e29b-41d4-a716-446655440401",
           "title": "React Native Fundamentals",
           "description": "Learn the basics of React Native development with hands-on projects and real-world applications.",
-          "level": "intermediate",
           "rating": 4.5,
           "duration_hours": 12,
           "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
-          "tags": ["react-native", "mobile", "javascript"]
+          "tags": [
+            "react-native",
+            "mobile",
+            "javascript"
+          ]
         }
       },
       {
@@ -141,11 +174,14 @@
           "id": "550e8400-e29b-41d4-a716-446655440404",
           "title": "Cloud Architecture with AWS",
           "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
-          "level": "intermediate",
           "rating": 4.5,
           "duration_hours": 20,
           "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
-          "tags": ["aws", "cloud", "architecture"]
+          "tags": [
+            "aws",
+            "cloud",
+            "architecture"
+          ]
         }
       }
     ]
@@ -165,9 +201,8 @@
           "instructor_rating": "4.8",
           "category_id": "cat_mobile",
           "category_name": "Mobile Development",
-          "category_icon": "📱",
+          "category_icon": "\ud83d\udcf1",
           "category_color": "#3B82F6",
-          "level": "beginner",
           "duration_hours": 12,
           "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
           "video_preview_url": "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
@@ -178,7 +213,13 @@
           "is_featured": true,
           "language": "English",
           "subtitles": "English, Spanish",
-          "tags": ["react-native", "mobile", "javascript", "ios", "android"],
+          "tags": [
+            "react-native",
+            "mobile",
+            "javascript",
+            "ios",
+            "android"
+          ],
           "created_at": "2024-01-15T08:00:00Z",
           "updated_at": "2024-10-01T14:30:00Z",
           "requirements": [
@@ -201,9 +242,8 @@
           "instructor_rating": "4.9",
           "category_id": "cat_web",
           "category_name": "Web Development",
-          "category_icon": "🌐",
+          "category_icon": "\ud83c\udf10",
           "category_color": "#10B981",
-          "level": "advanced",
           "duration_hours": 18,
           "thumbnail_url": "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=400&h=250&fit=crop",
           "video_preview_url": null,
@@ -243,9 +283,8 @@
           "instructor_rating": "4.6",
           "category_id": "cat_design",
           "category_name": "Design",
-          "category_icon": "🎨",
+          "category_icon": "\ud83c\udfa8",
           "category_color": "#F59E0B",
-          "level": "beginner",
           "duration_hours": 14,
           "thumbnail_url": "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop",
           "video_preview_url": null,
@@ -256,7 +295,13 @@
           "is_featured": false,
           "language": "English",
           "subtitles": "English, French, Spanish",
-          "tags": ["design", "ui", "ux", "figma", "creative"],
+          "tags": [
+            "design",
+            "ui",
+            "ux",
+            "figma",
+            "creative"
+          ],
           "created_at": "2024-01-20T09:30:00Z",
           "updated_at": "2024-08-22T11:45:00Z",
           "requirements": [
@@ -279,9 +324,8 @@
           "instructor_rating": "4.8",
           "category_id": "cat_data",
           "category_name": "Data Science",
-          "category_icon": "📊",
+          "category_icon": "\ud83d\udcca",
           "category_color": "#EF4444",
-          "level": "intermediate",
           "duration_hours": 22,
           "thumbnail_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=250&fit=crop",
           "video_preview_url": null,
@@ -292,7 +336,13 @@
           "is_featured": true,
           "language": "English",
           "subtitles": "English",
-          "tags": ["python", "data-science", "pandas", "numpy", "matplotlib"],
+          "tags": [
+            "python",
+            "data-science",
+            "pandas",
+            "numpy",
+            "matplotlib"
+          ],
           "created_at": "2024-03-05T14:20:00Z",
           "updated_at": "2024-09-30T10:15:00Z",
           "requirements": [
@@ -315,9 +365,8 @@
           "instructor_rating": "4.7",
           "category_id": "cat_cloud",
           "category_name": "Cloud Computing",
-          "category_icon": "☁️",
+          "category_icon": "\u2601\ufe0f",
           "category_color": "#8B5CF6",
-          "level": "intermediate",
           "duration_hours": 20,
           "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
           "video_preview_url": null,
@@ -328,7 +377,13 @@
           "is_featured": false,
           "language": "English",
           "subtitles": "English",
-          "tags": ["aws", "cloud", "architecture", "devops", "serverless"],
+          "tags": [
+            "aws",
+            "cloud",
+            "architecture",
+            "devops",
+            "serverless"
+          ],
           "created_at": "2024-04-12T16:00:00Z",
           "updated_at": "2024-10-05T12:30:00Z",
           "requirements": [
@@ -351,9 +406,8 @@
           "instructor_rating": "4.9",
           "category_id": "cat_ai",
           "category_name": "Artificial Intelligence",
-          "category_icon": "🤖",
+          "category_icon": "\ud83e\udd16",
           "category_color": "#EC4899",
-          "level": "beginner",
           "duration_hours": 16,
           "thumbnail_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=250&fit=crop",
           "video_preview_url": null,
@@ -421,14 +475,17 @@
             "course_id": "1",
             "title": "React Native Fundamentals",
             "description": "Learn the basics of React Native development with hands-on projects and real-world applications.",
-            "level": "beginner",
             "duration_hours": 12,
             "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
             "rating": "4.5",
             "student_count": 1250,
-            "tags": ["react-native", "mobile", "javascript"],
+            "tags": [
+              "react-native",
+              "mobile",
+              "javascript"
+            ],
             "category_name": "Mobile Development",
-            "category_icon": "📱",
+            "category_icon": "\ud83d\udcf1",
             "category_color": "#3B82F6",
             "instructor_name": "Sarah Johnson",
             "instructor_avatar": "https://ui-avatars.com/api/?name=Sarah+Johnson&size=50&background=3B82F6&color=fff",
@@ -457,14 +514,18 @@
             "course_id": "3",
             "title": "UI/UX Design Principles",
             "description": "Learn fundamental design principles and create stunning user interfaces with practical design tools.",
-            "level": "beginner",
             "duration_hours": 14,
             "thumbnail_url": "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop",
             "rating": "4.4",
             "student_count": 2100,
-            "tags": ["design", "ui", "ux", "figma"],
+            "tags": [
+              "design",
+              "ui",
+              "ux",
+              "figma"
+            ],
             "category_name": "Design",
-            "category_icon": "🎨",
+            "category_icon": "\ud83c\udfa8",
             "category_color": "#F59E0B",
             "instructor_name": "Emma Rodriguez",
             "instructor_avatar": "https://ui-avatars.com/api/?name=Emma+Rodriguez&size=50&background=F59E0B&color=fff",
@@ -480,7 +541,8 @@
             "last_accessed_formatted": "3 weeks ago",
             "enrollment_date_formatted": "5 months ago",
             "completion_date_formatted": "3 weeks ago"
-          },{
+          },
+          {
             "enrollment_id": "enr_003",
             "enrollment_date": "2024-10-05T12:00:00Z",
             "completion_date": null,
@@ -492,14 +554,17 @@
             "course_id": "5",
             "title": "Cloud Architecture with AWS",
             "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
-            "level": "intermediate",
             "duration_hours": 20,
             "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
             "rating": "4.5",
             "student_count": 567,
-            "tags": ["aws", "cloud", "architecture"],
+            "tags": [
+              "aws",
+              "cloud",
+              "architecture"
+            ],
             "category_name": "Cloud Computing",
-            "category_icon": "☁️",
+            "category_icon": "\u2601\ufe0f",
             "category_color": "#8B5CF6",
             "instructor_name": "Alex Kumar",
             "instructor_avatar": "https://ui-avatars.com/api/?name=Alex+Kumar&size=50&background=8B5CF6&color=fff",
@@ -515,7 +580,8 @@
             "last_accessed_formatted": "1 day ago",
             "enrollment_date_formatted": "3 months ago",
             "completion_date_formatted": null
-          },{
+          },
+          {
             "enrollment_id": "enr_004",
             "enrollment_date": "2024-11-20T09:30:00Z",
             "completion_date": null,
@@ -527,14 +593,17 @@
             "course_id": "2",
             "title": "Advanced TypeScript",
             "description": "Master advanced TypeScript concepts including generics, decorators, and type manipulation techniques.",
-            "level": "advanced",
             "duration_hours": 18,
             "thumbnail_url": "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=400&h=250&fit=crop",
             "rating": "4.7",
             "student_count": 678,
-            "tags": ["typescript", "javascript", "programming"],
+            "tags": [
+              "typescript",
+              "javascript",
+              "programming"
+            ],
             "category_name": "Web Development",
-            "category_icon": "🌐",
+            "category_icon": "\ud83c\udf10",
             "category_color": "#10B981",
             "instructor_name": "Michael Chen",
             "instructor_avatar": "https://ui-avatars.com/api/?name=Michael+Chen&size=50&background=10B981&color=fff",
@@ -550,7 +619,8 @@
             "last_accessed_formatted": "3 days ago",
             "enrollment_date_formatted": "2 months ago",
             "completion_date_formatted": null
-          },{
+          },
+          {
             "enrollment_id": "enr_005",
             "enrollment_date": "2024-12-01T15:45:00Z",
             "completion_date": null,
@@ -562,14 +632,17 @@
             "course_id": "6",
             "title": "Machine Learning Basics",
             "description": "Introduction to machine learning concepts with practical implementations using popular frameworks.",
-            "level": "beginner",
             "duration_hours": 16,
             "thumbnail_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=250&fit=crop",
             "rating": "4.8",
             "student_count": 1456,
-            "tags": ["machine-learning", "ai", "python"],
+            "tags": [
+              "machine-learning",
+              "ai",
+              "python"
+            ],
             "category_name": "Artificial Intelligence",
-            "category_icon": "🤖",
+            "category_icon": "\ud83e\udd16",
             "category_color": "#EC4899",
             "instructor_name": "Dr. Lisa Park",
             "instructor_avatar": "https://ui-avatars.com/api/?name=Lisa+Park&size=50&background=EC4899&color=fff",
@@ -585,7 +658,8 @@
             "last_accessed_formatted": "4 days ago",
             "enrollment_date_formatted": "1 month ago",
             "completion_date_formatted": null
-          },{
+          },
+          {
             "enrollment_id": "enr_006",
             "enrollment_date": "2024-12-10T11:00:00Z",
             "completion_date": null,
@@ -597,14 +671,17 @@
             "course_id": "4",
             "title": "Python for Data Science",
             "description": "Comprehensive course covering data analysis, visualization, and machine learning with Python libraries.",
-            "level": "intermediate",
             "duration_hours": 22,
             "thumbnail_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=250&fit=crop",
             "rating": "4.6",
             "student_count": 890,
-            "tags": ["python", "data-science", "pandas"],
+            "tags": [
+              "python",
+              "data-science",
+              "pandas"
+            ],
             "category_name": "Data Science",
-            "category_icon": "📊",
+            "category_icon": "\ud83d\udcca",
             "category_color": "#EF4444",
             "instructor_name": "Dr. James Wilson",
             "instructor_avatar": "https://ui-avatars.com/api/?name=James+Wilson&size=50&background=EF4444&color=fff",
@@ -620,7 +697,8 @@
             "last_accessed_formatted": "5 days ago",
             "enrollment_date_formatted": "1 month ago",
             "completion_date_formatted": null
-          },{
+          },
+          {
             "enrollment_id": "enr_007",
             "enrollment_date": "2024-12-15T14:30:00Z",
             "completion_date": null,
@@ -632,14 +710,17 @@
             "course_id": "7",
             "title": "Cloud Architecture with AWS",
             "description": "Learn to design and implement scalable cloud solutions using Amazon Web Services.",
-            "level": "intermediate",
             "duration_hours": 20,
             "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
             "rating": "4.5",
             "student_count": 567,
-            "tags": ["aws", "cloud", "architecture"],
+            "tags": [
+              "aws",
+              "cloud",
+              "architecture"
+            ],
             "category_name": "Cloud Computing",
-            "category_icon": "☁️",
+            "category_icon": "\u2601\ufe0f",
             "category_color": "#8B5CF6",
             "instructor_name": "Alex Kumar",
             "instructor_avatar": "https://ui-avatars.com/api/?name=Alex+Kumar&size=50&background=8B5CF6&color=fff",
@@ -719,7 +800,6 @@
             "rating": 4.7,
             "image": "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=400&h=250&fit=crop",
             "category": "Web Development",
-            "level": "advanced",
             "modules": 9,
             "tags": [
               "typescript",
@@ -755,9 +835,14 @@
             "rating": 4.6,
             "image": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=250&fit=crop",
             "category": "Data Science",
-            "level": "intermediate",
             "modules": 11,
-            "tags": ["python", "data-science", "pandas", "numpy", "matplotlib"],
+            "tags": [
+              "python",
+              "data-science",
+              "pandas",
+              "numpy",
+              "matplotlib"
+            ],
             "createdAt": "2024-03-05T14:20:00Z",
             "updatedAt": "2024-09-30T10:15:00Z",
             "isWishlisted": true
@@ -785,7 +870,6 @@
             "rating": 4.8,
             "image": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=250&fit=crop",
             "category": "Artificial Intelligence",
-            "level": "beginner",
             "modules": 8,
             "tags": [
               "machine-learning",
@@ -821,9 +905,14 @@
             "rating": 4.5,
             "image": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
             "category": "Mobile Development",
-            "level": "beginner",
             "modules": 12,
-            "tags": ["react-native", "mobile", "javascript", "ios", "android"],
+            "tags": [
+              "react-native",
+              "mobile",
+              "javascript",
+              "ios",
+              "android"
+            ],
             "createdAt": "2024-01-15T08:00:00Z",
             "updatedAt": "2024-10-01T14:30:00Z",
             "isWishlisted": true
@@ -851,9 +940,14 @@
             "rating": 4.4,
             "image": "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=250&fit=crop",
             "category": "Design",
-            "level": "beginner",
             "modules": 10,
-            "tags": ["design", "ui", "ux", "figma", "creative"],
+            "tags": [
+              "design",
+              "ui",
+              "ux",
+              "figma",
+              "creative"
+            ],
             "createdAt": "2024-01-20T09:30:00Z",
             "updatedAt": "2024-08-22T11:45:00Z",
             "isWishlisted": true
@@ -881,9 +975,14 @@
             "rating": 4.5,
             "image": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=250&fit=crop",
             "category": "Cloud Computing",
-            "level": "intermediate",
             "modules": 15,
-            "tags": ["aws", "cloud", "architecture", "devops", "serverless"],
+            "tags": [
+              "aws",
+              "cloud",
+              "architecture",
+              "devops",
+              "serverless"
+            ],
             "createdAt": "2024-04-12T16:00:00Z",
             "updatedAt": "2024-10-05T12:30:00Z",
             "isWishlisted": true
@@ -911,9 +1010,14 @@
             "rating": 4.6,
             "image": "https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=400&h=250&fit=crop",
             "category": "Web Development",
-            "level": "intermediate",
             "modules": 18,
-            "tags": ["javascript", "nodejs", "react", "mongodb", "fullstack"],
+            "tags": [
+              "javascript",
+              "nodejs",
+              "react",
+              "mongodb",
+              "fullstack"
+            ],
             "createdAt": "2024-03-10T10:00:00Z",
             "updatedAt": "2024-09-25T13:00:00Z",
             "isWishlisted": true
@@ -941,7 +1045,6 @@
             "rating": 4.7,
             "image": "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&h=250&fit=crop",
             "category": "Security",
-            "level": "beginner",
             "modules": 14,
             "tags": [
               "security",
@@ -976,9 +1079,14 @@
             "rating": 4.3,
             "image": "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=400&h=250&fit=crop",
             "category": "Design",
-            "level": "beginner",
             "modules": 8,
-            "tags": ["figma", "design", "mobile", "ui", "prototyping"],
+            "tags": [
+              "figma",
+              "design",
+              "mobile",
+              "ui",
+              "prototyping"
+            ],
             "createdAt": "2024-04-22T09:15:00Z",
             "updatedAt": "2024-09-08T10:30:00Z",
             "isWishlisted": true
@@ -1006,7 +1114,6 @@
             "rating": 4.8,
             "image": "https://images.unsplash.com/photo-1605745341112-85968b19335b?w=400&h=250&fit=crop",
             "category": "DevOps",
-            "level": "intermediate",
             "modules": 16,
             "tags": [
               "docker",
@@ -1039,7 +1146,6 @@
           "description": "Learn the basics of React Native development with hands-on projects and real-world applications. This comprehensive course covers everything from setting up your development environment to deploying your first mobile app.",
           "instructor_id": "inst_001",
           "category_id": "cat_mobile",
-          "level": "beginner",
           "duration_hours": 12,
           "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
           "video_preview_url": "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
@@ -1050,12 +1156,18 @@
           "is_featured": true,
           "language": "English",
           "subtitles": "English, Spanish",
-          "tags": ["react-native", "mobile", "javascript", "ios", "android"],
+          "tags": [
+            "react-native",
+            "mobile",
+            "javascript",
+            "ios",
+            "android"
+          ],
           "created_at": "2024-01-15T08:00:00Z",
           "updated_at": "2024-10-01T14:30:00Z",
           "category_name": "Mobile Development",
           "category_description": "Build mobile applications for iOS and Android",
-          "category_icon": "📱",
+          "category_icon": "\ud83d\udcf1",
           "category_color": "#3B82F6",
           "instructor_name": "Sarah Johnson",
           "instructor_email": "sarah.johnson@example.com",
@@ -1341,7 +1453,6 @@
           "title": "React Native Fundamentals",
           "description": "Learn the basics of React Native development",
           "instructor_name": "Sarah Johnson",
-          "level": "beginner",
           "duration_hours": 12,
           "thumbnail_url": "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400&h=250&fit=crop",
           "rating": "4.5",
@@ -1350,13 +1461,21 @@
           "is_published": true,
           "is_featured": true,
           "language": "English",
-          "tags": ["react-native", "mobile", "javascript"],
+          "tags": [
+            "react-native",
+            "mobile",
+            "javascript"
+          ],
           "created_at": "2024-01-15T08:00:00Z",
           "updated_at": "2024-10-01T14:30:00Z",
           "category_name": "Mobile Development",
           "category_id": "cat_mobile",
-          "requirements": ["Basic JavaScript knowledge"],
-          "outcomes": ["Build mobile apps with React Native"]
+          "requirements": [
+            "Basic JavaScript knowledge"
+          ],
+          "outcomes": [
+            "Build mobile apps with React Native"
+          ]
         },
         "sections": [
           {
@@ -1616,7 +1735,10 @@
             "id": "q3",
             "question_text": "Do you need to install Node.js to develop React Native apps?",
             "question_type": "true-false",
-            "options": ["True", "False"],
+            "options": [
+              "True",
+              "False"
+            ],
             "correct_answer": "True",
             "explanation": "Node.js is required as it provides npm and the JavaScript runtime.",
             "points": 20,
@@ -1641,7 +1763,10 @@
             "id": "q5",
             "question_text": "Can React Native apps run on both iOS and Android?",
             "question_type": "true-false",
-            "options": ["True", "False"],
+            "options": [
+              "True",
+              "False"
+            ],
             "correct_answer": "True",
             "explanation": "React Native enables cross-platform development for both iOS and Android.",
             "points": 20,
