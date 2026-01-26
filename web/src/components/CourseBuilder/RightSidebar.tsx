@@ -1123,7 +1123,7 @@ export const RightSidebar = () => {
         </div>
 
         {/* Course Statistics */}
-        <div>
+        {/* <div>
           <label
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-3"
@@ -1221,7 +1221,7 @@ export const RightSidebar = () => {
               </span>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Delete Confirmation Modal */}

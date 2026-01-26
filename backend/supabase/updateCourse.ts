@@ -152,7 +152,6 @@ serve(async (req) => {
 
     if (courseFields.title !== undefined) updateData.title = courseFields.title;
     if (courseFields.description !== undefined) updateData.description = courseFields.description;
-    if (courseFields.level !== undefined) updateData.level = courseFields.level;
     if (courseFields.instructorName !== undefined) updateData.instructor_name = courseFields.instructorName;
     if (courseFields.instructorId !== undefined) updateData.instructor_id = courseFields.instructorId;
     if (courseFields.thumbnailUrl !== undefined) updateData.thumbnail_url = courseFields.thumbnailUrl;
@@ -362,7 +361,6 @@ serve(async (req) => {
                   resource_type: 'pdf',
                   order_index: lesson.order ?? j,
                   is_preview: lesson.isPreview || false,
-                  thumbnail_url: lesson.thumbnailUrl || null,
                   is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,
                   file_size_bytes: lesson.fileSize || null,
                   estimated_read_minutes: estimatePdfReadMinutes(lesson.fileSize || null)
@@ -383,7 +381,6 @@ serve(async (req) => {
                   resource_type: 'pdf',
                   order_index: lesson.order ?? j,
                   is_preview: lesson.isPreview || false,
-                  thumbnail_url: lesson.thumbnailUrl || null,
                   is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,
                   file_size_bytes: lesson.fileSize || null,
                   estimated_read_minutes: estimatePdfReadMinutes(lesson.fileSize || null)

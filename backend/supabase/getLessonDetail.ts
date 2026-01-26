@@ -72,7 +72,6 @@ serve(async (req) => {
           id,
           title,
           instructor_name,
-          level
         ),
         course_sections (
           id,
@@ -97,7 +96,6 @@ serve(async (req) => {
           description,
           resource_url,
           file_size_bytes,
-          thumbnail_url,
           is_preview,
           is_downloadable,
           order_index,
@@ -107,7 +105,6 @@ serve(async (req) => {
             id,
             title,
             instructor_name,
-            level
           ),
           course_sections (
             id,
@@ -141,7 +138,6 @@ serve(async (req) => {
         resource_url: resource.resource_url,
         file_size_bytes: resource.file_size_bytes,
         is_downloadable: resource.is_downloadable,
-        thumbnail_url: resource.thumbnail_url,
         is_preview: resource.is_preview,
         order_index: resource.order_index,
         course_id: resource.course_id,
@@ -256,7 +252,6 @@ serve(async (req) => {
         id: video.courses.id,
         title: video.courses.title,
         instructor_name: video.courses.instructor_name,
-        level: video.courses.level
       },
       section: {
         id: video.course_sections.id,

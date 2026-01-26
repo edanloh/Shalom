@@ -148,7 +148,6 @@ serve(async (req) => {
         description: originalCourse.description,
         instructor_name: originalCourse.instructor_name,
         category_id: originalCourse.category_id,
-        level: originalCourse.level,
         duration_hours: originalCourse.duration_hours,
         thumbnail_url: originalCourse.thumbnail_url,
         tags: originalCourse.tags,
@@ -389,7 +388,6 @@ serve(async (req) => {
             download_count: 0, // Reset download count for duplicate
             is_downloadable: resource.is_downloadable,
             order_index: resource.order_index,
-            thumbnail_url: resource.thumbnail_url,
             is_preview: resource.is_preview,
             created_at: timestamp,
             updated_at: timestamp,
@@ -415,7 +413,6 @@ serve(async (req) => {
         title: newCourse.title,
         description: newCourse.description,
         instructor_name: newCourse.instructor_name,
-        level: newCourse.level,
         duration_hours: newCourse.duration_hours,
         thumbnail_url: newCourse.thumbnail_url,
         rating: newCourse.rating,

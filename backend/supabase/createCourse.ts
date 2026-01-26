@@ -44,7 +44,6 @@ serve(async (req) => {
       title,
       description,
       category,  
-      level = "Beginner",
       instructorId,
       instructorName,
       thumbnailUrl,
@@ -145,7 +144,6 @@ serve(async (req) => {
         title,
         description: description || '',
         category_id: finalCategoryId,
-        level,
         instructor_id: instructorId,
         instructor_name: instructorName || 'Shalom Instructor',
         thumbnail_url: thumbnailUrl || null,
@@ -199,7 +197,6 @@ serve(async (req) => {
               resource_type: 'pdf',
               order_index: lesson.order ?? j,
               is_preview: lesson.isPreview || false,
-              thumbnail_url: lesson.thumbnailUrl || null,
               is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,
               file_size_bytes: lesson.fileSize || null,
               estimated_read_minutes: estimatePdfReadMinutes(lesson.fileSize || null)

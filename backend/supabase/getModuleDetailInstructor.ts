@@ -61,7 +61,7 @@ serve(async (req) => {
     const { data: course, error: courseError } = await supabaseClient
       .from('courses')
       .select(`
-        id, title, description, instructor_name, level,
+        id, title, description, instructor_name,
         duration_hours, thumbnail_url,
         rating, total_ratings, student_count, is_published,
         is_featured, language, tags,
