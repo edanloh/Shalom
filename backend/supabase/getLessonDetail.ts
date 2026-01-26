@@ -72,7 +72,6 @@ serve(async (req) => {
           id,
           title,
           instructor_name,
-          level
         ),
         course_sections (
           id,
@@ -107,7 +106,6 @@ serve(async (req) => {
             id,
             title,
             instructor_name,
-            level
           ),
           course_sections (
             id,
@@ -256,7 +254,6 @@ serve(async (req) => {
         id: video.courses.id,
         title: video.courses.title,
         instructor_name: video.courses.instructor_name,
-        level: video.courses.level
       },
       section: {
         id: video.course_sections.id,

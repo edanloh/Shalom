@@ -29,7 +29,6 @@ const ENDPOINTS = {
 export interface CourseListParams {
   limit?: number;
   category?: string;
-  level?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -54,7 +53,6 @@ export interface Course {
   quizzes: number;
   createdDate: string;
   lastUpdated: string;
-  level?: string;
   tags?: string[];
   recommendationReason?: string;
   recommendationScore?: number;
@@ -144,7 +142,6 @@ export interface EnrollmentCourse {
   course_id: string;
   title: string;
   description: string;
-  level: string;
   duration_hours: number;
   thumbnail_url: string;
   rating: string;
@@ -370,7 +367,6 @@ const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course =
 
     createdDate: awsCourse.created_at ? new Date(awsCourse.created_at).toLocaleDateString() : 'N/A',
     lastUpdated: awsCourse.updated_at ? new Date(awsCourse.updated_at).toLocaleDateString() : 'N/A',
-    level: awsCourse.level || 'beginner',
     tags: Array.isArray(awsCourse.tags) ? awsCourse.tags : [],
     recommendationReason: awsCourse.recommendation_reason,
     recommendationScore: awsCourse.recommendation_score,
@@ -390,8 +386,6 @@ class CourseService {
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.category) queryParams.append('filterField', 'category_name');
       if (params?.category) queryParams.append('filterValue', params.category);
-      if (params?.level) queryParams.append('filterField', 'level');
-      if (params?.level) queryParams.append('filterValue', params.level);
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
       
@@ -1072,7 +1066,6 @@ class CourseService {
     title: string;
     category: string;
     description?: string;
-    level?: string;
     tags?: string[];
     instructorId?: string;
   }): Promise<Course> {
@@ -1084,7 +1077,6 @@ class CourseService {
         title: courseData.title,
         category: courseData.category,
         description: courseData.description || '',
-        level: courseData.level || 'Beginner',
         tags: courseData.tags || [],
         instructorId: instructorId,
         isPublished: false, // Create as draft by default
@@ -1109,7 +1101,6 @@ class CourseService {
     category: string;
     description: string;
     thumbnailUrl?: string | null;
-    level: string;
     instructorId: string;
     instructorName: string;
     modules: any[];

@@ -152,7 +152,6 @@ serve(async (req) => {
 
     if (courseFields.title !== undefined) updateData.title = courseFields.title;
     if (courseFields.description !== undefined) updateData.description = courseFields.description;
-    if (courseFields.level !== undefined) updateData.level = courseFields.level;
     if (courseFields.instructorName !== undefined) updateData.instructor_name = courseFields.instructorName;
     if (courseFields.instructorId !== undefined) updateData.instructor_id = courseFields.instructorId;
     if (courseFields.thumbnailUrl !== undefined) updateData.thumbnail_url = courseFields.thumbnailUrl;
