@@ -103,6 +103,55 @@ const QuizScreen = () => {
       const data = await quizService.getQuizDetail(courseId, quizId, userId);
       setQuizDetail(data);
 
+      const attempts = data.userAttempts || [];
+      const isPassed = quizService.isQuizPassed(attempts);
+      if (isPassed) {
+        const latestPassed = attempts.find((attempt) => attempt.is_passed);
+        if (latestPassed) {
+          const totalQuestions =
+            Number(latestPassed.total_questions) || data.questions.length || 0;
+          const correctAnswers =
+            Number(latestPassed.correct_answers) ||
+            Math.round((latestPassed.score / 100) * totalQuestions);
+          const answersMap = latestPassed.answers || {};
+          const gradedAnswers = data.questions
+            .map((question) => {
+              const selected = answersMap[question.id];
+              if (!selected) return null;
+              const correctAnswer = question.correct_answer || "";
+              return {
+                questionId: question.id,
+                isCorrect: selected === correctAnswer,
+                correctAnswer,
+              };
+            })
+            .filter(Boolean) as Array<{
+            questionId: string;
+            isCorrect: boolean;
+            correctAnswer: string;
+          }>;
+
+          setSelectedAnswers(new Map(Object.entries(answersMap)));
+          setQuizResult({
+            score: latestPassed.score,
+            totalQuestions,
+            correctAnswers,
+            isPassed: true,
+            attemptNumber: latestPassed.attempt_number,
+            attemptsRemaining: quizService.getAttemptsRemaining(
+              attempts,
+              data.max_attempts
+            ),
+            answers: gradedAnswers,
+            moduleProgress: null,
+          });
+          setShowResults(true);
+          setReviewMode(false);
+          setTimerActive(false);
+          return;
+        }
+      }
+
       // Record start time for all quizzes
       setQuizStartTime(new Date());
 
@@ -319,6 +368,20 @@ const QuizScreen = () => {
       }
     }
     
+    if (quizResult?.isPassed && isLastItem) {
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'MainTabs', params: { screen: 'Home' } as any },
+          {
+            name: 'CourseDetail',
+            params: { courseId, quizCompleted: true, quizId } as any,
+          },
+        ],
+      });
+      return;
+    }
+
     // Default: Navigate back with state to refresh CourseDetail
     navigation.navigate('CourseDetail', {
       courseId,
@@ -997,7 +1060,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   backToCourseButton: {
-    backgroundColor: Colors.purple600,
+    backgroundColor: Colors.purple400,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

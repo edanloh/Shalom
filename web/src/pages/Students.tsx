@@ -8,12 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX } from "lucide-react";
+import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
 import { disableStudent } from "@/lib/disableStudent";
-import { Colors } from "@/constants";
-import { courseService } from "@/services";
+import { courseService, studentService } from "@/services";
+import { useToast } from "@/hooks/use-toast";
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,11 +21,14 @@ const Students = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [profileCache, setProfileCache] = useState<Record<string, any>>({});
+  const [profileLoadingId, setProfileLoadingId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { toast } = useToast();
 
 	const fetchStudents = async () => {
 		setLoading(true);
@@ -45,15 +48,6 @@ const Students = () => {
 				coursesEnrolled: student.coursesEnrolled || 0,
 				completedCourses: student.completedCourses || 0,
 				totalHours: student.totalHours || 0,
-				// Mock data for detailed view (will be fetched when viewing individual student)
-				currentCourses: [
-					{ id: 1, name: "Loading...", progress: 0, grade: 0 }
-				],
-				completedCoursesData: [],
-				quizResults: [],
-				streak: Math.floor(student.engagement / 10) || 0,
-				badges: Math.floor(student.completedCourses * 2) || 0,
-				averageScore: student.progress || 0,
 				enabled: student.enabled !== false, // Get from API, default to true if null/undefined
 			}));
 			
@@ -68,6 +62,35 @@ const Students = () => {
   useEffect(() => {
     fetchStudents();
   }, []);
+
+  const activeProfileBase = selectedStudent
+    ? profileCache[selectedStudent.id] || selectedStudent
+    : null;
+  const activeProfile = selectedStudent
+    ? profileCache[selectedStudent.id] || null
+    : null;
+  const activeProfileLoading = selectedStudent
+    ? profileLoadingId === selectedStudent.id
+    : false;
+  const activeProfileCurrentCourses = activeProfile?.currentCourses || [];
+  const activeProfileCompletedCourses = activeProfile?.completedCoursesData || [];
+  const activeProfileQuizResults = activeProfile?.quizResults || [];
+
+  const loadStudentProfile = async (studentId: string) => {
+    if (profileCache[studentId]) return;
+    setProfileLoadingId(studentId);
+    try {
+      const profile = await studentService.getStudentProfile(studentId);
+      setProfileCache((prev) => ({ ...prev, [studentId]: profile }));
+      if (selectedStudent?.id === studentId) {
+        setSelectedStudent(profile);
+      }
+    } catch (err) {
+      console.error("Failed to load student profile:", err);
+    } finally {
+      setProfileLoadingId(null);
+    }
+  };
 
   // const students = [
   //   {
@@ -270,76 +293,100 @@ const Students = () => {
                   <TableCell className="text-muted-foreground">{student.lastActivity}</TableCell>
                   <TableCell className="text-right">
                     <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                      <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => setSelectedStudent(student)}>
+                    <SheetTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            loadStudentProfile(student.id);
+                          }}
+                        >
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </SheetTrigger>
-                      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+                      <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
                         <SheetHeader>
                           <SheetTitle>Student Profile</SheetTitle>
                         </SheetHeader>
-                        {selectedStudent && (
-                          <div className="space-y-6 mt-6">
+                        {activeProfileBase && (
+                          <>
+                          <div className="space-y-6 mt-6 flex flex-col min-h-0">
                             {/* Header */}
                             <div className="flex items-center gap-4 pb-6 border-b border-border">
                               <Avatar className="h-20 w-20">
                                 <AvatarFallback className="text-2xl bg-primary">
-                                  {selectedStudent.name.split(' ').map((n: string) => n[0]).join('')}
+                                  {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1">
-                                <h3 className="font-semibold text-2xl text-foreground">{selectedStudent.name}</h3>
-                                <p className="text-sm text-muted-foreground mb-2">{selectedStudent.email}</p>
+                                <h3 className="font-semibold text-2xl text-foreground">{activeProfileBase.name}</h3>
+                                <p className="text-sm text-muted-foreground mb-2">{activeProfileBase.email}</p>
                                 <div className="flex gap-2">
-                                  <Badge variant={selectedStudent.enabled ? "default" : "destructive"}>
-                                    {selectedStudent.enabled ? "Active" : "Inactive"}
+                                  <Badge variant={activeProfileBase.enabled ? "default" : "destructive"}>
+                                    {activeProfileBase.enabled ? "Active" : "Inactive"}
                                   </Badge>
-                                  <Badge variant="outline">{selectedStudent.coursesEnrolled} Courses</Badge>
+                                  <Badge variant="outline">{activeProfileBase.coursesEnrolled} Courses</Badge>
                                 </div>
                               </div>
                             </div>
+                            {activeProfileLoading && (
+                              <div className="flex items-center justify-center py-12">
+                                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                  Loading profile details...
+                                </div>
+                              </div>
+                            )}
 
+                            {!activeProfile && !activeProfileLoading && (
+                              <div className="text-sm text-muted-foreground">
+                                Profile details are not available yet.
+                              </div>
+                            )}
+
+                            {activeProfile && (
+                              <>
                             {/* Quick Stats Grid */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                               <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                                 <Target className="h-5 w-5 text-primary mb-2" />
-                                <p className="text-2xl font-bold">{selectedStudent.averageScore}%</p>
+                                <p className="text-2xl font-bold">{activeProfile.averageScore}%</p>
                                 <p className="text-xs text-muted-foreground">Avg Score</p>
                               </div>
                               <div className="p-4 rounded-lg bg-success/10 border border-success/20">
                                 <CheckCircle className="h-5 w-5 text-success mb-2" />
-                                <p className="text-2xl font-bold">{selectedStudent.completedCourses}</p>
+                                <p className="text-2xl font-bold">{activeProfile.completedCourses}</p>
                                 <p className="text-xs text-muted-foreground">Completed</p>
                               </div>
                               <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
                                 <Clock className="h-5 w-5 text-warning mb-2" />
-                                <p className="text-2xl font-bold">{selectedStudent.totalHours}h</p>
+                                <p className="text-2xl font-bold">{activeProfile.totalHours}h</p>
                                 <p className="text-xs text-muted-foreground">Study Time</p>
                               </div>
                               <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
                                 <Award className="h-5 w-5 text-accent mb-2" />
-                                <p className="text-2xl font-bold">{selectedStudent.badges}</p>
+                                <p className="text-2xl font-bold">{activeProfile.badges}</p>
                                 <p className="text-xs text-muted-foreground">Badges</p>
                               </div>
                             </div>
 
                             {/* Tabs for detailed information */}
-                            <Tabs defaultValue="journey" className="w-full">
+                            <Tabs defaultValue="journey" className="w-full flex flex-col flex-1 min-h-0">
                               <TabsList className="grid w-full grid-cols-3">
                                 <TabsTrigger value="journey">Learning Journey</TabsTrigger>
                                 <TabsTrigger value="performance">Performance</TabsTrigger>
                                 <TabsTrigger value="activity">Activity</TabsTrigger>
                               </TabsList>
 
-                              <TabsContent value="journey" className="space-y-4 mt-4">
+                              <TabsContent value="journey" className="space-y-4 mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
                                 <div>
                                   <h4 className="font-semibold mb-3 flex items-center gap-2">
                                     <BookOpen className="h-4 w-4 text-primary" />
                                     Current Courses
                                   </h4>
                                   <div className="space-y-3">
-                                    {selectedStudent.currentCourses.map((course: any) => (
+                                    {activeProfileCurrentCourses.map((course: any) => (
                                       <div key={course.id} className="p-4 rounded-lg bg-background/50 border border-border">
                                           <div className="flex items-center justify-between mb-2">
                                           <p className="font-medium">{course.name}</p>
@@ -349,17 +396,20 @@ const Students = () => {
                                         <p className="text-xs text-muted-foreground mt-1">{course.progress}% Complete</p>
                                       </div>
                                     ))}
+                                    {activeProfileCurrentCourses.length === 0 && (
+                                      <div className="text-sm text-muted-foreground">No active courses</div>
+                                    )}
                                   </div>
                                 </div>
 
-                                {selectedStudent.completedCoursesData.length > 0 && (
+                                {activeProfileCompletedCourses.length > 0 && (
                                   <div>
                                     <h4 className="font-semibold mb-3 flex items-center gap-2">
                                       <CheckCircle className="h-4 w-4 text-success" />
                                       Completed Courses
                                     </h4>
                                     <div className="space-y-3">
-                                      {selectedStudent.completedCoursesData.map((course: any) => (
+                                      {activeProfileCompletedCourses.map((course: any) => (
                                         <div key={course.id} className="p-4 rounded-lg bg-success/10 border border-success/20">
                                             <div className="flex items-center justify-between">
                                               <div className="flex-1">
@@ -380,30 +430,30 @@ const Students = () => {
                                 )}
                               </TabsContent>
 
-                              <TabsContent value="performance" className="space-y-4 mt-4">
+                              <TabsContent value="performance" className="space-y-4 mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="p-4 rounded-lg bg-background/50 border border-border">
                                     <div className="flex items-center gap-2 mb-2">
                                       <TrendingUp className="h-4 w-4 text-primary" />
                                       <span className="text-sm font-medium">Overall Progress</span>
                                     </div>
-                                    <Progress value={selectedStudent.progress} className="h-2 mb-2" />
-                                    <p className="text-2xl font-bold">{selectedStudent.progress}%</p>
+                                    <Progress value={activeProfile.progress} className="h-2 mb-2" />
+                                    <p className="text-2xl font-bold">{activeProfile.progress}%</p>
                                   </div>
                                   <div className="p-4 rounded-lg bg-background/50 border border-border">
                                     <div className="flex items-center gap-2 mb-2">
                                       <Star className="h-4 w-4 text-warning" />
                                       <span className="text-sm font-medium">Engagement</span>
                                     </div>
-                                    <Progress value={selectedStudent.engagement} className="h-2 mb-2" />
-                                    <p className="text-2xl font-bold">{selectedStudent.engagement}%</p>
+                                    <Progress value={activeProfile.engagement} className="h-2 mb-2" />
+                                    <p className="text-2xl font-bold">{activeProfile.engagement}%</p>
                                   </div>
                                 </div>
 
                                 <div>
                                   <h4 className="font-semibold mb-3">Recent Quiz Results</h4>
                                   <div className="space-y-2">
-                                    {selectedStudent.quizResults.map((quiz: any, index: number) => (
+                                    {activeProfileQuizResults.map((quiz: any, index: number) => (
                                       <div key={index} className="p-3 rounded-lg bg-background/50 border border-border flex items-center justify-between">
                                           <div>
                                           <p className="font-medium text-sm">{quiz.quiz}</p>
@@ -414,6 +464,9 @@ const Students = () => {
                                           </Badge>
                                         </div>
                                     ))}
+                                    {activeProfileQuizResults.length === 0 && (
+                                      <div className="text-sm text-muted-foreground">No quiz results yet</div>
+                                    )}
                                   </div>
                                 </div>
 
@@ -422,31 +475,39 @@ const Students = () => {
                                   <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                       <p className="text-muted-foreground">Strengths</p>
-                                      <p className="font-medium">Quiz Performance, Consistency</p>
+                                      <p className="font-medium">
+                                        {activeProfile.strengths?.length
+                                          ? activeProfile.strengths.join(", ")
+                                          : "No strengths detected"}
+                                      </p>
                                     </div>
                                     <div>
                                       <p className="text-muted-foreground">Areas to Improve</p>
-                                      <p className="font-medium">Assignment Submissions</p>
+                                      <p className="font-medium">
+                                        {activeProfile.risks?.length
+                                          ? activeProfile.risks.join(", ")
+                                          : "No risks detected"}
+                                      </p>
                                     </div>
                                   </div>
                                 </div>
                               </TabsContent>
 
-                              <TabsContent value="activity" className="space-y-4 mt-4">
+                              <TabsContent value="activity" className="space-y-4 mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="p-4 rounded-lg bg-background/50 border border-border">
                                     <div className="flex items-center gap-2 mb-2">
                                       <Clock className="h-4 w-4 text-warning" />
                                       <span className="text-sm font-medium">Last Activity</span>
                                     </div>
-                                    <p className="text-xl font-bold">{selectedStudent.lastActivity}</p>
+                                    <p className="text-xl font-bold">{activeProfile.lastActivity}</p>
                                   </div>
                                   <div className="p-4 rounded-lg bg-background/50 border border-border">
                                     <div className="flex items-center gap-2 mb-2">
                                       <TrendingUp className="h-4 w-4 text-success" />
                                       <span className="text-sm font-medium">Current Streak</span>
                                     </div>
-                                    <p className="text-xl font-bold">{selectedStudent.streak} days</p>
+                                    <p className="text-xl font-bold">{activeProfile.streak} days</p>
                                   </div>
                                 </div>
 
@@ -455,94 +516,175 @@ const Students = () => {
                                   <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                       <span className="text-sm">Total Study Hours</span>
-                                      <span className="font-bold">{selectedStudent.totalHours}h</span>
+                                      <span className="font-bold">{activeProfile.totalHours}h</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                       <span className="text-sm">Enrolled Since</span>
-                                      <span className="font-medium">{selectedStudent.enrolledDate}</span>
+                                      <span className="font-medium">{activeProfile.enrolledDate}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                       <span className="text-sm">Active Courses</span>
-                                      <span className="font-medium">{selectedStudent.currentCourses.length}</span>
+                                      <span className="font-medium">{activeProfileCurrentCourses.length}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                       <span className="text-sm">Badges Earned</span>
-                                      <span className="font-medium">{selectedStudent.badges}</span>
+                                      <span className="font-medium">{activeProfile.badges}</span>
                                     </div>
                                   </div>
                                 </div>
 
                                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                                   <h4 className="font-semibold mb-2 text-sm">Activity Status</h4>
-                                  <Badge className={selectedStudent.engagement >= 70 ? "status-badge-published" : "status-badge-draft"}>
-                                    {selectedStudent.engagement >= 70 ? "Highly Engaged" : "Needs Attention"}
+                                  <Badge className={activeProfile.engagement >= 70 ? "status-badge-published" : "status-badge-draft"}>
+                                    {activeProfile.engagement >= 70 ? "Highly Engaged" : "Needs Attention"}
                                   </Badge>
                                 </div>
                               </TabsContent>
                             </Tabs>
-
-                            <Button className="w-full gap-2">
-                              <Mail className="h-4 w-4" />
-                              Send Message
-                            </Button>
-                            
-                            {selectedStudent.enabled ? (
+                            </>
+                            )}
+                          </div>
+                          {activeProfile && (
+                          <div className="mt-auto border-t border-border bg-background/95 backdrop-blur">
+                            <div className="flex flex-col gap-2 p-4">
+                              <Button className="w-full gap-2">
+                                <Mail className="h-4 w-4" />
+                                Send Message
+                              </Button>
+                              
+                            {activeProfile.enabled ? (
                               <Button
                                 className="w-full gap-2"
                                 variant="destructive"
                                 onClick={async () => {
                                   try {
+                                    const toastInstance = toast({
+                                      title: "Disabling user",
+                                      description: (
+                                        <span className="inline-flex items-center gap-2">
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          Updating access...
+                                        </span>
+                                      ),
+                                    });
                                     const result = await disableStudent({
-                                      studentId: selectedStudent.email,
+                                      studentId: activeProfile.email,
                                       status: false,
                                     });
                                     if (result) {
-                                      // Update local state immediately
-                                      setSelectedStudent({ ...selectedStudent, enabled: false });
+                                        // Update local state immediately
+                                        setSelectedStudent({ ...activeProfile, enabled: false });
+                                      setProfileCache((prev) => ({
+                                        ...prev,
+                                        [activeProfile.id]: { ...activeProfile, enabled: false },
+                                      }));
+                                      setStudents((prev) =>
+                                        prev.map((student) =>
+                                          student.id === activeProfile.id
+                                            ? { ...student, enabled: false }
+                                            : student
+                                        )
+                                      );
                                       // Refresh the full list
                                       fetchStudents();
                                       setIsSheetOpen(false);
+                                      toastInstance.update({
+                                        id: toastInstance.id,
+                                        title: "User disabled",
+                                        description: `${activeProfile.email} can no longer log in.`,
+                                      });
                                     } else {
                                       console.error("disableStudent failed:", result);
+                                      toastInstance.update({
+                                        id: toastInstance.id,
+                                        title: "Disable failed",
+                                        description: "Unable to update user status.",
+                                        variant: "destructive",
+                                      });
                                     }
                                   } catch (err) {
-                                    console.error("Failed to disable student:", err);
-                                  }
-                                }}
+                                    const message =
+                                      err instanceof Error ? err.message : "Unable to update user status.";
+                                    toast({
+                                      title: "Disable failed",
+                                      description: message,
+                                variant: "destructive",
+                              });
+                            }
+                          }}
                               >
                                 <UserX className="h-4 w-4" />
                                 Disable User
-                              </Button>
-                            ) : (
+                                </Button>
+                              ) : (
                               <Button
-                                className="w-full gap-2"
-                                style={{backgroundColor: Colors.purple600}}
+                                className="w-full gap-2 bg-primary hover:bg-primary/90"
                                 variant="default"
                                 onClick={async () => {
                                   try {
+                                    const toastInstance = toast({
+                                      title: "Enabling user",
+                                      description: (
+                                        <span className="inline-flex items-center gap-2">
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                          Restoring access...
+                                        </span>
+                                      ),
+                                    });
                                     const result = await disableStudent({
-                                      studentId: selectedStudent.email,
+                                      studentId: activeProfile.email,
                                       status: true,
                                     });
                                     if (result) {
-                                      // Update local state immediately
-                                      setSelectedStudent({ ...selectedStudent, enabled: true });
+                                        // Update local state immediately
+                                        setSelectedStudent({ ...activeProfile, enabled: true });
+                                      setProfileCache((prev) => ({
+                                        ...prev,
+                                        [activeProfile.id]: { ...activeProfile, enabled: true },
+                                      }));
+                                      setStudents((prev) =>
+                                        prev.map((student) =>
+                                          student.id === activeProfile.id
+                                            ? { ...student, enabled: true }
+                                            : student
+                                        )
+                                      );
                                       // Refresh the full list
                                       fetchStudents();
                                       setIsSheetOpen(false);
+                                      toastInstance.update({
+                                        id: toastInstance.id,
+                                        title: "User enabled",
+                                        description: `${activeProfile.email} can log in again.`,
+                                      });
                                     } else {
                                       console.error("enableStudent failed:", result);
+                                      toastInstance.update({
+                                        id: toastInstance.id,
+                                        title: "Enable failed",
+                                        description: "Unable to update user status.",
+                                        variant: "destructive",
+                                      });
                                     }
                                   } catch (err) {
-                                    console.error("Failed to enable student:", err);
-                                  }
-                                }}
+                                    const message =
+                                      err instanceof Error ? err.message : "Unable to update user status.";
+                                    toast({
+                                      title: "Enable failed",
+                                      description: message,
+                                      variant: "destructive",
+                                    });
+                                }
+                              }}
                               >
-                                <UserX className="h-4 w-4" />
-                                Enable User
+                              <UserX className="h-4 w-4" />
+                              Enable User
                               </Button>
                             )}
+                            </div>
                           </div>
+                          )}
+                          </>
                         )}
                       </SheetContent>
                     </Sheet>

@@ -14,7 +14,6 @@ SELECT
   c.description,
   c.instructor_name,
   c.category_id,
-  c.level,
   c.duration_hours,
   c.thumbnail_url,
   c.is_published,
@@ -52,7 +51,7 @@ LEFT JOIN course_ratings cr ON cr.course_id = c.id  -- ← This was missing!
 
 GROUP BY 
   c.id, c.title, c.description, c.instructor_name, c.category_id,
-  c.level, c.duration_hours, c.thumbnail_url, c.is_published,
+  c.duration_hours, c.thumbnail_url, c.is_published,
   c.is_featured, c.language, c.tags, c.created_at, c.updated_at,
   cat.name, cat.color;
 

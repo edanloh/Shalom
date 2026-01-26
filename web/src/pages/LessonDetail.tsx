@@ -117,7 +117,6 @@ const LessonDetail = () => {
         id: lessonData.course?.id,
         title: lessonData.course?.title,
         instructor_name: lessonData.course?.instructor_name,
-        level: lessonData.course?.level,
       });
 
       // Set current section
@@ -498,10 +497,6 @@ const LessonDetail = () => {
                     <div className="text-sm">
                       <p className="text-muted-foreground">Instructor</p>
                       <p className="font-medium">{course.instructor_name}</p>
-                    </div>
-                    <div className="text-sm">
-                      <p className="text-muted-foreground">Level</p>
-                      <p className="font-medium capitalize">{course.level}</p>
                     </div>
                   </>
                 )}

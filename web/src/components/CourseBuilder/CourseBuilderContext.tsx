@@ -1012,7 +1012,6 @@ export const CourseBuilderProvider = ({
           category: finalCategoryId || "",
           description: courseDescription || "Course description",
           thumbnailUrl: uploadedCourseThumbnailUrl || null,
-          level: "Beginner", // TODO: Add level selector in UI
           instructorId: user?.id || "550e8400-e29b-41d4-a716-446655440101", // Get from auth context
           instructorName: user?.name || "Shalom Instructor", // Get from auth context
           modules: transformedModules,

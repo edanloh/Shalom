@@ -92,9 +92,9 @@ CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(500) NOT NULL,
     description TEXT NOT NULL,
+    instructor_id UUID REFERENCES users(id),
     instructor_name VARCHAR(255) DEFAULT 'Shalom Instructor', -- Single instructor
     category_id UUID NOT NULL REFERENCES categories(id),
-    level VARCHAR(20) NOT NULL CHECK (level IN ('Beginner', 'Intermediate', 'Advanced')),
     duration_hours INTEGER NOT NULL, -- total duration in hours
     thumbnail_url TEXT,
     video_preview_url TEXT,
@@ -316,13 +316,13 @@ INSERT INTO users (id, email, name, avatar_url, password_hash, role, points, joi
 ('550e8400-e29b-41d4-a716-446655440201', 'admin@shalom.edu', 'Shalom Instructor', 'https://via.placeholder.com/150', '$2a$10$hashedpassword6', 'admin', 5000, '2023-08-15 08:00:00');
 
 -- Insert Courses (instructor_name instead of instructor_id)
-INSERT INTO courses (id, title, description, instructor_name, category_id, level, duration_hours, thumbnail_url, rating, total_ratings, student_count, is_published, is_featured, tags) VALUES
-('550e8400-e29b-41d4-a716-446655440401', 'Complete Web Development Bootcamp 2024', 'Learn HTML, CSS, JavaScript, React, Node.js, and more in this comprehensive bootcamp. Build real-world projects and become a full-stack developer.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440001', 'Beginner', 40, 'https://via.placeholder.com/400x250', 4.9, 2180, 45000, true, true, ARRAY['HTML', 'CSS', 'JavaScript', 'React', 'Node.js', 'Full-Stack']),
-('550e8400-e29b-41d4-a716-446655440402', 'Machine Learning Fundamentals with Python', 'Master the basics of machine learning with hands-on Python projects. Learn scikit-learn, pandas, and build your first ML models.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440002', 'Intermediate', 35, 'https://via.placeholder.com/400x250', 4.8, 1536, 32000, true, true, ARRAY['Python', 'Machine Learning', 'Data Science', 'scikit-learn', 'pandas']),
-('550e8400-e29b-41d4-a716-446655440403', 'UI/UX Design Masterclass', 'Learn user experience design from scratch. Master Figma, design thinking, user research, and create beautiful, functional interfaces.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440003', 'Beginner', 25, 'https://via.placeholder.com/400x250', 4.9, 1372, 28000, true, true, ARRAY['UI Design', 'UX Design', 'Figma', 'User Research', 'Prototyping']),
-('550e8400-e29b-41d4-a716-446655440404', 'Advanced React & TypeScript', 'Deep dive into advanced React patterns, hooks, performance optimization, and TypeScript integration for professional development.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440001', 'Advanced', 30, 'https://via.placeholder.com/400x250', 4.7, 846, 18000, true, false, ARRAY['React', 'TypeScript', 'Advanced', 'Hooks', 'Performance']),
-('550e8400-e29b-41d4-a716-446655440405', 'Digital Marketing Mastery', 'Complete guide to digital marketing including SEO, social media marketing, content strategy, and paid advertising campaigns.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440008', 'Beginner', 20,'https://via.placeholder.com/400x250', 4.6, 1012, 22000, true, false, ARRAY['Digital Marketing', 'SEO', 'Social Media', 'Content Marketing', 'PPC']),
-('550e8400-e29b-41d4-a716-446655440406', 'React Native Mobile Development', 'Build cross-platform mobile apps with React Native. Learn navigation, state management, and deploy to both iOS and Android.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440007', 'Intermediate', 28, 'https://via.placeholder.com/400x250', 4.8, 980, 20000, true, false, ARRAY['React Native', 'Mobile Development', 'iOS', 'Android', 'Cross-Platform']);
+INSERT INTO courses (id, title, description, instructor_name, category_id, duration_hours, thumbnail_url, rating, total_ratings, student_count, is_published, is_featured, tags) VALUES
+('550e8400-e29b-41d4-a716-446655440401', 'Complete Web Development Bootcamp 2024', 'Learn HTML, CSS, JavaScript, React, Node.js, and more in this comprehensive bootcamp. Build real-world projects and become a full-stack developer.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440001', 40, 'https://via.placeholder.com/400x250', 4.9, 2180, 45000, true, true, ARRAY['HTML', 'CSS', 'JavaScript', 'React', 'Node.js', 'Full-Stack']),
+('550e8400-e29b-41d4-a716-446655440402', 'Machine Learning Fundamentals with Python', 'Master the basics of machine learning with hands-on Python projects. Learn scikit-learn, pandas, and build your first ML models.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440002', 35, 'https://via.placeholder.com/400x250', 4.8, 1536, 32000, true, true, ARRAY['Python', 'Machine Learning', 'Data Science', 'scikit-learn', 'pandas']),
+('550e8400-e29b-41d4-a716-446655440403', 'UI/UX Design Masterclass', 'Learn user experience design from scratch. Master Figma, design thinking, user research, and create beautiful, functional interfaces.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440003', 25, 'https://via.placeholder.com/400x250', 4.9, 1372, 28000, true, true, ARRAY['UI Design', 'UX Design', 'Figma', 'User Research', 'Prototyping']),
+('550e8400-e29b-41d4-a716-446655440404', 'Advanced React & TypeScript', 'Deep dive into advanced React patterns, hooks, performance optimization, and TypeScript integration for professional development.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440001', 30, 'https://via.placeholder.com/400x250', 4.7, 846, 18000, true, false, ARRAY['React', 'TypeScript', 'Advanced', 'Hooks', 'Performance']),
+('550e8400-e29b-41d4-a716-446655440405', 'Digital Marketing Mastery', 'Complete guide to digital marketing including SEO, social media marketing, content strategy, and paid advertising campaigns.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440008', 20,'https://via.placeholder.com/400x250', 4.6, 1012, 22000, true, false, ARRAY['Digital Marketing', 'SEO', 'Social Media', 'Content Marketing', 'PPC']),
+('550e8400-e29b-41d4-a716-446655440406', 'React Native Mobile Development', 'Build cross-platform mobile apps with React Native. Learn navigation, state management, and deploy to both iOS and Android.', 'Shalom Instructor', '550e8400-e29b-41d4-a716-446655440007', 28, 'https://via.placeholder.com/400x250', 4.8, 980, 20000, true, false, ARRAY['React Native', 'Mobile Development', 'iOS', 'Android', 'Cross-Platform']);
 
 -- Insert Course Sections
 INSERT INTO course_sections (id, course_id, title, description, order_index, lessons_count, duration_minutes) VALUES
@@ -445,7 +445,6 @@ SELECT
     c.id,
     c.title,
     c.description,
-    c.level,
     c.duration_hours,
     c.rating,
     c.student_count,
@@ -673,7 +672,6 @@ CREATE TABLE IF NOT EXISTS user_interests (
 CREATE TABLE IF NOT EXISTS content_features (
     course_id UUID PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
     tags TEXT[],
-    level VARCHAR(20) CHECK (level IN ('Beginner', 'Intermediate', 'Advanced')),
     duration_minutes INTEGER,
     popularity_score NUMERIC(6,3) DEFAULT 0.000,
     freshness_score NUMERIC(6,3) DEFAULT 0.000,
@@ -1029,10 +1027,10 @@ INSERT INTO user_interests (id, user_id, topic, weight, source) VALUES
 ('550e8400-e29b-41d4-a716-446655520203', '550e8400-e29b-41d4-a716-446655440103', 'Machine Learning', 2.700, 'declared')
 ON CONFLICT (user_id, topic) DO NOTHING;
 
-INSERT INTO content_features (course_id, tags, level, duration_minutes, popularity_score, freshness_score, quality_score) VALUES
-('550e8400-e29b-41d4-a716-446655440401', ARRAY['React', 'Frontend', 'TypeScript'], 'Intermediate', 720, 9.500, 7.200, 9.200),
-('550e8400-e29b-41d4-a716-446655440402', ARRAY['Python', 'Data Science', 'Machine Learning'], 'Beginner', 640, 9.800, 8.100, 9.000),
-('550e8400-e29b-41d4-a716-446655440404', ARRAY['Node', 'Backend', 'API'], 'Intermediate', 560, 8.900, 6.800, 8.700)
+INSERT INTO content_features (course_id, tags, duration_minutes, popularity_score, freshness_score, quality_score) VALUES
+('550e8400-e29b-41d4-a716-446655440401', ARRAY['React', 'Frontend', 'TypeScript'], 720, 9.500, 7.200, 9.200),
+('550e8400-e29b-41d4-a716-446655440402', ARRAY['Python', 'Data Science', 'Machine Learning'], 640, 9.800, 8.100, 9.000),
+('550e8400-e29b-41d4-a716-446655440404', ARRAY['Node', 'Backend', 'API'], 560, 8.900, 6.800, 8.700)
 ON CONFLICT (course_id) DO NOTHING;
 
 INSERT INTO course_skills (id, course_id, skill, proficiency) VALUES

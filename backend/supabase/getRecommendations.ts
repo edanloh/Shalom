@@ -35,7 +35,6 @@ serve(async (req) => {
         id,
         title,
         description,
-        level,
         rating,
         duration_hours,
         thumbnail_url,

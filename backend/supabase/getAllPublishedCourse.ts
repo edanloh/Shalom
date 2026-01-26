@@ -37,7 +37,6 @@ serve(async (req) => {
 
     const allowedSortFields = [
       "title",
-      "level",
       "rating",
       "student_count",
       "created_at",
@@ -63,7 +62,7 @@ serve(async (req) => {
       .order(safeSortBy, { ascending });
 
     // Apply filters
-    if (filterField && filterValue) {
+    if (filterField && filterValue && filterField !== "level") {
       if (filterField === "category_name") {
         query = query.ilike('categories.name', `%${filterValue}%`);
       } else if (filterField === "instructor_name") {

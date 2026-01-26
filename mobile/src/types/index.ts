@@ -169,7 +169,6 @@ export interface Course {
   image: string;
   category: string;
   categoryColor?: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
   modules: number;
   tags?: string[];
   prerequisites?: string[];
@@ -282,7 +281,6 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 //   rating: number;
 //   image: string;
 //   category: string;
-//   level: string;
 //   modules: number;
 // }
 
@@ -298,7 +296,6 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 // Filter and Search types
 export interface CourseFilters {
   category?: string[];
-  level?: ('beginner' | 'intermediate' | 'advanced')[];
   rating?: number;
   duration?: {
     min?: number;

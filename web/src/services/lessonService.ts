@@ -21,7 +21,6 @@ export interface LessonDetail {
     id: string;
     title: string;
     instructor_name: string;
-    level: string;
   };
   section: {
     id: string;

@@ -11,7 +11,6 @@ export interface CourseDetailResponse {
       description: string;
       instructor_id: string;
       category_id: string;
-      level: string;
       duration_hours: number;
       thumbnail_url: string;
       rating: string | number;
@@ -108,7 +107,6 @@ export interface ProcessedCourseDetail {
   totalRatings: number;
   studentCount: number;
   duration: string;
-  level: string;
   category: string;
   categoryColor: string;
   tags: string[];
@@ -196,7 +194,6 @@ class CourseDetailService {
       ),
       studentCount: course.student_count || 0,
       duration: this.formatDuration(course.duration_hours || 0),
-      level: course.level,
       category: course.category_name || 'Uncategorized',
       categoryColor: course.category_color || Colors.accent,
       tags: course.tags || [],

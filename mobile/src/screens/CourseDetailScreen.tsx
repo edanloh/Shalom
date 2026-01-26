@@ -454,7 +454,6 @@ export default function CourseDetailScreen({
                 instructor: courseDetail.instructor,
                 rating: courseDetail.rating,
                 duration: courseDetail.duration,
-                level: courseDetail.level,
                 category: courseDetail.category,
               } as any);
             }}

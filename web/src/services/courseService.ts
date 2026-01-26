@@ -29,7 +29,6 @@ const ENDPOINTS = {
 export interface CourseListParams {
   limit?: number;
   category?: string;
-  level?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -54,7 +53,6 @@ export interface Course {
   quizzes: number;
   createdDate: string;
   lastUpdated: string;
-  level?: string;
   tags?: string[];
   recommendationReason?: string;
   recommendationScore?: number;
@@ -144,7 +142,6 @@ export interface EnrollmentCourse {
   course_id: string;
   title: string;
   description: string;
-  level: string;
   duration_hours: number;
   thumbnail_url: string;
   rating: string;
@@ -370,7 +367,6 @@ const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course =
 
     createdDate: awsCourse.created_at ? new Date(awsCourse.created_at).toLocaleDateString() : 'N/A',
     lastUpdated: awsCourse.updated_at ? new Date(awsCourse.updated_at).toLocaleDateString() : 'N/A',
-    level: awsCourse.level || 'beginner',
     tags: Array.isArray(awsCourse.tags) ? awsCourse.tags : [],
     recommendationReason: awsCourse.recommendation_reason,
     recommendationScore: awsCourse.recommendation_score,
@@ -390,8 +386,6 @@ class CourseService {
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.category) queryParams.append('filterField', 'category_name');
       if (params?.category) queryParams.append('filterValue', params.category);
-      if (params?.level) queryParams.append('filterField', 'level');
-      if (params?.level) queryParams.append('filterValue', params.level);
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
       
@@ -606,6 +600,7 @@ class CourseService {
       coursesEnrolled: number;
       completedCourses: number;
       totalHours: number;
+      enabled?: boolean;
     }>;
     statistics: {
       total_students: number;
@@ -618,29 +613,33 @@ class CourseService {
   }> {
     try {
       const response = await apiService.get<any>(ENDPOINTS.ALL_STUDENTS);
-      
-      // API response: { success, data: { students, statistics } }
+
+      const payload = response?.data ?? response;
+      const students = Array.isArray(payload?.students) ? payload.students : [];
+      const statistics = payload?.statistics || {
+        total_students: 0,
+        active_students: 0,
+        engaged_students: 0,
+        at_risk_students: 0,
+        average_progress: 0,
+        average_engagement: 0
+      };
+
       return {
-        students: response.data.students.map((student: any) => ({
+        students: students.map((student: any) => ({
           id: student.id,
           name: student.name,
           email: student.email,
           enrolledDate: student.enrolledDate,
-          progress: student.progress || 0,
+          progress: Number(student.progress ?? 0),
           lastActivity: student.lastActivity || 'Never',
-          engagement: student.engagement || 0,
-          coursesEnrolled: student.coursesEnrolled || 0,
-          completedCourses: student.completedCourses || 0,
-          totalHours: student.totalHours || 0
+          engagement: Number(student.engagement ?? 0),
+          coursesEnrolled: Number(student.coursesEnrolled ?? 0),
+          completedCourses: Number(student.completedCourses ?? 0),
+          totalHours: Number(student.totalHours ?? 0),
+          enabled: student.enabled
         })),
-        statistics: response.data.statistics || {
-          total_students: 0,
-          active_students: 0,
-          engaged_students: 0,
-          at_risk_students: 0,
-          average_progress: 0,
-          average_engagement: 0
-        }
+        statistics
       };
     } catch (error) {
       console.error('Error fetching all students:', error);
@@ -1067,7 +1066,6 @@ class CourseService {
     title: string;
     category: string;
     description?: string;
-    level?: string;
     tags?: string[];
     instructorId?: string;
   }): Promise<Course> {
@@ -1079,7 +1077,6 @@ class CourseService {
         title: courseData.title,
         category: courseData.category,
         description: courseData.description || '',
-        level: courseData.level || 'Beginner',
         tags: courseData.tags || [],
         instructorId: instructorId,
         isPublished: false, // Create as draft by default
@@ -1104,7 +1101,6 @@ class CourseService {
     category: string;
     description: string;
     thumbnailUrl?: string | null;
-    level: string;
     instructorId: string;
     instructorName: string;
     modules: any[];

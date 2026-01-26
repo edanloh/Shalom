@@ -72,7 +72,6 @@ export interface ModuleDetailResponse {
       title: string;
       description: string;
       instructor_name: string;
-      level: string;
       duration_hours: number;
       thumbnail_url?: string;
       rating: string;

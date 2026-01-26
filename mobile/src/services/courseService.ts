@@ -44,7 +44,6 @@ const WISHLIST = {
 export interface CourseListParams {
   limit?: number;
   category?: string;
-  level?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -62,7 +61,6 @@ export interface EnrollmentCourse {
   course_id: string;
   title: string;
   description: string;
-  level: string;
   duration_hours: number;
   thumbnail_url: string;
   rating: string;
@@ -243,16 +241,6 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   // Calculate duration string from hours
   const durationStr = awsCourse.duration_hours ? `${awsCourse.duration_hours}h` : '0h';
   
-  // Map level to lowercase format expected by types/index.ts
-  const mapLevel = (level: string): 'beginner' | 'intermediate' | 'advanced' => {
-    const levelLower = level?.toLowerCase();
-    switch (levelLower) {
-      case 'intermediate': return 'intermediate';
-      case 'advanced': return 'advanced';
-      default: return 'beginner';
-    }
-  };
-
   // Generate avatar from instructor name
   const generateAvatar = (name: string): string => {
     if (!name) return 'https://via.placeholder.com/50x50';
@@ -285,7 +273,6 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
       'https://via.placeholder.com/400x250',
     category: awsCourse.category_name || 'General',
     categoryColor: awsCourse.category_color || Colors.categoryDefault,
-    level: mapLevel(awsCourse.level),
     modules: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
     tags: Array.isArray(awsCourse.tags) ? awsCourse.tags : [],
     prerequisites: [],
@@ -372,16 +359,6 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=50&background=3B82F6&color=fff`;
   };
 
-  // Map level to lowercase format
-  const mapLevel = (level: string): 'beginner' | 'intermediate' | 'advanced' => {
-    const levelLower = level?.toLowerCase();
-    switch (levelLower) {
-      case 'intermediate': return 'intermediate';
-      case 'advanced': return 'advanced';
-      default: return 'beginner';
-    }
-  };
-
   return {
     id: enrollment.course_id,
     title: enrollment.title,
@@ -405,7 +382,6 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     image: enrollment.thumbnail_url,
     category: enrollment.category_name,
     categoryColor: enrollment.category_color || Colors.categoryDefault,
-    level: mapLevel(enrollment.level),
     modules: progressTotal,
     tags: enrollment.tags || [],
     prerequisites: [],
@@ -433,7 +409,6 @@ class CourseService {
       const queryParams: Record<string, string> = {};
       if (params?.limit) queryParams.limit = params.limit.toString();
       if (params?.category) queryParams.category = params.category;
-      if (params?.level) queryParams.level = params.level;
       if (params?.sortBy) queryParams.sortBy = params.sortBy;
       if (params?.sortOrder) queryParams.sortOrder = params.sortOrder;
 
