@@ -503,7 +503,8 @@ serve(async (req) => {
         is_completed: isEnrollmentCompleted,
         completion_date: isEnrollmentCompleted ? new Date().toISOString() : null,
         current_video_id: videoId,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString()
       })
       .eq('user_id', userId)
       .eq('course_id', course_id)

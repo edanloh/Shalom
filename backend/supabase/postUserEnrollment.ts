@@ -321,7 +321,8 @@ serve(async (req) => {
         enrollment_date: enrollmentDate || new Date().toISOString(),
         progress_percentage: progressNum,
         is_completed: !!isCompleted,
-        total_watch_time_minutes: watchMinsNum
+        total_watch_time_minutes: watchMinsNum,
+        last_activity_at: new Date().toISOString()
       })
       .select(`
         id,

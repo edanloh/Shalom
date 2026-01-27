@@ -224,6 +224,7 @@ serve(async (req) => {
         is_completed: isAllCompleted,
         completion_date: isAllCompleted ? new Date().toISOString() : null,
         updated_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
       })
       .eq("user_id", userId)
       .eq("course_id", courseId);

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Header } from "@/components/Header";
 import { StatsCard } from "@/components/StatsCard";
 import { Card } from "@/components/ui/card";
@@ -26,6 +26,8 @@ import {
   GraduationCap,
   BarChart3,
 } from "lucide-react";
+import { analyticsService, type InstructorAnalytics } from "@/services";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LineChart,
   Line,
@@ -55,109 +57,138 @@ const Analytics = () => {
   const [viewMode, setViewMode] = useState<"all" | "course">("all");
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [analytics, setAnalytics] = useState<InstructorAnalytics | null>(null);
+  const [courseAnalytics, setCourseAnalytics] = useState<InstructorAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const tooltipWrapperStyle = { pointerEvents: "none" } as const;
   const { toast } = useToast();
-  const allCourses = [
-    {
-      id: "1",
-      name: "Data Science Fundamentals Data Science Fundamentals",
-      students: 245,
-      rating: 4.8,
-      completion: 67,
-      engagement: 85,
-    },
-    {
-      id: "2",
-      name: "Machine Learning A-Z",
-      students: 189,
-      rating: 4.6,
-      completion: 54,
-      engagement: 78,
-    },
-    {
-      id: "3",
-      name: "Python for Beginners",
-      students: 312,
-      rating: 4.9,
-      completion: 78,
-      engagement: 92,
-    },
-    {
-      id: "4",
-      name: "Advanced Analytics",
-      students: 156,
-      rating: 4.5,
-      completion: 45,
-      engagement: 65,
-    },
-    {
-      id: "5",
-      name: "Deep Learning Basics",
-      students: 198,
-      rating: 4.7,
-      completion: 61,
-      engagement: 72,
-    },
-  ];
+  const { user } = useAuth();
+  const defaultUserId = user?.id || "550e8400-e29b-41d4-a716-446655440201";
 
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await analyticsService.getInstructorAnalytics(defaultUserId, {
+          days: Number(dateFilter),
+        });
+        setAnalytics(data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load analytics";
+        setError(message);
+        toast({
+          title: "Analytics unavailable",
+          description: message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAnalytics();
+  }, [dateFilter, defaultUserId, toast]);
+
+  useEffect(() => {
+    const loadCourseAnalytics = async () => {
+      if (!selectedCourseId) {
+        setCourseAnalytics(null);
+        return;
+      }
+      try {
+        const data = await analyticsService.getInstructorAnalytics(defaultUserId, {
+          days: Number(dateFilter),
+          courseId: selectedCourseId,
+        });
+        setCourseAnalytics(data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load course analytics";
+        toast({
+          title: "Course analytics unavailable",
+          description: message,
+          variant: "destructive",
+        });
+      }
+    };
+
+    loadCourseAnalytics();
+  }, [dateFilter, selectedCourseId, defaultUserId, toast]);
+
+  useEffect(() => {
+    if (viewMode === "course") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [viewMode, selectedCourseId]);
+
+  const allCourses = analytics?.courses ?? [];
+  const overallEngagementAvg = useMemo(() => {
+    const items = analytics?.course_performance ?? [];
+    if (items.length === 0) return null;
+    return items.reduce((sum, item) => sum + item.engagement, 0) / items.length;
+  }, [analytics]);
+  const overallCompletionAvg = useMemo(() => {
+    const items = analytics?.course_performance ?? [];
+    if (items.length === 0) return null;
+    return items.reduce((sum, item) => sum + item.completion, 0) / items.length;
+  }, [analytics]);
+  const overallRatingAvg = analytics?.summary?.average_rating ?? null;
+  const enrollmentTrend = courseAnalytics?.enrollment_trend ?? [];
+  const enrollmentMonthly = courseAnalytics?.enrollment_monthly ?? null;
+  const enrollmentTrendText = useMemo(() => {
+    if (enrollmentMonthly) {
+      const last = enrollmentMonthly.current.students ?? 0;
+      const prev = enrollmentMonthly.previous.students ?? 0;
+      if (prev === 0) return last === 0 ? "No change from last month" : "+100% from last month";
+      const delta = ((last - prev) / prev) * 100;
+      return `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}% from last month`;
+    }
+    if (enrollmentTrend.length < 2) return `Last ${dateFilter} days`;
+    const last = enrollmentTrend[enrollmentTrend.length - 1]?.students ?? 0;
+    const prev = enrollmentTrend[enrollmentTrend.length - 2]?.students ?? 0;
+    if (prev === 0) return last === 0 ? "No change from last month" : "+100% from last month";
+    const delta = ((last - prev) / prev) * 100;
+    return `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}% from last month`;
+  }, [enrollmentTrend, enrollmentMonthly, dateFilter]);
   const filteredCourses = allCourses.filter((course) =>
     course.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getDateFilteredData = (days: string) => {
-    // Simulate different data based on date range
-    const multiplier = parseInt(days) / 30;
-    return [
-      { month: "Jan", students: Math.floor(120 * multiplier) },
-      { month: "Feb", students: Math.floor(180 * multiplier) },
-      { month: "Mar", students: Math.floor(240 * multiplier) },
-      { month: "Apr", students: Math.floor(320 * multiplier) },
-      { month: "May", students: Math.floor(410 * multiplier) },
-      { month: "Jun", students: Math.floor(502 * multiplier) },
-    ];
-  };
-
   const enrollmentData = useMemo(
-    () => getDateFilteredData(dateFilter),
-    [dateFilter]
+    () => analytics?.enrollment_trend ?? [],
+    [analytics]
+  );
+  const courseEnrollmentData = useMemo(
+    () =>
+      selectedCourseId
+        ? courseAnalytics?.enrollment_trend ?? []
+        : enrollmentData,
+    [selectedCourseId, courseAnalytics, enrollmentData]
   );
 
-  const completionData = [
-    { name: "Completed", value: 640, color: "hsl(var(--success))" },
-    { name: "In Progress", value: 280, color: "hsl(var(--primary))" },
-    { name: "Not Started", value: 82, color: "hsl(var(--muted))" },
-  ];
+  const completionData =
+    analytics?.completion_breakdown?.map((entry) => {
+      const colorMap: Record<string, string> = {
+        Completed: "hsl(var(--success))",
+        "In Progress": "hsl(var(--primary))",
+        "Not Started": "hsl(var(--muted))",
+      };
+      return { ...entry, color: colorMap[entry.name] || "hsl(var(--muted))" };
+    }) ?? [];
 
-  const studentActivityData = [
-    { day: "Mon", active: 420, inactive: 80 },
-    { day: "Tue", active: 380, inactive: 120 },
-    { day: "Wed", active: 450, inactive: 50 },
-    { day: "Thu", active: 390, inactive: 110 },
-    { day: "Fri", active: 410, inactive: 90 },
-    { day: "Sat", active: 280, inactive: 220 },
-    { day: "Sun", active: 320, inactive: 180 },
-  ];
+  const studentActivityData = analytics?.activity_by_day ?? [];
 
-  const categoryPerformance = [
-    { category: "Engagement", value: 82 },
-    { category: "Completion", value: 76 },
-    { category: "Satisfaction", value: 88 },
-    { category: "Retention", value: 79 },
-    { category: "Performance", value: 85 },
-  ];
+  const categoryPerformance = analytics?.category_performance ?? [];
+  const cohortAnalytics = analytics?.cohort_analytics ?? [];
 
-  const coursePerformance = selectedCourseId
-    ? [allCourses.find((c) => c.id === selectedCourseId)]
-        .filter(Boolean)
-        .map((c) => ({
-          course: c!.name,
-          engagement: c!.engagement,
-          completion: c!.completion,
-        }))
-    : allCourses.map((c) => ({
-        course: c.name,
-        engagement: c.engagement,
-        completion: c.completion,
-      }));
+  const coursePerformance =
+    analytics?.course_performance ??
+    allCourses.map((c) => ({
+      course: c.name,
+      engagement: c.engagement,
+      completion: c.completion,
+    }));
 
   // Custom tick component with responsive width-based formatting
   const CustomXAxisTick = ({ x, y, payload, width }: any) => {
@@ -251,36 +282,180 @@ const Analytics = () => {
   };
 
   const selectedCourse = allCourses.find((c) => c.id === selectedCourseId);
+  const ratingTrendText = useMemo(() => {
+    if (overallRatingAvg === null) return `Last ${dateFilter} days`;
+    const delta = Number(selectedCourse?.rating || 0) - overallRatingAvg;
+    if (Math.abs(delta) < 0.01) return "On par with average";
+    return delta > 0 ? "Above average" : "Below average";
+  }, [overallRatingAvg, selectedCourse, dateFilter]);
+  const completionTrendText = useMemo(() => {
+    if (overallCompletionAvg === null) return `Last ${dateFilter} days`;
+    const delta = Number(selectedCourse?.completion || 0) - overallCompletionAvg;
+    const formatted = `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%`;
+    return `${formatted} vs target`;
+  }, [overallCompletionAvg, selectedCourse, dateFilter]);
+  const engagementTrendText = useMemo(() => {
+    if (overallEngagementAvg === null) return `Last ${dateFilter} days`;
+    const delta = Number(selectedCourse?.engagement || 0) - overallEngagementAvg;
+    if (Math.abs(delta) < 1) return "On track";
+    return delta > 0 ? "High engagement" : "Low engagement";
+  }, [overallEngagementAvg, selectedCourse, dateFilter]);
 
-  const singleCourseModuleData = selectedCourse
-    ? [
-        { module: "Module 1", completion: 85, avgScore: 88 },
-        { module: "Module 2", completion: 72, avgScore: 82 },
-        { module: "Module 3", completion: 65, avgScore: 79 },
-        { module: "Module 4", completion: 48, avgScore: 85 },
-      ]
-    : [];
+  const singleCourseModuleData =
+    courseAnalytics?.course_details?.module_performance ?? [];
 
-  const singleCourseTimeData = [
-    { week: "Week 1", hours: 42 },
-    { week: "Week 2", hours: 58 },
-    { week: "Week 3", hours: 65 },
-    { week: "Week 4", hours: 71 },
-  ];
+  const singleCourseTimeData =
+    courseAnalytics?.course_details?.weekly_study_time ?? [];
+  const courseCohortMetrics = courseAnalytics?.course_details?.cohort_metrics ?? null;
 
   const handleExport = () => {
+    const data = selectedCourseId ? courseAnalytics : analytics;
+    if (!data) {
+      toast({
+        title: "Export unavailable",
+        description: "No analytics data to export yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const lines: string[] = [];
+    const addSection = (title: string) => {
+      lines.push(title);
+    };
+    const addRow = (row: Array<string | number | null | undefined>) => {
+      const escaped = row.map((cell) => {
+        const value = cell ?? "";
+        const text = String(value);
+        return text.includes(",") || text.includes('"') || text.includes("\n")
+          ? `"${text.replace(/"/g, '""')}"`
+          : text;
+      });
+      lines.push(escaped.join(","));
+    };
+
+    addSection("Summary");
+    addRow(["Metric", "Value"]);
+    addRow(["Total Enrolled", data.summary.total_enrolled]);
+    addRow(["Average Engagement", `${data.summary.average_engagement}%`]);
+    addRow(["Study Hours", data.summary.study_hours]);
+    addRow(["Goal Completion", `${data.summary.goal_completion}%`]);
+    addRow(["Average Rating", data.summary.average_rating]);
+    lines.push("");
+
+    addSection("Course Performance");
+    addRow(["Course", "Students", "Rating", "Completion %", "Engagement %"]);
+    data.courses.forEach((course) => {
+      addRow([
+        course.name,
+        course.students,
+        course.rating,
+        course.completion,
+        course.engagement,
+      ]);
+    });
+    lines.push("");
+
+    addSection("Enrollment Trend");
+    addRow(["Period", "Enrollments"]);
+    data.enrollment_trend.forEach((point) => {
+      addRow([point.month, point.students]);
+    });
+    lines.push("");
+
+    addSection("Completion Breakdown");
+    addRow(["Status", "Count"]);
+    data.completion_breakdown.forEach((item) => {
+      addRow([item.name, item.value]);
+    });
+    lines.push("");
+
+    addSection("Weekly Activity");
+    addRow(["Day", "Active", "Inactive"]);
+    data.activity_by_day.forEach((item) => {
+      addRow([item.day, item.active, item.inactive]);
+    });
+    lines.push("");
+
+    addSection("Category Performance");
+    addRow(["Category", "Score"]);
+    data.category_performance.forEach((item) => {
+      addRow([item.category, item.value]);
+    });
+    lines.push("");
+
+    if (selectedCourseId) {
+      addSection("Module Performance");
+      addRow(["Module", "Completion %", "Avg Score %"]);
+      data.course_details.module_performance.forEach((item) => {
+        addRow([item.module, item.completion, item.avgScore]);
+      });
+      lines.push("");
+
+      addSection("Weekly Study Time");
+      addRow(["Week", "Hours"]);
+      data.course_details.weekly_study_time.forEach((item) => {
+        addRow([item.week, item.hours]);
+      });
+      lines.push("");
+    }
+
+    const csv = lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const fileSuffix = selectedCourseId ? `course-${selectedCourseId}` : "all-courses";
+    link.href = url;
+    link.download = `analytics-${fileSuffix}-${dateFilter}d.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
     toast({
-      title: "Export Started",
-      description: "Your analytics data is being exported to CSV...",
+      title: "Export complete",
+      description: "Analytics CSV has been downloaded.",
     });
   };
 
   const handleShare = () => {
-    toast({
-      title: "Share Link Created",
-      description: "Analytics dashboard link copied to clipboard",
-    });
+    const params = new URLSearchParams();
+    params.set("days", dateFilter);
+    if (selectedCourseId) {
+      params.set("courseId", selectedCourseId);
+      params.set("view", "course");
+    } else {
+      params.set("view", "all");
+    }
+    const url = `${window.location.origin}/analytics?${params.toString()}`;
+
+    navigator.clipboard.writeText(url).then(
+      () => {
+        toast({
+          title: "Share link copied",
+          description: "Analytics link copied to clipboard.",
+        });
+      },
+      () => {
+        toast({
+          title: "Share failed",
+          description: "Unable to copy link. Please copy from the address bar.",
+          variant: "destructive",
+        });
+      }
+    );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-6 py-8">
+          <div className="flex justify-center items-center py-12">
+            <BarChart3 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -320,6 +495,12 @@ const Analytics = () => {
           </div>
         </div>
 
+        {error && (
+          <Card className="p-4 border border-destructive/30 bg-destructive/10 text-destructive">
+            {error}
+          </Card>
+        )}
+
         {/* View Mode Tabs */}
         <Tabs
           value={viewMode}
@@ -342,30 +523,30 @@ const Analytics = () => {
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatsCard
                 title="Total Enrolled"
-                value="1,002"
+                value={(analytics?.summary.total_enrolled ?? 0).toLocaleString()}
                 icon={Users}
-                trend="+12% from last month"
+                trend={`Last ${dateFilter} days`}
                 variant="default"
               />
               <StatsCard
                 title="Avg Engagement"
-                value="82%"
+                value={`${analytics?.summary.average_engagement ?? 0}%`}
                 icon={TrendingUp}
-                trend="+8% improvement"
+                trend="Across courses"
                 variant="success"
               />
               <StatsCard
                 title="Study Hours"
-                value="12,450"
+                value={(analytics?.summary.study_hours ?? 0).toLocaleString()}
                 icon={Clock}
-                trend="This month"
+                trend={`Last ${dateFilter} days`}
                 variant="accent"
               />
               <StatsCard
                 title="Goal Completion"
-                value="76%"
+                value={`${analytics?.summary.goal_completion ?? 0}%`}
                 icon={Target}
-                trend="+15% vs target"
+                trend="Completion rate"
                 variant="warning"
               />
             </section>
@@ -391,6 +572,7 @@ const Analytics = () => {
                     />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
+                      wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
@@ -453,6 +635,7 @@ const Analytics = () => {
                     />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
+                      wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
@@ -495,6 +678,7 @@ const Analytics = () => {
                       ))}
                     </Pie>
                     <Tooltip
+                      wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
@@ -505,6 +689,53 @@ const Analytics = () => {
                 </ResponsiveContainer>
               </Card>
             </div>
+
+            <Card className="p-6 gradient-card border-border">
+              <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Cohort Snapshot
+              </h3>
+              {cohortAnalytics.length > 0 ? (
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                  {cohortAnalytics.map((cohort) => (
+                    <div
+                      key={cohort.course_id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        setSelectedCourseId(cohort.course_id);
+                        setViewMode("course");
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedCourseId(cohort.course_id);
+                          setViewMode("course");
+                        }
+                      }}
+                      className="flex flex-col gap-2 p-4 rounded-lg bg-background/50 cursor-pointer hover:bg-background/70"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-foreground">
+                          {cohort.course_name}
+                        </span>
+                      </div>
+                      <div className="flex flex-nowrap gap-4 text-xs text-muted-foreground overflow-x-auto whitespace-nowrap">
+                        <span>Enrolled: {cohort.enrolled}</span>
+                        <span>Avg Progress: {cohort.average_progress}%</span>
+                        <span>Completion: {cohort.completion_rate}%</span>
+                        <span>Avg Score: {cohort.average_quiz_score}%</span>
+                        <span>Pass Rate: {cohort.quiz_pass_rate}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  No cohort data available yet.
+                </div>
+              )}
+            </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="p-6 gradient-card border-border">
@@ -524,6 +755,7 @@ const Analytics = () => {
                     />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
+                      wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
@@ -590,6 +822,7 @@ const Analytics = () => {
                       strokeWidth={2}
                     />
                     <Tooltip
+                      wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
@@ -625,10 +858,10 @@ const Analytics = () => {
                   {filteredCourses.map((course) => (
                     <Card
                       key={course.id}
-                      className="gradient-card border-border hover-lift cursor-pointer transition-all"
+                      className="gradient-card border-border hover-lift cursor-pointer transition-all h-full"
                       onClick={() => setSelectedCourseId(course.id)}
                     >
-                      <div className="p-6 space-y-4">
+                      <div className="p-6 flex flex-col h-full">
                         <div className="flex items-start justify-between">
                           <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
                             <BookOpen className="h-6 w-6 text-primary" />
@@ -641,7 +874,7 @@ const Analytics = () => {
                           </div>
                         </div>
 
-                        <div>
+                        <div className="mt-4 flex-1">
                           <h3 className="font-semibold text-lg mb-2 line-clamp-2">
                             {course.name}
                           </h3>
@@ -676,7 +909,7 @@ const Analytics = () => {
                           </div>
                         </div>
 
-                        <Button className="w-full" variant="outline">
+                        <Button className="w-full mt-4" variant="outline">
                           View Analytics
                         </Button>
                       </div>
@@ -727,31 +960,164 @@ const Analytics = () => {
                     title="Enrolled Students"
                     value={selectedCourse?.students.toString() || "0"}
                     icon={Users}
-                    trend="+12% from last month"
+                    trend={enrollmentTrendText}
                     variant="default"
                   />
                   <StatsCard
                     title="Course Rating"
                     value={`${selectedCourse?.rating || 0}/5`}
                     icon={Award}
-                    trend="Above average"
+                    trend={ratingTrendText}
                     variant="success"
                   />
                   <StatsCard
                     title="Completion Rate"
                     value={`${selectedCourse?.completion || 0}%`}
                     icon={Target}
-                    trend="+5% vs target"
+                    trend={completionTrendText}
                     variant="accent"
                   />
                   <StatsCard
                     title="Engagement"
                     value={`${selectedCourse?.engagement || 0}%`}
                     icon={TrendingUp}
-                    trend="High engagement"
+                    trend={engagementTrendText}
                     variant="warning"
                   />
                 </section>
+
+                {courseCohortMetrics && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card className="p-6 gradient-card border-border">
+                      <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+                        <Award className="h-5 w-5 text-success" />
+                        Quiz Performance
+                      </h3>
+                      <ResponsiveContainer width="100%" height={240}>
+                        <BarChart
+                          data={[
+                            {
+                              label: "Avg Score",
+                              value: courseCohortMetrics.average_quiz_score,
+                            },
+                            {
+                              label: "Pass Rate",
+                              value: courseCohortMetrics.quiz_pass_rate,
+                            },
+                          ]}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="hsl(var(--border))"
+                          />
+                          <XAxis
+                            dataKey="label"
+                            stroke="hsl(var(--muted-foreground))"
+                          />
+                          <YAxis stroke="hsl(var(--muted-foreground))" />
+                          <Tooltip
+                            wrapperStyle={tooltipWrapperStyle}
+                            contentStyle={{
+                              backgroundColor: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                            formatter={(value: number) => `${value}%`}
+                          />
+                          <Bar
+                            dataKey="value"
+                            fill="hsl(var(--success))"
+                            radius={[8, 8, 0, 0]}
+                            name="Percentage"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Card>
+
+                    <Card className="p-6 gradient-card border-border">
+                      <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+                        <BookOpen className="h-5 w-5 text-primary" />
+                        Assignment Submissions
+                      </h3>
+                      <ResponsiveContainer width="100%" height={240}>
+                        <BarChart
+                          data={[
+                            {
+                              label: "Pending",
+                              value: courseCohortMetrics.submissions_pending,
+                            },
+                            {
+                              label: "Graded",
+                              value: courseCohortMetrics.submissions_graded,
+                            },
+                          ]}
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="hsl(var(--border))"
+                          />
+                          <XAxis
+                            dataKey="label"
+                            stroke="hsl(var(--muted-foreground))"
+                          />
+                          <YAxis stroke="hsl(var(--muted-foreground))" />
+                          <Tooltip
+                            wrapperStyle={tooltipWrapperStyle}
+                            contentStyle={{
+                              backgroundColor: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          <Bar
+                            dataKey="value"
+                            fill="hsl(var(--primary))"
+                            radius={[8, 8, 0, 0]}
+                            name="Count"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Card>
+                  </div>
+                )}
+
+                {courseCohortMetrics && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <Card className="p-6 gradient-card border-border text-center">
+                      <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-3">
+                        <Clock className="h-6 w-6 text-accent" />
+                      </div>
+                      <p className="text-3xl font-bold mb-1">
+                        {courseCohortMetrics.average_watch_hours}h
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Avg Watch Time
+                      </p>
+                    </Card>
+                    <Card className="p-6 gradient-card border-border text-center">
+                      <div className="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center mx-auto mb-3">
+                        <Users className="h-6 w-6 text-success" />
+                      </div>
+                      <p className="text-3xl font-bold mb-1">
+                        {courseCohortMetrics.active_learners}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Active Learners
+                      </p>
+                    </Card>
+                    <Card className="p-6 gradient-card border-border text-center">
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
+                        <Target className="h-6 w-6 text-primary" />
+                      </div>
+                      <p className="text-3xl font-bold mb-1">
+                        {courseCohortMetrics.completion_rate}%
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Completion Rate
+                      </p>
+                    </Card>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card className="p-6 gradient-card border-border">
@@ -771,6 +1137,7 @@ const Analytics = () => {
                         />
                         <YAxis stroke="hsl(var(--muted-foreground))" />
                         <Tooltip
+                          wrapperStyle={tooltipWrapperStyle}
                           contentStyle={{
                             backgroundColor: "hsl(var(--card))",
                             border: "1px solid hsl(var(--border))",
@@ -831,6 +1198,7 @@ const Analytics = () => {
                         />
                         <YAxis stroke="hsl(var(--muted-foreground))" />
                         <Tooltip
+                          wrapperStyle={tooltipWrapperStyle}
                           contentStyle={{
                             backgroundColor: "hsl(var(--card))",
                             border: "1px solid hsl(var(--border))",
@@ -858,7 +1226,7 @@ const Analytics = () => {
                     Student Enrollment Over Time
                   </h3>
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={enrollmentData}>
+                    <LineChart data={courseEnrollmentData}>
                       <CartesianGrid
                         strokeDasharray="3 3"
                         stroke="hsl(var(--border))"
@@ -869,6 +1237,7 @@ const Analytics = () => {
                       />
                       <YAxis stroke="hsl(var(--muted-foreground))" />
                       <Tooltip
+                        wrapperStyle={tooltipWrapperStyle}
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
