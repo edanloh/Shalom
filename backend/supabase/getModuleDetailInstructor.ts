@@ -104,7 +104,7 @@ serve(async (req) => {
     // }
 
     // ========================================
-    // 2. Fetch sections, lessons, quizzes, quiz questions, requirements, outcomes, reviews in parallel
+    // 2. Fetch sections, lessons, quizzes, quiz questions, outcomes, reviews in parallel
     // ========================================
     // First, get section IDs for filtering videos
     const sectionIds = await getSectionIds(supabaseClient, courseId);
@@ -116,7 +116,6 @@ serve(async (req) => {
       { data: pdfResources, error: pdfResourcesError },
       { data: quizzes, error: quizzesError },
       { data: quizQuestions, error: quizQuestionsError },
-      { data: requirements, error: requirementsError },
       { data: outcomes, error: outcomesError },
       { data: reviews, error: reviewsError }
     ] = await Promise.all([
@@ -140,7 +139,7 @@ serve(async (req) => {
         .from('course_resources')
         .select(`
           id, section_id, title, description, resource_url,
-          order_index, resource_type, is_preview, thumbnail_url,
+          order_index, resource_type, is_preview,
           file_size_bytes, is_downloadable
         `)
         .in('section_id', sectionIds)
@@ -168,12 +167,6 @@ serve(async (req) => {
         .order('order_index', { ascending: true }),
       
       supabaseClient
-        .from('course_requirements')
-        .select('requirement, order_index')
-        .eq('course_id', courseId)
-        .order('order_index', { ascending: true }),
-      
-      supabaseClient
         .from('course_outcomes')
         .select('outcome, order_index')
         .eq('course_id', courseId)
@@ -197,7 +190,6 @@ serve(async (req) => {
     if (pdfResourcesError) console.error('PDF resources error:', pdfResourcesError);
     if (quizzesError) console.error('Quizzes error:', quizzesError);
     if (quizQuestionsError) console.error('Quiz questions error:', quizQuestionsError);
-    if (requirementsError) console.error('Requirements error:', requirementsError);
     if (outcomesError) console.error('Outcomes error:', outcomesError);
     if (reviewsError) console.error('Reviews error:', reviewsError);
 
@@ -230,7 +222,6 @@ serve(async (req) => {
           description: r.description,
           resource_url: r.resource_url,
           resource_type: r.resource_type,
-          thumbnail_url: r.thumbnail_url,
           is_preview: r.is_preview,
           is_downloadable: r.is_downloadable,
           file_size_bytes: r.file_size_bytes,
@@ -320,7 +311,7 @@ serve(async (req) => {
         category_name: course.categories?.name,
         category_id: course.categories?.id,
         category_color: course.categories?.color,
-        requirements: (requirements || []).map((r: any) => r.requirement),
+        requirements: [],
         outcomes: (outcomes || []).map((o: any) => o.outcome),
         rating: averageRating,
         totalRatings: processedReviews.length,

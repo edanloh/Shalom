@@ -469,6 +469,19 @@ serve(async (req) => {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('quiz_id', quizId);
+    const maxAttempts =
+      quiz.max_attempts === null || quiz.max_attempts === undefined
+        ? null
+        : Number(quiz.max_attempts);
+    if (maxAttempts !== null && (previousAttempts || 0) >= maxAttempts) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Maximum attempts reached for this quiz",
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // ========================================
     // 2. Get all questions with correct answers
@@ -673,7 +686,8 @@ serve(async (req) => {
     // ========================================
     // 6. Return response
     // ========================================
-    const attemptsRemaining = Math.max(0, quiz.max_attempts - attemptNumber);
+    const attemptsRemaining =
+      maxAttempts === null ? null : Math.max(0, maxAttempts - attemptNumber);
 
     return new Response(
       JSON.stringify({

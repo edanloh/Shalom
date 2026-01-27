@@ -152,6 +152,7 @@ export const useContentManagement = () => {
               baseTitle: "New Quiz",
               status: "draft",
               passingScore: 70,
+              maxAttempts: 1,
               order: nextOrder,
               questions: [
                 {

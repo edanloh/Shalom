@@ -21,7 +21,7 @@ export interface ModuleItem {
   // Quiz specific fields
   passing_score?: number;
   time_limit_minutes?: number;
-  max_attempts?: number;
+  max_attempts?: number | null;
 }
 
 // Course Section with Items

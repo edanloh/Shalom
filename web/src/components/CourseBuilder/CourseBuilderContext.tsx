@@ -54,6 +54,7 @@ export interface Quiz {
   baseTitle?: string;
   status: string;
   passingScore: number;
+  maxAttempts?: number | null;
   questions: Question[];
   order?: number;
 }
@@ -960,6 +961,7 @@ export const CourseBuilderProvider = ({
           // Save only the user's custom title, not the "Quiz X.Y:" prefix
           title: quiz.baseTitle || quiz.title.replace(/^Quiz \d+\.\d+:\s*/, ""),
           passingScore: quiz.passingScore || 70,
+          maxAttempts: quiz.maxAttempts === null ? null : quiz.maxAttempts ?? 1,
           order: quiz.order ?? quizIndex, // Use existing order or index
           questions: quiz.questions.map((q, qIndex) => {
             // Convert correctAnswer index back to actual answer text for database

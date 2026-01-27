@@ -91,7 +91,7 @@ serve(async (req) => {
     }
 
     // ========================================
-    // 2. Fetch sections, lessons, quizzes, PDFs, requirements, outcomes, reviews in parallel
+    // 2. Fetch sections, lessons, quizzes, PDFs, outcomes, reviews in parallel
     // ========================================
     // First, get section IDs for filtering videos
     const sectionIds = await getSectionIds(supabaseClient, courseId);
@@ -102,7 +102,6 @@ serve(async (req) => {
       { data: lessons, error: lessonsError },
       { data: quizzes, error: quizzesError },
       { data: resources, error: resourcesError },
-      { data: requirements, error: requirementsError },
       { data: outcomes, error: outcomesError },
       { data: reviews, error: reviewsError }
     ] = await Promise.all([
@@ -136,17 +135,11 @@ serve(async (req) => {
         .from('course_resources')
         .select(`
           id, section_id, title, description, order_index,
-          resource_type, resource_url, thumbnail_url, estimated_read_minutes
+          resource_type, resource_url, estimated_read_minutes
         `)
         .eq('course_id', courseId)
         .eq('resource_type', 'pdf')
         .order('section_id', { ascending: true })
-        .order('order_index', { ascending: true }),
-      
-      supabaseClient
-        .from('course_requirements')
-        .select('requirement, order_index')
-        .eq('course_id', courseId)
         .order('order_index', { ascending: true }),
       
       supabaseClient
@@ -172,7 +165,6 @@ serve(async (req) => {
     if (lessonsError) console.error('Lessons error:', lessonsError);
     if (quizzesError) console.error('Quizzes error:', quizzesError);
     if (resourcesError) console.error('Resources error:', resourcesError);
-    if (requirementsError) console.error('Requirements error:', requirementsError);
     if (outcomesError) console.error('Outcomes error:', outcomesError);
     if (reviewsError) console.error('Reviews error:', reviewsError);
 
@@ -330,7 +322,6 @@ serve(async (req) => {
           order_index: r.order_index,
           type: "pdf",
           pdf_url: r.resource_url,
-          thumbnail_url: r.thumbnail_url,
           estimated_read_minutes: r.estimated_read_minutes ?? 0,
           is_completed: userProgress?.pdfProgress?.some(
             (pp: any) => pp.resource_id === r.id && pp.is_completed
@@ -344,7 +335,7 @@ serve(async (req) => {
           ...q,
           type: "quiz",
           is_completed: userProgress?.quizAttempts?.some(
-            (qa: any) => qa.quiz_id === q.id && qa.is_passed
+            (qa: any) => qa.quiz_id === q.id
           ) || false
         }));
 
@@ -428,7 +419,7 @@ serve(async (req) => {
         ...course,
         category_name: course.categories?.name,
         category_id: course.categories?.id,
-        requirements: (requirements || []).map((r: any) => r.requirement),
+        requirements: [],
         outcomes: (outcomes || []).map((o: any) => o.outcome),
         rating: averageRating,
         totalRatings: processedReviews.length,

@@ -46,7 +46,7 @@ interface BackendQuizDetailResponse {
     description: string;
     passing_score: number;
     time_limit_minutes: number | null;
-    max_attempts: number;
+    max_attempts: number | null;
     course: {
       id: string;
       title: string;
@@ -79,7 +79,7 @@ export interface QuizDetailResponse {
     description: string;
     passing_score: number;
     time_limit_minutes: number | null;
-    max_attempts: number;
+    max_attempts: number | null;
     course: {
       id: string;
       title: string;
@@ -123,7 +123,7 @@ export interface SubmitQuizResponse {
     correctAnswers: number;
     isPassed: boolean;
     attemptNumber: number;
-    attemptsRemaining: number;
+    attemptsRemaining: number | null;
     answers: Array<{
       questionId: string;
       isCorrect: boolean;
@@ -248,7 +248,11 @@ class QuizService {
   /**
    * Check if user can retry quiz
    */
-  canRetryQuiz(userAttempts: QuizDetailResponse['data']['userAttempts'], maxAttempts: number): boolean {
+  canRetryQuiz(
+    userAttempts: QuizDetailResponse['data']['userAttempts'],
+    maxAttempts: number | null
+  ): boolean {
+    if (maxAttempts === null) return true;
     if (!userAttempts) return true;
     return userAttempts.length < maxAttempts;
   }
@@ -256,7 +260,11 @@ class QuizService {
   /**
    * Calculate attempts remaining
    */
-  getAttemptsRemaining(userAttempts: QuizDetailResponse['data']['userAttempts'], maxAttempts: number): number {
+  getAttemptsRemaining(
+    userAttempts: QuizDetailResponse['data']['userAttempts'],
+    maxAttempts: number | null
+  ): number | null {
+    if (maxAttempts === null) return null;
     if (!userAttempts) return maxAttempts;
     return Math.max(0, maxAttempts - userAttempts.length);
   }

@@ -50,8 +50,7 @@ serve(async (req) => {
       durationHours = 0,
       tags = [],
       modules = [],
-      outcomes = [],
-      requirements = []
+      outcomes = []
     } = body;
 
     let computedDurationMinutes = 0;
@@ -245,7 +244,7 @@ serve(async (req) => {
             passing_score: quiz.passingScore || 70,
             order_index: quiz.order ?? k,
             time_limit_minutes: quiz.timeLimitMinutes || 30,
-            max_attempts: quiz.maxAttempts || 3
+            max_attempts: quiz.maxAttempts === null ? null : quiz.maxAttempts ?? 1
           })
           .select()
           .single();
@@ -306,17 +305,6 @@ serve(async (req) => {
         .insert({
           course_id: course.id,
           outcome: outcomes[i],
-          order_index: i
-        });
-    }
-
-    // Insert requirements
-    for (let i = 0; i < requirements.length; i++) {
-      await supabaseClient
-        .from('course_requirements')
-        .insert({
-          course_id: course.id,
-          requirement: requirements[i],
           order_index: i
         });
     }

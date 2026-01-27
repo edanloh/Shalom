@@ -727,6 +727,7 @@ class CourseService {
               title: quiz.title,
               description: quiz.description || "",
               passing_score: quiz.passing_score || 70,
+              max_attempts: quiz.max_attempts === null ? null : quiz.max_attempts ?? 1,
               questions: (quiz.questions || []).map((q: any) => ({
                 id: q.id,
                 question_text: q.text || q.question_text,
@@ -781,6 +782,7 @@ class CourseService {
             baseTitle: quiz.title,
             status: "published",
             passingScore: quiz.passing_score || 70,
+            maxAttempts: quiz.max_attempts === null ? null : quiz.max_attempts ?? 1,
             questions: (quiz.questions || []).map((question: any) => {
               console.log("Transforming question:", question);
 

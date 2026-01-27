@@ -144,8 +144,8 @@ serve(async (req) => {
     const body = await req.json();
     console.log('Update course request:', courseId);
 
-    // Extract modules, outcomes, requirements for separate handling
-    const { modules, outcomes, requirements, ...courseFields } = body;
+    // Extract modules and outcomes for separate handling
+    const { modules, outcomes, ...courseFields } = body;
 
     // Build update object for course fields
     const updateData: any = {};
@@ -475,7 +475,7 @@ serve(async (req) => {
                 passing_score: quiz.passingScore || 70,
                 order_index: quiz.order ?? k,
                 time_limit_minutes: quiz.timeLimitMinutes || 30,
-                max_attempts: quiz.maxAttempts || 3
+                max_attempts: quiz.maxAttempts === null ? null : quiz.maxAttempts ?? 1
               })
               .eq('id', quiz.id);
 
@@ -492,7 +492,7 @@ serve(async (req) => {
                 passing_score: quiz.passingScore || 70,
                 order_index: quiz.order ?? k,
                 time_limit_minutes: quiz.timeLimitMinutes || 30,
-                max_attempts: quiz.maxAttempts || 3
+                max_attempts: quiz.maxAttempts === null ? null : quiz.maxAttempts ?? 1
               })
               .select('id')
               .single();
@@ -645,24 +645,6 @@ serve(async (req) => {
           .insert({
             course_id: courseId,
             outcome: outcomes[i],
-            order_index: i
-          });
-      }
-    }
-
-    // Update requirements if provided
-    if (requirements && Array.isArray(requirements)) {
-      await supabaseClient
-        .from('course_requirements')
-        .delete()
-        .eq('course_id', courseId);
-
-      for (let i = 0; i < requirements.length; i++) {
-        await supabaseClient
-          .from('course_requirements')
-          .insert({
-            course_id: courseId,
-            requirement: requirements[i],
             order_index: i
           });
       }

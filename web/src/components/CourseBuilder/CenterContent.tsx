@@ -844,7 +844,7 @@ const QuizEditor = ({
 
       {/* Quiz Settings */}
       <div className="space-y-4 mb-6">
-        <div className="flex items-center gap-4">
+        <div className="flex items-start gap-4">
           <div className="mr-4">
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Passing Score (%)
@@ -861,6 +861,35 @@ const QuizEditor = ({
               max="100"
               className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
             />
+          </div>
+          <div className="mr-4 flex flex-col">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Max Attempts
+            </label>
+            <input
+              type={quiz?.maxAttempts === null ? "text" : "number"}
+              value={quiz?.maxAttempts === null ? "-" : quiz?.maxAttempts ?? 1}
+              onChange={(e) =>
+                updateQuiz(module.id, quiz.id, {
+                  maxAttempts: Math.max(1, parseInt(e.target.value) || 1),
+                })
+              }
+              min="1"
+              readOnly={quiz?.maxAttempts === null}
+              className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
+            />
+            <label className="mt-2 flex items-center gap-2 text-xs text-slate-300">
+              <input
+                type="checkbox"
+                checked={quiz?.maxAttempts === null}
+                onChange={(e) =>
+                  updateQuiz(module.id, quiz.id, {
+                    maxAttempts: e.target.checked ? null : 1,
+                  })
+                }
+              />
+              Unlimited attempts
+            </label>
           </div>
           <div className="ml-4">
             <label className="block text-sm font-medium text-slate-300 mb-2">

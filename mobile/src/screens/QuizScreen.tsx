@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { MainStackParamList } from "@/types/navigation";
-import { quizService, moduleService } from "@/services";
+import { quizService } from "@/services";
 import creditService from "../services/creditService";
 import { showToast } from "@/components/common/Toast";
 import { Images } from "../../assets";
@@ -50,6 +50,9 @@ const QuizScreen = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [attemptsRemainingDisplay, setAttemptsRemainingDisplay] = useState<
+    number | null
+  >(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [initialTime, setInitialTime] = useState<number | null>(null);
   const [timerActive, setTimerActive] = useState(false);
@@ -57,6 +60,7 @@ const QuizScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
+  const [attemptsBlocked, setAttemptsBlocked] = useState(false);
 
   // Use course navigation hook
   const { nextItem: nextItemInModule, isLastItem } = useCourseNavigation(
@@ -104,49 +108,70 @@ const QuizScreen = () => {
       setQuizDetail(data);
 
       const attempts = data.userAttempts || [];
+      const attemptsRemaining = quizService.getAttemptsRemaining(
+        attempts,
+        data.max_attempts
+      );
+      setAttemptsRemainingDisplay(attemptsRemaining);
       const isPassed = quizService.isQuizPassed(attempts);
+      setAttemptsBlocked(
+        attemptsRemaining === 0 && !isPassed
+      );
+
+      const buildResultFromAttempt = (attempt: any, passedOverride?: boolean) => {
+        const totalQuestions =
+          Number(attempt.total_questions) || data.questions.length || 0;
+        const correctAnswers =
+          Number(attempt.correct_answers) ||
+          Math.round((attempt.score / 100) * totalQuestions);
+        const answersMap = attempt.answers || {};
+        const gradedAnswers = data.questions
+          .map((question) => {
+            const selected = answersMap[question.id];
+            if (!selected) return null;
+            const correctAnswer = question.correct_answer || "";
+            return {
+              questionId: question.id,
+              isCorrect: selected === correctAnswer,
+              correctAnswer,
+            };
+          })
+          .filter(Boolean) as Array<{
+          questionId: string;
+          isCorrect: boolean;
+          correctAnswer: string;
+        }>;
+
+        setSelectedAnswers(new Map(Object.entries(answersMap)));
+        setQuizResult({
+          score: attempt.score,
+          totalQuestions,
+          correctAnswers,
+          isPassed: passedOverride ?? attempt.is_passed,
+          attemptNumber: attempt.attempt_number,
+          attemptsRemaining,
+          answers: gradedAnswers,
+        });
+      };
+
       if (isPassed) {
         const latestPassed = attempts.find((attempt) => attempt.is_passed);
         if (latestPassed) {
-          const totalQuestions =
-            Number(latestPassed.total_questions) || data.questions.length || 0;
-          const correctAnswers =
-            Number(latestPassed.correct_answers) ||
-            Math.round((latestPassed.score / 100) * totalQuestions);
-          const answersMap = latestPassed.answers || {};
-          const gradedAnswers = data.questions
-            .map((question) => {
-              const selected = answersMap[question.id];
-              if (!selected) return null;
-              const correctAnswer = question.correct_answer || "";
-              return {
-                questionId: question.id,
-                isCorrect: selected === correctAnswer,
-                correctAnswer,
-              };
-            })
-            .filter(Boolean) as Array<{
-            questionId: string;
-            isCorrect: boolean;
-            correctAnswer: string;
-          }>;
-
-          setSelectedAnswers(new Map(Object.entries(answersMap)));
-          setQuizResult({
-            score: latestPassed.score,
-            totalQuestions,
-            correctAnswers,
-            isPassed: true,
-            attemptNumber: latestPassed.attempt_number,
-            attemptsRemaining: quizService.getAttemptsRemaining(
-              attempts,
-              data.max_attempts
-            ),
-            answers: gradedAnswers,
-            moduleProgress: null,
-          });
+          buildResultFromAttempt(latestPassed, true);
           setShowResults(true);
           setReviewMode(false);
+          setTimerActive(false);
+          return;
+        }
+      }
+
+      if (attemptsRemaining === 0 && attempts.length > 0) {
+        const latestAttempt = quizService.getLatestAttempt(attempts);
+        if (latestAttempt) {
+          buildResultFromAttempt(latestAttempt, false);
+          setAttemptsRemainingDisplay(attemptsRemaining);
+          setShowResults(false);
+          setReviewMode(true);
           setTimerActive(false);
           return;
         }
@@ -167,18 +192,6 @@ const QuizScreen = () => {
       setError(err.message || "Failed to load quiz");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchCourseSections = async () => {
-    try {
-      const moduleDetail = await moduleService.getModuleDetail(
-        courseId,
-        userId
-      );
-      setCourseSections(moduleDetail.sections);
-    } catch (err) {
-      console.error("Error fetching course sections:", err);
     }
   };
 
@@ -204,6 +217,16 @@ const QuizScreen = () => {
 
   const handleSubmitQuiz = async () => {
     if (!quizDetail) return;
+    if (attemptsBlocked) {
+      Alert.alert(
+        "Attempts limit reached",
+        "You’ve used all attempts. Review your last submission."
+      );
+      setReviewMode(true);
+      setShowResults(false);
+      setTimerActive(false);
+      return;
+    }
 
     // Check if all questions are answered
     if (
@@ -272,7 +295,56 @@ const QuizScreen = () => {
       }
     } catch (err: any) {
       console.error("Error submitting quiz:", err);
-      Alert.alert("Error", err.message || "Failed to submit quiz");
+      if (String(err?.message || "").includes("Maximum attempts reached")) {
+        Alert.alert(
+          "Attempts limit reached",
+          "You’ve used all attempts. Review your last submission."
+        );
+        const attempts = quizDetail.userAttempts || [];
+        const latestAttempt = quizService.getLatestAttempt(attempts);
+        if (latestAttempt) {
+          const totalQuestions =
+            Number(latestAttempt.total_questions) ||
+            quizDetail.questions.length ||
+            0;
+          const correctAnswers =
+            Number(latestAttempt.correct_answers) ||
+            Math.round((latestAttempt.score / 100) * totalQuestions);
+          const answersMap = latestAttempt.answers || {};
+          const gradedAnswers = quizDetail.questions
+            .map((question) => {
+              const selected = answersMap[question.id];
+              if (!selected) return null;
+              const correctAnswer = question.correct_answer || "";
+              return {
+                questionId: question.id,
+                isCorrect: selected === correctAnswer,
+                correctAnswer,
+              };
+            })
+            .filter(Boolean) as Array<{
+            questionId: string;
+            isCorrect: boolean;
+            correctAnswer: string;
+          }>;
+          setSelectedAnswers(new Map(Object.entries(answersMap)));
+          setQuizResult({
+            score: latestAttempt.score,
+            totalQuestions,
+            correctAnswers,
+            isPassed: false,
+            attemptNumber: latestAttempt.attempt_number,
+            attemptsRemaining: 0,
+            answers: gradedAnswers,
+          });
+          setReviewMode(true);
+          setShowResults(false);
+          setTimerActive(false);
+          return;
+        }
+      } else {
+        Alert.alert("Error", err.message || "Failed to submit quiz");
+      }
       // Restart timer if submission failed
       setTimerActive(true);
     } finally {
@@ -289,6 +361,7 @@ const QuizScreen = () => {
     setShowResults(false);
     setQuizResult(null);
     setReviewMode(false);
+    setAttemptsBlocked(false);
 
     // Reset start time for all quizzes
     setQuizStartTime(new Date());
@@ -300,6 +373,9 @@ const QuizScreen = () => {
       setInitialTime(timeInSeconds);
       setTimerActive(true);
     }
+
+    // Refresh attempts from server to avoid stale counts
+    fetchQuizDetail();
   };
 
   const handleReview = () => {
@@ -321,8 +397,8 @@ const QuizScreen = () => {
       isLastItem,
     });
 
-    // Only auto-navigate if quiz was passed
-    if (quizResult && quizResult.isPassed) {
+    // Auto-navigate regardless of pass/fail to mark completion
+    if (quizResult) {
       console.log('🎯 Quiz passed! Checking next item...', {
         currentQuizId: quizId,
         currentSectionId: sectionId,
@@ -368,7 +444,7 @@ const QuizScreen = () => {
       }
     }
     
-    if (quizResult?.isPassed && isLastItem) {
+    if (quizResult && isLastItem) {
       navigation.reset({
         index: 1,
         routes: [
@@ -520,7 +596,9 @@ const QuizScreen = () => {
           {/* Action Buttons - Only show if NOT last item or if failed */}
           {(!isLastItem || !isPassed) && (
             <View style={styles.resultActions}>
-              {quizResult.attemptsRemaining > 0 && !isPassed ? (
+              {(quizResult.attemptsRemaining === null ||
+                quizResult.attemptsRemaining > 0) &&
+              !isPassed ? (
                 <TouchableOpacity
                   style={styles.actionButton}
                   onPress={handleRetry}
@@ -578,6 +656,11 @@ const QuizScreen = () => {
   }
   const answeredCount = selectedAnswers.size;
   const isCurrentQuestionAnswered = selectedAnswers.has(currentQuestion.id);
+  const allQuestionsAnswered = quizDetail
+    ? quizDetail.questions.every((question) =>
+        selectedAnswers.has(question.id)
+      )
+    : false;
 
   // Get the correct answer for current question (if in review mode)
   const correctAnswerForCurrentQuestion =
@@ -644,10 +727,20 @@ const QuizScreen = () => {
     >
       {/* Segmented Progress Bar */}
       <View style={styles.segmentedProgressContainer}>
-        <Text style={styles.progressLabel}>
-          {reviewMode ? "Review Mode - " : ""}Question{" "}
-          {currentQuestionIndex + 1} of {quizDetail.questions.length}
-        </Text>
+        {!reviewMode && quizDetail?.max_attempts !== undefined && (
+          <Text style={styles.attemptsInline}>
+            Attempts left:{" "}
+            {quizDetail.max_attempts === null
+              ? "Unlimited"
+              : attemptsRemainingDisplay}
+          </Text>
+        )}
+        <View style={styles.progressHeaderRow}>
+          <Text style={styles.progressLabel}>
+            {reviewMode ? "Review Mode - " : ""}Question{" "}
+            {currentQuestionIndex + 1} of {quizDetail.questions.length}
+          </Text>
+        </View>
         <View style={styles.segmentsWrapper}>
           {progressSegments.map((segment, index) => (
             <View
@@ -764,38 +857,65 @@ const QuizScreen = () => {
         })}
       </View>
 
+      <View style={styles.questionNavRow}>
+        <TouchableOpacity
+          style={[
+            styles.navIconButtonLarge,
+            currentQuestionIndex === 0 && styles.navIconButtonDisabled,
+          ]}
+          onPress={handlePreviousQuestion}
+          disabled={currentQuestionIndex === 0}
+        >
+          <Ionicons
+            name="chevron-back"
+            size={22}
+            color={
+              currentQuestionIndex === 0 ? Colors.gray600 : Colors.textPrimary
+            }
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.navIconButtonLarge,
+            (!reviewMode && !isCurrentQuestionAnswered) ||
+            currentQuestionIndex === quizDetail.questions.length - 1
+              ? styles.navIconButtonDisabled
+              : null,
+          ]}
+          onPress={handleNextQuestion}
+          disabled={
+            (!reviewMode && !isCurrentQuestionAnswered) ||
+            currentQuestionIndex === quizDetail.questions.length - 1
+          }
+        >
+          <Ionicons
+            name="chevron-forward"
+            size={22}
+            color={
+              (!reviewMode && !isCurrentQuestionAnswered) ||
+              currentQuestionIndex === quizDetail.questions.length - 1
+                ? Colors.gray600
+                : Colors.textPrimary
+            }
+          />
+        </TouchableOpacity>
+      </View>
+
       {/* Bottom Navigation */}
       <View style={{ paddingVertical: Spacing.lg }}>
         {reviewMode ? (
-          <View style={{ flexDirection: "column" }}>
-            {currentQuestionIndex < quizDetail.questions.length - 1 ? (
-              <ActionButton onPress={handleNextQuestion} text={"Next"} />
-            ) : (
-              <ActionButton onPress={handleDoneReview} text={"Done"} />
-            )}
-            {currentQuestionIndex > 0 && (
-              <ActionButton
-                onPress={handlePreviousQuestion}
-                text={"Previous"}
-              />
-            )}
-          </View>
-        ) : currentQuestionIndex === quizDetail.questions.length - 1 ? (
-          <ActionButton
-            onPress={handleSubmitQuiz}
-            loading={submitting}
-            disabled={submitting}
-            text={"Submit"}
-          />
+          currentQuestionIndex === quizDetail.questions.length - 1 && (
+            <ActionButton onPress={handleDoneReview} text={"Done"} />
+          )
         ) : (
-          <ActionButton
-            onPress={handleNextQuestion}
-            text={"Next"}
-            disabled={!reviewMode && !isCurrentQuestionAnswered}
-            style={
-              !reviewMode && !isCurrentQuestionAnswered && { opacity: 0.2 }
-            }
-          />
+          allQuestionsAnswered && (
+            <ActionButton
+              onPress={handleSubmitQuiz}
+              loading={submitting}
+              disabled={submitting}
+              text={"Submit"}
+            />
+          )
         )}
       </View>
     </Screen>
@@ -853,11 +973,55 @@ const styles = StyleSheet.create({
   segmentedProgressContainer: {
     paddingVertical: Spacing.lg,
   },
+  progressHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    gap: 8,
+  },
+  navIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.gray800,
+    borderWidth: 1,
+    borderColor: Colors.purple400,
+  },
+  navIconButtonDisabled: {
+    opacity: 0.4,
+    borderColor: Colors.gray600,
+  },
   progressLabel: {
     fontSize: 15,
     color: Colors.textSecondary,
-    marginBottom: 10,
     textAlign: "left",
+    flex: 1,
+  },
+  attemptsInline: {
+    marginBottom: 6,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: "600",
+    textAlign: "right",
+  },
+  questionNavRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
+    paddingVertical: Spacing.md,
+  },
+  navIconButtonLarge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.gray800,
+    borderWidth: 1,
+    borderColor: Colors.purple400,
   },
   segmentsWrapper: {
     flexDirection: "row",
