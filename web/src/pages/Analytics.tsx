@@ -19,12 +19,12 @@ import {
   Clock,
   Target,
   Download,
-  Share2,
   Search,
   Award,
   BookOpen,
   GraduationCap,
   BarChart3,
+  HelpCircle,
 } from "lucide-react";
 import { analyticsService, type InstructorAnalytics } from "@/services";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,11 +46,17 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
 } from "recharts";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const Analytics = () => {
   const [dateFilter, setDateFilter] = useState("30");
@@ -65,6 +71,39 @@ const Analytics = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const defaultUserId = user?.id || "550e8400-e29b-41d4-a716-446655440201";
+  const SectionHelp = ({
+    title,
+    items,
+  }: {
+    title: string;
+    items: Array<{ label: string; formula: string; className: string }>;
+  }) => (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Analytics help"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="max-w-xs text-sm">
+          <div className="space-y-2">
+            <p className="font-semibold text-foreground">{title}</p>
+            <div className="space-y-1.5">
+              {items.map((item) => (
+                <p key={item.label} className={`text-sm ${item.className}`}>
+                  {item.label}: {item.formula}
+                </p>
+              ))}
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 
   useEffect(() => {
     const loadAnalytics = async () => {
@@ -155,17 +194,17 @@ const Analytics = () => {
     course.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const enrollmentData = useMemo(
-    () => analytics?.enrollment_trend ?? [],
-    [analytics]
-  );
-  const courseEnrollmentData = useMemo(
-    () =>
-      selectedCourseId
-        ? courseAnalytics?.enrollment_trend ?? []
-        : enrollmentData,
-    [selectedCourseId, courseAnalytics, enrollmentData]
-  );
+  const enrollmentData = useMemo(() => {
+    const data = analytics?.enrollment_trend ?? [];
+    return [...data].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
+  }, [analytics]);
+  const courseEnrollmentData = useMemo(() => {
+    if (selectedCourseId) {
+      const data = courseAnalytics?.enrollment_trend ?? [];
+      return [...data].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
+    }
+    return enrollmentData;
+  }, [selectedCourseId, courseAnalytics, enrollmentData]);
 
   const completionData =
     analytics?.completion_breakdown?.map((entry) => {
@@ -416,34 +455,6 @@ const Analytics = () => {
     });
   };
 
-  const handleShare = () => {
-    const params = new URLSearchParams();
-    params.set("days", dateFilter);
-    if (selectedCourseId) {
-      params.set("courseId", selectedCourseId);
-      params.set("view", "course");
-    } else {
-      params.set("view", "all");
-    }
-    const url = `${window.location.origin}/analytics?${params.toString()}`;
-
-    navigator.clipboard.writeText(url).then(
-      () => {
-        toast({
-          title: "Share link copied",
-          description: "Analytics link copied to clipboard.",
-        });
-      },
-      () => {
-        toast({
-          title: "Share failed",
-          description: "Unable to copy link. Please copy from the address bar.",
-          variant: "destructive",
-        });
-      }
-    );
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -487,10 +498,6 @@ const Analytics = () => {
             <Button variant="outline" className="gap-2" onClick={handleExport}>
               <Download className="h-4 w-4" />
               Export
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={handleShare}>
-              <Share2 className="h-4 w-4" />
-              Share
             </Button>
           </div>
         </div>
@@ -556,6 +563,21 @@ const Analytics = () => {
                 <h3 className="text-lg font-semibold mb-5 text-foreground flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-primary" />
                   Course Performance Comparison
+                  <SectionHelp
+                    title="Compare engagement and completion by course"
+                    items={[
+                      {
+                        label: "Engagement %",
+                        formula: "(sum of student progress %) ÷ students",
+                        className: "text-primary",
+                      },
+                      {
+                        label: "Completion %",
+                        formula: "completed students ÷ students × 100",
+                        className: "text-success",
+                      },
+                    ]}
+                  />
                 </h3>
                 <ResponsiveContainer width="100%" height={380}>
                   <BarChart data={coursePerformance}>
@@ -571,7 +593,7 @@ const Analytics = () => {
                       tick={<CustomXAxisTick />}
                     />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip
+                    <RechartsTooltip
                       wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
@@ -602,6 +624,16 @@ const Analytics = () => {
                 <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary" />
                   Enrollment Trends
+                  <SectionHelp
+                    title="Enrollments over the selected time range"
+                    items={[
+                      {
+                        label: "Enrollments",
+                        formula: "count of enrollments per day/month in filter",
+                        className: "text-primary",
+                      },
+                    ]}
+                  />
                 </h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={enrollmentData}>
@@ -634,7 +666,7 @@ const Analytics = () => {
                       stroke="hsl(var(--muted-foreground))"
                     />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip
+                    <RechartsTooltip
                       wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
@@ -658,6 +690,26 @@ const Analytics = () => {
                 <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                   <Target className="h-5 w-5 text-success" />
                   Student Progress Distribution
+                  <SectionHelp
+                    title="Distribution of progress status"
+                    items={[
+                      {
+                        label: "Completed",
+                        formula: "100% done",
+                        className: "text-success",
+                      },
+                      {
+                        label: "In Progress",
+                        formula: "between 1% and 99%",
+                        className: "text-primary",
+                      },
+                      {
+                        label: "Not Started",
+                        formula: "0%",
+                        className: "text-muted-foreground",
+                      },
+                    ]}
+                  />
                 </h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -677,7 +729,7 @@ const Analytics = () => {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip
+                    <RechartsTooltip
                       wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
@@ -694,6 +746,31 @@ const Analytics = () => {
               <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
                 Cohort Snapshot
+                <SectionHelp
+                  title="Per-course cohort snapshot"
+                  items={[
+                    {
+                      label: "Enrolled",
+                      formula: "number of students",
+                      className: "text-foreground",
+                    },
+                    {
+                      label: "Avg Progress %",
+                      formula: "average of student progress",
+                      className: "text-primary",
+                    },
+                    {
+                      label: "Completion %",
+                      formula: "completed ÷ students × 100",
+                      className: "text-success",
+                    },
+                    {
+                      label: "Avg Score / Pass Rate",
+                      formula: "from quiz attempts",
+                      className: "text-warning",
+                    },
+                  ]}
+                />
               </h3>
               {cohortAnalytics.length > 0 ? (
                 <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
@@ -742,6 +819,21 @@ const Analytics = () => {
                 <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                   <Users className="h-5 w-5 text-accent" />
                   Weekly Student Activity
+                  <SectionHelp
+                    title="Active vs inactive students"
+                    items={[
+                      {
+                        label: "Active",
+                        formula: "students with activity that day",
+                        className: "text-success",
+                      },
+                      {
+                        label: "Inactive",
+                        formula: "total students − active",
+                        className: "text-muted-foreground",
+                      },
+                    ]}
+                  />
                 </h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={studentActivityData}>
@@ -754,7 +846,7 @@ const Analytics = () => {
                       stroke="hsl(var(--muted-foreground))"
                     />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip
+                    <RechartsTooltip
                       wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
@@ -784,7 +876,17 @@ const Analytics = () => {
               <Card className="p-6 gradient-card border-border">
                 <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-warning" />
-                  Performance Categories
+                  User Performance Across Categories
+                  <SectionHelp
+                    title="Category performance"
+                    items={[
+                      {
+                        label: "Score %",
+                        formula: "average progress of students in that category",
+                        className: "text-primary",
+                      },
+                    ]}
+                  />
                 </h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <RadarChart
@@ -821,7 +923,7 @@ const Analytics = () => {
                       fillOpacity={0.6}
                       strokeWidth={2}
                     />
-                    <Tooltip
+                    <RechartsTooltip
                       wrapperStyle={tooltipWrapperStyle}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
@@ -992,6 +1094,21 @@ const Analytics = () => {
                       <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                         <Award className="h-5 w-5 text-success" />
                         Quiz Performance
+                        <SectionHelp
+                          title="Quiz performance for this course"
+                          items={[
+                            {
+                              label: "Avg Score",
+                              formula: "average quiz score",
+                              className: "text-success",
+                            },
+                            {
+                              label: "Pass Rate",
+                              formula: "passed ÷ attempts × 100",
+                              className: "text-primary",
+                            },
+                          ]}
+                        />
                       </h3>
                       <ResponsiveContainer width="100%" height={240}>
                         <BarChart
@@ -1015,7 +1132,7 @@ const Analytics = () => {
                             stroke="hsl(var(--muted-foreground))"
                           />
                           <YAxis stroke="hsl(var(--muted-foreground))" />
-                          <Tooltip
+                          <RechartsTooltip
                             wrapperStyle={tooltipWrapperStyle}
                             contentStyle={{
                               backgroundColor: "hsl(var(--card))",
@@ -1038,6 +1155,21 @@ const Analytics = () => {
                       <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                         <BookOpen className="h-5 w-5 text-primary" />
                         Assignment Submissions
+                        <SectionHelp
+                          title="Submission workload"
+                          items={[
+                            {
+                              label: "Pending",
+                              formula: "submitted not graded",
+                              className: "text-warning",
+                            },
+                            {
+                              label: "Graded",
+                              formula: "marked as graded",
+                              className: "text-primary",
+                            },
+                          ]}
+                        />
                       </h3>
                       <ResponsiveContainer width="100%" height={240}>
                         <BarChart
@@ -1061,7 +1193,7 @@ const Analytics = () => {
                             stroke="hsl(var(--muted-foreground))"
                           />
                           <YAxis stroke="hsl(var(--muted-foreground))" />
-                          <Tooltip
+                          <RechartsTooltip
                             wrapperStyle={tooltipWrapperStyle}
                             contentStyle={{
                               backgroundColor: "hsl(var(--card))",
@@ -1124,6 +1256,21 @@ const Analytics = () => {
                     <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-primary" />
                       Module-wise Performance
+                      <SectionHelp
+                        title="Module completion and score"
+                        items={[
+                          {
+                            label: "Completion %",
+                            formula: "course average progress",
+                            className: "text-primary",
+                          },
+                          {
+                            label: "Avg Score",
+                            formula: "course average quiz score",
+                            className: "text-success",
+                          },
+                        ]}
+                      />
                     </h3>
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={singleCourseModuleData}>
@@ -1136,7 +1283,7 @@ const Analytics = () => {
                           stroke="hsl(var(--muted-foreground))"
                         />
                         <YAxis stroke="hsl(var(--muted-foreground))" />
-                        <Tooltip
+                        <RechartsTooltip
                           wrapperStyle={tooltipWrapperStyle}
                           contentStyle={{
                             backgroundColor: "hsl(var(--card))",
@@ -1165,6 +1312,16 @@ const Analytics = () => {
                     <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                       <Clock className="h-5 w-5 text-accent" />
                       Weekly Study Time
+                      <SectionHelp
+                        title="Weekly watch time"
+                        items={[
+                          {
+                            label: "Hours",
+                            formula: "total watch time ÷ 4 weeks (approx)",
+                            className: "text-accent",
+                          },
+                        ]}
+                      />
                     </h3>
                     <ResponsiveContainer width="100%" height={300}>
                       <AreaChart data={singleCourseTimeData}>
@@ -1197,7 +1354,7 @@ const Analytics = () => {
                           stroke="hsl(var(--muted-foreground))"
                         />
                         <YAxis stroke="hsl(var(--muted-foreground))" />
-                        <Tooltip
+                        <RechartsTooltip
                           wrapperStyle={tooltipWrapperStyle}
                           contentStyle={{
                             backgroundColor: "hsl(var(--card))",
@@ -1224,6 +1381,16 @@ const Analytics = () => {
                   <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" />
                     Student Enrollment Over Time
+                    <SectionHelp
+                      title="Course enrollments over time"
+                      items={[
+                        {
+                          label: "Enrollments",
+                          formula: "count within the selected time range",
+                          className: "text-primary",
+                        },
+                      ]}
+                    />
                   </h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={courseEnrollmentData}>
@@ -1236,7 +1403,7 @@ const Analytics = () => {
                         stroke="hsl(var(--muted-foreground))"
                       />
                       <YAxis stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip
+                      <RechartsTooltip
                         wrapperStyle={tooltipWrapperStyle}
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",

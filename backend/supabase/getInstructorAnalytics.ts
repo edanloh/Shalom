@@ -114,28 +114,31 @@ serve(async (req) => {
 
     const distinctStudents = new Set((enrollments || []).map((e) => e.user_id));
     const totalStudents = distinctStudents.size;
-    const avgProgress =
-      enrollments && enrollments.length > 0
-        ? enrollments.reduce((sum, e) => sum + Number(e.progress_percentage || 0), 0) / enrollments.length
-        : 0;
-    const completedCount = (enrollments || []).filter((e) => e.is_completed).length;
-    const completionRate = enrollments.length > 0 ? (completedCount / enrollments.length) * 100 : 0;
-    const totalWatchMinutes = (enrollments || []).reduce(
-      (sum, e) => sum + Number(e.total_watch_time_minutes || 0),
-      0
-    );
-
-    const ratingValues = (ratings || []).map((r) => Number(r.rating || 0));
-    const averageRating =
-      ratingValues.length > 0
-        ? ratingValues.reduce((sum, r) => sum + r, 0) / ratingValues.length
-        : 0;
-
     const now = new Date();
     const start = new Date(now.getTime() - days * dayMs);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const previousMonthEnd = new Date(monthStart.getTime() - 1);
+    const activeWindowEnrollments = (enrollments || []).filter((e) => {
+      const updated = new Date(
+        e.last_activity_at || e.updated_at || e.enrollment_date || 0
+      );
+      return updated >= start;
+    });
+    const avgProgress =
+      activeWindowEnrollments.length > 0
+        ? activeWindowEnrollments.reduce(
+            (sum, e) => sum + Number(e.progress_percentage || 0),
+            0
+          ) / activeWindowEnrollments.length
+        : 0;
+    const completedCount = (enrollments || []).filter((e) => e.is_completed).length;
+    const completionRate = enrollments.length > 0 ? (completedCount / enrollments.length) * 100 : 0;
+    const ratingValues = (ratings || []).map((r) => Number(r.rating || 0));
+    const averageRating =
+      ratingValues.length > 0
+        ? ratingValues.reduce((sum, r) => sum + r, 0) / ratingValues.length
+        : 0;
 
     const enrollmentTrendMap = new Map<string, number>();
     let currentMonthEnrollments = 0;
@@ -164,6 +167,15 @@ serve(async (req) => {
       current: { label: formatMonthYearLabel(monthStart), students: currentMonthEnrollments },
       previous: { label: formatMonthYearLabel(previousMonthStart), students: previousMonthEnrollments },
     };
+
+    const totalWatchMinutes = (enrollments || []).reduce(
+      (sum, e) => sum + Number(e.total_watch_time_minutes || 0),
+      0
+    );
+    const totalWatchMinutesWindow = activeWindowEnrollments.reduce(
+      (sum, e) => sum + Number(e.total_watch_time_minutes || 0),
+      0
+    );
 
     const completion_breakdown = [
       {
@@ -210,7 +222,7 @@ serve(async (req) => {
     }
 
     const categoryScores = new Map<string, { total: number; count: number }>();
-    for (const enrollment of enrollments || []) {
+    for (const enrollment of activeWindowEnrollments) {
       const course = courses.find((c) => c.id === enrollment.course_id);
       const categoryName = course
         ? String(categoryMap.get(course.category_id) ?? "Uncategorized")
@@ -230,6 +242,12 @@ serve(async (req) => {
 
     const coursePerformance = courses.map((course) => {
       const courseEnrollments = (enrollments || []).filter((e) => e.course_id === course.id);
+      const courseWindowEnrollments = courseEnrollments.filter((e) => {
+        const updated = new Date(
+          e.last_activity_at || e.updated_at || e.enrollment_date || 0
+        );
+        return updated >= start;
+      });
       const courseRatingValues = (ratings || [])
         .filter((r) => r.course_id === course.id)
         .map((r) => Number(r.rating || 0));
@@ -238,13 +256,17 @@ serve(async (req) => {
           ? courseRatingValues.reduce((sum, r) => sum + r, 0) / courseRatingValues.length
           : Number(course.rating || 0);
       const courseAvgProgress =
-        courseEnrollments.length > 0
-          ? courseEnrollments.reduce((sum, e) => sum + Number(e.progress_percentage || 0), 0) /
-            courseEnrollments.length
+        courseWindowEnrollments.length > 0
+          ? courseWindowEnrollments.reduce(
+              (sum, e) => sum + Number(e.progress_percentage || 0),
+              0
+            ) / courseWindowEnrollments.length
           : 0;
       const courseCompletionRate =
-        courseEnrollments.length > 0
-          ? (courseEnrollments.filter((e) => e.is_completed).length / courseEnrollments.length) * 100
+        courseWindowEnrollments.length > 0
+          ? (courseWindowEnrollments.filter((e) => e.is_completed).length /
+              courseWindowEnrollments.length) *
+            100
           : 0;
       return {
         id: course.id,
@@ -265,12 +287,16 @@ serve(async (req) => {
     if (cohortCourseIds.length > 0) {
       const { data: quizAttempts } = await supabase
         .from("quiz_attempts")
-        .select("score,is_passed,course_quizzes!inner(course_id)")
+        .select("score,is_passed,completed_at,course_quizzes!inner(course_id)")
         .in("course_quizzes.course_id", cohortCourseIds);
 
       (quizAttempts || []).forEach((attempt: any) => {
         const courseId = attempt?.course_quizzes?.course_id;
         if (!courseId) return;
+        const completedAt = attempt?.completed_at
+          ? new Date(attempt.completed_at)
+          : null;
+        if (completedAt && completedAt < start) return;
         const score = Number(attempt.score || 0);
         const isPassed = Boolean(attempt.is_passed);
         const current = quizStatsByCourse.get(courseId) || {
@@ -287,6 +313,12 @@ serve(async (req) => {
 
     const cohort_analytics = courses.map((course) => {
       const courseEnrollments = (enrollments || []).filter((e) => e.course_id === course.id);
+      const courseWindowEnrollments = courseEnrollments.filter((e) => {
+        const updated = new Date(
+          e.last_activity_at || e.updated_at || e.enrollment_date || 0
+        );
+        return updated >= start;
+      });
       const enrolledCount = courseEnrollments.length;
       const activeLearnerSet = new Set(
         courseEnrollments
@@ -299,13 +331,17 @@ serve(async (req) => {
           .map((e) => e.user_id)
       );
       const avgProgress =
-        enrolledCount > 0
-          ? courseEnrollments.reduce((sum, e) => sum + Number(e.progress_percentage || 0), 0) /
-            enrolledCount
+        courseWindowEnrollments.length > 0
+          ? courseWindowEnrollments.reduce(
+              (sum, e) => sum + Number(e.progress_percentage || 0),
+              0
+            ) / courseWindowEnrollments.length
           : 0;
       const completionRate =
-        enrolledCount > 0
-          ? (courseEnrollments.filter((e) => e.is_completed).length / enrolledCount) * 100
+        courseWindowEnrollments.length > 0
+          ? (courseWindowEnrollments.filter((e) => e.is_completed).length /
+              courseWindowEnrollments.length) *
+            100
           : 0;
       const quizStats = quizStatsByCourse.get(course.id) || {
         total: 0,
@@ -359,8 +395,9 @@ serve(async (req) => {
 
       const { data: courseQuizScores } = await supabase
         .from("quiz_attempts")
-        .select("score,is_passed,course_quizzes(course_id)")
-        .eq("course_quizzes.course_id", activeCourseId);
+        .select("score,is_passed,completed_at,course_quizzes(course_id)")
+        .eq("course_quizzes.course_id", activeCourseId)
+        .gte("completed_at", start.toISOString());
 
       const quizScores =
         (courseQuizScores || [])
@@ -398,13 +435,15 @@ serve(async (req) => {
         .from("assignment_submissions")
         .select("id, assignments!inner(course_id)", { count: "exact", head: true })
         .eq("submission_status", "submitted")
-        .eq("assignments.course_id", activeCourseId);
+        .eq("assignments.course_id", activeCourseId)
+        .gte("created_at", start.toISOString());
 
       const { count: gradedSubmissionsCount } = await supabase
         .from("assignment_submissions")
         .select("id, assignments!inner(course_id)", { count: "exact", head: true })
         .eq("submission_status", "graded")
-        .eq("assignments.course_id", activeCourseId);
+        .eq("assignments.course_id", activeCourseId)
+        .gte("created_at", start.toISOString());
 
       const totalWatchMinutes = courseEnrollments.reduce(
         (sum, e) => sum + Number(e.total_watch_time_minutes || 0),
@@ -462,7 +501,7 @@ serve(async (req) => {
       summary: {
         total_enrolled: totalStudents,
         average_engagement: toPercent(avgProgress),
-        study_hours: Math.round(totalWatchMinutes / 60),
+        study_hours: Math.round(totalWatchMinutesWindow / 60),
         goal_completion: toPercent(completionRate),
         average_rating: Number(averageRating.toFixed(2)),
       },
