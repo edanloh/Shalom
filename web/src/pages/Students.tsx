@@ -26,7 +26,7 @@ const Students = () => {
 
   const [search, setSearch] = useState("");
   const [students, setStudents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { toast } = useToast();
 
@@ -244,140 +244,151 @@ const Students = () => {
           </div>
         </Card>
 
-        <Card className="gradient-card border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Enrolled Date</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead>Engagement</TableHead>
-                <TableHead>Last Activity</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedStudents.map((student) => (
-                <TableRow key={student.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-foreground">{student.name}</p>
-                        <p className="text-sm text-muted-foreground">{student.email}</p>
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-destructive mb-4">{error}</p>
+            <Button onClick={() => fetchStudents()}>Retry</Button>
+          </div>
+        ) : (
+          <Card className="gradient-card border-border">
+            <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Enrolled Date</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Engagement</TableHead>
+                  <TableHead>Last Activity</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedStudents.map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarFallback>{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-foreground">{student.name}</p>
+                          <p className="text-sm text-muted-foreground">{student.email}</p>
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={student.enabled ? "default" : "destructive"}>
-                      {student.enabled ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{student.enrolledDate}</TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-foreground">{student.progress}%</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={student.enabled ? "default" : "destructive"}>
+                        {student.enabled ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{student.enrolledDate}</TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-foreground">{student.progress}%</span>
+                        </div>
+                        <Progress value={student.progress} className="h-2" />
                       </div>
-                      <Progress value={student.progress} className="h-2" />
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getEngagementColor(student.engagement) as any}>
-                      {student.engagement}%
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{student.lastActivity}</TableCell>
-                  <TableCell className="text-right">
-                    <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                    <SheetTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSelectedStudent(student);
-                            loadStudentProfile(student.id);
-                          }}
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </SheetTrigger>
-                      <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
-                        <SheetHeader>
-                          <SheetTitle>Student Profile</SheetTitle>
-                        </SheetHeader>
-                        {activeProfileBase && (
-                          <>
-                          <div className="space-y-6 mt-6 flex flex-col min-h-0">
-                            {/* Header */}
-                            <div className="flex items-center gap-4 pb-6 border-b border-border">
-                              <Avatar className="h-20 w-20">
-                                <AvatarFallback className="text-2xl bg-primary">
-                                  {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-2xl text-foreground">{activeProfileBase.name}</h3>
-                                <p className="text-sm text-muted-foreground mb-2">{activeProfileBase.email}</p>
-                                <div className="flex gap-2">
-                                  <Badge variant={activeProfileBase.enabled ? "default" : "destructive"}>
-                                    {activeProfileBase.enabled ? "Active" : "Inactive"}
-                                  </Badge>
-                                  <Badge variant="outline">{activeProfileBase.coursesEnrolled} Courses</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getEngagementColor(student.engagement) as any}>
+                        {student.engagement}%
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{student.lastActivity}</TableCell>
+                    <TableCell className="text-right">
+                      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                      <SheetTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              loadStudentProfile(student.id);
+                            }}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </SheetTrigger>
+                        <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
+                          <SheetHeader>
+                            <SheetTitle>Student Profile</SheetTitle>
+                          </SheetHeader>
+                          {activeProfileBase && (
+                            <>
+                            <div className="space-y-6 mt-6 flex flex-col min-h-0">
+                              {/* Header */}
+                              <div className="flex items-center gap-4 pb-6 border-b border-border">
+                                <Avatar className="h-20 w-20">
+                                  <AvatarFallback className="text-2xl bg-primary">
+                                    {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-2xl text-foreground">{activeProfileBase.name}</h3>
+                                  <p className="text-sm text-muted-foreground mb-2">{activeProfileBase.email}</p>
+                                  <div className="flex gap-2">
+                                    <Badge variant={activeProfileBase.enabled ? "default" : "destructive"}>
+                                      {activeProfileBase.enabled ? "Active" : "Inactive"}
+                                    </Badge>
+                                    <Badge variant="outline">{activeProfileBase.coursesEnrolled} Courses</Badge>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            {activeProfileLoading && (
-                              <div className="flex items-center justify-center py-12">
-                                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                                  Loading profile details...
+                              {activeProfileLoading && (
+                                <div className="flex items-center justify-center py-12">
+                                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                    Loading profile details...
+                                  </div>
+                                </div>
+                              )}
+
+                              {!activeProfile && !activeProfileLoading && (
+                                <div className="text-sm text-muted-foreground">
+                                  Profile details are not available yet.
+                                </div>
+                              )}
+
+                              {activeProfile && (
+                                <>
+                              {/* Quick Stats Grid */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                                  <Target className="h-5 w-5 text-primary mb-2" />
+                                  <p className="text-2xl font-bold">{activeProfile.averageScore}%</p>
+                                  <p className="text-xs text-muted-foreground">Avg Score</p>
+                                </div>
+                                <div className="p-4 rounded-lg bg-success/10 border border-success/20">
+                                  <CheckCircle className="h-5 w-5 text-success mb-2" />
+                                  <p className="text-2xl font-bold">{activeProfile.completedCourses}</p>
+                                  <p className="text-xs text-muted-foreground">Completed</p>
+                                </div>
+                                <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
+                                  <Clock className="h-5 w-5 text-warning mb-2" />
+                                  <p className="text-2xl font-bold">{activeProfile.totalHours}h</p>
+                                  <p className="text-xs text-muted-foreground">Study Time</p>
+                                </div>
+                                <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
+                                  <Award className="h-5 w-5 text-accent mb-2" />
+                                  <p className="text-2xl font-bold">{activeProfile.badges}</p>
+                                  <p className="text-xs text-muted-foreground">Badges</p>
                                 </div>
                               </div>
-                            )}
 
-                            {!activeProfile && !activeProfileLoading && (
-                              <div className="text-sm text-muted-foreground">
-                                Profile details are not available yet.
-                              </div>
-                            )}
-
-                            {activeProfile && (
-                              <>
-                            {/* Quick Stats Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                                <Target className="h-5 w-5 text-primary mb-2" />
-                                <p className="text-2xl font-bold">{activeProfile.averageScore}%</p>
-                                <p className="text-xs text-muted-foreground">Avg Score</p>
-                              </div>
-                              <div className="p-4 rounded-lg bg-success/10 border border-success/20">
-                                <CheckCircle className="h-5 w-5 text-success mb-2" />
-                                <p className="text-2xl font-bold">{activeProfile.completedCourses}</p>
-                                <p className="text-xs text-muted-foreground">Completed</p>
-                              </div>
-                              <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
-                                <Clock className="h-5 w-5 text-warning mb-2" />
-                                <p className="text-2xl font-bold">{activeProfile.totalHours}h</p>
-                                <p className="text-xs text-muted-foreground">Study Time</p>
-                              </div>
-                              <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
-                                <Award className="h-5 w-5 text-accent mb-2" />
-                                <p className="text-2xl font-bold">{activeProfile.badges}</p>
-                                <p className="text-xs text-muted-foreground">Badges</p>
-                              </div>
-                            </div>
-
-                            {/* Tabs for detailed information */}
-                            <Tabs defaultValue="journey" className="w-full flex flex-col flex-1 min-h-0">
-                              <TabsList className="grid w-full grid-cols-3">
-                                <TabsTrigger value="journey">Learning Journey</TabsTrigger>
-                                <TabsTrigger value="performance">Performance</TabsTrigger>
-                                <TabsTrigger value="activity">Activity</TabsTrigger>
-                              </TabsList>
+                              {/* Tabs for detailed information */}
+                              <Tabs defaultValue="journey" className="w-full flex flex-col flex-1 min-h-0">
+                                <TabsList className="grid w-full grid-cols-3">
+                                  <TabsTrigger value="journey">Learning Journey</TabsTrigger>
+                                  <TabsTrigger value="performance">Performance</TabsTrigger>
+                                  <TabsTrigger value="activity">Activity</TabsTrigger>
+                                </TabsList>
 
                               <TabsContent value="journey" className="space-y-4 mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
                                 <div>
@@ -694,17 +705,19 @@ const Students = () => {
             </TableBody>
           </Table>
 
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(filteredStudents.length / itemsPerPage)}
-            onPageChange={(page) => {
-              setCurrentPage(page);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            itemsPerPage={itemsPerPage}
-            totalItems={filteredStudents.length}
-          />
-        </Card>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredStudents.length / itemsPerPage)}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              itemsPerPage={itemsPerPage}
+              totalItems={filteredStudents.length}
+            />
+            </>
+          </Card>
+        )}
       </main>
     </div>
   );
