@@ -37,6 +37,8 @@ export const RightSidebar = () => {
     setCourseName,
     courseDescription,
     setCourseDescription,
+    courseOutcomes,
+    setCourseOutcomes,
     courseCategory,
     setCourseCategory,
     courseThumbnailUrl,
@@ -135,6 +137,25 @@ export const RightSidebar = () => {
 
   const handleMouseUp = () => {
     setIsResizing(null);
+  };
+
+  const handleOutcomeChange = (index: number, value: string) => {
+    setCourseOutcomes((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  const handleAddOutcome = () => {
+    setCourseOutcomes((prev) => [...prev, ""]);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleRemoveOutcome = (index: number) => {
+    setCourseOutcomes((prev) => prev.filter((_, i) => i !== index));
+    setHasUnsavedChanges(true);
   };
 
   /**
@@ -513,6 +534,70 @@ export const RightSidebar = () => {
             className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-y"
             placeholder="Enter course description..."
           />
+        </div>
+
+        {/* Course Outcomes */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label
+              style={{ color: Colors.textSecondary }}
+              className="block text-sm font-medium"
+            >
+              Course Outcomes
+            </label>
+            <button
+              onClick={handleAddOutcome}
+              style={{ color: Colors.accent }}
+              className="flex items-center gap-1 text-xs hover:opacity-80 transition-opacity"
+              title="Add outcome"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="font-medium">Add</span>
+            </button>
+          </div>
+          <div className="space-y-2">
+            {courseOutcomes.length === 0 && (
+              <div
+                style={{
+                  backgroundColor: Colors.textInputBg,
+                  borderColor: Colors.gray600,
+                  color: Colors.textSecondary,
+                }}
+                className="px-3 py-2 border rounded text-xs"
+              >
+                Add outcomes to describe what learners will achieve.
+              </div>
+            )}
+            {courseOutcomes.map((outcome, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={outcome}
+                  onChange={(e) => handleOutcomeChange(index, e.target.value)}
+                  style={{
+                    backgroundColor: Colors.textInputBg,
+                    borderColor: Colors.gray600,
+                    color: Colors.textPrimary,
+                  }}
+                  className="flex-1 px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+                  placeholder={`Outcome ${index + 1}`}
+                />
+                <button
+                  onClick={() => handleRemoveOutcome(index)}
+                  className="p-2 rounded hover:opacity-80 transition-opacity"
+                  style={{
+                    backgroundColor: Colors.gray800,
+                    color: Colors.textSecondary,
+                    borderColor: Colors.gray600,
+                    borderWidth: 1,
+                  }}
+                  title="Remove outcome"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Course Category - Improved UI with General as default */}

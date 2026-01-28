@@ -126,6 +126,8 @@ interface CourseBuilderContextType {
   setCourseName: (name: string) => void;
   courseDescription: string;
   setCourseDescription: (description: string) => void;
+  courseOutcomes: string[];
+  setCourseOutcomes: (outcomes: string[]) => void;
   courseCategory: string;
   setCourseCategory: (category: string) => void;
   localCategories: Array<{ id: string; name: string; color?: string }>;
@@ -213,6 +215,7 @@ export const CourseBuilderProvider = ({
   // Course state - Start with empty data (will be loaded from API or kept empty for new course)
   const [courseName, setCourseName] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
+  const [courseOutcomes, setCourseOutcomes] = useState<string[]>([]);
   const [courseCategory, setCourseCategory] = useState("");
   const [courseThumbnailUrl, setCourseThumbnailUrl] = useState("");
   const [courseStatus, setCourseStatus] = useState("draft");
@@ -273,6 +276,7 @@ export const CourseBuilderProvider = ({
         // Set course basic info
         setCourseName(courseBuilderData.courseName);
         setCourseDescription(courseBuilderData.courseDescription);
+        setCourseOutcomes(courseBuilderData.courseOutcomes || []);
         setCourseThumbnailUrl(courseBuilderData.courseThumbnailUrl);
         setCourseStatus(courseBuilderData.courseStatus);
 
@@ -1017,7 +1021,7 @@ export const CourseBuilderProvider = ({
           instructorId: user?.id || "550e8400-e29b-41d4-a716-446655440101", // Get from auth context
           instructorName: user?.name || "Shalom Instructor", // Get from auth context
           modules: transformedModules,
-          outcomes: [], // TODO: Add outcomes in UI
+          outcomes: courseOutcomes.map((outcome) => outcome.trim()).filter(Boolean),
           requirements: [], // TODO: Add requirements in UI
         };
 
@@ -1049,6 +1053,7 @@ export const CourseBuilderProvider = ({
           thumbnailUrl: uploadedCourseThumbnailUrl || null,
           isPublished: courseStatus === "published",
           modules: transformedModules,
+          outcomes: courseOutcomes.map((outcome) => outcome.trim()).filter(Boolean),
         };
 
         console.log("check course category:", courseCategory);
@@ -1109,6 +1114,8 @@ export const CourseBuilderProvider = ({
     setCourseName,
     courseDescription,
     setCourseDescription,
+    courseOutcomes,
+    setCourseOutcomes,
     courseCategory,
     setCourseCategory,
     courseThumbnailUrl,

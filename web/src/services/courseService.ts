@@ -54,6 +54,7 @@ export interface Course {
   createdDate: string;
   lastUpdated: string;
   tags?: string[];
+  outcomes?: string[];
   recommendationReason?: string;
   recommendationScore?: number;
 }
@@ -236,6 +237,7 @@ export interface CourseBuilderData {
   courseThumbnailUrl: string;
   courseStatus: 'published' | 'draft';
   courseCategory: string;
+  courseOutcomes: string[];
   modules: CourseBuilderModule[];
 }
 
@@ -468,6 +470,7 @@ class CourseService {
         lastUpdated: courseData.updated_at
           ? new Date(courseData.updated_at).toLocaleDateString()
           : "N/A",
+        outcomes: Array.isArray(courseData.outcomes) ? courseData.outcomes : [],
       };
 
       // Extract modules/sections
@@ -887,6 +890,7 @@ class CourseService {
         courseThumbnailUrl: course.thumbnail_url || "",
         courseStatus: course.is_published ? "published" : "draft",
         courseCategory: course.category_id || "",
+        courseOutcomes: course.outcomes || [],
         modules: numberedModules,
       };
     } catch (error) {

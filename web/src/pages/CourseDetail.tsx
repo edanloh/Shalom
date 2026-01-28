@@ -483,6 +483,25 @@ const CourseDetail = () => {
 
               <p className="text-foreground mb-6">{course.description}</p>
 
+              {course.outcomes && course.outcomes.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">
+                    Course Outcomes
+                  </h3>
+                  <ul className="grid gap-2">
+                    {course.outcomes.map((outcome, index) => (
+                      <li
+                        key={`${outcome}-${index}`}
+                        className="flex items-start gap-2 text-sm text-foreground"
+                      >
+                        <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+                        <span>{outcome}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="grid grid-cols-4 gap-4">
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-primary" />

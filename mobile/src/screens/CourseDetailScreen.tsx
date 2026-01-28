@@ -499,6 +499,20 @@ export default function CourseDetailScreen({
         <Text style={styles.courseOverview}>Overview</Text>
         <Text style={styles.courseDescription}>{courseDetail.description}</Text>
 
+        {courseDetail.outcomes.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Course Outcomes</Text>
+            <View style={styles.outcomesList}>
+              {courseDetail.outcomes.map((outcome, index) => (
+                <View key={`${outcome}-${index}`} style={styles.outcomeItem}>
+                  <View style={styles.outcomeBullet} />
+                  <Text style={styles.outcomeText}>{outcome}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
         {/* Course Progress Section */}
         {courseContent && courseContent.userProgress && (
           <>
@@ -780,6 +794,28 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 22,
     marginBottom: Spacing.xl,
+  },
+  outcomesList: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.xl,
+  },
+  outcomeItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.sm,
+  },
+  outcomeBullet: {
+    marginTop: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.purple400,
+  },
+  outcomeText: {
+    flex: 1,
+    fontSize: TextStyles.body.fontSize,
+    color: Colors.textSecondary,
+    lineHeight: 22,
   },
   sectionHeader: {
     flexDirection: "row",
