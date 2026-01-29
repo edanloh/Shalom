@@ -31,6 +31,7 @@ export default function EditProfileScreen({ navigation }: any) {
     phone: user?.phone || "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const uri = getAvatarUri();
 
   useEffect(() => {
     // Init form with user data
@@ -49,7 +50,7 @@ export default function EditProfileScreen({ navigation }: any) {
       }
     };
     init();
-  }, [user]);
+  }, []);
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.email.trim()) {
@@ -58,8 +59,7 @@ export default function EditProfileScreen({ navigation }: any) {
     }
     setIsLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 800)); // simulate API
-      await updateUser(user!.id, formData);
+      await updateUser(user?.uuid || "", formData);
       Alert.alert("Success", "Profile updated", [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
@@ -101,7 +101,7 @@ export default function EditProfileScreen({ navigation }: any) {
           `${user?.email}_avatar${parseInt(avatarId) + 1}.png`,
           result.blob
         );
-        await updateUser(user!.id, {
+        await updateUser(user?.uuid || "", {
           avatar_url: `${user?.email}_avatar${parseInt(avatarId) + 1}.png`,
         });
         Alert.alert("Success", "Profile picture updated.");
@@ -143,7 +143,7 @@ export default function EditProfileScreen({ navigation }: any) {
           {/* Avatar */}
           <View style={styles.avatarSection}>
             <View>
-              <ImageWithFallback source={{uri: getAvatarUri()}} fallback={Images.profile} style={styles.avatar} />
+              <ImageWithFallback source={{uri: uri}} fallback={Images.profile} style={styles.avatar} />
               <Pressable
                 style={styles.avatarEditButton}
                 onPress={handleChangeAvatar}

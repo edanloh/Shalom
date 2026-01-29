@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Colors, Spacing, TextStyles } from "../constants";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { ImageWithFallback } from "../components/common";
 import { Images } from "../../assets";
 import { getAvatarUri } from "@/utils/avatar";
@@ -40,7 +40,8 @@ const isIconUrl = (value?: string) =>
   !!value && (value.startsWith("http://") || value.startsWith("https://"));
 
 export default function ProfileScreen({ navigation }: any) {
-  const { user, logout } = useAuth();
+  const { user } = useUser();
+  const { logout } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [balance, setBalance] = useState<number>((user as any)?.points ?? 0);
   const [creditHistory, setCreditHistory] = useState<CreditEvent[]>([]);
@@ -52,7 +53,7 @@ export default function ProfileScreen({ navigation }: any) {
   const tabHidden = useRef(false);
 
   // Safe fallbacks so the UI renders even if some fields are missing
-  const displayName = useUser().user?.name ?? "User";
+  const displayName = user?.name ?? "User";
 
   const quickActions = useMemo(
     () => [
