@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from '@/contexts/UserContext';
 import { uploadProfilePic } from '@/services/userService';
 import { getAvatarUri } from '@/utils/avatar';
+import { useAuth } from "@/contexts/AuthContext";
 
 const Settings = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -28,6 +29,7 @@ const Settings = () => {
   const [location, setLocation] = useState(user?.location ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const { changePassword } = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -92,6 +94,36 @@ const Settings = () => {
       title: 'Avatar Updated',
       description: 'Your profile picture has been updated successfully',
     });
+  };
+
+  const handleChangePassword = async () => {
+    const currentPasswordInput = document.getElementById('current-password') as HTMLInputElement;
+    const newPasswordInput = document.getElementById('new-password') as HTMLInputElement;
+    const confirmPasswordInput = document.getElementById('confirm-password') as HTMLInputElement;
+    const currentPassword = currentPasswordInput.value;
+    const newPassword = newPasswordInput.value;
+    const confirmPassword = confirmPasswordInput.value;
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: 'Error',
+        description: 'New password and confirm password do not match',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      await changePassword(user!.email, currentPassword, newPassword);
+      toast({
+        title: 'Success',
+        description: 'Your password has been changed successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to change password. Please check your current password.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -252,7 +284,7 @@ const Settings = () => {
                     <Label htmlFor="confirm-password">Confirm Password</Label>
                     <Input id="confirm-password" className="mt-1" type="password" />
                   </div>
-                  <Button>Update Password</Button>
+                  <Button onClick={handleChangePassword}>Update Password</Button>
                 </div>
               </div>
             </Card>

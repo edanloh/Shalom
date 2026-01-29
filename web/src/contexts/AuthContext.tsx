@@ -22,6 +22,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  changePassword: (email: string, oldPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -73,21 +74,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-    if (data?.user)
-      setAuthUser({
-        id: '550e8400-e29b-41d4-a716-446655440105',
-        email: data.user.email,
-        name: data.user.user_metadata.full_name || '',
-        auth_provider: data.user.app_metadata.provider,
-        ...data.user,
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-    // setAuthUser({ id: data.user.id, email: data.user.email, ...data.user });
-    setIsLoading(false);
+      if (error) throw error;
+      if (data?.user)
+        setAuthUser({
+          id: '550e8400-e29b-41d4-a716-446655440105',
+          email: data.user.email,
+          name: data.user.user_metadata.full_name || '',
+          auth_provider: data.user.app_metadata.provider,
+          ...data.user,
+        });
+      // setAuthUser({ id: data.user.id, email: data.user.email, ...data.user });
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = async () => {
@@ -98,6 +104,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.href = '/login';
   };
 
+  const changePassword = async (email: string, oldPassword: string, newPassword: string) => {
+    setIsLoading(true);
+    const { data, error } = await supabase.auth.updateUser({
+      email,
+      password: newPassword,
+    });
+    if (error) throw error;
+    setIsLoading(false);
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -106,6 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
         login,
         logout,
+        changePassword,
       }}
     >
       {children}

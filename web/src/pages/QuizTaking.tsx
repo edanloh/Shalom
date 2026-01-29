@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { moduleService } from "@/services/moduleService";
 import apiService from "@/services/apiService";
+import { useUser } from "@/contexts/UserContext";
 
 interface CourseSection {
   id: string;
@@ -35,7 +36,7 @@ const QuizTaking = () => {
   const { courseId, moduleId, quizId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useUser();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [timeRemaining, setTimeRemaining] = useState(1800); // 30 minutes
@@ -106,7 +107,7 @@ const QuizTaking = () => {
       }
       
       // Use hardcoded admin ID for instructor view (same as CourseDetail)
-      const adminId = user?.id || user?.sub || (user as any)?.['cognito:username'] || '550e8400-e29b-41d4-a716-446655440101';
+      const adminId = user?.uuid || '550e8400-e29b-41d4-a716-446655440101';
       
       try {
         console.log('🔄 Fetching course sections for:', courseId, 'with adminId:', adminId);
@@ -185,7 +186,7 @@ const QuizTaking = () => {
   };
 
   const handleSubmit = async () => {
-    if (!user?.sub || !quizId) {
+    if (!user?.uuid || !quizId) {
       toast({
         title: "Error",
         description: "User information or quiz ID is missing",
@@ -208,7 +209,7 @@ const QuizTaking = () => {
 
       const result = await moduleService.submitQuiz(
         quizId,
-        user.sub,
+        user.uuid,
         answersArray,
         timeTakenMinutes
       );

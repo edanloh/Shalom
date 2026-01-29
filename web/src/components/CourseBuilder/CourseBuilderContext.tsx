@@ -4,6 +4,7 @@ import moduleService from '../../services/moduleService';
 import apiService from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../services/storageService';
+import { useUser } from '@/contexts/UserContext';
 
 // Types
 export interface Question {
@@ -141,7 +142,7 @@ interface CourseBuilderProviderProps {
 }
 
 export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProviderProps) => {
-  const { user } = useAuth(); // Get authenticated user for admin ID
+  const { user } = useUser(); // Get authenticated user for admin ID
   
   // Course state - Start with empty data (will be loaded from API or kept empty for new course)
   const [courseName, setCourseName] = useState("");
@@ -166,7 +167,7 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
       try {
         // Fetch all course data in ONE call using the instructor endpoint
         // This returns both course info and modules with lessons/quizzes
-        const adminId = user?.id || '550e8400-e29b-41d4-a716-446655440101';
+        const adminId = user?.uuid || '550e8400-e29b-41d4-a716-446655440101';
         const response = await apiService.get<any>(`/getModuleDetailInstructor/${adminId}/${courseId}`);
         
         if (!response || !response.data) {
@@ -688,7 +689,7 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
           description: courseDescription || 'Course description',
           thumbnailUrl: uploadedCourseThumbnailUrl || null,
           level: 'Beginner', // TODO: Add level selector in UI
-          instructorId: user?.id || '550e8400-e29b-41d4-a716-446655440101', // Get from auth context
+          instructorId: user?.uuid || '550e8400-e29b-41d4-a716-446655440101', // Get from auth context
           instructorName: user?.name || 'Instructor', // Get from auth context
           modules: transformedModules,
           outcomes: [], // TODO: Add outcomes in UI
