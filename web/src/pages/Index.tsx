@@ -18,11 +18,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { courseService } from "@/services";
-import { useAuth } from "@/contexts/AuthContext";
+import { useUser } from "@/contexts/UserContext";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useUser();
   // const defaultUserId = user?.id || '550e8400-e29b-41d4-a716-446655440201';
   const defaultUserId = '550e8400-e29b-41d4-a716-446655440201';
 

@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useUser } from "@/contexts/UserContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,11 +25,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useEffect, useState } from "react";
+import { getAvatarUri } from "@/utils/avatar";
+import { Avatar } from "./ui/avatar";
 
 export const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
+  const { user } = useUser();
+  const [avatarUrl, setAvatarUrl] = useState(null);
+
+  useEffect(() => {
+    setAvatarUrl(getAvatarUri(user?.avatar_url));
+  }, [user]);
+  
 
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/" },
@@ -98,13 +109,21 @@ export const Header = () => {
               <DropdownMenuTrigger asChild>
                 <div className="flex items-center gap-3 cursor-pointer">
                   <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-semibold hover-scale">
-                    {user?.email
-                      ? user.email.substring(0, 2).toUpperCase()
-                      : "DR"}
+                    <Avatar className="h-10 w-10">
+                      <img src={avatarUrl} />
+                    </Avatar>
                   </div>
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">
+                      {user?.name || "User"}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">

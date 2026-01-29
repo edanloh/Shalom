@@ -12,10 +12,12 @@ interface SupabaseUser {
   id: string;
   email: string;
   [key: string]: any;
+  name: string;
+  auth_provider: string;
 }
 
 interface AuthContextType {
-  user: SupabaseUser | null;
+  authUser: SupabaseUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -25,7 +27,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [authUser, setAuthUser] = useState<SupabaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,10 +35,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       const { data, error } = await supabase.auth.getUser();
       if (data?.user) {
-        setUser({ id: "550e8400-e29b-41d4-a716-446655440105", email: data.user.email, ...data.user });
-        // setUser({ id: data.user.id, email: data.user.email, ...data.user });
+        setAuthUser({
+          id: '550e8400-e29b-41d4-a716-446655440105',
+          email: data.user.email,
+          name: data.user.user_metadata.full_name || '',
+          auth_provider: data.user.app_metadata.provider,
+          ...data.user,
+        });
+        // setAuthUser({ id: data.user.id, email: data.user.email, ...data.user });
       } else {
-        setUser(null);
+        setAuthUser(null);
       }
       setIsLoading(false);
     };
@@ -45,14 +53,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (session?.user) {
-          setUser({
-            id: "550e8400-e29b-41d4-a716-446655440105",
+          setAuthUser({
+            id: '550e8400-e29b-41d4-a716-446655440105',
             // id: session.user.id,
             email: session.user.email,
+            name: session.user.user_metadata.full_name || '',
+            auth_provider: session.user.app_metadata.provider,
             ...session.user,
           });
         } else {
-          setUser(null);
+          setAuthUser(null);
         }
       },
     );
@@ -69,15 +79,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     if (error) throw error;
     if (data?.user)
-      setUser({ id: "550e8400-e29b-41d4-a716-446655440105", email: data.user.email, ...data.user });
-      // setUser({ id: data.user.id, email: data.user.email, ...data.user });
+      setAuthUser({
+        id: '550e8400-e29b-41d4-a716-446655440105',
+        email: data.user.email,
+        name: data.user.user_metadata.full_name || '',
+        auth_provider: data.user.app_metadata.provider,
+        ...data.user,
+      });
+    // setAuthUser({ id: data.user.id, email: data.user.email, ...data.user });
     setIsLoading(false);
   };
 
   const logout = async () => {
     setIsLoading(true);
     await supabase.auth.signOut();
-    setUser(null);
+    setAuthUser(null);
     setIsLoading(false);
     window.location.href = '/login';
   };
@@ -85,8 +101,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AuthContext.Provider
       value={{
-        user,
-        isAuthenticated: !!user,
+        authUser,
+        isAuthenticated: authUser != null,
         isLoading,
         login,
         logout,

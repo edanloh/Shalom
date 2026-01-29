@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,31 +11,93 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { User, Bell, Shield, Palette, Settings as SettingsIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from '@/contexts/UserContext';
+import { uploadProfilePic } from '@/services/userService';
+import { getAvatarUri } from '@/utils/avatar';
 
 const Settings = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [twoFactorAuth, setTwoFactorAuth] = useState(false);
   const { toast } = useToast();
+  const [blob, setBlob] = useState<Blob | null>(null);
 
-  const handleSaveProfile = () => {
+  const { user, updateUser } = useUser();
+  const [name, setName] = useState(user?.name ?? '');
+  const [bio, setBio] = useState(user?.bio ?? '');
+  const [location, setLocation] = useState(user?.location ?? '');
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [avatarUrl, setAvatarUrl] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name ?? ''); 
+      setBio(user.bio ?? '');
+      setLocation(user.location ?? ''); 
+      setPhone(user.phone ?? ''); 
+      setAvatarUrl(getAvatarUri(user.avatar_url));
+    }
+  }, [user]);
+
+  const handleSaveProfile = async () => {
+    await updateUser(user!.uuid, {
+      name,
+      bio,
+      location,
+      phone,
+    });
+    toast({
+      title: 'Profile Updated',
+      description: 'Your profile has been saved successfully',
+    });
+  };
+
+  const handleSaveNotifications = async () => {
     toast({
       title: "Profile Updated",
       description: "Your profile has been saved successfully"
     });
   };
 
-  const handleSaveNotifications = () => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleChangeAvatar = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Convert to Blob and upload
+    const blob = new Blob([file], { type: file.type });
+    setBlob(blob);
+    let avatarIdStr;
+    if (user?.avatar_url == null) {
+      avatarIdStr = "0.png";
+    } else {
+      avatarIdStr = user.avatar_url.split("_avatar")[1] || "0.png";
+    }
+    const avatarId = avatarIdStr.substring(0, avatarIdStr.length - 4);
+    await uploadProfilePic(
+      `${user?.email}_avatar${parseInt(avatarId) + 1}.png`,
+      blob
+    );
+    await updateUser(user?.uuid || "", {
+      avatar_url: `${user?.email}_avatar${parseInt(avatarId) + 1}.png`,
+    });
     toast({
-      title: "Settings Saved",
-      description: "Your notification preferences have been updated"
+      title: 'Avatar Updated',
+      description: 'Your profile picture has been updated successfully',
     });
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="container mx-auto px-6 py-8 space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Settings</h1>
@@ -56,51 +118,66 @@ const Settings = () => {
               <Shield className="h-4 w-4" />
               Security
             </TabsTrigger>
-            
           </TabsList>
 
           <TabsContent value="profile" className="space-y-6">
             <Card className="p-6 gradient-card border-border space-y-6">
               <div className="flex items-center gap-6">
                 <Avatar className="h-24 w-24">
-                  <AvatarFallback className="text-2xl">DR</AvatarFallback>
+                  <img src={avatarUrl} />
                 </Avatar>
                 <div className="space-y-2">
-                  <Button variant="outline">Change Avatar</Button>
-                  <p className="text-sm text-muted-foreground">JPG, PNG or GIF. Max size 2MB.</p>
+                  <Button variant="outline" onClick={handleChangeAvatar}>
+                    Change Avatar
+                  </Button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    ref={fileInputRef}
+                    onChange={handleAvatarFileChange}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    JPG, PNG or GIF. Max size 2MB.
+                  </p>
                 </div>
               </div>
 
               <Separator />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="first-name">First Name</Label>
-                  <Input id="first-name" defaultValue="Rachel" />
-                </div>
-                <div>
-                  <Label htmlFor="last-name">Last Name</Label>
-                  <Input id="last-name" defaultValue="Anderson" />
-                </div>
                 <div className="md:col-span-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue="rachel.anderson@university.edu" />
+                  <Label htmlFor="first-name">Name</Label>
+                  <Input
+                    id="first-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <Label htmlFor="bio">Bio</Label>
-                  <Textarea 
-                    id="bio" 
-                    defaultValue="Professor of Data Science with 10+ years of experience in machine learning and analytics."
+                  <Textarea
+                    id="bio"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
                     rows={4}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="title">Title</Label>
-                  <Input id="title" defaultValue="Professor of Data Science" />
+                  <Label htmlFor="location">Location</Label>
+                  <Input
+                    id="location"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <Label htmlFor="department">Department</Label>
-                  <Input id="department" defaultValue="Computer Science" />
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
                 </div>
               </div>
 
