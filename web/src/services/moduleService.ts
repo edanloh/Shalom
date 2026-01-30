@@ -238,7 +238,7 @@ class ModuleService {
     adminId: string, courseId: string
   ): Promise<any> {
     try {
-      const response = await apiService.get(`getModuleDetailInstructor/${adminId}/${courseId}`)
+      const response = await apiService.get(`/getModuleDetailInstructor/${adminId}/${courseId}`)
       return response;
     } catch (error) {
       console.error(`Error getting module details for instructor ${adminId} and course ${courseId}:`, error);
