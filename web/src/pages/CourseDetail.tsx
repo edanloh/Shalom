@@ -412,8 +412,10 @@ const CourseDetail = () => {
       <div className="min-h-screen bg-background">
         <Header />
         <main className="container mx-auto px-6 py-8">
-          <div className="flex justify-center items-center py-12">
+          <div className="flex justify-center items-center py-12 flex-col">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <br />
+            <p className="ml-4 text-lg">Loading course details...</p>
           </div>
         </main>
       </div>

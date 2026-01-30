@@ -133,8 +133,10 @@ const Courses = () => {
         </div>
 
         {loading ? (
-          <div className="flex justify-center items-center py-12">
+          <div className="flex justify-center items-center py-12 flex-col">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <br />
+            <p className="ml-4 text-lg">Loading courses...</p>
           </div>
         ) : error ? (
           <div className="text-center py-12">

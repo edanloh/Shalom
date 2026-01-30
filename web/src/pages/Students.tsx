@@ -623,63 +623,6 @@ const Students = () => {
                               <Mail className="h-4 w-4" />
                               Send Message
                             </Button>
-                            
-                            {selectedStudent.enabled ? (
-                              <Button
-                                className="w-full gap-2"
-                                variant="destructive"
-                                onClick={async () => {
-                                  try {
-                                    const result = await disableStudent({
-                                      studentId: selectedStudent.email,
-                                      status: false,
-                                    });
-                                    if (result) {
-                                      // Update local state immediately
-                                      setSelectedStudent({ ...selectedStudent, enabled: false });
-                                      // Refresh the full list
-                                      fetchStudents();
-                                      setIsSheetOpen(false);
-                                    } else {
-                                      console.error("disableStudent failed:", result);
-                                    }
-                                  } catch (err) {
-                                    console.error("Failed to disable student:", err);
-                                  }
-                                }}
-                              >
-                                <UserX className="h-4 w-4" />
-                                Disable User
-                              </Button>
-                            ) : (
-                              <Button
-                                className="w-full gap-2"
-                                style={{backgroundColor: Colors.purple600}}
-                                variant="default"
-                                onClick={async () => {
-                                  try {
-                                    const result = await disableStudent({
-                                      studentId: selectedStudent.email,
-                                      status: true,
-                                    });
-                                    if (result) {
-                                      // Update local state immediately
-                                      setSelectedStudent({ ...selectedStudent, enabled: true });
-                                      // Refresh the full list
-                                      fetchStudents();
-                                      setIsSheetOpen(false);
-                                    } else {
-                                      console.error("enableStudent failed:", result);
-                                    }
-                                  } catch (err) {
-                                    console.error("Failed to enable student:", err);
-                                  }
-                                }}
-                              >
-                                <UserX className="h-4 w-4" />
-                                Enable User
-                              </Button>
-                            )}
                           </div>
                         )}
                       </SheetContent>
