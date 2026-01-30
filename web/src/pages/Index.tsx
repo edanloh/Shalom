@@ -61,7 +61,7 @@ const Index = () => {
   };
 
   // Show loading state
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -83,7 +83,7 @@ const Index = () => {
         <section className="space-y-2">
           <h1 className="text-4xl font-bold text-foreground">
             Welcome Back,{" "}
-            <span className="bg-gradient-primary bg-clip-text text-transparent">
+            <span className="bg-gradient-primary bg-clip-text">
               {user?.name || "Instructor"}
             </span>
           </h1>

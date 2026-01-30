@@ -15,6 +15,7 @@ import { useUser } from '@/contexts/UserContext';
 import { uploadProfilePic } from '@/services/userService';
 import { getAvatarUri } from '@/utils/avatar';
 import { useAuth } from "@/contexts/AuthContext";
+import { validatePassword } from "@/utils/authUtils";
 
 const Settings = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -30,6 +31,9 @@ const Settings = () => {
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [avatarUrl, setAvatarUrl] = useState(null);
   const { changePassword } = useAuth();
+
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -103,6 +107,22 @@ const Settings = () => {
     const currentPassword = currentPasswordInput.value;
     const newPassword = newPasswordInput.value;
     const confirmPassword = confirmPasswordInput.value;
+    if (!validatePassword(newPassword)) {
+      toast({
+        title: 'Error',
+        description: 'New password does not meet requirements.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!validatePassword(confirmPassword)) {
+      toast({
+        title: 'Error',
+        description: 'Confirm password does not meet requirements.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast({
         title: 'Error',
@@ -278,11 +298,29 @@ const Settings = () => {
                   </div>
                   <div>
                     <Label htmlFor="new-password">New Password</Label>
-                    <Input id="new-password" className="mt-1" type="password" />
+                    <Input
+                      id="new-password"
+                      className="mt-1"
+                      type="password"
+                      onChange={e => setNewPassword(e.target.value)}
+                      value={newPassword}
+                    />
+                    {newPassword && validatePassword(newPassword) && (
+                      <p className="text-xs text-destructive mt-1">{validatePassword(newPassword)}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="confirm-password">Confirm Password</Label>
-                    <Input id="confirm-password" className="mt-1" type="password" />
+                    <Input
+                      id="confirm-password"
+                      className="mt-1"
+                      type="password"
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      value={confirmPassword}
+                    />
+                    {confirmPassword && validatePassword(confirmPassword) && (
+                      <p className="text-xs text-destructive mt-1">{validatePassword(confirmPassword)}</p>
+                    )}
                   </div>
                   <Button onClick={handleChangePassword}>Update Password</Button>
                 </div>

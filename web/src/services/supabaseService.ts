@@ -39,7 +39,7 @@ export function getSupabaseClient(): SupabaseClient {
         'Supabase configuration missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file'
       );
     }
-    supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
   return supabaseClient;
 }

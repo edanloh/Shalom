@@ -60,7 +60,48 @@ export const Header = () => {
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => navigate("/")}
             >
-              <div className="h-8 w-8 rounded-lg bg-gradient-primary" />
+              <div className="lg:hidden items-center gap-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <div className="flex items-center gap-3 cursor-pointer">
+                      <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-semibold hover-scale">
+                        {/* Menu dropdown icon */}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 6h16M4 12h16M4 18h16"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 ml-4">
+                    {navItems.map((item, idx) => {
+                      const Icon = item.icon;
+                      const isActive = location.pathname === item.path;
+                      return (
+                        <div key={item.path}>
+                          <DropdownMenuItem
+                            onClick={e => { e.stopPropagation(); navigate(item.path); }}
+                          >
+                            <Icon className="h-4 w-4 mr-4" />
+                            <span className="inline">{item.label}</span>
+                          </DropdownMenuItem>
+                          {idx < navItems.length - 1 && <DropdownMenuSeparator key={item.path + '-sep'} />}
+                        </div>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <span className="text-xl font-bold text-foreground">Shalom</span>
             </div>
           </div>
@@ -78,7 +119,7 @@ export const Header = () => {
                   className="gap-2"
                 >
                   <Icon className="h-4 w-4" />
-                  <span className="hidden xl:inline">{item.label}</span>
+                  <span className="inline">{item.label}</span>
                 </Button>
               );
             })}

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUser } from '@/contexts/UserContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -19,6 +20,7 @@ const Login = () => {
   const [error, setError] = useState('');
 
   const { login, isAuthenticated, isLoading } = useAuth();
+  const { user } = useUser();
   const navigate = useNavigate();
   React.useEffect(() => {
     // Only redirect if auth check is complete and user is authenticated
@@ -48,7 +50,7 @@ const Login = () => {
   };
 
   // Show loading spinner while checking auth status
-  if (isLoading) {
+  if (isLoading && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
