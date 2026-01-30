@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { courseService, moduleService, Course, Module, Review, Student } from "@/services";
 import { supabaseService } from "@/services/supabaseService";
+import { useUser } from "@/contexts/UserContext";
 
 const CourseDetail = () => {
   const { courseId } = useParams();
@@ -56,6 +57,7 @@ const CourseDetail = () => {
   const [availableStudents, setAvailableStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useUser();
 
   // Fetch course data
   useEffect(() => {
@@ -94,14 +96,12 @@ const CourseDetail = () => {
 
       // Use instructor endpoint to get full course details
       // TODO: Get actual admin ID from auth context
-      const adminId = '550e8400-e29b-41d4-a716-446655440101';
+      const adminId = user.uuid;
       
       // Call Supabase Edge Function with path parameters
-      const fullData = await supabaseService.post<{
-        success: boolean;
-        data?: { course: any; totalSections?: number; totalVideos?: number; totalQuizzes?: number };
-        message?: string;
-      }>(`getModuleDetailInstructor/${adminId}/${courseId}`, {});
+      const fullData = await moduleService.getModuleDetailInstructor(adminId, courseId);
+
+      console.log('Fetched course data:', fullData);
       
       if (!fullData.success || !fullData.data) {
         throw new Error(fullData.message || 'Course not found');

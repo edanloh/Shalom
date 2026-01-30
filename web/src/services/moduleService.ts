@@ -233,6 +233,18 @@ class ModuleService {
       throw error;
     }
   }
+
+  async getModuleDetailInstructor(
+    adminId: string, courseId: string
+  ): Promise<any> {
+    try {
+      const response = await apiService.get(`getModuleDetailInstructor/${adminId}/${courseId}`)
+      return response;
+    } catch (error) {
+      console.error(`Error getting module details for instructor ${adminId} and course ${courseId}:`, error);
+      throw error;
+    }
+  }
 }
 
 export const moduleService = new ModuleService();

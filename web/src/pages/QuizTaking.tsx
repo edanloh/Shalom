@@ -107,7 +107,7 @@ const QuizTaking = () => {
       }
       
       // Use hardcoded admin ID for instructor view (same as CourseDetail)
-      const adminId = user?.uuid || '550e8400-e29b-41d4-a716-446655440101';
+      const adminId = user?.uuid
       
       try {
         console.log('🔄 Fetching course sections for:', courseId, 'with adminId:', adminId);

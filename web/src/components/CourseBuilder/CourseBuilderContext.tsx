@@ -167,7 +167,7 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
       try {
         // Fetch all course data in ONE call using the instructor endpoint
         // This returns both course info and modules with lessons/quizzes
-        const adminId = user?.uuid || '550e8400-e29b-41d4-a716-446655440101';
+        const adminId = user?.uuid
         const response = await apiService.get<any>(`/getModuleDetailInstructor/${adminId}/${courseId}`);
         
         if (!response || !response.data) {
@@ -689,7 +689,7 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
           description: courseDescription || 'Course description',
           thumbnailUrl: uploadedCourseThumbnailUrl || null,
           level: 'Beginner', // TODO: Add level selector in UI
-          instructorId: user?.uuid || '550e8400-e29b-41d4-a716-446655440101', // Get from auth context
+          instructorId: user?.uuid, // Get from auth context
           instructorName: user?.name || 'Instructor', // Get from auth context
           modules: transformedModules,
           outcomes: [], // TODO: Add outcomes in UI

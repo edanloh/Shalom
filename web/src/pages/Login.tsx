@@ -85,6 +85,7 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              showEye
             />
             {error && (
               <div className="text-sm text-destructive text-center">

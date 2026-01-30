@@ -19,10 +19,8 @@ import { validatePassword } from "@/utils/authUtils";
 
 const Settings = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
   const [twoFactorAuth, setTwoFactorAuth] = useState(false);
   const { toast } = useToast();
-  const [blob, setBlob] = useState<Blob | null>(null);
 
   const { user, updateUser } = useUser();
   const [name, setName] = useState(user?.name ?? '');
@@ -79,7 +77,6 @@ const Settings = () => {
     if (!file) return;
     // Convert to Blob and upload
     const blob = new Blob([file], { type: file.type });
-    setBlob(blob);
     let avatarIdStr;
     if (user?.avatar_url == null) {
       avatarIdStr = "0.png";
@@ -269,19 +266,6 @@ const Settings = () => {
               </div>
 
               <Separator />
-
-              <div>
-                <h2 className="text-lg font-semibold text-foreground mb-4">Push Notifications</h2>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Enable push notifications</p>
-                      <p className="text-sm text-muted-foreground">Receive real-time notifications on your device</p>
-                    </div>
-                    <Switch checked={pushNotifications} onCheckedChange={setPushNotifications} />
-                  </div>
-                </div>
-              </div>
 
               <Button onClick={handleSaveNotifications}>Save Preferences</Button>
             </Card>
