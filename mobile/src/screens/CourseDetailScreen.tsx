@@ -1,4 +1,5 @@
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Modal } from 'react-native';
 import {
   View,
   Text,
@@ -27,6 +28,7 @@ import { useCourses } from '../contexts/CourseContext';
 import Screen from '../components/common/Screen';
 import ActionButton from '@/components/ActionButton';
 import { showToast } from '@/components/common/Toast';
+import notificationService from '@/services/notificationService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -47,10 +49,12 @@ export default function CourseDetailScreen({
   const userId = user?.uuid;
   const fallbackUserId =
     process.env.EXPO_PUBLIC_DEFAULT_USER_ID || "550e8400-e29b-41d4-a716-446655440101";
-  const effectiveUserId = userId || fallbackUserId;
-
+    const effectiveUserId = userId || fallbackUserId;
+    
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showAllAnnouncements, setShowAllAnnouncements] = useState(false);
   
   // Wishlist functionality
   const { toggleWishlist, isWishlisted } = useCourses();
@@ -60,6 +64,14 @@ export default function CourseDetailScreen({
     React.useCallback(() => {
       if (userId) {
         loadCourseDetail();
+          notificationService.getCourseNotifications(courseId).then(data => {
+          // Group by notification ID to avoid duplicates
+          console.log('[CourseDetailScreen] fetched notifications:', data);
+          const uniqueNotifications = Array.from(new Map(data.map(item => [item.type, item])).values());
+          setNotifications(uniqueNotifications);
+        }).catch(err => {
+          console.error('Error fetching notifications:', err);
+        });
       }
     }, [courseId, userId])
   );
@@ -507,6 +519,95 @@ export default function CourseDetailScreen({
             <Text style={styles.instructorName}>{courseDetail.instructor.name}</Text>
             <Text style={styles.instructorRole}>Data Science Expert</Text>
           </View>
+        </View>
+
+        {/* Announcements Section */}
+        <Text style={styles.sectionTitle}>Announcements</Text>
+        <View style={{ marginBottom: 24 }}>
+          {notifications && notifications.length > 0 ? (
+            <>
+              {notifications.slice(0, 3).map((notification, idx) => (
+                <View
+                  key={notification.id || idx}
+                  style={{
+                    backgroundColor: Colors.textInputBg,
+                    borderRadius: 10,
+                    padding: 14,
+                    marginBottom: 10,
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <Ionicons name="notifications" size={22} color={Colors.purple400} style={{ marginRight: 12, marginTop: 2 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: Colors.textPrimary, fontWeight: '600', marginBottom: 2 }}>
+                      {notification.message}
+                    </Text>
+                    <Text style={{ color: Colors.textSecondary, marginBottom: 4 }}>
+                      {notification.created_at ? new Date(notification.created_at).toLocaleString() : 'N/A'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              {notifications.length > 3 && (
+                <>
+                  <Pressable
+                    onPress={() => setShowAllAnnouncements(true)}
+                    style={{ alignItems: 'center', paddingVertical: 6 }}
+                  >
+                    <Text style={{ color: Colors.purple200 }}>View All Announcements</Text>
+                  </Pressable>
+                  <Modal
+                    visible={showAllAnnouncements}
+                    animationType="fade"
+                    transparent={true}
+                    onRequestClose={() => setShowAllAnnouncements(false)}
+                  >
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+                      <View style={{ backgroundColor: Colors.primary, borderRadius: 16, padding: 18, width: '90%', maxHeight: '80%' }}>
+                        <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginBottom: 18, textAlign: 'center' }}>{`${notifications.length} Announcements`}</Text>
+                        <ScrollView style={{ maxHeight: 400 }}>
+                          {notifications.map((notification, idx) => (
+                            <View
+                              key={notification.id || idx}
+                              style={{
+                                backgroundColor: Colors.textInputBg,
+                                borderRadius: 10,
+                                padding: 14,
+                                marginBottom: 10,
+                                flexDirection: 'row',
+                                alignItems: 'flex-start',
+                              }}
+                            >
+                              <Ionicons name="notifications" size={22} color={Colors.purple400} style={{ marginRight: 12, marginTop: 2 }} />
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ color: Colors.textPrimary, fontWeight: '600', marginBottom: 2 }}>
+                                  {notification.message}
+                                </Text>
+                                <Text style={{ color: Colors.textSecondary, marginBottom: 4 }}>
+                                  {notification.created_at ? new Date(notification.created_at).toLocaleString() : 'N/A'}
+                                </Text>
+                              </View>
+                            </View>
+                          ))}
+                        </ScrollView>
+                        <Pressable
+                          onPress={() => setShowAllAnnouncements(false)}
+                          style={{ alignItems: 'center', paddingTop: 8 }}
+                        >
+                          <Text style={{ color: Colors.purple400, fontWeight: '700', fontSize: 16 }}>Close</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </Modal>
+                </>
+              )}
+            </>
+          ) : (
+            <Text style={{ color: Colors.textSecondary, fontStyle: 'italic', textAlign: 'center', marginVertical: 12 }}>
+              No announcements yet
+            </Text>
+          )}
         </View>
 
         {/* Course Reviews */}
