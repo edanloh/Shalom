@@ -52,7 +52,11 @@ const Register = () => {
         setError(response.error || 'Registration failed. Please try again.');
         throw new Error(response.error || 'Registration failed');
       } else {
-        setError('Please request confirmation from the administrator');
+        setError('');
+        toast({
+          title: "Registration Successful",
+          description: `Please request admin approval to access instructor features.`,
+        });
       }
     } catch (err: any) {
       if (err?.message?.includes('Invalid login credentials')) {

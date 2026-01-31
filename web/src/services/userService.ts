@@ -44,3 +44,14 @@ export async function registerCheck(user: User): Promise<any> {
   const data: any = (resp as any)?.data ?? (resp as any);
   return data?.data ?? data;
 }
+
+export async function approveInstructor(id: string, access_token: string): Promise<any> {
+  const url = '/approveInstructor';
+  const resp = await apiService.post<any>(url, { id }, {
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+    },
+  });
+  const data: any = (resp as any)?.data ?? (resp as any);
+  return data?.data ?? data;
+}

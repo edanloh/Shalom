@@ -7,7 +7,7 @@ import {
 } from 'react';
 
 import { supabase } from '@/lib/supabase';
-import { registerCheck, fetchUserProfile } from '@/services/userService';
+import { registerCheck, fetchUserProfile, approveInstructor as ApproveInstructor } from '@/services/userService';
 
 interface SupabaseUser {
   id: string;
@@ -25,6 +25,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   changePassword: (email: string, oldPassword: string, newPassword: string) => Promise<void>;
   register: ( email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  approveInstructor: (uuid: string) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -114,6 +115,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     }
   };
+  
+  const approveInstructor = async (id: string) => {
+    const sessionResponse = await supabase.auth.getSession();
+    const accessToken = sessionResponse.data.session?.access_token;
+    const response = await ApproveInstructor(id, accessToken);
+    return response;
+  };
 
   const logout = async () => {
     setIsLoading(true);
@@ -163,6 +171,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   };
 
+  const getSession = async () => {
+    setIsLoading(true);
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data?.session?.access_token;
+    setIsLoading(false);
+    return { data };
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -173,6 +189,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logout,
         changePassword,
         register,
+        approveInstructor,
       }}
     >
       {children}

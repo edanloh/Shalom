@@ -9,13 +9,14 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { User, Bell, Shield, Palette, Settings as SettingsIcon } from "lucide-react";
+import { User, Bell, Shield, Palette, Settings as SettingsIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from '@/contexts/UserContext';
 import { uploadProfilePic } from '@/services/userService';
 import { getAvatarUri } from '@/utils/avatar';
 import { useAuth } from "@/contexts/AuthContext";
 import { validatePassword } from "@/utils/authUtils";
+import courseService from "@/services/courseService";
 
 const Settings = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -28,18 +29,59 @@ const Settings = () => {
   const [location, setLocation] = useState(user?.location ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [avatarUrl, setAvatarUrl] = useState(null);
-  const { changePassword } = useAuth();
+  const { changePassword, approveInstructor } = useAuth();
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Instructor approvals
+  const { getAllStudents } = courseService;
+  const [students, setAllStudents] = useState([]);
+  const [studentFilter, setStudentFilter] = useState("");
+  const [approvingPerson, setApprovingPerson] = useState<string>(null);
+
+  const filteredStudents = students.filter(student => {
+    const search = studentFilter.toLowerCase();
+    return (
+      student.name?.toLowerCase().includes(search) ||
+      student.email?.toLowerCase().includes(search)
+    );
+  });
+
+  const handleApproveInstructor = async (uuid: string, name: string) => {
+    setApprovingPerson(uuid);
+    try {
+      const response = await approveInstructor(uuid);
+      toast({
+        title: "Instructor Approved",
+        description: `Instructor ${name} has been approved.`
+      });
+      const studentsData = await getAllStudents();
+      setAllStudents(studentsData.students);
+    } catch (error) {
+      console.error("Error approving instructor:", error);
+      toast({
+        title: "Error",
+        description: `Failed to approve instructor ${name}.`,
+        variant: "destructive"
+      });
+    } finally {
+      setApprovingPerson(null);
+    }
+  };
+
   useEffect(() => {
+    const fetchStudents = async () => {
+      const studentsData = await getAllStudents();
+      setAllStudents(studentsData.students);
+    }
     if (user) {
       setName(user.name ?? ''); 
       setBio(user.bio ?? '');
       setLocation(user.location ?? ''); 
       setPhone(user.phone ?? ''); 
       setAvatarUrl(getAvatarUri(user.avatar_url));
+      fetchStudents();
     }
   }, [user]);
 
@@ -154,7 +196,9 @@ const Settings = () => {
         </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full md:w-[600px] grid-cols-3">
+          <TabsList className={`grid w-full md:w-[800px] 
+            ${user.uuid === "550e8400-e29b-41d4-a716-446655440201" ? "grid-cols-4" : "grid-cols-3"}`
+            }>
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
               Profile
@@ -167,6 +211,12 @@ const Settings = () => {
               <Shield className="h-4 w-4" />
               Security
             </TabsTrigger>
+            {user.uuid === "550e8400-e29b-41d4-a716-446655440201" && (
+              <TabsTrigger value="approval" className="gap-2">
+                <Shield className="h-4 w-4" />
+                Instructor Approvals
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="profile" className="space-y-6">
@@ -307,6 +357,58 @@ const Settings = () => {
                     )}
                   </div>
                   <Button onClick={handleChangePassword}>Update Password</Button>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="approval" className="space-y-6">
+            <Card className="p-6 gradient-card border-border space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground mb-4">
+                  Instructor Approvals
+                </h3>
+                <div className="mb-4">
+                  <Input
+                    type="text"
+                    placeholder="Filter users by name or email"
+                    value={studentFilter}
+                    onChange={(e) => setStudentFilter(e.target.value)}
+                  />
+                </div>
+                <div
+                  style={{ maxHeight: '350px', overflowY: 'auto' }}
+                  className="space-y-2 border rounded p-2 bg-background"
+                >
+                  {filteredStudents.length === 0 ? (
+                    <div className="text-muted-foreground text-center py-8">
+                      No students found.
+                    </div>
+                  ) : (
+                    filteredStudents.map((student) => (
+                      <div
+                        key={student.uuid+student.email}
+                        className="flex items-center justify-between border-b last:border-b-0 pb-2 px-1"
+                      >
+                        <div>
+                          <div className="font-medium">{student.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {student.email}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveInstructor(student.id, student.name)}
+                        >
+                          {approvingPerson === student.id ? (
+                            <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                          ) : (
+                            'Approve'
+                          )}
+                        </Button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </Card>

@@ -108,19 +108,17 @@ class ApiService {
   // Authentication interceptor - adds JWT token to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
-      // const authData = localStorage.getItem('shalom_auth');
-      // let token = null;
-      
-      // if (authData) {
-      //   const parsed = JSON.parse(authData);
-      //   token = parsed.IdToken || parsed.AccessToken;
-      // }
-      
+      // Only set Authorization if not already present
       if (SUPABASE_ANON_KEY) {
+        if (!config.headers || !('Authorization' in config.headers)) {
+          config.headers = {
+            ...config.headers,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          };
+        }
+        // Always set apikey for Supabase
         config.headers = {
           ...config.headers,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          // supabase specific
           apikey: SUPABASE_ANON_KEY,
         };
       }
