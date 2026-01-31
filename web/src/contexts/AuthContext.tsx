@@ -7,6 +7,7 @@ import {
 } from 'react';
 
 import { supabase } from '@/lib/supabase';
+import { registerCheck, fetchUserProfile } from '@/services/userService';
 
 interface SupabaseUser {
   id: string;
@@ -20,9 +21,10 @@ interface AuthContextType {
   authUser: SupabaseUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   changePassword: (email: string, oldPassword: string, newPassword: string) => Promise<void>;
+  register: ( email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,14 +82,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
       });
       if (error) throw error;
-      if (data?.user)
-        setAuthUser({
+      if (data?.user) {
+        const auth_user = {
           id: '550e8400-e29b-41d4-a716-446655440105',
           email: data.user.email,
           name: data.user.user_metadata.full_name || '',
           auth_provider: data.user.app_metadata.provider,
           ...data.user,
-        });
+        }
+        const check = await registerCheck(auth_user);
+        if (check.success) {
+          if (check.user.role === 'instructor' || check.user.role === 'admin') {
+            setAuthUser(auth_user);
+            await fetchUserProfile(check.user.email);
+          } else {
+            setAuthUser(null);
+            // Logout user if not instructor or admin
+            await supabase.auth.signOut();
+            setIsLoading(false);
+            return {
+              success: false,
+              error: 'Unauthorized role. Access denied.',
+            }
+          }
+        }
+      }
       // setAuthUser({ id: data.user.id, email: data.user.email, ...data.user });
     } catch (error) {
       throw error;
@@ -114,6 +133,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }
 
+  const register = async (email: string, password: string, name: string) => {
+    setIsLoading(true);
+    const { data, error } = await supabase.auth.signUp({
+      email: email,
+      password: password,
+      options: {
+        data: {
+          first_name: name,
+          name: name,
+          role: 'instructor',
+        },
+      },
+    });
+    if (error) throw error;
+    if (data?.user) {
+      const auth_user = {
+        id: '550e8400-e29b-41d4-a716-446655440105',
+        email: data.user.email,
+        name: data.user.user_metadata.name || '',
+        auth_provider: data.user.app_metadata.provider,
+        ...data.user,
+      }
+      setAuthUser(null);
+      await supabase.auth.signOut();
+      const response = await registerCheck(auth_user);
+      return response;
+    }
+    setIsLoading(false);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -123,6 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         logout,
         changePassword,
+        register,
       }}
     >
       {children}

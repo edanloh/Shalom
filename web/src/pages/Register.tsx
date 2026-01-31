@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
 import {
   Card,
   CardContent,
@@ -12,42 +12,55 @@ import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUser } from '@/contexts/UserContext';
+import { useToast } from '@/hooks/use-toast';
+import { validatePassword } from '@/utils/authUtils';
 
-const Login = () => {
+const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [name, setName] = useState('');
+  const { toast } = useToast();
 
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { register, isAuthenticated, isLoading } = useAuth();
   const { user } = useUser();
   const navigate = useNavigate();
-  React.useEffect(() => {
+  useEffect(() => {
     // Only redirect if auth check is complete and user is authenticated
     if (!isLoading && isAuthenticated) {
       navigate('/', { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setLoading(true);
+    const response = validatePassword(password);
+    if (response) {
+      toast({
+        title: 'Error',
+        description: response,
+        variant: 'destructive',
+      });
+      return;
+    }
     setError('');
     try {
-      const resp = await login(email, password);
-      if (!resp.success) {
-        setError(resp.error || 'Login failed. Please try again.');
-      } else {
-        setError('');
-      }
+      const response = await register(email, password, name);
       // Redirect handled by useEffect
+      if (!response.success) {
+        setError(response.error || 'Registration failed. Please try again.');
+        throw new Error(response.error || 'Registration failed');
+      } else {
+        setError('Please request confirmation from the administrator');
+      }
     } catch (err: any) {
       if (err?.message?.includes('Invalid login credentials')) {
         setError('Incorrect email or password.');
       } else if (err?.message?.includes('User not found')) {
         setError('No account found with this email.');
       } else {
-        setError(err?.message || 'Login failed. Please try again.');
+        setError(err?.message || 'Registration failed. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -59,14 +72,22 @@ const Login = () => {
       <Card className="w-full max-w-md shadow-lg border border-border">
         <CardHeader className="flex flex-col items-center gap-2">
           <CardTitle className="text-2xl font-bold">
-            Sign in to Shalom
+            Shalom Instructor Registration
           </CardTitle>
           <CardDescription className="text-center">
-            Enter your email and password
+            Enter a name, email, and password to create your account.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <Input
+              type="text"
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+            />
             <Input
               type="email"
               placeholder="Email"
@@ -89,32 +110,33 @@ const Login = () => {
               </div>
             )}
             <Button
-              type="submit"
+              type="button"
               className="w-full"
               size="lg"
               variant="default"
               disabled={loading}
+              onClick={() => {handleSubmit()}}
             >
               {loading ? (
                 <Loader2 className="h-5 w-5 animate-spin mx-auto" />
               ) : (
-                'Sign In'
+                'Register'
               )}
             </Button>
             <p className="text-sm text-center">
-              Don't have an account?
+              Already have an account?
               <a
-                href="/register"
+                href="/login"
                 className="text-primary hover:underline ml-1"
               >
-                Register here
+                Login here
               </a>
             </p>
-          </form>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
 };
 
-export default Login;
+export default Register;

@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Index from "./pages/Index";
 import Courses from "./pages/Courses";
 import Analytics from "./pages/Analytics";
@@ -37,6 +38,7 @@ const App = () => (
             <Routes>
               {/* Public route */}
               <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
               {/* Protected routes - all nested under ProtectedRoute */}
               <Route element={<ProtectedRoute />}>
