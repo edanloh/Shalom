@@ -118,13 +118,6 @@ export default function SettingsScreen({ navigation }: any) {
       onPress: () => navigation.navigate('EditProfile'),
     },
     {
-      key: 'privacy',
-      icon: 'shield-checkmark-outline' as const,
-      title: 'Privacy & Security',
-      subtitle: 'Manage your privacy settings',
-      onPress: () => console.log('Privacy & Security'),
-    },
-    {
       key: 'changePassword',
       icon: 'lock-closed-outline' as const,
       title: 'Change Password',

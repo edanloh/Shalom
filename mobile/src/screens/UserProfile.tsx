@@ -49,6 +49,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
   const lastScrollY = useRef(0);
   const tabHidden = useRef(false);
 
@@ -158,13 +159,7 @@ export default function ProfileScreen({ navigation }: any) {
         title: "Edit Profile",
         subtitle: "Update your personal information",
         onPress: () => navigation.navigate("EditProfile"),
-      },
-      {
-        icon: "shield-checkmark-outline",
-        title: "Privacy & Security",
-        subtitle: "Manage your privacy settings",
-        onPress: () => console.log("Navigate to Privacy & Security"),
-      },
+      }
     ];
     if (user?.auth_provider !== "google") {
       items.push({
@@ -216,9 +211,14 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={externalStyles.scrollContent}>
           {/* Avatar & name */}
           <View style={[externalStyles.header, { marginBottom: 16 }]}>
-            <View style={[externalStyles.logo, { marginBottom: 16 }]}>
+            <Pressable
+              style={[externalStyles.logo, { marginBottom: 16 }]}
+              onPress={() => setShowAvatarModal(true)}
+              accessibilityLabel="View profile picture"
+              accessibilityRole="imagebutton"
+            >
               <ImageWithFallback
-                source={{uri: getAvatarUri()}}
+                source={{ uri: getAvatarUri() }}
                 fallback={Images.profile}
                 style={externalStyles.avatar}
               />
@@ -228,7 +228,21 @@ export default function ProfileScreen({ navigation }: any) {
                   style={styles.avatarGoogleIcon}
                 />
               )}
-            </View>
+            </Pressable>
+              {/* Avatar Modal */}
+              <CustomModal
+                visible={showAvatarModal}
+                onClose={() => setShowAvatarModal(false)}
+              >
+                <View style={{ alignItems: "center", justifyContent: "center"}}>
+                  <ImageWithFallback
+                    source={{ uri: getAvatarUri() }}
+                    fallback={Images.profile}
+                    style={{ width: 150, height: 150, borderRadius: 75, marginBottom: 12 }}
+                  />
+                  <Text style={[TextStyles.h3, { textAlign: "center", color: Colors.textSecondary }]}>{displayName}</Text>
+                </View>
+              </CustomModal>
             <View
               style={{
                 flexDirection: "row",
