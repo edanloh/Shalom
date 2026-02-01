@@ -34,7 +34,11 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
     const result = await login(email, password);
     if (!result.success) {
-      setLoginWarning(result.error || "Login failed. Please try again");
+      if (result.error?.includes("banned")) {
+        setLoginWarning("Your account has been disabled. Please contact the instructors/admins.");
+      } else {
+        setLoginWarning(result.error || "Login failed. Please try again");
+      }
       setLoading(false);
     }
     // Navigation will happen automatically when Supabase session state changes

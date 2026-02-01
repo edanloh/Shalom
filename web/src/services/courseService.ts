@@ -314,6 +314,7 @@ class CourseService {
       coursesEnrolled: number;
       completedCourses: number;
       totalHours: number;
+      enabled: boolean;
     }>;
     statistics: {
       total_students: number;
@@ -339,7 +340,8 @@ class CourseService {
           engagement: student.engagement || 0,
           coursesEnrolled: student.coursesEnrolled || 0,
           completedCourses: student.completedCourses || 0,
-          totalHours: student.totalHours || 0
+          totalHours: student.totalHours || 0,
+          enabled: student.enabled,
         })),
         statistics: response.data.statistics || {
           total_students: 0,

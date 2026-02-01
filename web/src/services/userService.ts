@@ -55,3 +55,14 @@ export async function approveInstructor(id: string, access_token: string): Promi
   const data: any = (resp as any)?.data ?? (resp as any);
   return data?.data ?? data;
 }
+
+export async function disableUser(email: string, access_token: string, enabled: boolean): Promise<any> {
+  const url = '/disableUser';
+  const resp = await apiService.post<any>(url, { email, enabled }, {
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+    },
+  });
+  const data: any = (resp as any)?.data ?? (resp as any);
+  return data?.data ?? data;
+}

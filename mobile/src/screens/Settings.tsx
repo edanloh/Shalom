@@ -319,32 +319,6 @@ export default function SettingsScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Danger Zone */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Danger Zone</Text>
-            <View style={styles.card}>
-              <Pressable
-                onPress={() =>
-                  Alert.alert('Delete Account', 'Are you sure? This cannot be undone.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => {} },
-                  ])
-                }
-                android_ripple={{ color: 'rgba(239,68,68,0.12)' }}
-                style={({ pressed }) => [styles.row, pressed && { opacity: 0.9 }]}
-              >
-                <View style={styles.rowLeft}>
-                  <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                  <View style={styles.rowTextWrap}>
-                    <Text style={styles.dangerTitle}>Delete Account</Text>
-                    <Text style={styles.rowSub}>Permanently delete your account and all data</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward-outline" size={16} color="#ef4444" />
-              </Pressable>
-            </View>
-          </View>
-
           <Text style={styles.version}>Version 1.0.0</Text>
 
           {/* Help & Support Modal */}

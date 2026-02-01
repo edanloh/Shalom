@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX } from "lucide-react";
+import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, UserX2, UserCheck } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
 import { Colors } from "@/constants";
@@ -16,6 +16,8 @@ import { courseService } from "@/services";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { postNotification } from "@/services/notificationService";
+import { disableUser } from "@/services/userService";
+import { supabase } from '@/lib/supabase';
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -64,7 +66,7 @@ const Students = () => {
 				streak: Math.floor(student.engagement / 10) || 0,
 				badges: Math.floor(student.completedCourses * 2) || 0,
 				averageScore: student.progress || 0,
-				enabled: student.enabled !== false, // Get from API, default to true if null/undefined
+        enabled: student.enabled,
 			}));
 			
 			setStudents(transformedStudents);
@@ -244,6 +246,29 @@ const Students = () => {
     setMessageStudent(["",""]);
   }
 
+  const handleDisableUser = async (email: string, enable: boolean) => {
+    console.log(selectedStudent)
+    const sessionResponse = await supabase.auth.getSession();
+    const accessToken = sessionResponse.data.session?.access_token;
+    try {
+      const response = await disableUser(email, accessToken, enable);
+      toast({
+        title: "Success",
+        description: "User status has been updated successfully.",
+        variant: "default",
+      });
+      return response;
+    } catch (error) {
+      console.error('Error disabling/enabling user:', error);
+      toast({
+        title: "Error",
+        description: "There was an error updating the user status.",
+        variant: "destructive",
+      });
+      return;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -406,7 +431,7 @@ const Students = () => {
                   <TableCell className="text-right">
                     <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                       <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => setSelectedStudent(student)}>
+                        <Button variant="ghost" size="icon" onClick={() => {setSelectedStudent(student); console.log(student);}}>
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </SheetTrigger>
@@ -622,6 +647,56 @@ const Students = () => {
                               <Mail className="h-4 w-4" />
                               Send Message
                             </Button>
+                            {selectedStudent.enabled == true ? (
+                              <Button
+                                className="w-full gap-2"
+                                variant="destructive"
+                                onClick={async () => {
+                                  try {
+                                    const result = await handleDisableUser(selectedStudent.email, false);
+                                    if (result) {
+                                      // Update local state immediately
+                                      setSelectedStudent({ ...selectedStudent, enabled: false });
+                                      // Refresh the full list
+                                      fetchStudents();
+                                      setIsSheetOpen(false);
+                                    } else {
+                                      console.error("disableStudent failed:", result);
+                                    }
+                                  } catch (err) {
+                                    console.error("Failed to disable student:", err);
+                                  }
+                                }}
+                              >
+                                <UserX className="h-4 w-4" />
+                                Disable User
+                              </Button>
+                            ) : (
+                              <Button
+                                className="w-full gap-2"
+                                style={{backgroundColor: Colors.purple600}}
+                                variant="default"
+                                onClick={async () => {
+                                  try {
+                                    const result = await handleDisableUser(selectedStudent.email, true);
+                                    if (result) {
+                                      // Update local state immediately
+                                      setSelectedStudent({ ...selectedStudent, enabled: true });
+                                      // Refresh the full list
+                                      fetchStudents();
+                                      setIsSheetOpen(false);
+                                    } else {
+                                      console.error("enableStudent failed:", result);
+                                    }
+                                  } catch (err) {
+                                    console.error("Failed to enable student:", err);
+                                  }
+                                }}
+                              >
+                                <UserCheck className="h-4 w-4" />
+                                Enable User
+                              </Button>
+                            )}
                           </div>
                         )}
                       </SheetContent>
