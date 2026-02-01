@@ -75,6 +75,36 @@ serve(async (req) => {
     );
 
     /* ------------------------------------------------------------------ */
+    /* 2️⃣b Fetch course content counts for candidates */
+    /* ------------------------------------------------------------------ */
+    const courseIds = candidates.map((c) => c.id);
+    const sectionCountsMap = new Map<string, number>();
+    const videoCountsMap = new Map<string, number>();
+    const quizCountsMap = new Map<string, number>();
+
+    if (courseIds.length > 0) {
+      const [
+        { data: sectionCountsData },
+        { data: videoCountsData },
+        { data: quizCountsData },
+      ] = await Promise.all([
+        supabase.rpc("get_section_counts_by_course", { course_ids: courseIds }),
+        supabase.rpc("get_video_counts_by_course", { course_ids: courseIds }),
+        supabase.rpc("get_quiz_counts_by_course", { course_ids: courseIds }),
+      ]);
+
+      for (const row of sectionCountsData ?? []) {
+        sectionCountsMap.set(row.course_id, row.count ?? 0);
+      }
+      for (const row of videoCountsData ?? []) {
+        videoCountsMap.set(row.course_id, row.count ?? 0);
+      }
+      for (const row of quizCountsData ?? []) {
+        quizCountsMap.set(row.course_id, row.count ?? 0);
+      }
+    }
+
+    /* ------------------------------------------------------------------ */
     /* 3️⃣ Fetch recent recommendation events */
     /* ------------------------------------------------------------------ */
     const since = new Date(
@@ -175,6 +205,9 @@ serve(async (req) => {
           ...course,
           category_name: course.category?.name ?? null,
           category_color: course.category?.color ?? null,
+          total_sections: sectionCountsMap.get(course.id) ?? 0,
+          total_videos: videoCountsMap.get(course.id) ?? 0,
+          total_quizzes: quizCountsMap.get(course.id) ?? 0,
         },
       };
     });
