@@ -6,13 +6,15 @@ interface OfficePreviewProps {
   resourceType: 'pdf' | 'document' | 'slides';
   title: string;
   isLoading?: boolean;
+  onError?: () => void;
 }
 
 export const OfficeOnlinePreview: React.FC<OfficePreviewProps> = ({ 
   previewUrl, 
   resourceType,
   title,
-  isLoading = false 
+  isLoading = false,
+  onError
 }) => {
   const getIcon = () => {
     switch (resourceType) {
@@ -83,6 +85,7 @@ export const OfficeOnlinePreview: React.FC<OfficePreviewProps> = ({
           }}
           title={`${getLabel()} - ${title}`}
           allow="fullscreen"
+          onError={onError}
         />
       </div>
       <div

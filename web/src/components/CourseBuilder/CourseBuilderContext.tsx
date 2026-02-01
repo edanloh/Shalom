@@ -128,12 +128,18 @@ interface CourseBuilderContextType {
   courseDescription: string;
   setCourseDescription: (description: string) => void;
   courseOutcomes: string[];
-  setCourseOutcomes: (outcomes: string[]) => void;
+  setCourseOutcomes: (
+    outcomes: string[] | ((prev: string[]) => string[]),
+  ) => void;
   courseCategory: string;
   setCourseCategory: (category: string) => void;
   localCategories: Array<{ id: string; name: string; color?: string }>;
   setLocalCategories: (
-    categories: Array<{ id: string; name: string; color?: string }>,
+    categories:
+      | Array<{ id: string; name: string; color?: string }>
+      | ((
+          prev: Array<{ id: string; name: string; color?: string }>,
+        ) => Array<{ id: string; name: string; color?: string }>),
   ) => void;
   courseThumbnailUrl: string;
   setCourseThumbnailUrl: (url: string) => void;
@@ -175,6 +181,8 @@ interface CourseBuilderContextType {
   setModalState: (state: ModalState) => void;
   showModal: (config: Omit<ModalState, "isOpen">) => void;
   closeModal: () => void;
+  showValidationErrors: boolean;
+  setShowValidationErrors: (value: boolean) => void;
 
   // Drag and drop state
   draggedItem: DraggedItem | null;
@@ -423,6 +431,7 @@ export const CourseBuilderProvider = ({
     courseId,
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   // Upload all pending files (videos and thumbnails) before saving
   const uploadAllPendingFiles = async () => {
@@ -736,18 +745,36 @@ export const CourseBuilderProvider = ({
     const errors: string[] = [];
 
     // 1. Course must have a title
-    if (!courseName || !courseName.trim()) {
+    const courseTitle = courseName?.trim() || "";
+    if (!courseTitle) {
       errors.push("❌ Course title is required");
+    } else if (courseTitle.length < 3) {
+      errors.push("❌ Course title must be at least 3 characters");
     }
 
-    // 2. Course must have at least one module
+    // 2. Course description required
+    const courseDesc = courseDescription?.trim() || "";
+    if (!courseDesc) {
+      errors.push("❌ Course description is required");
+    } else if (courseDesc.length < 10) {
+      errors.push("❌ Course description must be at least 10 characters");
+    }
+
+    // 3. Course must have at least one module
     if (modules.length === 0) {
       errors.push("❌ Course must have at least one module");
     }
 
-    // 3. Validate each module
+    // 4. Validate each module
     modules.forEach((module, moduleIndex) => {
       const moduleNumber = moduleIndex + 1;
+      const moduleTitle = (module.title || "")
+        .replace(/^Module \d+:\s*/, "")
+        .trim();
+
+      if (!moduleTitle) {
+        errors.push(`❌ Module ${moduleNumber}: Title is required`);
+      }
 
       // Check if module is empty (no lessons and no quizzes)
       if (module.lessons.length === 0 && module.quizzes.length === 0) {
@@ -760,8 +787,14 @@ export const CourseBuilderProvider = ({
       // Validate lessons in this module
       module.lessons.forEach((lesson, lessonIndex) => {
         const lessonNumber = lessonIndex + 1;
-        const lessonTitle = lesson.baseTitle || lesson.title;
+        const lessonTitle = (lesson.baseTitle || lesson.title || "")
+          .replace(/^Lesson \d+\.\d+:\s*/, "")
+          .trim();
         const lessonIdentifier = `Lesson ${moduleNumber}.${lessonNumber} "${lessonTitle}"`;
+
+        if (!lessonTitle) {
+          errors.push(`❌ Lesson ${moduleNumber}.${lessonNumber}: Title is required.`);
+        }
 
         if (lesson.type === "video") {
           // Video lessons must have a video URL or uploaded file
@@ -795,8 +828,20 @@ export const CourseBuilderProvider = ({
       // Validate quizzes in this module
       module.quizzes.forEach((quiz, quizIndex) => {
         const quizNumber = quizIndex + 1;
-        const quizTitle = quiz.baseTitle || quiz.title;
+        const quizTitle = (quiz.baseTitle || quiz.title || "")
+          .replace(/^Quiz \d+\.\d+:\s*/, "")
+          .trim();
         const quizIdentifier = `Quiz ${moduleNumber}.${quizNumber} "${quizTitle}"`;
+
+        if (!quizTitle) {
+          errors.push(`❌ Quiz ${moduleNumber}.${quizNumber}: Title is required.`);
+        }
+
+        if (quiz.maxAttempts !== null && quiz.maxAttempts !== undefined) {
+          if (Number.isNaN(Number(quiz.maxAttempts)) || Number(quiz.maxAttempts) < 1) {
+            errors.push(`❌ ${quizIdentifier}: Max attempts must be at least 1 or set to unlimited.`);
+          }
+        }
 
         // Quiz must have at least one question
         if (!quiz.questions || quiz.questions.length === 0) {
@@ -820,7 +865,11 @@ export const CourseBuilderProvider = ({
             question.type === "true-false"
           ) {
             // Must have options
-            if (!question.options || question.options.length === 0) {
+            const options = question.options || [];
+            const hasOptions = options.length > 0;
+            const nonEmptyOptions = options.filter((opt) => String(opt).trim() !== "");
+
+            if (!hasOptions || nonEmptyOptions.length === 0) {
               errors.push(
                 `❌ ${questionIdentifier}: Must have answer options.`,
               );
@@ -846,6 +895,33 @@ export const CourseBuilderProvider = ({
                 `❌ ${questionIdentifier}: Must select at least one correct answer.`,
               );
             }
+
+            // Validate correct answer index(es) for multiple-choice / multiple-correct
+            if (
+              question.type === "multiple-choice" &&
+              typeof question.correctAnswer === "number" &&
+              options.length > 0 &&
+              (question.correctAnswer < 0 || question.correctAnswer >= options.length)
+            ) {
+              errors.push(
+                `❌ ${questionIdentifier}: Correct answer must be a valid option.`,
+              );
+            }
+
+            if (
+              question.type === "multiple-correct" &&
+              Array.isArray(question.correctAnswer) &&
+              options.length > 0
+            ) {
+              const invalidIndex = question.correctAnswer.some(
+                (idx: number) => idx < 0 || idx >= options.length,
+              );
+              if (invalidIndex) {
+                errors.push(
+                  `❌ ${questionIdentifier}: One or more correct answers are invalid.`,
+                );
+              }
+            }
           }
         });
       });
@@ -864,6 +940,7 @@ export const CourseBuilderProvider = ({
     const validationErrors = validateCourseData();
 
     if (validationErrors.length > 0) {
+      setShowValidationErrors(true);
       return {
         success: false,
         message: `Validation failed: ${validationErrors.length} error(s) found`,
@@ -872,6 +949,7 @@ export const CourseBuilderProvider = ({
     }
 
     console.log("[saveCourse] ✓ Validation passed!");
+    setShowValidationErrors(false);
 
     // Continue with existing save logic...
     setIsSaving(true);
@@ -1150,6 +1228,8 @@ export const CourseBuilderProvider = ({
     setModalState,
     showModal,
     closeModal,
+    showValidationErrors,
+    setShowValidationErrors,
 
     // Drag and drop state
     draggedItem,

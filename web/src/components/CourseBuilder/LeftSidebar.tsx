@@ -166,10 +166,12 @@ const ModuleItem = ({
   return (
     <div
       key={module.id}
-      className={`drag-item bg-slate-700 rounded-lg border border-slate-600 overflow-hidden hover:border-slate-500 transition-all ${
+      className={`drag-item bg-slate-700 rounded-lg border border-slate-600 overflow-hidden transition-all ${
         isDraggedOver ? "drag-over border-blue-400 bg-slate-600" : ""
       } ${isDragging ? "dragging opacity-50" : ""} ${
-        isSelected ? "border-blue-500 bg-slate-650" : ""
+        isSelected
+          ? "border-blue-500 ring-1 ring-blue-500"
+          : "hover:border-slate-500"
       }`}
       draggable
       onDragStart={(e) => {
@@ -342,7 +344,10 @@ const ModuleItem = ({
 
           <div className="grid grid-cols-2 gap-2 pt-2">
             <button
-              onClick={() => onAddLesson(module.id, 'video')}
+              onClick={() => {
+                setSelectedItem({ type: "module", id: module.id });
+                onAddLesson(module.id, "video");
+              }}
               className="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white text-xs rounded transition-colors"
             >
               + Video
@@ -354,7 +359,10 @@ const ModuleItem = ({
               + Document
             </button>
             <button
-              onClick={() => onAddQuiz(module.id)}
+              onClick={() => {
+                setSelectedItem({ type: "module", id: module.id });
+                onAddQuiz(module.id);
+              }}
               className="col-span-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded transition-colors"
             >
               + Quiz

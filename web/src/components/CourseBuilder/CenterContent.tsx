@@ -18,19 +18,26 @@ import {
 } from "../ui/dialog";
 import StyledPDFViewer from "@/components/document/StyledPDFViewer";
 import OfficeOnlinePreview from "@/components/document/OfficeOnlinePreview";
+import { ValidationModal } from "./ValidationModal";
 
 /* ------------------------- MODULE EDITOR ------------------------- */
-const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
+const ModuleEditor = ({
+  selectedItem,
+  modules,
+  updateModule,
+  showValidationErrors,
+}: any) => {
   const module = modules.find((m: any) => m.id === selectedItem.id);
 
   // Extract the base title without "Module X:" prefix for editing
   const baseTitle = module?.title?.replace(/^Module \d+:\s*/, "") || "";
+  const isModuleTitleEmpty = !baseTitle.trim();
 
   return (
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
-          Module Title
+          Module Title<span className="text-red-500 ml-1">*</span>
         </label>
         <input
           type="text"
@@ -43,8 +50,12 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
               title: `Module ${moduleNumber}: ${e.target.value}`,
             });
           }}
+          placeholder="Enter module title"
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
         />
+        {showValidationErrors && isModuleTitleEmpty && (
+          <p className="text-xs text-red-400 mt-1">Module title is required.</p>
+        )}
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -56,6 +67,7 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
             updateModule(selectedItem.id, { description: e.target.value })
           }
           rows={3}
+          placeholder="Enter module description..."
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
         />
       </div>
@@ -64,7 +76,12 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
 };
 
 /* ------------------------- LESSON EDITOR ------------------------- */
-const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
+const LessonEditor = ({
+  selectedItem,
+  modules,
+  updateLesson,
+  showValidationErrors,
+}: any) => {
   const { currentCourseId } = useCourseBuilder();
   const module = modules.find((m: any) =>
     m.lessons.some((l: any) => l.id === selectedItem.id),
@@ -95,11 +112,37 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
     selectedVideoFile,
     extractYouTubeId,
     handleVideoUrlChange,
-    handleThumbnailFileChange,
-    handleVideoFileChange,
+    handleThumbnailFileChange: originalHandleThumbnailFileChange,
+    handleVideoFileChange: originalHandleVideoFileChange,
     clearThumbnail,
     clearVideo,
   } = useVideoUpload(updateLesson, module.id, lesson.id, lesson);
+
+  // Wrap thumbnail file change handler to check for validation errors
+  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    originalHandleThumbnailFileChange(e);
+    
+    // Check if there was a validation error
+    const errorInfo = (window as any).__thumbnailUploadError;
+    if (errorInfo) {
+      setValidationMessage(errorInfo);
+      setShowValidationModal(true);
+      delete (window as any).__thumbnailUploadError;
+    }
+  };
+
+  // Wrap video file change handler to check for validation errors
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    originalHandleVideoFileChange(e);
+    
+    // Check if there was a validation error
+    const errorInfo = (window as any).__videoUploadError;
+    if (errorInfo) {
+      setValidationMessage(errorInfo);
+      setShowValidationModal(true);
+      delete (window as any).__videoUploadError;
+    }
+  };
 
   // Check lesson type
   const isVideoLesson = lesson?.type === "video";
@@ -132,6 +175,31 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
   const [localVideoPreviewUrl, setLocalVideoPreviewUrl] = useState("");
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [documentUploadError, setDocumentUploadError] = useState("");
+  
+  // Validation states
+  const MAX_FILE_SIZE_MB = 50;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationMessage, setValidationMessage] = useState({ title: "", description: "" });
+  const [videoPreviewError, setVideoPreviewError] = useState(false);
+  const [documentPreviewError, setDocumentPreviewError] = useState(false);
+
+  // Detect and handle unsupported document types
+  useEffect(() => {
+    if (lesson?.resourceUrl && 
+        !lesson.resourceUrl.startsWith('[LOCAL_FILE:') &&
+        !officeOnlinePreviewUrl &&
+        !isRemotePdf &&
+        lesson.resourceUrl.trim() !== '') {
+      // Unsupported document type detected
+      setValidationMessage({
+        title: "Unsupported Document Type",
+        description: "The document URL provided is not in a supported format (PDF, DOCX, or PPTX). Please upload a PDF, Word document, or PowerPoint presentation, or use the 'Upload File' option to upload your document directly.",
+      });
+      setShowValidationModal(true);
+      updateLesson(module.id, lesson.id, { resourceUrl: "" });
+    }
+  }, [lesson?.resourceUrl, officeOnlinePreviewUrl, isRemotePdf]);
 
   const decodeXmlEntities = (value: string) => {
     if (!value) return value;
@@ -278,6 +346,9 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
     setLocalVideoPreviewUrl("");
     return undefined;
   }, [selectedVideoFile, lesson?.videoUrl, module.id, lesson.id]);
+  const lessonTitleEmpty = !(lesson?.baseTitle || "").trim();
+  const hasVideo = !!lesson?.videoUrl && lesson.videoUrl.trim() !== "" && lesson.videoUrl !== "[LOCAL_FILE: ]";
+  const hasPdf = !!lesson?.resourceUrl && lesson.resourceUrl.trim() !== "" && lesson.resourceUrl !== "[LOCAL_FILE: ]";
 
   return (
     <div className="space-y-4">
@@ -286,7 +357,7 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
           style={{ color: Colors.textSecondary }}
           className="block text-sm font-medium mb-2"
         >
-          Lesson Title
+          Lesson Title<span className="text-red-500 ml-1">*</span>
         </label>
         <div
           style={{
@@ -306,8 +377,12 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             borderColor: Colors.gray600,
             color: Colors.textPrimary,
           }}
+          placeholder="Enter lesson title"
           className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
         />
+        {showValidationErrors && lessonTitleEmpty && (
+          <p className="text-xs text-red-400 mt-1">Lesson title is required.</p>
+        )}
       </div>
       <div>
         <label
@@ -340,8 +415,13 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-2"
           >
-            Document File (required)
+            Document<span className="text-red-500 ml-1">*</span>
           </label>
+          {showValidationErrors && !hasPdf && (
+            <p className="text-xs text-red-400 mb-2">
+              Document URL or file is required.
+            </p>
+          )}
 
           <div className="flex gap-2 mb-2">
             <button
@@ -503,6 +583,16 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
                           previewUrl={officeOnlinePreviewUrl}
                           resourceType={isRemoteDocx ? "document" : "slides"}
                           title={lesson.baseTitle || "Document Preview"}
+                          onError={() => {
+                            if (!documentPreviewError) {
+                              setDocumentPreviewError(true);
+                              setValidationMessage({
+                                title: "Document Preview Error",
+                                description: `The ${isRemoteDocx ? "Word document" : "PowerPoint presentation"} preview cannot be loaded. This might be due to an invalid URL, restricted access, or the document not being publicly accessible. Please ensure the document URL is publicly accessible and try again. For best results, upload the document directly using the "Upload File" option.`,
+                              });
+                              setShowValidationModal(true);
+                            }
+                          }}
                         />
                       ) : isRemotePdf ? (
                         <>
@@ -517,26 +607,7 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
                             title={lesson.baseTitle || "PDF Preview"}
                           />
                         </>
-                      ) : (
-                        <>
-                          <label
-                            style={{ color: Colors.textSecondary }}
-                            className="block text-sm font-medium mb-2"
-                          >
-                            Document Preview
-                          </label>
-                          <div
-                            className="rounded border p-4 text-center"
-                            style={{
-                              borderColor: Colors.gray600,
-                              backgroundColor: Colors.textInputBg,
-                              color: Colors.textMuted,
-                            }}
-                          >
-                            <p className="text-sm">Unsupported remote document type</p>
-                          </div>
-                        </>
-                      )}
+                      ) : null}
                     </div>
                   </>
                 )}
@@ -551,6 +622,17 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
+
+                  // Validate file size
+                  if (file.size > MAX_FILE_SIZE_BYTES) {
+                    setValidationMessage({
+                      title: "File Too Large",
+                      description: `The selected file is ${(file.size / (1024 * 1024)).toFixed(2)} MB, which exceeds the maximum allowed size of ${MAX_FILE_SIZE_MB} MB. Please choose a smaller file or compress the document before uploading.`,
+                    });
+                    setShowValidationModal(true);
+                    e.target.value = ""; // Reset file input
+                    return;
+                  }
 
                   const lowerName = file.name.toLowerCase();
                   const isDocx = lowerName.endsWith(".docx");
@@ -1076,11 +1158,23 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-2"
           >
-            Video (required)
+            Video<span className="text-red-500 ml-1">*</span>
           </label>
+          {showValidationErrors && !hasVideo && (
+            <p className="text-xs text-red-400 mb-2">
+              Video URL or file is required.
+            </p>
+          )}
           <div className="flex gap-2 mb-2">
             <button
               onClick={() => {
+                // Don't allow switching if there's a local file
+                if (
+                  lesson?.videoUrl?.startsWith("[LOCAL_FILE:") &&
+                  lesson.videoUrl !== "[LOCAL_FILE: ]"
+                ) {
+                  return;
+                }
                 // Clear local file when switching to URL mode (check BEFORE setting new mode)
                 if (
                   videoInputType === "upload" &&
@@ -1094,10 +1188,27 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
                 }
                 setVideoInputType("url");
               }}
+              disabled={
+                lesson?.videoUrl?.startsWith("[LOCAL_FILE:") &&
+                lesson.videoUrl !== "[LOCAL_FILE: ]"
+              }
               style={{
-                backgroundColor:
-                  videoInputType === "url" ? Colors.primary : "transparent",
+                backgroundColor: !lesson?.videoUrl?.startsWith(
+                  "[LOCAL_FILE:",
+                )
+                  ? Colors.accent
+                  : Colors.gray800,
                 color: Colors.textPrimary,
+                opacity:
+                  lesson?.videoUrl?.startsWith("[LOCAL_FILE:") &&
+                  lesson.videoUrl !== "[LOCAL_FILE: ]"
+                    ? 0.5
+                    : 1,
+                cursor:
+                  lesson?.videoUrl?.startsWith("[LOCAL_FILE:") &&
+                  lesson.videoUrl !== "[LOCAL_FILE: ]"
+                    ? "not-allowed"
+                    : "pointer",
               }}
               className="px-3 py-1 rounded text-sm"
             >
@@ -1105,6 +1216,13 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             </button>
             <button
               onClick={() => {
+                // Don't allow switching if there's a URL
+                if (
+                  lesson?.videoUrl &&
+                  !lesson.videoUrl.startsWith("[LOCAL_FILE:")
+                ) {
+                  return;
+                }
                 // Clear URL when switching to upload mode (check BEFORE setting new mode)
                 if (
                   videoInputType === "url" &&
@@ -1118,10 +1236,25 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
                 }
                 setVideoInputType("upload");
               }}
+              disabled={
+                lesson?.videoUrl &&
+                !lesson.videoUrl.startsWith("[LOCAL_FILE:")
+              }
               style={{
-                backgroundColor:
-                  videoInputType === "upload" ? Colors.primary : "transparent",
+                backgroundColor: lesson?.videoUrl?.startsWith("[LOCAL_FILE:")
+                  ? Colors.accent
+                  : Colors.gray800,
                 color: Colors.textPrimary,
+                opacity:
+                  lesson?.videoUrl &&
+                  !lesson.videoUrl.startsWith("[LOCAL_FILE:")
+                    ? 0.5
+                    : 1,
+                cursor:
+                  lesson?.videoUrl &&
+                  !lesson.videoUrl.startsWith("[LOCAL_FILE:")
+                    ? "not-allowed"
+                    : "pointer",
               }}
               className="px-3 py-1 rounded text-sm"
             >
@@ -1183,7 +1316,7 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
                       </p>
                     )}
                     {/* Video Preview */}
-                    {extractYouTubeId(lesson.videoUrl) && (
+                    {extractYouTubeId(lesson.videoUrl) ? (
                       <div className="mt-4">
                         <label
                           style={{ color: Colors.textSecondary }}
@@ -1213,10 +1346,59 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
                             title="Video preview"
+                            onError={() => {
+                              if (!videoPreviewError) {
+                                setVideoPreviewError(true);
+                                setValidationMessage({
+                                  title: "Video Preview Error",
+                                  description: "The video preview cannot be loaded. This might be due to an invalid URL, restricted content, or network issues. Please ensure the video URL is accessible and try again. For best results, consider hosting your video on YouTube.",
+                                });
+                                setShowValidationModal(true);
+                              }
+                            }}
                           />
                         </div>
                       </div>
-                    )}
+                    ) : lesson.videoUrl && lesson.videoUrl.trim() && lesson.videoUrl !== "[LOCAL_FILE: ]" ? (
+                      <div className="mt-4">
+                        <label
+                          style={{ color: Colors.textSecondary }}
+                          className="block text-sm font-medium mb-2"
+                        >
+                          Video Preview
+                        </label>
+                        <div
+                          className="rounded overflow-hidden"
+                          style={{
+                            backgroundColor: Colors.gray800,
+                            aspectRatio: "16/9",
+                            position: "relative",
+                          }}
+                        >
+                          <video
+                            src={lesson.videoUrl}
+                            controls
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              width: "100%",
+                              height: "100%",
+                            }}
+                            onError={() => {
+                              if (!videoPreviewError) {
+                                setVideoPreviewError(true);
+                                setValidationMessage({
+                                  title: "Video Cannot Be Loaded",
+                                  description: "The video file cannot be loaded properly. This could be due to an unsupported video format, a corrupted file, or network issues. Please ensure the video URL is accessible and in a standard format (MP4, WebM, or OGG), or consider hosting your video on YouTube and using the URL option instead.",
+                                });
+                                setShowValidationModal(true);
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
                   </>
                 )}
             </div>
@@ -1297,6 +1479,16 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
                             width: "100%",
                             height: "100%",
                           }}
+                          onError={() => {
+                            if (!videoPreviewError) {
+                              setVideoPreviewError(true);
+                              setValidationMessage({
+                                title: "Video Cannot Be Loaded",
+                                description: "The uploaded video file cannot be loaded properly. This could be due to an unsupported video format or a corrupted file. Please try uploading a different video file in a standard format (MP4, WebM, or OGG), or consider hosting your video on YouTube and using the URL option instead.",
+                              });
+                              setShowValidationModal(true);
+                            }
+                          }}
                         />
                       </div>
                     </div>
@@ -1359,6 +1551,14 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
           </div>
         )}
       </div>
+
+      {/* Validation Modal */}
+      <ValidationModal
+        open={showValidationModal}
+        onOpenChange={setShowValidationModal}
+        title={validationMessage.title}
+        description={validationMessage.description}
+      />
     </div>
   );
 };
@@ -1373,12 +1573,22 @@ const QuizEditor = ({
   updateQuestion,
   addOption,
   removeOption,
+  showValidationErrors,
 }: any) => {
   const { deleteQuiz } = useContentManagement();
   const module = modules.find((m: any) =>
     m.quizzes.some((q: any) => q.id === selectedItem.id),
   );
   const quiz = module?.quizzes.find((q: any) => q.id === selectedItem.id);
+  const quizTitleEmpty = !(quiz?.baseTitle || "").trim();
+  const passingScoreInvalid =
+    quiz?.passingScore === undefined ||
+    quiz?.passingScore === null ||
+    Number.isNaN(Number(quiz?.passingScore));
+  const maxAttemptsInvalid =
+    quiz?.maxAttempts !== null &&
+    quiz?.maxAttempts !== undefined &&
+    Number(quiz?.maxAttempts) < 1;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -1431,7 +1641,7 @@ const QuizEditor = ({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="block text-sm font-medium text-slate-300">
-            Quiz Title
+            Quiz Title<span className="text-red-500 ml-1">*</span>
           </label>
         </div>
         <input
@@ -1443,6 +1653,9 @@ const QuizEditor = ({
           placeholder="Enter quiz title (e.g., 'Module 1 Assessment')"
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
         />
+        {showValidationErrors && quizTitleEmpty && (
+          <p className="text-xs text-red-400 mt-1">Quiz title is required.</p>
+        )}
       </div>
 
       {/* Quiz Settings */}
@@ -1451,6 +1664,7 @@ const QuizEditor = ({
           <div className="mr-4">
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Passing Score (%)
+              <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               type="number"
@@ -1464,10 +1678,15 @@ const QuizEditor = ({
               max="100"
               className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
             />
+            {showValidationErrors && passingScoreInvalid && (
+              <p className="text-xs text-red-400 mt-1">
+                Passing score is required.
+              </p>
+            )}
           </div>
           <div className="mr-4 flex flex-col">
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Max Attempts
+              Max Attempts<span className="text-red-500 ml-1">*</span>
             </label>
             <input
               type={quiz?.maxAttempts === null ? "text" : "number"}
@@ -1481,6 +1700,11 @@ const QuizEditor = ({
               readOnly={quiz?.maxAttempts === null}
               className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
             />
+            {showValidationErrors && maxAttemptsInvalid && (
+              <p className="text-xs text-red-400 mt-1">
+                Must be at least 1 or set to unlimited.
+              </p>
+            )}
             <label className="mt-2 flex items-center gap-2 text-xs text-slate-300">
               <input
                 type="checkbox"
@@ -1555,7 +1779,7 @@ const QuizEditor = ({
             </h3>
             <button
               onClick={handleDeleteQuestion}
-              className="text-red-400 hover:text-red-300"
+              className="text-black hover:text-black"
             >
               <X className="h-4 w-4" />
             </button>
@@ -1564,7 +1788,7 @@ const QuizEditor = ({
           {/* Question text */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Question Text
+              Question Text<span className="text-red-500 ml-1">*</span>
             </label>
             <textarea
               value={currentQuestion.text}
@@ -1581,12 +1805,17 @@ const QuizEditor = ({
               rows={2}
               className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
             />
+            {showValidationErrors && !currentQuestion.text?.trim() && (
+              <p className="text-xs text-red-400 mt-1">
+                Question text is required.
+              </p>
+            )}
           </div>
 
           {/* Question Type Selection */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Question Type
+              Question Type<span className="text-red-500 ml-1">*</span>
             </label>
             <select
               value={currentQuestion.type}
@@ -1656,7 +1885,17 @@ const QuizEditor = ({
                   : currentQuestion.type === "multiple-correct"
                     ? "Options (Select all correct)"
                     : "Answer Options"}
+                <span className="text-red-500 ml-1">*</span>
               </label>
+              {showValidationErrors &&
+                (!currentQuestion.options ||
+                currentQuestion.options.filter((opt: any) =>
+                  String(opt).trim(),
+                ).length === 0) && (
+                <p className="text-xs text-red-400">
+                  At least one option is required.
+                </p>
+              )}
 
               {currentQuestion.type === "true-false" ? (
                 // True/False specific UI
@@ -1949,7 +2188,9 @@ const QuizEditor = ({
 
           {/* Points input */}
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Points</label>
+            <label className="block text-sm text-slate-300 mb-1">
+              Points<span className="text-red-500 ml-1">*</span>
+            </label>
             <input
               type="number"
               value={currentQuestion.points}
@@ -1965,6 +2206,9 @@ const QuizEditor = ({
               className="w-24 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
               min="0"
             />
+            {showValidationErrors && Number(currentQuestion.points) <= 0 && (
+              <p className="text-xs text-red-400 mt-1">Points are required.</p>
+            )}
           </div>
         </div>
       )}
@@ -2007,7 +2251,8 @@ const QuizEditor = ({
 
 /* ------------------------- MAIN CENTER CONTENT ------------------------- */
 export const CenterContent = () => {
-  const { selectedItem, setSelectedItem, modules } = useCourseBuilder();
+  const { selectedItem, setSelectedItem, modules, showValidationErrors } =
+    useCourseBuilder();
   const {
     updateModule,
     updateLesson,
@@ -2057,6 +2302,7 @@ export const CenterContent = () => {
             selectedItem={selectedItem}
             modules={modules}
             updateModule={updateModule}
+            showValidationErrors={showValidationErrors}
           />
         )}
         {selectedItem.type === "lesson" && (
@@ -2064,6 +2310,7 @@ export const CenterContent = () => {
             selectedItem={selectedItem}
             modules={modules}
             updateLesson={updateLesson}
+            showValidationErrors={showValidationErrors}
           />
         )}
         {selectedItem.type === "quiz" && (
@@ -2076,6 +2323,7 @@ export const CenterContent = () => {
             updateQuestion={updateQuestion}
             addOption={addOption}
             removeOption={removeOption}
+            showValidationErrors={showValidationErrors}
           />
         )}
       </div>

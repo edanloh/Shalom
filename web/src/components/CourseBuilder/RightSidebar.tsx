@@ -39,6 +39,7 @@ export const RightSidebar = () => {
     setCourseDescription,
     courseOutcomes,
     setCourseOutcomes,
+    showValidationErrors,
     courseCategory,
     setCourseCategory,
     courseThumbnailUrl,
@@ -488,7 +489,7 @@ export const RightSidebar = () => {
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-2"
           >
-            Course Title
+            Course Title<span className="text-red-500 ml-1">*</span>
           </label>
           <textarea
             rows={2}
@@ -507,6 +508,9 @@ export const RightSidebar = () => {
             className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-y"
             placeholder="Enter course title"
           />
+          {showValidationErrors && !courseName.trim() && (
+            <p className="text-xs text-red-400 mt-1">Course title is required.</p>
+          )}
         </div>
 
         {/* Course Description */}
@@ -515,7 +519,7 @@ export const RightSidebar = () => {
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-2"
           >
-            Course Description
+            Course Description<span className="text-red-500 ml-1">*</span>
           </label>
           <textarea
             rows={4}
@@ -534,6 +538,11 @@ export const RightSidebar = () => {
             className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-y"
             placeholder="Enter course description..."
           />
+          {showValidationErrors && !courseDescription.trim() && (
+            <p className="text-xs text-red-400 mt-1">
+              Course description is required.
+            </p>
+          )}
         </div>
 
         {/* Course Outcomes */}
@@ -557,16 +566,27 @@ export const RightSidebar = () => {
           </div>
           <div className="space-y-2">
             {courseOutcomes.length === 0 && (
-              <div
-                style={{
-                  backgroundColor: Colors.textInputBg,
-                  borderColor: Colors.gray600,
-                  color: Colors.textSecondary,
-                }}
-                className="px-3 py-2 border rounded text-xs"
-              >
-                Add outcomes to describe what learners will achieve.
-              </div>
+              <>
+                <p
+                  className="text-xs text-center py-2"
+                  style={{ color: Colors.gray500 }}
+                >
+                  No outcomes yet.
+                </p>
+                <div
+                  style={{
+                    backgroundColor: Colors.textInputBg,
+                    borderColor: Colors.gray600,
+                    color: Colors.textSecondary,
+                  }}
+                  className="mt-2 px-3 py-2 border rounded text-xs flex items-center gap-2"
+                >
+                  <Info className="h-4 w-4 flex-shrink-0" />
+                  <span>
+                    Add outcomes to describe what learners will achieve.
+                  </span>
+                </div>
+              </>
             )}
             {courseOutcomes.map((outcome, index) => (
               <div key={index} className="flex items-center gap-2">
@@ -607,7 +627,7 @@ export const RightSidebar = () => {
               style={{ color: Colors.textSecondary }}
               className="block text-sm font-medium"
             >
-              Course Category
+              Course Category<span className="text-red-500 ml-1">*</span>
             </label>
             <button
               onClick={() => setShowAddCategoryModal(true)}
@@ -1069,7 +1089,7 @@ export const RightSidebar = () => {
               style={{ color: Colors.textSecondary }}
               className="block text-sm font-medium"
             >
-              Publication Status
+              Publication Status<span className="text-red-500 ml-1">*</span>
             </label>
             {/* Status Badge */}
             <div
@@ -1647,7 +1667,7 @@ export const RightSidebar = () => {
                         border:
                           newCategoryColor === color
                             ? `3px solid ${Colors.accent}`
-                            : `2px solid ${Colors.gray700}`,
+                            : `2px solid ${Colors.gray600}`,
                       }}
                       className="h-10 rounded transition-all hover:scale-110"
                       title={color}
