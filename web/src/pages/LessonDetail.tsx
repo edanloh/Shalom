@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { lessonService } from "@/services";
-import AutomatedPDFViewer from "@/components/pdf/AutomatedPDFViewer";
+import UniversalDocumentViewer from "@/components/document/UniversalDocumentViewer";
+import OfficeOnlinePreview from "@/components/document/OfficeOnlinePreview";
 
 // Helper function to detect video type and convert to embeddable URL
 const getVideoEmbedInfo = (url: string) => {
@@ -62,6 +63,21 @@ const getVideoEmbedInfo = (url: string) => {
   };
 };
 
+const getDocumentType = (resourceType?: string, resourceUrl?: string) => {
+  if (resourceType) {
+    const normalized = resourceType.toLowerCase();
+    if (normalized === "docx") return "document";
+    if (normalized === "pptx" || normalized === "ppt" || normalized === "slides") return "ppt";
+    return normalized;
+  }
+  if (!resourceUrl) return "pdf";
+  const lowerUrl = resourceUrl.toLowerCase();
+  if (lowerUrl.endsWith(".docx")) return "document";
+  if (lowerUrl.endsWith(".pptx") || lowerUrl.endsWith(".ppt")) return "ppt";
+  if (lowerUrl.endsWith(".pdf")) return "pdf";
+  return "pdf";
+};
+
 const LessonDetail = () => {
   const { courseId, moduleId, lessonId } = useParams();
   const navigate = useNavigate();
@@ -100,11 +116,13 @@ const LessonDetail = () => {
         id: lessonData.id,
         title: lessonData.title,
         description: lessonData.description || "",
-        type: lessonData.type || "video", // 'video' or 'pdf'
+        type: lessonData.type || "video", // 'video' or document types
         video_url: lessonData.video_url,
         videoUrl: lessonData.video_url, // Also set camelCase for compatibility
         resource_url: lessonData.resource_url, // For PDF lessons
         resourceUrl: lessonData.resource_url,
+        resource_type: lessonData.resource_type,
+        resourceType: lessonData.resource_type,
         is_downloadable: lessonData.is_downloadable,
         file_size_bytes: lessonData.file_size_bytes,
         duration: lessonData.duration_seconds,
@@ -260,14 +278,15 @@ const LessonDetail = () => {
   const currentIndex = allVideos.findIndex((v) => v.id === lessonId);
   const hasPrevious = currentIndex > 0;
   const hasNext = currentIndex < allVideos.length - 1;
+  const lessonResourceUrl = lesson.resource_url || lesson.resourceUrl || "";
 
   // Get next item info for button label
   const nextItem = hasNext ? allVideos[currentIndex + 1] : null;
   const nextItemLabel =
     nextItem?.type === "quiz"
       ? "Next Quiz"
-      : nextItem?.type === "pdf"
-        ? "Next PDF"
+      : nextItem?.type === "pdf" || nextItem?.type === "document" || nextItem?.type === "ppt"
+        ? "Next Document"
         : "Next Lesson";
 
   // Get previous item info for button label
@@ -275,8 +294,8 @@ const LessonDetail = () => {
   const prevItemLabel =
     prevItem?.type === "quiz"
       ? "Previous Quiz"
-      : prevItem?.type === "pdf"
-        ? "Previous PDF"
+      : prevItem?.type === "pdf" || prevItem?.type === "document" || prevItem?.type === "ppt"
+        ? "Previous Document"
         : "Previous Lesson";
 
   return (
@@ -298,19 +317,19 @@ const LessonDetail = () => {
             <div>
               <h1 className="text-[32px] font-bold">{lesson.title}</h1>
               <p className="text-muted-foreground flex items-center gap-2">
-                {lesson.type === "pdf" ? (
-                  <>
-                    <FileText className="h-4 w-4" />
-                    {lesson.file_size_bytes
-                      ? `${(lesson.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
-                      : "PDF Document"}
-                  </>
-                ) : (
+                {lesson.type === "video" ? (
                   <>
                     <Clock className="h-4 w-4" />
                     {lesson.duration
                       ? `${Math.floor(lesson.duration / 60)} minutes`
                       : "N/A"}
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    {lesson.file_size_bytes
+                      ? `${(lesson.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+                      : `${lesson.resource_type?.toUpperCase() || "Document"}`}
                   </>
                 )}
               </p>
@@ -325,22 +344,49 @@ const LessonDetail = () => {
 
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 space-y-6">
-            {/* Video Player or PDF Viewer */}
+            {/* Video Player or Document Viewer */}
             <div className="gradient-card border border-border rounded-xl overflow-hidden">
               <div className="aspect-video bg-card">
-                {lesson.type === "pdf" ? (
-                  // Automated PDF Viewer
-                  lesson.resource_url ? (
-                    <AutomatedPDFViewer 
-                      pdfUrl={lesson.resource_url}
-                      title={lesson.title}
-                    />
+                {lesson.type !== "video" ? (
+                  // Universal Document Viewer (PDF, PPTX, DOCX, etc.)
+                  lessonResourceUrl ? (
+                    (() => {
+                      const docType = getDocumentType(
+                        lesson.resource_type,
+                        lessonResourceUrl,
+                      );
+                      const isOfficeDoc =
+                        docType === "document" || docType === "ppt";
+                      const officePreviewUrl =
+                        isOfficeDoc && lessonResourceUrl
+                          ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(lessonResourceUrl)}`
+                          : "";
+
+                      if (isOfficeDoc && officePreviewUrl) {
+                        return (
+                          <OfficeOnlinePreview
+                            previewUrl={officePreviewUrl}
+                            resourceType={docType === "document" ? "document" : "slides"}
+                            title={lesson.title}
+                          />
+                        );
+                      }
+
+                      return (
+                        <UniversalDocumentViewer
+                          documentUrl={lessonResourceUrl}
+                          title={lesson.title}
+                          documentType={docType}
+                          allowDownload={lesson.is_downloadable}
+                        />
+                      );
+                    })()
                   ) : (
                     <div className="flex items-center justify-center h-full bg-muted">
                       <div className="text-center">
                         <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
                         <p className="text-muted-foreground">
-                          No PDF available for this lesson
+                          No document available for this lesson
                         </p>
                       </div>
                     </div>
@@ -418,18 +464,16 @@ const LessonDetail = () => {
                       </h3>
                       <p className="text-foreground">{lesson.description}</p>
 
-                      {lesson.type === "pdf" &&
+                      {lesson.type !== "video" &&
                         lesson.is_downloadable &&
-                        lesson.resource_url && (
+                        lessonResourceUrl && (
                           <div className="mt-4">
                             <Button
-                              onClick={() =>
-                                window.open(lesson.resource_url, "_blank")
-                              }
+                              onClick={() => window.open(lessonResourceUrl, "_blank")}
                               variant="outline"
                             >
                               <FileText className="h-4 w-4 mr-2" />
-                              Download PDF
+                              Download Document
                             </Button>
                           </div>
                         )}

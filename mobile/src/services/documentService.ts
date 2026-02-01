@@ -1,21 +1,22 @@
 /**
- * PDF Service - Handles all PDF-related API calls
- * Integrates with Supabase backend for PDF access and progress tracking
- */
-/**
- * PDF Service - UPDATED to properly handle completion and cache invalidation
+ * Document Service - Handles all document-related API calls (PDF, PPTX, DOCX)
+ * Integrates with Supabase backend for document access and progress tracking
  */
 
 import { apiService } from "./apiService";
 
-export interface PDFDetailResponse {
+export interface DocumentDetailResponse {
   success: boolean;
   message: string;
   data: {
     id: string;
     title: string;
     description: string;
-    pdf_url: string;
+    pdf_url?: string; // Legacy support
+    resource_url: string;
+    resource_type: string; // 'pdf', 'document' (DOCX), 'ppt' (PPTX)
+    file_size_bytes?: number;
+    is_downloadable?: boolean;
     thumbnail_url?: string;
     course: {
       id: string;
@@ -26,8 +27,8 @@ export interface PDFDetailResponse {
       title: string;
     };
     navigation: {
-      previousItem: { id: string; title: string; type: 'video' | 'pdf' | 'quiz' } | null;
-      nextItem: { id: string; title: string; type: 'video' | 'pdf' | 'quiz' } | null;
+      previousItem: { id: string; title: string; type: 'video' | 'pdf' | 'document' | 'ppt' | 'quiz' } | null;
+      nextItem: { id: string; title: string; type: 'video' | 'pdf' | 'document' | 'ppt' | 'quiz' } | null;
     };
     userProgress?: {
       is_completed: boolean;
@@ -37,13 +38,13 @@ export interface PDFDetailResponse {
   };
 }
 
-export interface MarkPDFCompletedRequest {
+export interface MarkDocumentCompletedRequest {
   userId: string;
-  pdfId: string;
+  documentId: string;
   isCompleted: boolean;
 }
 
-export interface MarkPDFCompletedResponse {
+export interface MarkDocumentCompletedResponse {
   success: boolean;
   message: string;
   data: {
@@ -79,29 +80,29 @@ export interface MarkPDFCompletedResponse {
   };
 }
 
-class PDFService {
+class DocumentService {
   /**
-   * Get PDF details with navigation and user progress
-   * Endpoint: GET /courses/{courseId}/module/pdfs/{pdfId}?userId={userId}
+   * Get document details with navigation and user progress (PDF, PPTX, DOCX)
+   * Endpoint: GET /courses/{courseId}/module/pdfs/{documentId}?userId={userId}
    */
-  async getPDFDetail(
+  async getDocumentDetail(
     courseId: string,
-    pdfId: string,
+    documentId: string,
     userId?: string
-  ): Promise<PDFDetailResponse["data"]> {
+  ): Promise<DocumentDetailResponse["data"]> {
     try {
       const params: Record<string, string> = {};
       if (userId) {
         params.userId = userId;
       }
 
-      const response = await apiService.get<PDFDetailResponse>(
-        `/courses/${courseId}/module/pdfs/${pdfId}`,
+      const response = await apiService.get<DocumentDetailResponse>(
+        `/courses/${courseId}/module/pdfs/${documentId}`,
         params
       );
 
       if (!response.success || !response.data) {
-        throw new Error(response.message || "Failed to fetch PDF details");
+        throw new Error(response.message || "Failed to fetch document details");
       }
 
       return response.data;
@@ -112,28 +113,28 @@ class PDFService {
   }
 
   /**
-   * Mark PDF as completed
+   * Mark document as completed (PDF, PPTX, DOCX)
    * Endpoint: POST /updatePDFProgress
    *
    * UPDATED: Now returns comprehensive progress data including module status
    */
   async markCompleted(
     courseId: string,
-    request: MarkPDFCompletedRequest
-  ): Promise<MarkPDFCompletedResponse["data"]> {
+    request: MarkDocumentCompletedRequest
+  ): Promise<MarkDocumentCompletedResponse["data"]> {
     try {
-      console.log("📝 Marking PDF as completed:", {
+      console.log("📝 Marking document as completed:", {
         courseId,
-        pdfId: request.pdfId,
+        documentId: request.documentId,
         userId: request.userId,
         isCompleted: request.isCompleted,
       });
 
-      const response = await apiService.post<MarkPDFCompletedResponse>(
+      const response = await apiService.post<MarkDocumentCompletedResponse>(
         `/updatePDFProgress`,
         {
           userId: request.userId,
-          pdfId: request.pdfId,
+          pdfId: request.documentId, // Backend still uses pdfId parameter name
           courseId,
           isCompleted: request.isCompleted,
         }
@@ -157,4 +158,5 @@ class PDFService {
   }
 }
 
-export const pdfService = new PDFService();
+export const documentService = new DocumentService();
+export const pdfService = documentService; // Legacy export for backwards compatibility

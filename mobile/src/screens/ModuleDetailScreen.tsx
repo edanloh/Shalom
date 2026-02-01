@@ -46,10 +46,10 @@ const ModuleDetailScreen = () => {
 
   const [loading, setLoading] = useState(true);
   const [courseContent, setCourseContent] = useState<CourseContent | null>(
-    null
+    null,
   );
   const [currentSection, setCurrentSection] = useState<CourseSection | null>(
-    null
+    null,
   );
 
   useEffect(() => {
@@ -62,7 +62,7 @@ const ModuleDetailScreen = () => {
       try {
         const enrolled = await courseService.isUserEnrolledInCourse(
           userId,
-          courseId
+          courseId,
         );
         if (mounted) setIsEnrolled(enrolled);
       } catch {
@@ -85,18 +85,18 @@ const ModuleDetailScreen = () => {
         const hasCompletion =
           params?.videoCompleted ||
           params?.quizCompleted ||
-          params?.pdfCompleted ||
+          params?.documentCompleted ||
           params?.timestamp;
 
         if (hasCompletion) {
           console.log("✅ Item completed detected, forcing refresh...", {
             videoCompleted: params?.videoCompleted,
             quizCompleted: params?.quizCompleted,
-            pdfCompleted: params?.pdfCompleted,
+            documentCompleted: params?.documentCompleted,
             completedItemId:
               params?.completedVideoId ||
               params?.completedQuizId ||
-              params?.completedPdfId,
+              params?.completedDocumentId,
             timestamp: params?.timestamp,
           });
 
@@ -107,10 +107,10 @@ const ModuleDetailScreen = () => {
           navigation.setParams({
             videoCompleted: undefined,
             quizCompleted: undefined,
-            pdfCompleted: undefined,
+            documentCompleted: undefined,
             completedVideoId: undefined,
             completedQuizId: undefined,
-            completedPdfId: undefined,
+            completedDocumentId: undefined,
             timestamp: undefined,
           });
         } else {
@@ -120,7 +120,7 @@ const ModuleDetailScreen = () => {
       };
 
       handleFocus();
-    }, [courseId, userId, route.params])
+    }, [courseId, userId, route.params]),
   );
 
   const fetchCourseContent = async () => {
@@ -142,8 +142,8 @@ const ModuleDetailScreen = () => {
             ? moduleService.getSectionById(data.sections, sectionId)
             : data.sections[0])
         : sectionId
-        ? moduleService.getSectionById(data.sections, sectionId)
-        : data.sections[0];
+          ? moduleService.getSectionById(data.sections, sectionId)
+          : data.sections[0];
 
       setCurrentSection(section);
 
@@ -175,7 +175,7 @@ const ModuleDetailScreen = () => {
     return moduleService.getItemProgress(
       itemId,
       itemType,
-      courseContent.userProgress
+      courseContent.userProgress,
     );
   };
 
@@ -192,13 +192,32 @@ const ModuleDetailScreen = () => {
           text: "Go to course",
           onPress: () => navigation.navigate("CourseDetail", { courseId }),
         },
-      ]
+      ],
     );
     return false;
   };
 
   const handleItemPress = async (item: ModuleItem) => {
     if (!(await requireEnrollment())) return;
+
+    // Check if all previous items are completed
+    if (currentSection?.items) {
+      const itemIndex = currentSection.items.findIndex((i) => i.id === item.id);
+      if (itemIndex > 0) {
+        const previousItems = currentSection.items.slice(0, itemIndex);
+        const incompletePrevious = previousItems.filter((i) => !i.is_completed);
+
+        if (incompletePrevious.length > 0) {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          Alert.alert(
+            "Complete Previous Items First",
+            `Please complete "${incompletePrevious[0].title}" before accessing this item.`,
+            [{ text: "OK", style: "default" }],
+          );
+          return;
+        }
+      }
+    }
 
     console.log("📍 Navigating to item:", {
       type: item.type,
@@ -221,12 +240,13 @@ const ModuleDetailScreen = () => {
         sectionId: currentSection?.id,
         userId,
       });
-    } else if (item.type === "pdf") {
-      navigation.navigate("PDFView", {
-        pdfId: item.id,
+    } else if (["pdf", "document", "ppt"].includes(item.type)) {
+      navigation.navigate("DocumentView", {
+        documentId: item.id,
         courseId,
         sectionId: currentSection?.id,
         userId,
+        documentType: item.type,
       });
     }
   };
@@ -234,7 +254,7 @@ const ModuleDetailScreen = () => {
   const getNextSection = (): CourseSection | null => {
     if (!courseContent || !currentSection) return null;
     const currentIndex = courseContent.sections.findIndex(
-      (s) => s.id === currentSection.id
+      (s) => s.id === currentSection.id,
     );
     if (
       currentIndex === -1 ||
@@ -254,7 +274,7 @@ const ModuleDetailScreen = () => {
   const getPreviousSection = (): CourseSection | null => {
     if (!courseContent || !currentSection) return null;
     const currentIndex = courseContent.sections.findIndex(
-      (s) => s.id === currentSection.id
+      (s) => s.id === currentSection.id,
     );
     if (currentIndex <= 0) return null;
     return courseContent.sections[currentIndex - 1];
@@ -264,7 +284,8 @@ const ModuleDetailScreen = () => {
     const nextSection = getNextSection();
     if (nextSection) {
       // Check if current section is completed
-      const isCurrentModuleCompleted = (currentSection as any)?.module_is_completed;
+      const isCurrentModuleCompleted = (currentSection as any)
+        ?.module_is_completed;
       if (!isCurrentModuleCompleted) {
         Alert.alert(
           "Complete Current Module First",
@@ -288,17 +309,31 @@ const ModuleDetailScreen = () => {
     const progress = getItemProgress(item.id, item.type);
     const isCompleted = item.is_completed;
 
+    // Check if item is locked (previous items not completed)
+    const isLocked = currentSection?.items
+      ? (() => {
+          const itemIndex = currentSection.items.findIndex(
+            (i) => i.id === item.id,
+          );
+          if (itemIndex > 0) {
+            const previousItems = currentSection.items.slice(0, itemIndex);
+            return previousItems.some((i) => !i.is_completed);
+          }
+          return false;
+        })()
+      : false;
+
     return (
       <TouchableOpacity
         key={item.id}
-        style={styles.itemCard}
+        style={[styles.itemCard, isLocked && styles.itemCardLocked]}
         onPress={() => handleItemPress(item)}
-        activeOpacity={0.7}
+        activeOpacity={isLocked ? 1 : 0.7}
       >
         <View style={styles.itemIconContainer}>
           {item.type === "video" ? (
             <Ionicons name="play-circle" size={24} color={Colors.purple400} />
-          ) : item.type === "pdf" ? (
+          ) : ["pdf", "document", "ppt"].includes(item.type) ? (
             <Ionicons name="document-text" size={24} color={Colors.purple400} />
           ) : (
             <Ionicons name="help-circle" size={24} color={Colors.yellow} />
@@ -342,28 +377,19 @@ const ModuleDetailScreen = () => {
                   <Text style={styles.itemMetaText}>Quiz</Text>
                 </View>
               )}
-              {item.type === "pdf" && (
+              {["pdf", "document", "ppt"].includes(item.type) && (
                 <View style={styles.itemMeta}>
                   <Ionicons
                     name="newspaper-outline"
                     size={14}
                     color={Colors.textSecondary}
                   />
-                  <Text style={styles.itemMetaText}>PDF Document</Text>
+                  <Text style={styles.itemMetaText}>
+                    {item.type === "pdf" ? "PDF" : item.type === "ppt" ? "PPT" : "Document"}
+                  </Text>
                 </View>
               )}
             </View>
-
-            {isCompleted && (
-              <View style={styles.completedBadge}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={Colors.green}
-                />
-                <Text style={styles.completedText}>Completed</Text>
-              </View>
-            )}
           </View>
 
           {item.type === "video" && progress && !isCompleted && (
@@ -382,6 +408,29 @@ const ModuleDetailScreen = () => {
                   ]}
                 />
               </View>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.badgeContainer}>
+          {isCompleted && (
+            <View style={styles.completedBadge}>
+              <Ionicons
+                name="checkmark-circle"
+                size={16}
+                color={Colors.green}
+              />
+              <Text style={styles.completedText}>Completed</Text>
+            </View>
+          )}
+          {isLocked && (
+            <View style={styles.lockedBadge}>
+              <Ionicons
+                name="lock-closed"
+                size={14}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.lockedBadgeText}>Locked</Text>
             </View>
           )}
         </View>
@@ -457,7 +506,7 @@ const ModuleDetailScreen = () => {
             <Text style={styles.statText}>
               {
                 currentSection.items.filter(
-                  (i: ModuleItem) => i.type === "video"
+                  (i: ModuleItem) => i.type === "video",
                 ).length
               }{" "}
               videos
@@ -472,10 +521,11 @@ const ModuleDetailScreen = () => {
             />
             <Text style={styles.statText}>
               {
-                currentSection.items.filter((i: ModuleItem) => i.type === "pdf")
-                  .length
+                currentSection.items.filter((i: ModuleItem) =>
+                  ["pdf", "document", "ppt"].includes(i.type),
+                ).length
               }{" "}
-              PDFs
+              Documents
             </Text>
           </View>
           <View style={styles.statDivider} />
@@ -488,7 +538,7 @@ const ModuleDetailScreen = () => {
             <Text style={styles.statText}>
               {
                 currentSection.items.filter(
-                  (i: ModuleItem) => i.type === "quiz"
+                  (i: ModuleItem) => i.type === "quiz",
                 ).length
               }{" "}
               quizzes
@@ -512,7 +562,7 @@ const ModuleDetailScreen = () => {
             <Text style={styles.progressPercentage}>
               {moduleService.getSectionCompletionPercentage(
                 currentSection,
-                courseContent.userProgress
+                courseContent.userProgress,
               )}
               %
             </Text>
@@ -524,7 +574,7 @@ const ModuleDetailScreen = () => {
                 {
                   width: `${moduleService.getSectionCompletionPercentage(
                     currentSection,
-                    courseContent.userProgress
+                    courseContent.userProgress,
                   )}%`,
                 },
               ]}
@@ -540,7 +590,7 @@ const ModuleDetailScreen = () => {
               <Text style={styles.moduleCompletedText}>
                 Module Completed on{" "}
                 {new Date(
-                  (currentSection as any).module_completed_at
+                  (currentSection as any).module_completed_at,
                 ).toLocaleDateString()}
               </Text>
             </View>
@@ -553,7 +603,7 @@ const ModuleDetailScreen = () => {
         <Text style={styles.contentTitle}>Lessons</Text>
         {currentSection.items && currentSection.items.length > 0 ? (
           currentSection.items.map((item: ModuleItem, index: number) =>
-            renderItem(item, index)
+            renderItem(item, index),
           )
         ) : (
           <View style={styles.emptyState}>
@@ -637,7 +687,13 @@ const ModuleDetailScreen = () => {
                     {getNextSection()?.title}
                   </Text>
                   {!canGoToNextSection() && (
-                    <Text style={[styles.navButtonTextDisabled, styles.navButtonTextRight, styles.lockedText]}>
+                    <Text
+                      style={[
+                        styles.navButtonTextDisabled,
+                        styles.navButtonTextRight,
+                        styles.lockedText,
+                      ]}
+                    >
                       🔒 Complete this module first
                     </Text>
                   )}
@@ -656,7 +712,9 @@ const ModuleDetailScreen = () => {
             <Ionicons
               name="chevron-forward"
               size={20}
-              color={canGoToNextSection() ? Colors.secondary : Colors.textSecondary}
+              color={
+                canGoToNextSection() ? Colors.secondary : Colors.textSecondary
+              }
             />
           </TouchableOpacity>
         </View>
@@ -827,6 +885,7 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.textInputBg,
     borderRadius: 12,
     padding: Spacing.md,
@@ -879,6 +938,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     marginLeft: 4,
+  },
+  badgeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.xs,
   },
   completedBadge: {
     flexDirection: "row",
@@ -957,6 +1022,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "500",
     color: Colors.textSecondary,
+  },
+  itemCardLocked: {
+    opacity: 0.6,
+  },
+  lockedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.textSecondary + "20",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  lockedBadgeText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginLeft: 4,
+    fontWeight: "600",
   },
 });
 

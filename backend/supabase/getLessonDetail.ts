@@ -85,7 +85,7 @@ serve(async (req) => {
       .single();
 
     // ========================================
-    // 2. If not found in videos, try course_resources (PDFs)
+    // 2. If not found in videos, try course_resources (Documents: PDF, PPTX, DOCX)
     // ========================================
     let lessonType = 'video';
     let pdfResource = null;
@@ -98,6 +98,7 @@ serve(async (req) => {
           title,
           description,
           resource_url,
+          resource_type,
           file_size_bytes,
           is_preview,
           is_downloadable,
@@ -115,7 +116,7 @@ serve(async (req) => {
           )
         `)
         .eq('id', videoId)
-        .eq('resource_type', 'pdf')
+        .in('resource_type', ['pdf', 'document', 'ppt'])
         .single();
 
 
@@ -139,12 +140,13 @@ serve(async (req) => {
 
       // Convert resource to video-like structure for compatibility
       pdfResource = resource;
-      lessonType = 'pdf';
+      lessonType = resource.resource_type || 'pdf'; // Use actual resource type (pdf, document, slides)
       video = {
         id: resource.id,
         title: resource.title,
         description: resource.description,
         resource_url: resource.resource_url,
+        resource_type: resource.resource_type,
         file_size_bytes: resource.file_size_bytes,
         is_downloadable: resource.is_downloadable,
         is_preview: resource.is_preview,
@@ -168,10 +170,10 @@ serve(async (req) => {
 
     const { data: allResources, error: resourceNavError } = await supabaseClient
       .from('course_resources')
-      .select('id, title, order_index')
+      .select('id, title, order_index, resource_type')
       .eq('section_id', video.section_id)
       .eq('course_id', video.course_id)
-      .eq('resource_type', 'pdf')
+      .in('resource_type', ['pdf', 'document', 'ppt'])
       .order('order_index', { ascending: true });
 
 
@@ -190,7 +192,10 @@ serve(async (req) => {
     // Combine and sort all items by order_index
     const allItems = [
       ...(allVideos || []).map((v: any) => ({ ...v, type: 'video' })),
-      ...(allResources || []).map((r: any) => ({ ...r, type: 'pdf' })),
+      ...(allResources || []).map((r: any) => ({ 
+        ...r, 
+        type: r.resource_type || 'pdf' // Use actual resource type
+      })),
       ...(allQuizzes || []).map((q: any) => ({ ...q, type: 'quiz' }))
     ].sort((a, b) => a.order_index - b.order_index);
 
@@ -251,15 +256,18 @@ serve(async (req) => {
     // ========================================
     // 5. Build response data
     // ========================================
+    const isDocumentType = ['pdf', 'document', 'ppt'].includes(lessonType);
+    
     const responseData = {
       id: video.id,
       title: video.title,
       description: video.description,
       type: lessonType,
       video_url: lessonType === 'video' ? video.video_url : undefined,
-      resource_url: lessonType === 'pdf' ? video.resource_url : undefined,
-      file_size_bytes: lessonType === 'pdf' ? video.file_size_bytes : undefined,
-      is_downloadable: lessonType === 'pdf' ? video.is_downloadable : undefined,
+      resource_url: isDocumentType ? video.resource_url : undefined,
+      resource_type: isDocumentType ? video.resource_type : undefined,
+      file_size_bytes: isDocumentType ? video.file_size_bytes : undefined,
+      is_downloadable: isDocumentType ? video.is_downloadable : undefined,
       duration_seconds: lessonType === 'video' ? video.duration_seconds : undefined,
       thumbnail_url: video.thumbnail_url,
       is_preview: video.is_preview,

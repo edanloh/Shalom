@@ -1,8 +1,9 @@
-// ENHANCED: Automated PDFView Screen with intelligent viewer fallback
+// ENHANCED: Automated DocumentView Screen with intelligent viewer fallback
+// Supports PDF, DOCX, and PPTX documents
 // Automatically cycles through viewers until one works successfully
 // No manual dropdown needed - fully automated detection
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -26,78 +27,97 @@ import type { MainStackParamList } from "@/types/navigation";
 import Screen from "@/components/common/Screen";
 import ActionButton from "@/components/ActionButton";
 import { CourseCompletionCard } from "@/components";
-import { pdfService } from "@/services/pdfService";
+import { documentService } from "@/services/documentService";
 import { moduleService } from "@/services/moduleService";
 import { useCourseNavigation } from "@/hooks";
 import type { ModuleItem } from "@/services/moduleService";
 
-type PDFViewNavigationProp = StackNavigationProp<MainStackParamList, "PDFView">;
+type DocumentViewNavigationProp = StackNavigationProp<MainStackParamList, "DocumentView">;
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// PDF Viewer fallback options - ordered by reliability
-const PDF_VIEWERS = [
+// Document Viewer fallback options - ordered by reliability
+// For PDF: Direct, PDF.js, Google Drive
+// For DOCX/PPTX: Office Online, Google Drive
+const DOCUMENT_VIEWERS = [
   {
-    name: "Direct PDF",
-    getUrl: (pdfUrl: string) => pdfUrl,
+    name: "Direct Document",
+    getUrl: (docUrl: string) => docUrl,
     description: "Native viewer",
-    timeout: 8000, // 8 seconds
-  },
-  {
-    name: "Mozilla PDF.js",
-    getUrl: (pdfUrl: string) =>
-      `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(pdfUrl)}`,
-    description: "Open-source viewer",
-    timeout: 10000, // 10 seconds
-  },
-  {
-    name: "Google Drive Viewer",
-    getUrl: (pdfUrl: string) =>
-      `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(pdfUrl)}`,
-    description: "Google viewer",
-    timeout: 10000,
+    timeout: 8000,
+    supportedTypes: ['pdf'] as const,
   },
   {
     name: "Office Online",
-    getUrl: (pdfUrl: string) =>
-      `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(pdfUrl)}`,
-    description: "Microsoft viewer",
+    getUrl: (docUrl: string) =>
+      `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(docUrl)}`,
+    description: "Microsoft Office viewer",
     timeout: 12000,
+    supportedTypes: ['pdf', 'document', 'ppt'] as const,
+  },
+  {
+    name: "Mozilla PDF.js",
+    getUrl: (docUrl: string) =>
+      `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(docUrl)}`,
+    description: "Open-source PDF viewer",
+    timeout: 10000,
+    supportedTypes: ['pdf'] as const,
+  },
+  {
+    name: "Google Drive Viewer",
+    getUrl: (docUrl: string) =>
+      `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(docUrl)}`,
+    description: "Google viewer",
+    timeout: 10000,
+    supportedTypes: ['pdf', 'document', 'ppt'] as const,
   },
   {
     name: "PDF.js CDN",
-    getUrl: (pdfUrl: string) =>
-      `https://cdnjs.cloudflare.com/ajax/libs/pdfjs-dist/3.11.174/web/viewer.html?file=${encodeURIComponent(pdfUrl)}`,
-    description: "CDN-hosted viewer",
+    getUrl: (docUrl: string) =>
+      `https://cdnjs.cloudflare.com/ajax/libs/pdfjs-dist/3.11.174/web/viewer.html?file=${encodeURIComponent(docUrl)}`,
+    description: "CDN-hosted PDF viewer",
     timeout: 10000,
+    supportedTypes: ['pdf'] as const,
   },
 ];
 
-const PDFView = () => {
+const DocumentView = () => {
   const route = useRoute();
-  const navigation = useNavigation<PDFViewNavigationProp>();
-  const { pdfId, courseId, sectionId, userId } = route.params as any;
+  const navigation = useNavigation<DocumentViewNavigationProp>();
+  const { documentId, courseId, sectionId, userId, documentType } = route.params as any;
 
   const [loading, setLoading] = useState(true);
-  const [pdfDetail, setPdfDetail] = useState<any>(null);
+  const [documentDetail, setDocumentDetail] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
   const [markingComplete, setMarkingComplete] = useState(false);
 
+  // Determine document type from detail or route param
+  const docType = documentDetail?.resource_type || documentType || 'pdf';
+  const supportedViewers = useMemo(() => {
+    if (docType === "document") {
+      return DOCUMENT_VIEWERS.filter((viewer) => viewer.name === "Office Online");
+    }
+    const filtered = DOCUMENT_VIEWERS.filter((viewer) =>
+      viewer.supportedTypes.includes(docType as any)
+    );
+    return filtered.length > 0 ? filtered : DOCUMENT_VIEWERS;
+  }, [docType]);
+  
   const {
     nextItem: nextItemInModule,
     previousItem: prevItemInModule,
     isLastItem,
     refetch: refetchNavigation,
-  } = useCourseNavigation(courseId, userId, pdfId, "pdf", sectionId);
+  } = useCourseNavigation(courseId, userId, documentId, docType as any, sectionId);
 
   const [showMenu, setShowMenu] = useState(false);
   const [downloading, setDownloading] = useState(false);
   
-  // Automated PDF viewer state
+  // Automated document viewer state
   const [currentViewerIndex, setCurrentViewerIndex] = useState(0);
   const [viewerAttempts, setViewerAttempts] = useState<number[]>([]);
-  const [pdfLoadError, setPdfLoadError] = useState(false);
+  const [documentLoadError, setDocumentLoadError] = useState(false);
   const [isLoadingViewer, setIsLoadingViewer] = useState(true);
   const [successfulViewer, setSuccessfulViewer] = useState<number | null>(null);
   const webViewRef = useRef<any>(null);
@@ -114,7 +134,7 @@ const PDFView = () => {
         clearTimeout(errorCheckTimeoutRef.current);
       }
     };
-  }, [pdfId]);
+  }, [documentId]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -132,29 +152,37 @@ const PDFView = () => {
         userId
       );
 
-      let foundPDF: any = null;
+      let foundDocument: any = null;
       let foundSection: any = null;
 
       for (const section of moduleDetail.sections) {
         if (section.items) {
-          const pdf = section.items.find(
-            (item: ModuleItem) => item.id === pdfId && item.type === "pdf"
+          const document = section.items.find(
+            (item: ModuleItem) => item.id === documentId && 
+              ['pdf', 'document', 'ppt'].includes(item.type)
           );
-          if (pdf) {
-            foundPDF = pdf;
+          if (document) {
+            foundDocument = document;
             foundSection = section;
             break;
           }
         }
       }
 
-      if (foundPDF && foundSection) {
-        setPdfDetail({
-          id: foundPDF.id,
-          title: foundPDF.title,
-          description: foundPDF.description || "",
-          pdf_url: foundPDF.pdf_url,
-          thumbnail_url: foundPDF.thumbnail_url,
+      if (foundDocument && foundSection) {
+        setDocumentDetail({
+          id: foundDocument.id,
+          title: foundDocument.title,
+          description: foundDocument.description || "",
+          resource_url:
+            foundDocument.resource_url ||
+            foundDocument.resourceUrl ||
+            foundDocument.pdf_url ||
+            foundDocument.pdfUrl,
+          resource_type: foundDocument.resource_type || foundDocument.type,
+          file_size_bytes: foundDocument.file_size_bytes,
+          is_downloadable: foundDocument.is_downloadable,
+          thumbnail_url: foundDocument.thumbnail_url,
           course: {
             id: courseId,
             title: moduleDetail.course.title,
@@ -164,25 +192,26 @@ const PDFView = () => {
             title: foundSection.title,
           },
           userProgress: {
-            is_completed: foundPDF.is_completed || false,
+            is_completed: foundDocument.is_completed || false,
           },
         });
-        setIsCompleted(foundPDF.is_completed || false);
+        setIsCompleted(foundDocument.is_completed || false);
 
-        console.log("📄 PDF loaded:", {
-          id: foundPDF.id,
-          title: foundPDF.title,
-          isCompleted: foundPDF.is_completed || false,
+        console.log("📄 Document loaded:", {
+          id: foundDocument.id,
+          title: foundDocument.title,
+          type: foundDocument.resource_type || foundDocument.type,
+          isCompleted: foundDocument.is_completed || false,
         });
       } else {
-        throw new Error("PDF not found in course modules");
+        throw new Error("Document not found in course modules");
       }
     } catch (err: any) {
       console.error("Error fetching course sections:", err);
-      setError(err.message || "Failed to load PDF");
+      setError(err.message || "Failed to load document");
       Alert.alert(
         "Error",
-        err.message || "Failed to load PDF",
+        err.message || "Failed to load document",
         [
           {
             text: "Go Back",
@@ -209,8 +238,8 @@ const PDFView = () => {
   };
 
   // Automatically try next viewer on error
-  const handlePDFError = () => {
-    console.log(`❌ PDF Viewer error with ${PDF_VIEWERS[currentViewerIndex].name}`);
+  const handleDocumentError = () => {
+    console.log(`❌ Document Viewer error with ${supportedViewers[currentViewerIndex]?.name || 'viewer'}`);
     
     clearAllTimeouts();
     
@@ -218,48 +247,50 @@ const PDFView = () => {
     setViewerAttempts((prev) => [...prev, currentViewerIndex]);
 
     // Auto-advance to next viewer
-    if (currentViewerIndex < PDF_VIEWERS.length - 1) {
+    if (currentViewerIndex < supportedViewers.length - 1) {
       const nextIndex = currentViewerIndex + 1;
-      console.log(`🔄 Auto-switching to ${PDF_VIEWERS[nextIndex].name}...`);
+      console.log(`🔄 Auto-switching to ${supportedViewers[nextIndex].name}...`);
       setCurrentViewerIndex(nextIndex);
       setIsLoadingViewer(true);
-      setPdfLoadError(false);
+      setDocumentLoadError(false);
     } else {
       // All viewers failed
-      console.log("💥 All PDF viewers failed");
+      console.log("💥 All document viewers failed");
       setIsLoadingViewer(false);
-      setPdfLoadError(true);
+      setDocumentLoadError(true);
     }
   };
 
   // Handle successful load
-  const handlePDFLoadSuccess = () => {
-    console.log(`✅ PDF loaded successfully with ${PDF_VIEWERS[currentViewerIndex].name}`);
+  const handleDocumentLoadSuccess = () => {
+    console.log(`✅ Document loaded successfully with ${supportedViewers[currentViewerIndex]?.name || 'viewer'}`);
     clearAllTimeouts();
     setSuccessfulViewer(currentViewerIndex);
     setIsLoadingViewer(false);
-    setPdfLoadError(false);
+    setDocumentLoadError(false);
   };
 
   // Start load timeout when viewer changes
   useEffect(() => {
-    if (pdfDetail?.pdf_url && !successfulViewer && currentViewerIndex < PDF_VIEWERS.length) {
+    if (documentDetail?.resource_url && !successfulViewer && currentViewerIndex < supportedViewers.length) {
       clearAllTimeouts();
       
-      const currentViewer = PDF_VIEWERS[currentViewerIndex];
-      console.log(`⏱️ Starting ${currentViewer.timeout}ms timeout for ${currentViewer.name}`);
+      const currentViewer = supportedViewers[currentViewerIndex];
+      // Increase timeout for Office Online to allow JavaScript confirmation time
+      const timeout = currentViewer.name === "Office Online" ? 15000 : currentViewer.timeout;
+      console.log(`⏱️ Starting ${timeout}ms timeout for ${currentViewer.name}`);
       
       // Set timeout for this viewer
       loadTimeoutRef.current = setTimeout(() => {
-        if (isLoadingViewer) {
+        if (isLoadingViewer && successfulViewer === null) {
           console.log(`⏰ Timeout reached for ${currentViewer.name}, trying next viewer...`);
-          handlePDFError();
+          handleDocumentError();
         }
-      }, currentViewer.timeout);
+      }, timeout);
     }
     
     return () => clearAllTimeouts();
-  }, [currentViewerIndex, pdfDetail?.pdf_url]);
+  }, [currentViewerIndex, documentDetail?.resource_url, supportedViewers]);
 
   // Handle WebView load events
   const handleWebViewLoad = (syntheticEvent: any) => {
@@ -275,7 +306,7 @@ const PDFView = () => {
     
     if (hasError) {
       console.log('🚫 Detected error page');
-      handlePDFError();
+      handleDocumentError();
     } else {
       // Give it a moment to fully render, then check via injected JS
       errorCheckTimeoutRef.current = setTimeout(() => {
@@ -296,41 +327,41 @@ const PDFView = () => {
     clearAllTimeouts();
     setCurrentViewerIndex(0);
     setViewerAttempts([]);
-    setPdfLoadError(false);
+    setDocumentLoadError(false);
     setIsLoadingViewer(true);
     setSuccessfulViewer(null);
   };
 
   const handleMarkAsCompleted = async () => {
-    if (!userId || !pdfId) {
-      Alert.alert("Error", "Missing user or PDF information");
+    if (!userId || !documentId) {
+      Alert.alert("Error", "Missing user or document information");
       return;
     }
 
     try {
       setMarkingComplete(true);
 
-      console.log("🔄 Marking PDF as completed...");
+      console.log("🔄 Marking document as completed...");
 
-      const result = await pdfService.markCompleted(courseId, {
+      const result = await documentService.markCompleted(courseId, {
         userId,
-        pdfId,
+        documentId,
         isCompleted: true,
       });
 
-      console.log("✅ PDF marked as completed:", {
-        pdfId,
+      console.log("✅ Document marked as completed:", {
+        documentId,
         courseProgress: result.courseProgress?.progress_percentage,
         moduleCompleted: result.moduleProgress?.is_completed,
       });
 
       setIsCompleted(true);
 
-      if (pdfDetail) {
-        setPdfDetail({
-          ...pdfDetail,
+      if (documentDetail) {
+        setDocumentDetail({
+          ...documentDetail,
           userProgress: {
-            ...pdfDetail.userProgress,
+            ...documentDetail.userProgress,
             is_completed: true,
             completed_at: new Date().toISOString(),
           },
@@ -340,14 +371,14 @@ const PDFView = () => {
       await refetchNavigation();
 
       navigation.setParams({
-        pdfCompleted: true,
-        completedPdfId: pdfId,
+        documentCompleted: true,
+        completedDocumentId: documentId,
         timestamp: Date.now(),
       } as any);
 
       Alert.alert("Success", "Lesson marked as completed!", [{ text: "OK" }]);
     } catch (error: any) {
-      console.error("Error marking PDF as completed:", error);
+      console.error("Error marking document as completed:", error);
       Alert.alert(
         "Error",
         error.message || "Failed to update completion status"
@@ -374,8 +405,8 @@ const PDFView = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
-          fromPdfId: pdfId,
-          pdfCompleted: true,
+          fromDocumentId: documentId,
+          documentCompleted: true,
         } as any);
       } else if (nextItemInModule.item.type === "quiz") {
         navigation.replace("QuizScreen", {
@@ -383,17 +414,18 @@ const PDFView = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
-          fromPdfId: pdfId,
-          pdfCompleted: true,
+          fromDocumentId: documentId,
+          documentCompleted: true,
         } as any);
-      } else if (nextItemInModule.item.type === "pdf") {
-        navigation.replace("PDFView", {
-          pdfId: nextItemInModule.item.id,
+      } else if (["pdf", "document", "ppt"].includes(nextItemInModule.item.type)) {
+        navigation.replace("DocumentView", {
+          documentId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
-          fromPdfId: pdfId,
-          pdfCompleted: true,
+          documentType: nextItemInModule.item.type,
+          fromDocumentId: documentId,
+          documentCompleted: true,
         } as any);
       }
     }
@@ -415,20 +447,21 @@ const PDFView = () => {
           sectionId: prevItemInModule.sectionId,
           userId,
         });
-      } else if (prevItemInModule.item.type === "pdf") {
-        navigation.replace("PDFView", {
-          pdfId: prevItemInModule.item.id,
+      } else if (["pdf", "document", "ppt"].includes(prevItemInModule.item.type)) {
+        navigation.replace("DocumentView", {
+          documentId: prevItemInModule.item.id,
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          documentType: prevItemInModule.item.type,
         });
       }
     }
   };
 
-  const handleDownloadPDF = async () => {
-    if (!pdfDetail?.pdf_url) {
-      Alert.alert("Error", "PDF URL not available");
+  const handleDownloadDocument = async () => {
+    if (!documentDetail?.resource_url) {
+      Alert.alert("Error", "Document URL not available");
       return;
     }
 
@@ -436,7 +469,8 @@ const PDFView = () => {
       setDownloading(true);
       setShowMenu(false);
 
-      const filename = `${pdfDetail.title.replace(/[^a-z0-9]/gi, "_")}.pdf`;
+      const extension = docType === "ppt" ? "pptx" : docType === "document" ? "docx" : "pdf";
+      const filename = `${documentDetail.title.replace(/[^a-z0-9]/gi, "_")}.${extension}`;
       const baseDir =
         (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory;
       if (!baseDir) {
@@ -445,7 +479,7 @@ const PDFView = () => {
       const fileUri = baseDir + filename;
 
       const downloadResumable = FileSystem.createDownloadResumable(
-        pdfDetail.pdf_url,
+        documentDetail.resource_url,
         fileUri
       );
 
@@ -456,27 +490,26 @@ const PDFView = () => {
 
         if (isAvailable) {
           await Sharing.shareAsync(result.uri, {
-            mimeType: "application/pdf",
-            dialogTitle: "Save PDF",
-            UTI: "com.adobe.pdf",
+            mimeType: docType === "ppt" ? "application/vnd.ms-powerpoint" : docType === "document" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/pdf",
+            dialogTitle: "Save Document",
           });
-          Alert.alert("Success", "PDF ready to save!");
+          Alert.alert("Success", "Document ready to save!");
         } else {
-          Alert.alert("Downloaded", `PDF saved to: ${result.uri}`, [
+          Alert.alert("Downloaded", `Document saved to: ${result.uri}`, [
             { text: "OK" },
           ]);
         }
       }
     } catch (error: any) {
-      console.error("Error downloading PDF:", error);
+      console.error("Error downloading document:", error);
       Alert.alert(
         "Download Error",
-        "Failed to download PDF. Please try opening it in your browser instead.",
+        "Failed to download document. Please try opening it in your browser instead.",
         [
           { text: "Cancel", style: "cancel" },
           {
             text: "Open in Browser",
-            onPress: () => Linking.openURL(pdfDetail.pdf_url),
+            onPress: () => Linking.openURL(documentDetail.resource_url),
           },
         ]
       );
@@ -495,13 +528,13 @@ const PDFView = () => {
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.purple400} />
-          <Text style={styles.loadingText}>Loading PDF...</Text>
+          <Text style={styles.loadingText}>Loading document...</Text>
         </View>
       </Screen>
     );
   }
 
-  if (error || !pdfDetail) {
+  if (error || !documentDetail) {
     return (
       <Screen
         title="Error"
@@ -515,7 +548,7 @@ const PDFView = () => {
             size={64}
             color={Colors.purple400}
           />
-          <Text style={styles.errorText}>{error || "PDF not found"}</Text>
+          <Text style={styles.errorText}>{error || "Document not found"}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={fetchCourseSections}
@@ -527,13 +560,13 @@ const PDFView = () => {
     );
   }
 
-  const currentViewer = PDF_VIEWERS[currentViewerIndex];
-  const pdfUrl = currentViewer.getUrl(pdfDetail.pdf_url);
+  const currentViewer = supportedViewers[currentViewerIndex] || DOCUMENT_VIEWERS[1];
+  const documentUrl = currentViewer.getUrl(documentDetail.resource_url);
 
   return (
     <Screen
-      title={pdfDetail.course.title}
-      subtitle={pdfDetail.section.title}
+      title={documentDetail.course.title}
+      subtitle={documentDetail.section.title}
       navigation={navigation}
       headerLeftIcon="chevron-back"
       customEdges={["top", "bottom"]}
@@ -549,9 +582,9 @@ const PDFView = () => {
         } as any);
       }}
     >
-      {/* PDF Viewer */}
+      {/* Document Viewer */}
       <View style={styles.pdfContainer}>
-        {pdfDetail.pdf_url ? (
+        {documentDetail.resource_url ? (
           <>
             {/* Automated Status Bar - only shows when trying different viewers */}
             {isLoadingViewer && successfulViewer === null && (
@@ -559,7 +592,7 @@ const PDFView = () => {
                 <ActivityIndicator size="small" color={Colors.purple400} />
                 <Text style={styles.autoStatusText}>
                   Loading with {currentViewer.name}
-                  {viewerAttempts.length > 0 && ` (${currentViewerIndex + 1}/${PDF_VIEWERS.length})`}
+                  {viewerAttempts.length > 0 && ` (${currentViewerIndex + 1}/${supportedViewers.length})`}
                 </Text>
               </View>
             )}
@@ -569,12 +602,12 @@ const PDFView = () => {
               <View style={styles.successBar}>
                 <Ionicons name="checkmark-circle" size={14} color={Colors.green} />
                 <Text style={styles.successText}>
-                  Loaded with {PDF_VIEWERS[successfulViewer].name}
+                  Loaded with {supportedViewers[successfulViewer]?.name || 'viewer'}
                 </Text>
               </View>
             )}
 
-            {pdfLoadError ? (
+            {documentLoadError ? (
               <View style={styles.errorOverlay}>
                 <Ionicons
                   name="alert-circle-outline"
@@ -582,7 +615,7 @@ const PDFView = () => {
                   color={Colors.purple400}
                 />
                 <Text style={styles.errorOverlayText}>
-                  Unable to load PDF
+                  Unable to load document
                 </Text>
                 <Text style={styles.errorSubtext}>
                   Tried {viewerAttempts.length} different viewer{viewerAttempts.length !== 1 ? 's' : ''}
@@ -599,7 +632,7 @@ const PDFView = () => {
                   
                   <TouchableOpacity
                     style={[styles.retryButtonSmall, styles.secondaryButton]}
-                    onPress={handleDownloadPDF}
+                    onPress={handleDownloadDocument}
                   >
                     <Ionicons name="download" size={16} color={Colors.purple400} />
                     <Text style={styles.secondaryButtonText}>Download</Text>
@@ -607,7 +640,7 @@ const PDFView = () => {
                   
                   <TouchableOpacity
                     style={[styles.retryButtonSmall, styles.secondaryButton]}
-                    onPress={() => Linking.openURL(pdfDetail.pdf_url)}
+                    onPress={() => Linking.openURL(documentDetail.resource_url)}
                   >
                     <Ionicons name="open-outline" size={16} color={Colors.purple400} />
                     <Text style={styles.secondaryButtonText}>Open in Browser</Text>
@@ -617,19 +650,19 @@ const PDFView = () => {
             ) : (
               <WebView
                 ref={webViewRef}
-                key={`${currentViewerIndex}-${pdfDetail.id}`}
-                source={{ uri: pdfUrl }}
+                key={`${currentViewerIndex}-${documentDetail.id}`}
+                source={{ uri: documentUrl }}
                 style={styles.webView}
                 startInLoadingState={true}
                 renderLoading={() => (
                   <View style={styles.webViewLoading}>
                     <ActivityIndicator size="large" color={Colors.purple400} />
                     <Text style={styles.loadingText}>
-                      Loading PDF...
+                      Loading document...
                     </Text>
                     {viewerAttempts.length > 0 && (
                       <Text style={styles.attemptTextLoading}>
-                        Trying alternative viewer {currentViewerIndex + 1}/{PDF_VIEWERS.length}
+                        Trying alternative viewer {currentViewerIndex + 1}/{supportedViewers.length}
                       </Text>
                     )}
                   </View>
@@ -639,60 +672,67 @@ const PDFView = () => {
                 onError={(syntheticEvent) => {
                   const { nativeEvent } = syntheticEvent;
                   console.error("WebView error:", nativeEvent);
-                  handlePDFError();
+                  handleDocumentError();
                 }}
                 onHttpError={(syntheticEvent) => {
                   const { nativeEvent } = syntheticEvent;
                   console.error("HTTP error:", nativeEvent.statusCode);
                   if (nativeEvent.statusCode >= 400) {
-                    handlePDFError();
+                    handleDocumentError();
                   }
                 }}
                 // Intelligent error detection via JavaScript
                 injectedJavaScript={`
                   (function() {
-                    // Multi-stage error detection
+                    // Multi-stage error detection - optimized for Office Online embeds
                     let checkCount = 0;
-                    const maxChecks = 3;
+                    const maxChecks = 5;
                     
                     function checkForErrors() {
                       checkCount++;
                       
                       try {
                         const bodyText = document.body.innerText.toLowerCase();
+                        
+                        // Strict error detection
                         const hasError = 
                           bodyText.includes('no preview available') || 
-                          bodyText.includes('error') ||
                           bodyText.includes('cannot display') ||
                           bodyText.includes('failed to load') ||
                           bodyText.includes('unable to load') ||
                           bodyText.includes('not supported') ||
-                          bodyText.includes('try again') ||
-                          document.querySelector('.error') !== null ||
-                          document.querySelector('[class*="error"]') !== null;
+                          bodyText.includes('filenotfound') ||
+                          bodyText.includes('error occurred') ||
+                          (bodyText.includes('error') && bodyText.length < 200) ||
+                          document.querySelector('.error') !== null;
                         
                         if (hasError) {
-                          window.ReactNativeWebView.postMessage('PDF_LOAD_FAILED');
+                          window.ReactNativeWebView.postMessage('DOCUMENT_LOAD_FAILED');
                           return;
                         }
                         
-                        // Check for successful PDF indicators
+                        // Check for Office Online frame (embedding successful)
+                        const hasOfficeOnlineFrame = document.querySelector('iframe') !== null;
+                        
+                        // Check for successful document indicators
                         const hasSuccess = 
+                          hasOfficeOnlineFrame ||
                           document.querySelector('canvas') !== null ||
                           document.querySelector('embed') !== null ||
                           document.querySelector('object[type="application/pdf"]') !== null ||
                           document.querySelector('#viewer') !== null ||
-                          bodyText.length > 100; // Has substantial content
+                          document.querySelector('[data-office-ui-fabric]') !== null ||
+                          (bodyText.length > 100 && !bodyText.includes('loading')); // Has substantial content
                         
                         if (hasSuccess && checkCount >= 2) {
-                          window.ReactNativeWebView.postMessage('PDF_LOAD_SUCCESS');
+                          window.ReactNativeWebView.postMessage('DOCUMENT_LOAD_SUCCESS');
                         } else if (checkCount < maxChecks) {
-                          setTimeout(checkForErrors, 2000);
+                          setTimeout(checkForErrors, 1500);
                         }
                       } catch (e) {
                         // If we can't check, assume it might be loading
                         if (checkCount < maxChecks) {
-                          setTimeout(checkForErrors, 2000);
+                          setTimeout(checkForErrors, 1500);
                         }
                       }
                     }
@@ -703,12 +743,12 @@ const PDFView = () => {
                   true;
                 `}
                 onMessage={(event) => {
-                  if (event.nativeEvent.data === 'PDF_LOAD_FAILED') {
+                  if (event.nativeEvent.data === 'DOCUMENT_LOAD_FAILED') {
                     console.log('🚨 JavaScript detected load failure');
-                    handlePDFError();
-                  } else if (event.nativeEvent.data === 'PDF_LOAD_SUCCESS') {
+                    handleDocumentError();
+                  } else if (event.nativeEvent.data === 'DOCUMENT_LOAD_SUCCESS') {
                     console.log('✅ JavaScript confirmed successful load');
-                    handlePDFLoadSuccess();
+                    handleDocumentLoadSuccess();
                   }
                 }}
                 javaScriptEnabled={true}
@@ -728,7 +768,7 @@ const PDFView = () => {
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity
                 style={styles.iconButton}
-                onPress={() => Linking.openURL(pdfDetail.pdf_url)}
+                onPress={() => Linking.openURL(documentDetail.resource_url)}
                 activeOpacity={0.7}
               >
                 <Ionicons
@@ -756,7 +796,7 @@ const PDFView = () => {
               <View style={styles.dropdownMenu}>
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={handleDownloadPDF}
+                  onPress={handleDownloadDocument}
                   disabled={downloading}
                 >
                   {downloading ? (
@@ -769,7 +809,7 @@ const PDFView = () => {
                     />
                   )}
                   <Text style={styles.menuItemText}>
-                    {downloading ? "Downloading..." : "Download PDF"}
+                    {downloading ? "Downloading..." : "Download Document"}
                   </Text>
                 </TouchableOpacity>
 
@@ -779,7 +819,7 @@ const PDFView = () => {
                   style={styles.menuItem}
                   onPress={() => {
                     setShowMenu(false);
-                    Linking.openURL(pdfDetail.pdf_url);
+                    Linking.openURL(documentDetail.resource_url);
                   }}
                 >
                   <Ionicons
@@ -790,7 +830,7 @@ const PDFView = () => {
                   <Text style={styles.menuItemText}>Open in Browser</Text>
                 </TouchableOpacity>
 
-                {successfulViewer === null && !pdfLoadError && (
+                {successfulViewer === null && !documentLoadError && (
                   <>
                     <View style={styles.menuDivider} />
                     <TouchableOpacity
@@ -819,7 +859,7 @@ const PDFView = () => {
               size={64}
               color={Colors.textSecondary}
             />
-            <Text style={styles.placeholderText}>No PDF available</Text>
+            <Text style={styles.placeholderText}>No document available</Text>
           </View>
         )}
       </View>
@@ -832,7 +872,7 @@ const PDFView = () => {
             <Text style={styles.completionText}>Completed</Text>
           </View>
         )}
-        <Text style={styles.title}>{pdfDetail.title}</Text>
+        <Text style={styles.title}>{documentDetail.title}</Text>
       </View>
 
       <ActionButton
@@ -880,7 +920,13 @@ const PDFView = () => {
                 ? "PREVIOUS QUIZ"
                 : prevItemInModule?.item.type === "video"
                 ? "PREVIOUS LESSON"
-                : "PREVIOUS PDF"}
+                : prevItemInModule?.item.type === "pdf"
+                ? "PREVIOUS PDF"
+                : prevItemInModule?.item.type === "document"
+                ? "PREVIOUS DOCX"
+                : prevItemInModule?.item.type === "ppt"
+                ? "PREVIOUS PPTX"
+                : "PREVIOUS DOCUMENT"}
             </Text>
             {prevItemInModule ? (
               <Text style={styles.navButtonText} numberOfLines={2}>
@@ -915,7 +961,13 @@ const PDFView = () => {
                 ? "NEXT QUIZ"
                 : nextItemInModule?.item.type === "video"
                 ? "NEXT LESSON"
-                : "NEXT PDF"}
+                : nextItemInModule?.item.type === "pdf"
+                ? "NEXT PDF"
+                : nextItemInModule?.item.type === "document"
+                ? "NEXT DOCX"
+                : nextItemInModule?.item.type === "ppt"
+                ? "NEXT PPTX"
+                : "NEXT DOCUMENT"}
             </Text>
             {nextItemInModule ? (
               <>
@@ -966,8 +1018,8 @@ const PDFView = () => {
           onBackToCourse={() => {
             navigation.navigate("CourseDetail", {
               courseId,
-              pdfCompleted: true,
-              pdfId,
+              documentCompleted: true,
+              completedDocumentId: documentId,
             } as any);
           }}
         />
@@ -1276,4 +1328,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PDFView;
+export default DocumentView;

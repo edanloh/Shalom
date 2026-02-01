@@ -130,13 +130,17 @@ const CourseDetail = () => {
       ? modules.map((section: any) => {
           const items = section.items || [];
           const videos = items.filter((item: any) => item.type === "video");
-          const pdfs = items.filter((item: any) => item.type === "pdf");
+          const documents = items.filter((item: any) =>
+            ["pdf", "document", "slides", "pptx", "docx", "ppt"].includes(
+              item.type,
+            ),
+          );
           const quizzes = items.filter((item: any) => item.type === "quiz");
 
           return {
             id: section.id,
             title: section.title,
-            lessons: videos.length + pdfs.length,
+            lessons: videos.length + documents.length,
             quizzes: quizzes.length,
             duration: section.total_duration_seconds
               ? `${Math.floor(section.total_duration_seconds / 60)} min`
@@ -156,10 +160,14 @@ const CourseDetail = () => {
                     ? `${Math.floor(item.duration_seconds / 60)} min`
                     : "N/A",
                 };
-              } else if (item.type === "pdf") {
+              } else if (
+                ["pdf", "document", "slides", "pptx", "docx", "ppt"].includes(
+                  item.type,
+                )
+              ) {
                 return {
                   id: item.id,
-                  type: "pdf" as const,
+                  type: "document" as const,
                   title: item.title,
                   fileSize: item.file_size_bytes
                     ? `${(item.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -383,7 +391,7 @@ const CourseDetail = () => {
   const handleItemClick = (module: any, item: any) => {
     if (item.type === "lesson") {
       navigate(`/course/${courseId}/module/${module.id}/lesson/${item.id}`);
-    } else if (item.type === "pdf") {
+    } else if (item.type === "document") {
       navigate(`/course/${courseId}/module/${module.id}/lesson/${item.id}`);
     } else if (item.type === "quiz") {
       navigate(`/course/${courseId}/module/${module.id}/quiz/${item.id}`);
@@ -618,17 +626,24 @@ const CourseDetail = () => {
                             <div className="flex items-center gap-3">
                               {item.type === "lesson" ? (
                                 <Video className="h-4 w-4 text-accent" />
-                              ) : item.type === "pdf" ? (
+                              ) : item.type === "document" || item.type === "pdf" || item.type === "ppt" ? (
                                 <FileText className="h-4 w-4 text-primary" />
                               ) : (
                                 <MessageSquare className="h-4 w-4 text-warning" />
                               )}
-                              <span className="text-sm">{item.title}</span>
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm">{item.title}</span>
+                                {(item.type === "pdf" || item.type === "document" || item.type === "ppt") && (
+                                  <span className="text-xs text-muted-foreground uppercase">
+                                    {item.type === "pdf" ? "PDF" : item.type === "document" ? "DOCX" : "PPTX"}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <span className="text-xs text-muted-foreground">
                               {item.type === "lesson"
                                 ? item.duration
-                                : item.type === "pdf"
+                                : item.type === "pdf" || item.type === "document"
                                   ? item.fileSize
                                   : `${item.questions} questions`}
                             </span>

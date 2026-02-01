@@ -68,6 +68,17 @@ export class StorageService {
   }
 
   /**
+   * Upload document file (PDF, PPTX, DOCX, XLSX, etc.)
+   * @param file - The document file to upload
+   * @param courseId - Optional course ID for organizing files
+   * @returns The public URL of the uploaded document
+   */
+  static async uploadDocument(file: File, courseId?: string): Promise<{ url: string; error: string | null }> {
+    const path = courseId ? `courses/${courseId}/` : '';
+    return this.uploadFile('course-documents', file, path);
+  }
+
+  /**
    * Delete a file from storage
    * @param bucket - The storage bucket name
    * @param filePath - The path of the file to delete

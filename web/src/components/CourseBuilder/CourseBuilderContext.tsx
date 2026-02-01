@@ -63,17 +63,18 @@ export interface Lesson {
   id: string;
   title: string;
   baseTitle?: string;
-  type: "video" | "pdf";
+  type: "video" | "document"; // Simplified: video or document
   status: string;
   content: string;
   videoUrl: string; // For video lessons
-  resourceUrl?: string; // For PDF lessons
+  resourceUrl?: string; // For document lessons (PDF, PPTX, DOCX)
+  resourceType?: string; // Specific document type: 'pdf', 'document' (DOCX), 'slides' (PPTX)
   thumbnailUrl?: string;
   durationSeconds?: number;
   isPreview?: boolean;
   order?: number;
-  fileSize?: number; // For PDF file size
-  isDownloadable?: boolean; // For PDF download permission
+  fileSize?: number; // For document file size
+  isDownloadable?: boolean; // For document download permission
 }
 
 export interface Module {
@@ -943,7 +944,9 @@ export const CourseBuilderProvider = ({
           type: lesson.type || "video", // Include lesson type
           videoUrl: lesson.type === "video" ? lesson.videoUrl || null : null,
           resourceUrl:
-            lesson.type === "pdf" ? lesson.resourceUrl || null : null,
+            lesson.type !== "video" ? lesson.resourceUrl || null : null,
+          resourceType:
+            lesson.type !== "video" ? lesson.resourceType || null : null,
           thumbnailUrl: lesson.thumbnailUrl || null,
           durationSeconds:
             lesson.type === "video" ? lesson.durationSeconds || 0 : undefined,
@@ -954,9 +957,11 @@ export const CourseBuilderProvider = ({
               : undefined,
           isPreview: lesson.isPreview || false,
           isDownloadable:
-            lesson.type === "pdf" ? (lesson.isDownloadable ?? true) : undefined,
+            lesson.type !== "video"
+              ? (lesson.isDownloadable ?? true)
+              : undefined,
           fileSize:
-            lesson.type === "pdf"
+            lesson.type !== "video"
               ? (lesson.fileSize ?? (lesson as any).fileSizeBytes)
               : undefined,
         })),

@@ -48,7 +48,7 @@ export const useContentManagement = () => {
   };
 
   // Lesson functions
-  const addLesson = (moduleId: string, lessonType: 'video' | 'pdf' = 'video') => {
+  const addLesson = (moduleId: string, lessonType: 'video' | 'pdf' | 'document' | 'slides' = 'video') => {
     const newLessonId = `l${Date.now()}`;
     let updatedModules = modules.map((m) => {
       if (m.id === moduleId) {
@@ -60,16 +60,22 @@ export const useContentManagement = () => {
         const maxOrder = allOrders.length > 0 ? Math.max(...allOrders) : -1;
         const nextOrder = maxOrder + 1;
         
+        // Normalize type: pdf/slides/document all become 'document' type
+        const normalizedType = lessonType === 'video' ? 'video' : 'document';
+        // Store the specific subtype in resourceType
+        const resourceSubType = lessonType === 'video' ? undefined : (lessonType === 'pdf' ? 'pdf' : lessonType);
+        
         const newLesson: Lesson = {
           id: newLessonId,
           title: `New Lesson`, // Will be updated by numbering
           baseTitle: "New Lesson",
-          type: lessonType,
+          type: normalizedType,
           status: "draft",
           content: "",
           videoUrl: lessonType === 'video' ? "" : undefined,
-          resourceUrl: lessonType === 'pdf' ? "" : undefined,
-          isDownloadable: lessonType === 'pdf' ? true : undefined,
+          resourceUrl: lessonType !== 'video' ? "" : undefined,
+          resourceType: resourceSubType,
+          isDownloadable: lessonType !== 'video' ? true : undefined,
           order: nextOrder,
         } as Lesson;
         

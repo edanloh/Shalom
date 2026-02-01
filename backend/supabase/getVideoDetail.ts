@@ -113,7 +113,7 @@ serve(async (req) => {
           )
         `)
         .eq('id', videoId)
-        .eq('resource_type', 'pdf')
+        .in('resource_type', ['pdf', 'document', 'ppt'])
         .single();
 
       if (resourceError || !resource) {
@@ -164,7 +164,7 @@ serve(async (req) => {
       .select('id, title, order_index')
       .eq('section_id', video.section_id)
       .eq('course_id', video.course_id)
-      .eq('resource_type', 'pdf')
+      .in('resource_type', ['pdf', 'document', 'ppt'])
       .order('order_index', { ascending: true });
 
     const { data: allQuizzes, error: quizNavError } = await supabaseClient

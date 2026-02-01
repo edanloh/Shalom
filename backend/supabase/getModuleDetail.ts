@@ -71,7 +71,8 @@ serve(async (req) => {
         created_at, updated_at,
         categories (
           id,
-          name
+          name, 
+          color
         )
       `)
       .eq('id', courseId)
@@ -138,7 +139,7 @@ serve(async (req) => {
           resource_type, resource_url, estimated_read_minutes
         `)
         .eq('course_id', courseId)
-        .eq('resource_type', 'pdf')
+        .in('resource_type', ['pdf', 'document', 'ppt'])
         .order('section_id', { ascending: true })
         .order('order_index', { ascending: true }),
       
@@ -311,22 +312,48 @@ serve(async (req) => {
           ) || false
         }));
 
-      // Get PDFs for this section
+      // Helper function to detect file type from URL extension
+      const detectFileTypeFromUrl = (url: string): 'pdf' | 'document' | 'ppt' => {
+        if (!url) return 'pdf';
+        const lowercaseUrl = url.toLowerCase();
+        if (lowercaseUrl.includes('.docx') || lowercaseUrl.includes('.doc')) {
+          return 'document';
+        }
+        if (lowercaseUrl.includes('.pptx') || lowercaseUrl.includes('.ppt')) {
+          return 'ppt';
+        }
+        return 'pdf';
+      };
+
+      // Get documents (PDFs, DOCX, PPTX) for this section
       const sectionPDFs = (resources || [])
         .filter((r: any) => r.section_id === section.id)
-        .map((r: any) => ({
-          id: r.id,
-          section_id: r.section_id,
-          title: r.title,
-          description: r.description,
-          order_index: r.order_index,
-          type: "pdf",
-          pdf_url: r.resource_url,
-          estimated_read_minutes: r.estimated_read_minutes ?? 0,
-          is_completed: userProgress?.pdfProgress?.some(
-            (pp: any) => pp.resource_id === r.id && pp.is_completed
-          ) || false
-        }));
+        .map((r: any) => {
+          // Determine type: prioritize resource_type from DB, fallback to URL extension
+          const dbType = r.resource_type?.toLowerCase();
+          let finalType = dbType || detectFileTypeFromUrl(r.resource_url);
+          
+          // If DB says "document" but URL is actually a PDF, use the URL extension
+          if (dbType === 'document' && r.resource_url.toLowerCase().includes('.pdf')) {
+            finalType = 'pdf';
+          }
+          
+          return {
+            id: r.id,
+            section_id: r.section_id,
+            title: r.title,
+            description: r.description,
+            order_index: r.order_index,
+            type: finalType,
+            pdf_url: r.resource_url,
+            resource_url: r.resource_url,
+            resource_type: finalType,
+            estimated_read_minutes: r.estimated_read_minutes ?? 0,
+            is_completed: userProgress?.pdfProgress?.some(
+              (pp: any) => pp.resource_id === r.id && pp.is_completed
+            ) || false
+          };
+        });
 
       // Get quizzes for this section
       const sectionQuizzes = (quizzes || [])
@@ -419,6 +446,7 @@ serve(async (req) => {
         ...course,
         category_name: course.categories?.name,
         category_id: course.categories?.id,
+        category_color: course.categories?.color,
         requirements: [],
         outcomes: (outcomes || []).map((o: any) => o.outcome),
         rating: averageRating,

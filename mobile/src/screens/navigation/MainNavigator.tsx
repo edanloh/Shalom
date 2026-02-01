@@ -290,8 +290,8 @@ export default function MainNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="PDFView"
-        component={Screens.PDFView}
+        name="DocumentView"
+        component={Screens.DocumentView}
         options={{ headerShown: false }}
       />
       <Stack.Screen

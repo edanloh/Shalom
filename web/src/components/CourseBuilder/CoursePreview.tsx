@@ -105,22 +105,13 @@ export const CoursePreview = () => {
 
   // Format module items for display
   const modulesList = modules.map((module) => {
-    // console.log("=== Preview Module:", module.title, "===");
-    // console.log(
-    //   "Lessons:",
-    //   module.lessons.map((l: any) => ({ title: l.title, order: l.order })),
-    // );
-    // console.log(
-    //   "Quizzes:",
-    //   module.quizzes.map((q: any) => ({ title: q.title, order: q.order })),
-    // );
-
     const items: Array<{
       id: string;
-      type: "lesson" | "quiz";
+      type: "lesson" | "video" | "quiz" | "document" | "pdf" | "ppt";
       title: string;
       duration?: string;
       questions?: number;
+      fileSize?: string;
     }> = [];
 
     // Build items array based on order values if they exist
@@ -149,29 +140,40 @@ export const CoursePreview = () => {
       });
     }
 
-    console.log(
-      "All content after sort:",
-      allContent.map((item: any) => ({
-        title: item.title,
-        type: item.itemType,
-        order: item.order,
-      })),
-    );
-
     // Map to UI format
     allContent.forEach((item: any) => {
       if (item.itemType === "lesson") {
+        const lessonType = (item.type || "lesson").toString().toLowerCase();
+        const isDocument = ["document", "pdf", "ppt", "pptx", "docx", "slides"].includes(lessonType);
+        const normalizedType =
+          lessonType === "pptx" || lessonType === "slides"
+            ? "ppt"
+            : lessonType === "docx"
+              ? "document"
+              : lessonType === "video" || lessonType === "document" || lessonType === "pdf" || lessonType === "ppt"
+                ? lessonType
+                : "lesson";
         items.push({
           id: item.id,
-          type: "lesson",
-          title: item.title,
-          duration: `${Math.floor((item.durationSeconds || 0) / 60)} min`,
+          type: normalizedType,
+          title: item.title.replace(/^Lesson\s+\d+(\.\d+)?\s*[-:]?\s*/i, ''),
+          duration:
+            !isDocument && (normalizedType === "lesson" || normalizedType === "video")
+              ? `${Math.floor((item.durationSeconds || 0) / 60)} min`
+              : undefined,
+          fileSize:
+            isDocument
+              ? item.fileSize ||
+                (item.file_size_bytes
+                  ? `${(item.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+                  : undefined)
+              : undefined,
         });
       } else {
         items.push({
           id: item.id,
           type: "quiz",
-          title: item.title,
+          title: item.title.replace(/^Quiz\s+\d+(\.\d+)?\s*[-:]?\s*/i, ''),
           questions: item.questions?.length || 0,
         });
       }
@@ -366,24 +368,35 @@ export const CoursePreview = () => {
                     </div>
 
                     {expandedModules.includes(module.id) && (
-                      <div className="p-4 bg-background/50 space-y-2">
+                      <div className="p-4 bg-background/50 space-y-2">                
                         {module.items.map((item) => (
                           <div
                             key={item.id}
                             className="flex items-center justify-between p-3 rounded hover:bg-muted/10"
                           >
                             <div className="flex items-center gap-3">
-                              {item.type === "lesson" ? (
+                              {item.type === "lesson" || item.type === "video" ? (
                                 <Video className="h-4 w-4 text-accent" />
+                              ) : item.type === "document" || item.type === "pdf" || item.type === "ppt" ? (
+                                <FileText className="h-4 w-4 text-primary" />
                               ) : (
                                 <MessageSquare className="h-4 w-4 text-warning" />
                               )}
-                              <span className="text-sm">{item.title}</span>
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm">{item.title}</span>
+                                {(item.type === "pdf" || item.type === "document" || item.type === "ppt") && (
+                                  <span className="text-xs text-muted-foreground uppercase">
+                                    {item.type === "pdf" ? "PDF" : item.type === "document" ? "DOCX" : "PPTX"}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <span className="text-xs text-muted-foreground">
-                              {item.type === "lesson"
+                              {item.type === "lesson" || item.type === "video"
                                 ? item.duration
-                                : `${item.questions} questions`}
+                                : item.type === "pdf" || item.type === "document" || item.type === "ppt"
+                                  ? item.fileSize || "Document"
+                                  : `${item.questions} questions`}
                             </span>
                           </div>
                         ))}

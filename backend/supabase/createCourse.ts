@@ -157,6 +157,20 @@ serve(async (req) => {
 
     if (courseError) throw courseError;
 
+    const normalizeResourceType = (lesson: any) => {
+      const rawType = (lesson.resourceType || lesson.type || 'pdf').toString().toLowerCase();
+      if (rawType === 'docx') return 'document';
+      if (rawType === 'pptx' || rawType === 'slides') return 'ppt';
+      if (rawType === 'document' || rawType === 'ppt' || rawType === 'pdf') return rawType;
+
+      const url = (lesson.resourceUrl || '').toString().toLowerCase();
+      if (url.endsWith('.docx')) return 'document';
+      if (url.endsWith('.pptx') || url.endsWith('.ppt')) return 'ppt';
+      if (url.endsWith('.pdf')) return 'pdf';
+
+      return 'pdf';
+    };
+
     // Insert modules (sections) with their lessons and quizzes
     const createdModules = [];
     for (let i = 0; i < modules.length; i++) {
@@ -176,15 +190,17 @@ serve(async (req) => {
 
       if (sectionError) throw sectionError;
 
-      // Create lessons (videos and PDFs) for this section
+      // Create lessons (videos and documents) for this section
       const createdLessons = [];
       const lessons = module.lessons || [];
       for (let j = 0; j < lessons.length; j++) {
         const lesson = lessons[j];
-        const lessonType = lesson.type || 'video';
+        const lessonType = (lesson.type || 'video').toString().toLowerCase();
+        const isDocumentLesson = lessonType !== 'video';
 
-        if (lessonType === 'pdf') {
-          // Insert PDF resource
+        if (isDocumentLesson) {
+          // Insert document resource (PDF/DOCX/PPTX)
+          const resourceType = normalizeResourceType(lesson);
           const { data: resourceData, error: resourceError } = await supabaseClient
             .from('course_resources')
             .insert({
@@ -193,7 +209,7 @@ serve(async (req) => {
               title: lesson.title,
               description: lesson.content || '',
               resource_url: lesson.resourceUrl || '',
-              resource_type: 'pdf',
+              resource_type: resourceType,
               order_index: lesson.order ?? j,
               is_preview: lesson.isPreview || false,
               is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,

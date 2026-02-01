@@ -134,7 +134,7 @@ interface ModuleItemProps {
   onDragEnd: () => void;
   onToggleExpansion: (moduleId: string) => void;
   onDeleteModule: (moduleId: string) => void;
-  onAddLesson: (moduleId: string, lessonType?: 'video' | 'pdf') => void;
+  onAddLesson: (moduleId: string, lessonType?: 'video' | 'document') => void;
   onDeleteLesson: (moduleId: string, lessonId: string) => void;
   onAddQuiz: (moduleId: string) => void;
   onDeleteQuiz: (moduleId: string, quizId: string) => void;
@@ -340,22 +340,22 @@ const ModuleItem = ({
 
           {/* Keep the add buttons at the bottom */}
 
-          <div className="flex gap-2 pt-2">
+          <div className="grid grid-cols-2 gap-2 pt-2">
             <button
               onClick={() => onAddLesson(module.id, 'video')}
-              className="flex-1 px-3 py-2 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white text-xs rounded transition-colors"
+              className="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white text-xs rounded transition-colors"
             >
               + Video
             </button>
             <button
-              onClick={() => onAddLesson(module.id, 'pdf')}
-              className="flex-1 px-3 py-2 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white text-xs rounded transition-colors"
+              onClick={() => onAddLesson(module.id, 'document')}
+              className="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white text-xs rounded transition-colors"
             >
               + Document
             </button>
             <button
               onClick={() => onAddQuiz(module.id)}
-              className="flex-1 px-3 py-2 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white text-xs rounded transition-colors"
+              className="col-span-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded transition-colors"
             >
               + Quiz
             </button>
@@ -450,10 +450,10 @@ const LessonItem = ({
             : "opacity-0 group-hover:opacity-100"
         } cursor-grab active:cursor-grabbing`}
       />
-      {lesson.type === 'pdf' ? (
-        <FileText className="h-4 w-4 mr-2" />
-      ) : (
+      {lesson.type === 'video' ? (
         <Video className="h-4 w-4 mr-2" />
+      ) : (
+        <FileText className="h-4 w-4 mr-2" />
       )}
       <span className="flex-1 truncate">{lesson.title}</span>
       <div className="opacity-0 group-hover:opacity-100 transition-opacity">

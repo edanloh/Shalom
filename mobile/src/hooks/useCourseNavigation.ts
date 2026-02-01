@@ -17,15 +17,15 @@ export interface NavigationItem {
  * 
  * @param courseId - The course ID
  * @param userId - The user ID
- * @param currentItemId - The current item ID (video/quiz/pdf)
- * @param currentItemType - The type of current item ('video' | 'quiz' | 'pdf')
+ * @param currentItemId - The current item ID (video/quiz/document)
+ * @param currentItemType - The type of current item ('video' | 'quiz' | 'pdf' | 'document' | 'ppt')
  * @param currentSectionId - The current section/module ID
  */
 export const useCourseNavigation = (
   courseId: string,
   userId: string,
   currentItemId: string,
-  currentItemType: "video" | "quiz" | "pdf",
+  currentItemType: "video" | "quiz" | "pdf" | "document" | "ppt",
   currentSectionId: string
 ) => {
   const [courseSections, setCourseSections] = useState<CourseSection[]>([]);

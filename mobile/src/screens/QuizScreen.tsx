@@ -415,7 +415,7 @@ const QuizScreen = () => {
           sectionId: nextItemInModule.sectionId,
         });
 
-        // Navigate to next item (video, quiz, or pdf)
+        // Navigate to next item (video, quiz, or document)
         if (nextItemInModule.item.type === 'video') {
           navigation.replace('LessonPlayer', {
             videoId: nextItemInModule.item.id,
@@ -430,12 +430,13 @@ const QuizScreen = () => {
             sectionId: nextItemInModule.sectionId,
             userId,
           });
-        } else if (nextItemInModule.item.type === 'pdf') {
-          navigation.replace('PDFView', {
-            pdfId: nextItemInModule.item.id,
+        } else if (['pdf', 'document', 'ppt'].includes(nextItemInModule.item.type)) {
+          navigation.replace('DocumentView', {
+            documentId: nextItemInModule.item.id,
             courseId,
             sectionId: nextItemInModule.sectionId,
             userId,
+            documentType: nextItemInModule.item.type,
           });
         }
         return;

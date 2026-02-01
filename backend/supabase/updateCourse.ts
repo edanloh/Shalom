@@ -280,6 +280,20 @@ serve(async (req) => {
       }
     }
 
+    const normalizeResourceType = (lesson: any) => {
+      const rawType = (lesson.resourceType || lesson.type || 'pdf').toString().toLowerCase();
+      if (rawType === 'docx') return 'document';
+      if (rawType === 'pptx' || rawType === 'slides') return 'ppt';
+      if (rawType === 'document' || rawType === 'ppt' || rawType === 'pdf') return rawType;
+
+      const url = (lesson.resourceUrl || '').toString().toLowerCase();
+      if (url.endsWith('.docx')) return 'document';
+      if (url.endsWith('.pptx') || url.endsWith('.ppt')) return 'ppt';
+      if (url.endsWith('.pdf')) return 'pdf';
+
+      return 'pdf';
+    };
+
     // Update modules if provided - PRESERVE STUDENT PROGRESS
     if (modules && Array.isArray(modules)) {
       // Get existing section IDs for this course
@@ -327,7 +341,7 @@ serve(async (req) => {
 
         processedSectionIds.push(sectionId);
 
-        // Handle lessons (videos and PDFs) for this section
+        // Handle lessons (videos and documents) for this section
         const { data: existingVideos } = await supabaseClient
           .from('course_videos')
           .select('id')
@@ -346,19 +360,21 @@ serve(async (req) => {
         const lessons = module.lessons || [];
         for (let j = 0; j < lessons.length; j++) {
           const lesson = lessons[j];
-          const lessonType = lesson.type || 'video';
+          const lessonType = (lesson.type || 'video').toString().toLowerCase();
+          const isDocumentLesson = lessonType !== 'video';
 
-          if (lessonType === 'pdf') {
-            // Handle PDF resources
+          if (isDocumentLesson) {
+            // Handle document resources (PDF/DOCX/PPTX)
+            const resourceType = normalizeResourceType(lesson);
             if (lesson.id && existingResourceIds.includes(lesson.id)) {
-              // UPDATE existing PDF resource
+              // UPDATE existing document resource
               await supabaseClient
                 .from('course_resources')
                 .update({
                   title: lesson.title,
                   description: lesson.content || '',
                   resource_url: lesson.resourceUrl || '',
-                  resource_type: 'pdf',
+                  resource_type: resourceType,
                   order_index: lesson.order ?? j,
                   is_preview: lesson.isPreview || false,
                   is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,
@@ -369,7 +385,7 @@ serve(async (req) => {
 
               processedResourceIds.push(lesson.id);
             } else {
-              // INSERT new PDF resource
+              // INSERT new document resource
               const { data: newResource, error: resourceError } = await supabaseClient
                 .from('course_resources')
                 .insert({
@@ -378,7 +394,7 @@ serve(async (req) => {
                   title: lesson.title,
                   description: lesson.content || '',
                   resource_url: lesson.resourceUrl || '',
-                  resource_type: 'pdf',
+                  resource_type: resourceType,
                   order_index: lesson.order ?? j,
                   is_preview: lesson.isPreview || false,
                   is_downloadable: lesson.isDownloadable !== undefined ? lesson.isDownloadable : true,

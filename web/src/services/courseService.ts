@@ -700,16 +700,19 @@ class CourseService {
       const moduleDetails = sections.map((section: any) => {
         const lessons =
           section.items
-            ?.filter(
-              (item: any) => item.type === "video" || item.type === "pdf"
+            ?.filter((item: any) =>
+              ["video", "pdf", "document", "slides", "pptx", "docx", "ppt"].includes(
+                item.type,
+              ),
             )
             .map((item: any) => ({
               id: item.id,
               title: item.title,
-              type: item.type || "video",
+              type: item.type === "video" ? "video" : "document",
               content: item.description || "",
               video_url: item.video_url || "",
               resource_url: item.resource_url || "",
+              resource_type: item.resource_type || item.type || "pdf",
               file_size_bytes: item.file_size_bytes,
               is_downloadable: item.is_downloadable || false,
               thumbnail_url: item.thumbnail_url || "",
@@ -769,6 +772,7 @@ class CourseService {
           content: lesson.content || "",
           videoUrl: lesson.video_url || "",
           resourceUrl: lesson.resource_url || "",
+          resourceType: lesson.resource_type || lesson.type || "pdf",
           fileSize: lesson.file_size_bytes,
           isDownloadable: lesson.is_downloadable || false,
           thumbnailUrl: lesson.thumbnail_url || "",

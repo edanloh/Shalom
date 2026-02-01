@@ -212,22 +212,46 @@ serve(async (req) => {
           duration_seconds: l.duration_seconds || 0 // Already in seconds
         }));
 
-      // Get PDF resources for this section
+      // Helper function to detect file type from URL extension
+      const detectFileTypeFromUrl = (url: string): 'pdf' | 'document' | 'ppt' => {
+        if (!url) return 'pdf';
+        const lowercaseUrl = url.toLowerCase();
+        if (lowercaseUrl.includes('.docx') || lowercaseUrl.includes('.doc')) {
+          return 'document';
+        }
+        if (lowercaseUrl.includes('.pptx') || lowercaseUrl.includes('.ppt')) {
+          return 'ppt';
+        }
+        return 'pdf';
+      };
+
+      // Get document resources (PDFs, DOCX, PPTX) for this section
       const sectionPdfResources = (pdfResources || [])
         .filter((r: any) => r.section_id === section.id)
-        .map((r: any) => ({
-          id: r.id,
-          section_id: r.section_id,
-          title: r.title,
-          description: r.description,
-          resource_url: r.resource_url,
-          resource_type: r.resource_type,
-          is_preview: r.is_preview,
-          is_downloadable: r.is_downloadable,
-          file_size_bytes: r.file_size_bytes,
-          order_index: r.order_index,
-          type: "pdf"
-        }));
+        .map((r: any) => {
+          // Determine type: prioritize resource_type from DB, fallback to URL extension
+          const dbType = r.resource_type?.toLowerCase();
+          let finalType = dbType || detectFileTypeFromUrl(r.resource_url);
+          
+          // If DB says "document" but URL is actually a PDF, use the URL extension
+          if (dbType === 'document' && r.resource_url.toLowerCase().includes('.pdf')) {
+            finalType = 'pdf';
+          }
+          
+          return {
+            id: r.id,
+            section_id: r.section_id,
+            title: r.title,
+            description: r.description,
+            resource_url: r.resource_url,
+            resource_type: finalType,
+            is_preview: r.is_preview,
+            is_downloadable: r.is_downloadable,
+            file_size_bytes: r.file_size_bytes,
+            order_index: r.order_index,
+            type: finalType
+          };
+        });
 
       // Get quizzes for this section and add questions
       const sectionQuizzes = (quizzes || [])

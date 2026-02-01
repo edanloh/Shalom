@@ -102,11 +102,11 @@ export default function CourseDetailScreen({
       (section) => section.module_is_completed === true,
     ).length;
 
-    console.log("[CourseDetailScreen] Progress calculation:", {
-      completedModules,
-      totalModules,
-      percentage: Math.round((completedModules / totalModules) * 100),
-    });
+    // console.log("[CourseDetailScreen] Progress calculation:", {
+    //   completedModules,
+    //   totalModules,
+    //   percentage: Math.round((completedModules / totalModules) * 100),
+    // });
 
     return Math.round((completedModules / totalModules) * 100);
   };
@@ -195,9 +195,12 @@ export default function CourseDetailScreen({
   const renderModule = (section: CourseSection, index: number) => {
     const isCompleted = section?.module_is_completed || false;
     const completedAt = section?.module_completed_at;
-    
+
     // Module is locked if it's not the first module and previous module is not completed
-    const isLocked = index > 0 && courseContent && !courseContent.sections[index - 1]?.module_is_completed;
+    const isLocked =
+      index > 0 &&
+      courseContent &&
+      !courseContent.sections[index - 1]?.module_is_completed;
 
     const onOpen = () => {
       if (!isEnrolled) {
@@ -216,7 +219,8 @@ export default function CourseDetailScreen({
       if (index > 0 && courseContent) {
         const previousModule = courseContent.sections[index - 1];
         if (!previousModule?.module_is_completed) {
-          const previousModuleTitle = previousModule?.title || "the previous module";
+          const previousModuleTitle =
+            previousModule?.title || "the previous module";
           Alert.alert(
             "Complete Previous Module First",
             `Please complete "${previousModuleTitle}" before moving to this module.`,
@@ -234,38 +238,32 @@ export default function CourseDetailScreen({
     };
 
     return (
-      <Pressable 
-        key={section.id} 
-        style={[styles.moduleItem, isLocked && styles.moduleItemLocked]} 
+      <Pressable
+        key={section.id}
+        style={[styles.moduleItem, isLocked && styles.moduleItemLocked]}
         onPress={isLocked ? undefined : onOpen}
         disabled={isLocked}
       >
-        <View style={[styles.moduleIcon, isLocked && styles.moduleIconLocked]}>
-          {isLocked ? (
-            <Ionicons name="lock-closed" size={20} color={Colors.textSecondary} />
-          ) : (
-            <Ionicons name="book-outline" size={20} color={Colors.purple400} />
-          )}
+        <View style={[styles.moduleIcon]}>
+          <Ionicons name="book-outline" size={20} color={Colors.purple400} />
         </View>
         <View style={styles.moduleContent}>
           <View style={styles.moduleTitleRow}>
-            <Text style={[styles.moduleTitle, isLocked && styles.moduleTextLocked]}>{section.title}</Text>
-            {isCompleted && (
-              <View style={styles.completedBadge}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={Colors.green}
-                />
-                <Text style={styles.completedBadgeText}>Completed</Text>
-              </View>
-            )}
-            {isLocked && (
-              <Text style={styles.lockedBadgeText}>Locked</Text>
-            )}
+            <Text
+              style={[styles.moduleTitle, isLocked && styles.moduleTextLocked]}
+            >
+              {section.title}
+            </Text>
           </View>
           {!!section.description && (
-            <Text style={[styles.moduleDescription, isLocked && styles.moduleTextLocked]}>{section.description}</Text>
+            <Text
+              style={[
+                styles.moduleDescription,
+                isLocked && styles.moduleTextLocked,
+              ]}
+            >
+              {section.description}
+            </Text>
           )}
           {isCompleted && completedAt && (
             <Text style={styles.completedDate}>
@@ -273,6 +271,30 @@ export default function CourseDetailScreen({
             </Text>
           )}
         </View>
+
+        <View style={styles.badgeContainer}>
+          {isCompleted && (
+            <View style={styles.completedBadge}>
+              <Ionicons
+                name="checkmark-circle"
+                size={16}
+                color={Colors.green}
+              />
+              <Text style={styles.completedBadgeText}>Completed</Text>
+            </View>
+          )}
+          {isLocked && (
+            <View style={styles.lockedBadge}>
+              <Ionicons
+                name="lock-closed"
+                size={14}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.lockedBadgeText}>Locked</Text>
+            </View>
+          )}
+        </View>
+
         <View style={styles.moduleRightSection}>
           <Ionicons
             name={isLocked ? "lock-closed" : "chevron-forward"}
@@ -519,7 +541,7 @@ export default function CourseDetailScreen({
             styles.catBadge,
             {
               backgroundColor:
-                courseDetail.categoryColor || Colors.categoryDefault,
+                courseDetail.categoryColor || Colors.categoryDefault
             },
           ]}
         >
@@ -569,12 +591,6 @@ export default function CourseDetailScreen({
                   {getCompletedModulesCount()} of{" "}
                   {courseContent?.sections.length || 0} modules completed
                 </Text>
-                {/* {calculateCourseProgress() === 100 && (
-                  <View style={styles.completedBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color={Colors.green} />
-                    <Text style={styles.completedBadgeText}>Course Completed!</Text>
-                  </View>
-                )} */}
               </View>
             </View>
           </>
@@ -793,7 +809,6 @@ const styles = StyleSheet.create({
     width: "auto",
     alignSelf: "flex-start",
     marginTop: Spacing.sm,
-    backgroundColor: Colors.categoryDefault,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: Spacing.md,
@@ -885,9 +900,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: Spacing.md,
   },
-  moduleIconLocked: {
-    backgroundColor: Colors.gray500 + "30",
-  },
   moduleContent: {
     flex: 1,
   },
@@ -935,11 +947,26 @@ const styles = StyleSheet.create({
     color: Colors.green,
     marginLeft: 4,
   },
+  lockedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.textSecondary + "20",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
   lockedBadgeText: {
     fontSize: 11,
     fontWeight: "600",
     color: Colors.textSecondary,
-    marginLeft: 8,
+    marginLeft: 4,
+  },
+  badgeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.xs,
   },
   progressCard: {
     backgroundColor: Colors.textInputBg,
