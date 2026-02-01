@@ -37,20 +37,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const getSession = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase.auth.getUser();
-      if (data?.user) {
-        setAuthUser({
-          id: '550e8400-e29b-41d4-a716-446655440105',
-          email: data.user.email,
-          name: data.user.user_metadata.full_name || '',
-          auth_provider: data.user.app_metadata.provider,
-          ...data.user,
-        });
-        // setAuthUser({ id: data.user.id, email: data.user.email, ...data.user });
-      } else {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          setAuthUser(null);
+        } else if (data?.user) {
+          setAuthUser({
+            id: '550e8400-e29b-41d4-a716-446655440105',
+            email: data.user.email,
+            name: data.user.user_metadata.full_name || '',
+            auth_provider: data.user.app_metadata.provider,
+            ...data.user,
+          });
+        } else {
+          setAuthUser(null);
+        }
+      } catch (err) {
         setAuthUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     getSession();
     // Listen for auth state changes
@@ -68,6 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setAuthUser(null);
         }
+        setIsLoading(false);
       },
     );
     return () => {

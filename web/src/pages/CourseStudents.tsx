@@ -269,11 +269,13 @@ const CourseStudents = () => {
                         });
                         return;
                       }
+                      // Generate random uuid
+                      const notificationId = crypto.randomUUID();
                       await postNotification({
                         userIds: [selectedStudent.id],
                         title: courseName,
                         message: messageStudent,
-                        type: 'course_announcement',
+                        type: `course_announcement-${courseId}-${notificationId}`,
                       });
                       toast({
                         title: 'Message Sent',
