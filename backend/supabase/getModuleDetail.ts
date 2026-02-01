@@ -209,7 +209,7 @@ serve(async (req) => {
             { data: moduleProgress }
           ] = await Promise.all([
             supabaseClient
-              .from('video_progress')
+              .from('user_video_progress')
               .select(`
                 video_id,
                 watch_time_seconds,

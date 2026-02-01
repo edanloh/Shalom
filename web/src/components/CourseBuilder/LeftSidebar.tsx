@@ -351,7 +351,7 @@ const ModuleItem = ({
               onClick={() => onAddLesson(module.id, 'pdf')}
               className="flex-1 px-3 py-2 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white text-xs rounded transition-colors"
             >
-              + PDF
+              + Document
             </button>
             <button
               onClick={() => onAddQuiz(module.id)}

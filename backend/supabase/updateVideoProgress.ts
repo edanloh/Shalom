@@ -365,7 +365,7 @@ serve(async (req) => {
     // ========================================
     const completedAt = isCompleted ? new Date().toISOString() : null;
     const { data: existingProgress, error: existingProgressError } = await supabaseClient
-      .from('video_progress')
+      .from('user_video_progress')
       .select('watch_time_seconds,is_completed')
       .eq('user_id', userId)
       .eq('video_id', videoId)
@@ -374,7 +374,7 @@ serve(async (req) => {
     if (existingProgressError) throw existingProgressError;
 
     const { data: progress, error: progressError } = await supabaseClient
-      .from('video_progress')
+      .from('user_video_progress')
       .upsert({
         user_id: userId,
         video_id: videoId,
@@ -469,7 +469,7 @@ serve(async (req) => {
 
     // Get completed videos
     const { data: completedVideos } = await supabaseClient
-      .from('video_progress')
+      .from('user_video_progress')
       .select('video_id')
       .eq('user_id', userId)
       .eq('is_completed', true)

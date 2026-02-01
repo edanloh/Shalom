@@ -29,7 +29,6 @@ type NavigationProp = StackNavigationProp<MainStackParamList, "MainTabs">;
 interface CourseCarouselProps {
   courses: Course[];
   onCourseComplete?: (courseId: string) => void;
-  onCourseLike?: (courseId: string) => void;
   onToggleWishlist?: (course: Course) => void;
   isWishlisted?: (courseId: string) => boolean;
 }
@@ -37,7 +36,6 @@ interface CourseCarouselProps {
 export default function CourseCarousel({
   courses,
   onCourseComplete,
-  onCourseLike,
   onToggleWishlist,
   isWishlisted,
 }: CourseCarouselProps) {
@@ -80,7 +78,7 @@ export default function CourseCarousel({
             index * (CARD_WIDTH + Spacing.md),
             (index + 1) * (CARD_WIDTH + Spacing.md),
           ];
-          
+
           return (
             <CourseCardItem
               key={course.id}
@@ -166,7 +164,7 @@ function CourseCardItem({
   });
 
   const wishlisted = isWishlisted?.(course.id) ?? false;
-  
+
   return (
     <Animated.View style={[styles.card, animatedStyle, { width: cardWidth }]}>
       <Pressable onPress={onPress} style={{ flex: 1 }}>
@@ -179,10 +177,10 @@ function CourseCardItem({
           />
 
           {/* Category Badge - Top Left */}
-          <View style={[styles.catBadge, { backgroundColor: course.categoryColor }]}>
-            <Text style={TextStyles.bodySmall}>
-              {course.category}
-            </Text>
+          <View
+            style={[styles.catBadge, { backgroundColor: course.categoryColor }]}
+          >
+            <Text style={TextStyles.bodySmall}>{course.category}</Text>
           </View>
 
           <View style={styles.imageOverlay} />
@@ -201,18 +199,19 @@ function CourseCardItem({
           </Text>
 
           {/* Progress Section */}
-          <Text style={[TextStyles.bodySmall, { marginVertical: Spacing.sm }]}>
-            {course.progress?.completed || 0} of{" "}
-            {course.progress?.total || course.modules || 0} items completed
-          </Text>
+          <View style={styles.progressRow}>
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${course.progress_percentage || 0}%` },
+                ]}
+              />
+            </View>
 
-          <View style={styles.progressBarContainer}>
-            <View
-              style={[
-                styles.progressBarFill,
-                { width: `${course.progress?.percentage || 0}%` },
-              ]}
-            />
+            <Text style={styles.progressText}>
+              {Math.round(Number(course.progress_percentage)) || 0}% {"\n"} Complete
+            </Text>
           </View>
 
           {/* Instructor Section */}
@@ -233,7 +232,7 @@ function CourseCardItem({
           <View style={styles.statsSection}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
-                {course.progress?.percentage || 0}%
+                {Math.round(Number(course.progress_percentage)) || 0}%
               </Text>
               <Text style={styles.statLabel}>Complete</Text>
             </View>
@@ -481,17 +480,30 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 18,
   },
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  progressText: {
+    marginLeft: Spacing.sm,
+    fontFamily: Typography.fontFamily.medium,
+    fontSize: TextStyles.caption.fontSize,
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
   progressLabel: {
     fontFamily: Typography.fontFamily.medium,
     fontSize: TextStyles.caption.fontSize,
     color: Colors.textSecondary,
   },
   progressBarContainer: {
-    width: "100%",
+    flex: 1, // take remaining horizontal space
     height: 6,
     backgroundColor: Colors.gray200,
     borderRadius: 3,
-    marginBottom: Spacing.md,
     overflow: "hidden",
   },
   progressBarFill: {

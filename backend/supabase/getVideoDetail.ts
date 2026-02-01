@@ -71,7 +71,7 @@ serve(async (req) => {
         courses (
           id,
           title,
-          instructor_name,
+          instructor_name
         ),
         course_sections (
           id,
@@ -96,6 +96,7 @@ serve(async (req) => {
           description,
           resource_url,
           file_size_bytes,
+          thumbnail_url,
           is_preview,
           is_downloadable,
           order_index,
@@ -104,7 +105,7 @@ serve(async (req) => {
           courses (
             id,
             title,
-            instructor_name,
+            instructor_name
           ),
           course_sections (
             id,
@@ -138,6 +139,7 @@ serve(async (req) => {
         resource_url: resource.resource_url,
         file_size_bytes: resource.file_size_bytes,
         is_downloadable: resource.is_downloadable,
+        thumbnail_url: resource.thumbnail_url,
         is_preview: resource.is_preview,
         order_index: resource.order_index,
         course_id: resource.course_id,
@@ -211,7 +213,7 @@ serve(async (req) => {
     if (userId) {
       try {
         const { data: progress, error: progressError } = await supabaseClient
-          .from('video_progress')
+          .from('user_video_progress')
           .select(`
             watch_time_seconds,
             is_completed,
@@ -253,7 +255,7 @@ serve(async (req) => {
       course: {
         id: video.courses.id,
         title: video.courses.title,
-        instructor_name: video.courses.instructor_name,
+        instructor_name: video.courses.instructor_name
       },
       section: {
         id: video.course_sections.id,

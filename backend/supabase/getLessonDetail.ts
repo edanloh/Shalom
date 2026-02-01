@@ -15,29 +15,34 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET,OPTIONS',
 };
 
-serve(async (req) => {
+serve(async (req) => { 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
+    console.log('CORS preflight request - returning 200');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     // Create Supabase client with service role key
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      supabaseUrl ?? '',
+      supabaseKey ?? ''
     );
 
     const url = new URL(req.url);
     
     // Extract videoId from path: /getLessonDetail/{videoId}
-    const pathParts = url.pathname.split('/').filter(Boolean);
+    const pathParts = url.pathname.split('/').filter(Boolean);    
     const videoId = pathParts[pathParts.length - 1];
-    
+
     // Extract userId from query parameter
     const userId = url.searchParams.get('userId');
 
     if (!videoId || videoId === 'getLessonDetail') {
+      console.log('ERROR: Invalid videoId');
       return new Response(
         JSON.stringify({
           success: false,
@@ -49,8 +54,6 @@ serve(async (req) => {
         }
       );
     }
-
-    console.log('Fetching video details:', { videoId, userId });
 
     // ========================================
     // 1. Try to fetch from course_videos first
@@ -71,7 +74,7 @@ serve(async (req) => {
         courses (
           id,
           title,
-          instructor_name,
+          instructor_name
         ),
         course_sections (
           id,
@@ -104,7 +107,7 @@ serve(async (req) => {
           courses (
             id,
             title,
-            instructor_name,
+            instructor_name
           ),
           course_sections (
             id,
@@ -115,11 +118,17 @@ serve(async (req) => {
         .eq('resource_type', 'pdf')
         .single();
 
+
       if (resourceError || !resource) {
         return new Response(
           JSON.stringify({
             success: false,
-            message: "Lesson not found"
+            message: "Lesson not found",
+            debug: {
+              videoId,
+              videoError: videoError?.message || null,
+              resourceError: resourceError?.message || null,
+            }
           }),
           {
             status: 404,
@@ -148,9 +157,9 @@ serve(async (req) => {
     }
 
     // ========================================
-    // 3. Fetch navigation (all items in same section - videos, PDFs, and quizzes)
+    // 3. Fetch navigation (all items in same section)
     // ========================================
-    const { data: allVideos, error: videoNavError } = await supabaseClient
+      const { data: allVideos, error: videoNavError } = await supabaseClient
       .from('course_videos')
       .select('id, title, order_index')
       .eq('section_id', video.section_id)
@@ -165,12 +174,14 @@ serve(async (req) => {
       .eq('resource_type', 'pdf')
       .order('order_index', { ascending: true });
 
+
     const { data: allQuizzes, error: quizNavError } = await supabaseClient
       .from('course_quizzes')
       .select('id, title, order_index')
       .eq('section_id', video.section_id)
       .eq('course_id', video.course_id)
       .order('order_index', { ascending: true });
+
 
     if (videoNavError) throw videoNavError;
     if (resourceNavError) throw resourceNavError;
@@ -183,8 +194,7 @@ serve(async (req) => {
       ...(allQuizzes || []).map((q: any) => ({ ...q, type: 'quiz' }))
     ].sort((a, b) => a.order_index - b.order_index);
 
-    const currentIndex = allItems.findIndex((item: any) => item.id === videoId);
-    
+    const currentIndex = allItems.findIndex((item: any) => item.id === videoId);    
     const previousVideo = currentIndex > 0 
       ? { 
           id: allItems[currentIndex - 1].id, 
@@ -209,7 +219,7 @@ serve(async (req) => {
     if (userId) {
       try {
         const { data: progress, error: progressError } = await supabaseClient
-          .from('video_progress')
+          .from('user_video_progress')
           .select(`
             watch_time_seconds,
             is_completed,
@@ -221,6 +231,12 @@ serve(async (req) => {
           .eq('video_id', videoId)
           .single();
 
+        console.log('Progress query result:', {
+          found: !!progress,
+          error: progressError,
+          data: progress
+        });
+
         if (!progressError && progress) {
           userProgress = progress;
         }
@@ -228,10 +244,10 @@ serve(async (req) => {
         console.error('Error fetching user progress:', progressError);
         // Continue without progress data
       }
+    } else {
+      console.log('Skipping progress fetch (no userId provided)');
     }
 
-    // ========================================
-    // 4. Construct response
     // ========================================
     // 5. Build response data
     // ========================================
@@ -265,6 +281,9 @@ serve(async (req) => {
       userProgress
     };
 
+    console.log('Response data prepared:', JSON.stringify(responseData, null, 2));
+    console.log('=== SUCCESS - Returning 200 ===');
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -278,13 +297,19 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("Error retrieving video details:", error);
+    console.error("=== ERROR OCCURRED ===");
+    console.error("Error type:", error?.constructor?.name);
+    console.error("Error message:", error?.message);
+    console.error("Error stack:", error?.stack);
+    console.error("Full error:", error);
 
     return new Response(
       JSON.stringify({
         success: false,
         message: "An error occurred while retrieving video details",
-        error: error.message || "Unknown error"
+        error: error.message || "Unknown error",
+        errorType: error?.constructor?.name || "Unknown",
+        stack: error?.stack || null
       }),
       {
         status: 500,

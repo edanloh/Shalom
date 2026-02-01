@@ -78,7 +78,7 @@ serve(async (req) => {
     if (enrollError) throw enrollError;
 
     const { data: videoActivity } = await supabase
-      .from("video_progress")
+      .from("user_video_progress")
       .select("updated_at")
       .eq("user_id", userId)
       .order("updated_at", { ascending: false })

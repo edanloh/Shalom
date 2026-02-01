@@ -24,7 +24,7 @@ const CACHE_CONFIG = {
 // Course service endpoints - Supabase Edge Functions
 const ENDPOINTS = {
   COURSES: '/getAllPublishedCourse', 
-  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, 
+  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}?includeDetails=false&sortBy=last_activity_at&sortOrder=desc`, 
   COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, 
   COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, 
   POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, 
@@ -53,7 +53,7 @@ export interface EnrollmentCourse {
   enrollment_id: string;
   enrollment_date: string;
   completion_date: string | null;
-  progress_percentage: string;
+  progress_percentage: number;
   is_completed: boolean;
   is_in_wishlist: boolean;
   last_accessed: string;
@@ -259,12 +259,13 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
       rating: parseFloat(awsCourse.instructor_rating || '4.5'),
       bio: awsCourse.instructor_bio || 'No bio available',
     },
-    progress: {
-      completed: 0, // Default values - would come from enrollment data
-      total: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
-      percentage: 0,
-      lastAccessed: new Date().toISOString(),
-    },
+    progress_percentage: awsCourse.progress_percentage,
+    // progress: {
+    //   completed: 0, // Default values - would come from enrollment data
+    //   total: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
+    //   percentage: 0,
+    //   lastAccessed: new Date().toISOString(),
+    // },
     duration: durationStr,
     rating: parseFloat(awsCourse.rating || '4.0'),
     image:
@@ -371,12 +372,7 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
       rating: parseFloat(enrollment.instructor_rating),
       bio: `Expert ${enrollment.category_name} instructor`,
     },
-    progress: {
-      completed: progressCompleted,
-      total: progressTotal,
-      percentage: calculatedPercentage,
-      lastAccessed: enrollment.last_accessed,
-    },
+    progress_percentage: enrollment.progress_percentage,
     duration: `${enrollment.duration_hours}h`,
     rating: parseFloat(enrollment.rating),
     image: enrollment.thumbnail_url,
@@ -387,7 +383,7 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     prerequisites: [],
     outcomes: [],
     createdAt: enrollment.enrollment_date,
-    updatedAt: enrollment.last_accessed,
+    updatedAt: enrollment.last_activity_at || enrollment.last_accessed || enrollment.enrollment_date,
     isWishlisted: Boolean(enrollment.is_in_wishlist),
   };
 };
@@ -461,15 +457,9 @@ class CourseService {
     try {
       userId = userId || DEFAULT_USER_ID;
       
-      // For testing, skip cache and always fetch fresh data
+      // Always clear cache to ensure fresh data
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`;
       await CacheManager.clear(cacheKey);
-      
-      // Check cache first
-      const cachedEnrollments = await CacheManager.get<Course[]>(cacheKey);
-      if (cachedEnrollments) {
-        return cachedEnrollments;
-      }
       
       const response = await apiService.get<any>(ENDPOINTS.USER_ENROLLMENTS(userId));
       const payload = unwrap<EnrollmentResponse | { enrollments: EnrollmentCourse[] }>(response);
@@ -486,6 +476,7 @@ class CourseService {
       }
 
       // Convert enrollment format to our app Course format
+      // Courses are already sorted by last_activity_at (descending) from the API
       const courses = enrollmentsData.map(convertEnrollmentToAppCourse);
 
       // Cache the response
@@ -499,38 +490,24 @@ class CourseService {
   }
 
   /**
-   * Get user's enrolled courses (filter courses with progress > 0)
-   * For now, returns first 2 courses as demo enrolled courses
+   * Get user's enrolled courses (uses getUserEnrollments for real data)
+   * Returns properly sorted courses by last activity
    */
   async getMyCourses(): Promise<Course[]> {
     try {
-      // Check cache first
       const cachedCourses = await CacheManager.get<Course[]>(`${CACHE_CONFIG.COURSES_KEY}_my`);
       if (cachedCourses) {
         return cachedCourses;
       }
 
-      // Get all courses and return first 2 as "my courses" for demo
-      const allCourses = await this.getCourses();
-      if (!allCourses || allCourses.length === 0) {
-        return [];
-      }
+      // Use the real enrolled courses from getUserEnrollments
+      const uid = DEFAULT_USER_ID;
+      const enrolledCourses = await this.getUserEnrollments(uid);
 
-      // For demo: take first 2 courses as enrolled courses and add progress
-      const myCourses = allCourses.slice(0, 2).map((course, index) => ({
-        ...course,
-        progress: {
-          completed: index === 0 ? 3 : 7, // Different progress for variety
-          total: course.modules || 10,
-          percentage: index === 0 ? 30 : 70, // 30% and 70% progress
-          lastAccessed: new Date().toISOString(),
-        }
-      }));
+      // Cache the result
+      await CacheManager.set(`${CACHE_CONFIG.COURSES_KEY}_my`, enrolledCourses);
 
-      // Cache the filtered courses
-      await CacheManager.set(`${CACHE_CONFIG.COURSES_KEY}_my`, myCourses);
-
-      return myCourses;
+      return enrolledCourses;
     } catch (error) {
       console.error('Error fetching my courses:', error);
       throw error;

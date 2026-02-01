@@ -600,7 +600,7 @@ serve(async (req) => {
         .eq('course_id', quiz.course_id);
 
       const { data: completedVideos } = await supabaseClient
-        .from('video_progress')
+        .from('user_video_progress')
         .select('video_id')
         .eq('user_id', userId)
         .eq('is_completed', true)

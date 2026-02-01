@@ -513,7 +513,7 @@ const PDFView = () => {
           <Ionicons
             name="alert-circle-outline"
             size={64}
-            color={Colors.textSecondary}
+            color={Colors.purple400}
           />
           <Text style={styles.errorText}>{error || "PDF not found"}</Text>
           <TouchableOpacity
@@ -579,7 +579,7 @@ const PDFView = () => {
                 <Ionicons
                   name="alert-circle-outline"
                   size={48}
-                  color={Colors.textSecondary}
+                  color={Colors.purple400}
                 />
                 <Text style={styles.errorOverlayText}>
                   Unable to load PDF
@@ -593,7 +593,7 @@ const PDFView = () => {
                     style={styles.retryButtonSmall}
                     onPress={handleManualRetry}
                   >
-                    <Ionicons name="refresh" size={16} color={Colors.white} />
+                    <Ionicons name="refresh" size={16} color={Colors.purple400} />
                     <Text style={styles.retryButtonText}>Try Again</Text>
                   </TouchableOpacity>
                   
@@ -765,7 +765,7 @@ const PDFView = () => {
                     <Ionicons
                       name="download-outline"
                       size={20}
-                      color={Colors.textPrimary}
+                      color={Colors.purple400}
                     />
                   )}
                   <Text style={styles.menuItemText}>
@@ -785,7 +785,7 @@ const PDFView = () => {
                   <Ionicons
                     name="globe-outline"
                     size={20}
-                    color={Colors.textPrimary}
+                    color={Colors.purple400}
                   />
                   <Text style={styles.menuItemText}>Open in Browser</Text>
                 </TouchableOpacity>
@@ -1023,7 +1023,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   secondaryButton: {
-    backgroundColor: Colors.textInputBg,
+    backgroundColor: Colors.gray800,
     borderWidth: 1,
     borderColor: Colors.purple400,
   },
@@ -1170,7 +1170,7 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 15,
-    color: Colors.textPrimary,
+    color: Colors.purple400,
     fontWeight: "500",
   },
   menuDivider: {

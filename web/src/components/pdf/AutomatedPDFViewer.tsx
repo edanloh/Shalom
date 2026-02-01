@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader2, AlertCircle, FileText, ExternalLink } from "lucide-react";
+import { Colors } from "@/constants/Colors";
 
 const PDF_VIEWERS = [
   {
@@ -293,7 +294,8 @@ const AutomatedPDFViewer: React.FC<AutomatedPDFViewerProps> = ({
             </button>
             <button
               onClick={() => window.open(pdfUrl, "_blank")}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-black rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+              style={{color: Colors.purple400}}
             >
               <ExternalLink className="h-4 w-4" />
               Open in New Tab

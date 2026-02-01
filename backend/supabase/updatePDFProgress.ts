@@ -183,7 +183,7 @@ serve(async (req) => {
     ] = await Promise.all([
       videoIds.length > 0
         ? supabase
-            .from("video_progress")
+            .from("user_video_progress")
             .select("video_id")
             .eq("user_id", userId)
             .in("video_id", videoIds)

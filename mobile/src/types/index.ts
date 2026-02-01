@@ -163,7 +163,8 @@ export interface Course {
   title: string;
   description: string;
   instructor: Instructor;
-  progress: CourseProgress;
+  progress_percentage?: number;
+  // progress: CourseProgress;
   duration: string;
   rating: number;
   image: string;

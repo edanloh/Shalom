@@ -399,10 +399,9 @@ export default function HomeScreen({ navigation, route }: any) {
   }, [user?.id, recommendedList]);
 
   const getTop10Courses = (courses: Course[]): Course[] => {
-    // Sort by percentage completed descending and return top 10
-    return courses
-      .sort((a, b) => b.progress.percentage - a.progress.percentage)
-      .slice(0, 10);
+    // Return top 10 courses - already sorted by last_activity_at from API
+    // Do NOT re-sort here to preserve the most recently active order
+    return courses.slice(0, 10);
   }
 
   // Handle user loading state

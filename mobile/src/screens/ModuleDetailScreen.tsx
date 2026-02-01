@@ -245,6 +245,12 @@ const ModuleDetailScreen = () => {
     return courseContent.sections[currentIndex + 1];
   };
 
+  const canGoToNextSection = (): boolean => {
+    if (!getNextSection()) return false;
+    // Can only go to next section if current module is completed
+    return (currentSection as any)?.module_is_completed === true;
+  };
+
   const getPreviousSection = (): CourseSection | null => {
     if (!courseContent || !currentSection) return null;
     const currentIndex = courseContent.sections.findIndex(
@@ -257,6 +263,16 @@ const ModuleDetailScreen = () => {
   const handleNextSection = () => {
     const nextSection = getNextSection();
     if (nextSection) {
+      // Check if current section is completed
+      const isCurrentModuleCompleted = (currentSection as any)?.module_is_completed;
+      if (!isCurrentModuleCompleted) {
+        Alert.alert(
+          "Complete Current Module First",
+          `Please complete all lessons in "${currentSection?.title}" before moving to the next module.`,
+          [{ text: "OK", style: "default" }],
+        );
+        return;
+      }
       setCurrentSection(nextSection);
     }
   };
@@ -569,7 +585,7 @@ const ModuleDetailScreen = () => {
               name="chevron-back"
               size={20}
               color={
-                getPreviousSection() ? Colors.purple400 : Colors.textSecondary
+                getPreviousSection() ? Colors.secondary : Colors.textSecondary
               }
             />
             <View style={styles.navButtonContent}>
@@ -596,10 +612,10 @@ const ModuleDetailScreen = () => {
           <TouchableOpacity
             style={[
               styles.navButton,
-              !getNextSection() && styles.navButtonDisabled,
+              !canGoToNextSection() && styles.navButtonDisabled,
             ]}
             onPress={handleNextSection}
-            disabled={!getNextSection()}
+            disabled={!canGoToNextSection()}
             activeOpacity={0.7}
           >
             <View style={styles.navButtonContent}>
@@ -607,18 +623,25 @@ const ModuleDetailScreen = () => {
                 style={[
                   styles.navLabel,
                   styles.navLabelRight,
-                  !getNextSection() && styles.navLabelDisabled,
+                  !canGoToNextSection() && styles.navLabelDisabled,
                 ]}
               >
                 NEXT MODULE
               </Text>
               {getNextSection() ? (
-                <Text
-                  style={[styles.navButtonText, styles.navButtonTextRight]}
-                  numberOfLines={2}
-                >
-                  {getNextSection()?.title}
-                </Text>
+                <>
+                  <Text
+                    style={[styles.navButtonText, styles.navButtonTextRight]}
+                    numberOfLines={2}
+                  >
+                    {getNextSection()?.title}
+                  </Text>
+                  {!canGoToNextSection() && (
+                    <Text style={[styles.navButtonTextDisabled, styles.navButtonTextRight, styles.lockedText]}>
+                      🔒 Complete this module first
+                    </Text>
+                  )}
+                </>
               ) : (
                 <Text
                   style={[
@@ -633,7 +656,7 @@ const ModuleDetailScreen = () => {
             <Ionicons
               name="chevron-forward"
               size={20}
-              color={getNextSection() ? Colors.purple400 : Colors.textSecondary}
+              color={canGoToNextSection() ? Colors.secondary : Colors.textSecondary}
             />
           </TouchableOpacity>
         </View>
@@ -927,6 +950,12 @@ const styles = StyleSheet.create({
   },
   navButtonTextDisabled: {
     fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  lockedText: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: "500",
     color: Colors.textSecondary,
   },
 });
