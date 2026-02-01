@@ -5,6 +5,8 @@ import apiService from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../services/storageService';
 import { useUser } from '@/contexts/UserContext';
+import { postNotification } from "@/services/notificationService";
+import { Student } from "@/services";
 
 // Types
 export interface Question {
@@ -424,8 +426,16 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
         setModules(updatedModules);
       }
     };
-
+    const getStudents = async () => {
+      const studentsData = await courseService.getCourseStudents(currentCourseId);
+      console.log('Enrolled students fetched for notifications:', studentsData);
+      setEnrolledStudents(studentsData);
+      const data = await courseService.getAllStudents();
+      setAllStudents(data.students);
+      console.log('All students fetched for notifications:', data.students);
+    };
     initializeOrderValues();
+    getStudents();
   }, []); // Run only once on mount
   
   // UI state
@@ -445,6 +455,10 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
   // Drag and drop state
   const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
   const [draggedOver, setDraggedOver] = useState<DraggedItem | null>(null);
+
+  // Students
+  const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
   
   // Utility functions
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -739,6 +753,30 @@ export const CourseBuilderProvider = ({ children, courseId }: CourseBuilderProvi
         confirmText: 'OK',
         showCancel: false,
       });
+
+      try {
+        if (currentCourseId && currentCourseId !== 'new' ) {
+          // Generate random uuid
+          const notificationId = crypto.randomUUID();
+          await postNotification({
+            userIds: enrolledStudents.map(student => student.id.toString()),
+            title: `${courseName}`,
+            message: `${courseName} has been updated! Check out the latest content.`,
+            type: `course_announcement-${currentCourseId}-${notificationId}`,
+          });
+        } else {
+          // Generate random uuid
+          const notificationId = crypto.randomUUID();
+          await postNotification({
+            userIds: allStudents.map(student => student.id.toString()),
+            title: `${courseName}`,
+            message: `New course ${courseName} has been created! Check it out now.`,
+            type: `course_announcement-${currentCourseId}-${notificationId}`,
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error sending notifications to students:', notificationError);
+      }
       
       setHasUnsavedChanges(false); // Reset after successful save
       return { success: true, courseId: finalCourseId };
