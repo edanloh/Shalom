@@ -17,8 +17,8 @@ export const useContentManagement = () => {
     const newModuleId = `m${Date.now()}`;
     const newModule: Module = {
       id: newModuleId,
-      title: `Module ${moduleNumber}: New Module`,
-      description: "Add a description for this module...",
+      title: `Module ${moduleNumber}: `,
+      description: "",
       status: "published",
       expanded: true,
       lessons: [],
@@ -31,6 +31,23 @@ export const useContentManagement = () => {
   };
 
   const deleteModule = (moduleId: string) => {
+    // Clear selection if deleting the currently selected module or its children
+    setSelectedItem((current: any) => {
+      if (!current) return current;
+      if (current.type === "module" && current.id === moduleId) {
+        return null;
+      }
+      if (current.type === "lesson" || current.type === "quiz") {
+        const module = modules.find((m) => m.id === moduleId);
+        if (!module) return current;
+        const isChild =
+          module.lessons.some((l) => l.id === current.id) ||
+          module.quizzes.some((q) => q.id === current.id);
+        return isChild ? null : current;
+      }
+      return current;
+    });
+
     let updatedModules = modules.filter((m) => m.id !== moduleId);
     updatedModules = modules.filter(m => m.id !== moduleId).map((module, index) => ({
       ...module,
@@ -62,8 +79,8 @@ export const useContentManagement = () => {
         
         const newLesson: Lesson = {
           id: newLessonId,
-          title: `New Lesson`, // Will be updated by numbering
-          baseTitle: "New Lesson",
+          title: "",
+          baseTitle: "",
           type: lessonType,
           status: "draft",
           content: "",
@@ -148,8 +165,8 @@ export const useContentManagement = () => {
             ...m.quizzes,
             {
               id: newQuizId,
-              title: `New Quiz`, // Will be updated by numbering
-              baseTitle: "New Quiz",
+              title: "",
+              baseTitle: "",
               status: "draft",
               passingScore: 70,
               maxAttempts: 1,
@@ -157,10 +174,10 @@ export const useContentManagement = () => {
               questions: [
                 {
                   id: `qq${Date.now()}`,
-                  text: "New question",
+                  text: "",
                   type: "multiple-choice",
-                  options: ["Option 1", "Option 2"],
-                  correctAnswer: 0,
+                  options: ["", ""],
+                  correctAnswer: null,
                   imageUrl: null,
                   points: 1,
                 },
@@ -233,10 +250,10 @@ export const useContentManagement = () => {
                     ...q.questions,
                     {
                       id: `qq${Date.now()}`,
-                      text: "New question",
+                      text: "",
                       type: "multiple-choice",
-                      options: ["Option 1", "Option 2"],
-                      correctAnswer: 0,
+                      options: ["", ""],
+                      correctAnswer: null,
                       imageUrl: null,
                       points: 1,
                     },

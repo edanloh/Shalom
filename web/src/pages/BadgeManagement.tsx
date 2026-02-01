@@ -67,6 +67,7 @@ const BadgeManagement = () => {
   const [badges, setBadges] = useState<BadgeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showCreateErrors, setShowCreateErrors] = useState(false);
 
   const iconOptions = [
     { value: "trophy", icon: Trophy, label: "Trophy" },
@@ -151,11 +152,14 @@ const BadgeManagement = () => {
     setNewBadgePoints("100");
     setNewBadgeIcon(null);
     setBadgeIconPreview("");
+    setShowCreateErrors(false);
   };
 
   const handleCreateBadge = async () => {
     const criteriaCount = parseInt(newBadgeCriteriaCount, 10);
-    if (!newBadgeName || !newBadgeDescription) {
+    const pointsValue = parseInt(newBadgePoints, 10);
+    if (!newBadgeName.trim() || !newBadgeDescription.trim()) {
+      setShowCreateErrors(true);
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -164,9 +168,19 @@ const BadgeManagement = () => {
       return;
     }
     if (!newBadgeCriteriaType || !Number.isFinite(criteriaCount) || criteriaCount <= 0) {
+      setShowCreateErrors(true);
       toast({
         title: "Error",
         description: "Please set a valid criteria type and count",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!Number.isFinite(pointsValue) || pointsValue <= 0) {
+      setShowCreateErrors(true);
+      toast({
+        title: "Error",
+        description: "Please enter a valid points value",
         variant: "destructive",
       });
       return;
@@ -306,6 +320,7 @@ const BadgeManagement = () => {
             open={isCreateDialogOpen}
             onOpenChange={(open) => {
               if (!open) resetCreateForm();
+              if (open) setShowCreateErrors(false);
               setIsCreateDialogOpen(open);
             }}
           >
@@ -322,16 +337,25 @@ const BadgeManagement = () => {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="badge-name">Badge Name *</Label>
+                  <Label htmlFor="badge-name">
+                    Badge Name <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="badge-name"
                     value={newBadgeName}
                     onChange={(e) => setNewBadgeName(e.target.value)}
                     placeholder="e.g., Course Master"
                   />
+                  {showCreateErrors && !newBadgeName.trim() && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Badge name is required.
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="badge-description">Description *</Label>
+                  <Label htmlFor="badge-description">
+                    Description <span className="text-red-500">*</span>
+                  </Label>
                   <Textarea
                     id="badge-description"
                     value={newBadgeDescription}
@@ -339,9 +363,16 @@ const BadgeManagement = () => {
                     placeholder="Describe what this badge represents..."
                     rows={3}
                   />
+                  {showCreateErrors && !newBadgeDescription.trim() && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Description is required.
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="badge-criteria">Earning Criteria *</Label>
+                  <Label htmlFor="badge-criteria">
+                    Earning Criteria <span className="text-red-500">*</span>
+                  </Label>
                   <div className="grid gap-3 md:grid-cols-2">
                     <Select value={newBadgeCriteriaType} onValueChange={setNewBadgeCriteriaType}>
                       <SelectTrigger id="badge-criteria">
@@ -364,9 +395,16 @@ const BadgeManagement = () => {
                       placeholder="Count"
                     />
                   </div>
+                  {showCreateErrors && (!newBadgeCriteriaType || !Number.isFinite(parseInt(newBadgeCriteriaCount, 10)) || parseInt(newBadgeCriteriaCount, 10) <= 0) && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Criteria type and count are required.
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="badge-points">Points Value</Label>
+                  <Label htmlFor="badge-points">
+                    Points Value <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="badge-points"
                     type="number"
@@ -374,6 +412,11 @@ const BadgeManagement = () => {
                     onChange={(e) => setNewBadgePoints(e.target.value)}
                     placeholder="100"
                   />
+                  {showCreateErrors && (!Number.isFinite(parseInt(newBadgePoints, 10)) || parseInt(newBadgePoints, 10) <= 0) && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Points value is required.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="badge-icon">Badge Icon (Optional)</Label>

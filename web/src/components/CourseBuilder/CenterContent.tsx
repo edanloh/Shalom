@@ -16,17 +16,23 @@ import {
 import StyledPDFViewer from "@/components/pdf/StyledPDFViewer";
 
 /* ------------------------- MODULE EDITOR ------------------------- */
-const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
+const ModuleEditor = ({
+  selectedItem,
+  modules,
+  updateModule,
+  showValidationErrors,
+}: any) => {
   const module = modules.find((m: any) => m.id === selectedItem.id);
 
   // Extract the base title without "Module X:" prefix for editing
   const baseTitle = module?.title?.replace(/^Module \d+:\s*/, "") || "";
+  const isModuleTitleEmpty = !baseTitle.trim();
 
   return (
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
-          Module Title
+          Module Title<span className="text-red-500 ml-1">*</span>
         </label>
         <input
           type="text"
@@ -39,8 +45,12 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
               title: `Module ${moduleNumber}: ${e.target.value}`,
             });
           }}
+          placeholder="Enter module title"
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
         />
+        {showValidationErrors && isModuleTitleEmpty && (
+          <p className="text-xs text-red-400 mt-1">Module title is required.</p>
+        )}
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -52,6 +62,7 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
             updateModule(selectedItem.id, { description: e.target.value })
           }
           rows={3}
+          placeholder="Enter module description..."
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
         />
       </div>
@@ -60,7 +71,12 @@ const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
 };
 
 /* ------------------------- LESSON EDITOR ------------------------- */
-const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
+const LessonEditor = ({
+  selectedItem,
+  modules,
+  updateLesson,
+  showValidationErrors,
+}: any) => {
   const module = modules.find((m: any) =>
     m.lessons.some((l: any) => l.id === selectedItem.id),
   );
@@ -98,6 +114,9 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
 
   // Check lesson type
   const isPdfLesson = lesson?.type === "pdf";
+  const lessonTitleEmpty = !(lesson?.baseTitle || "").trim();
+  const hasVideo = !!lesson?.videoUrl && lesson.videoUrl.trim() !== "" && lesson.videoUrl !== "[LOCAL_FILE: ]";
+  const hasPdf = !!lesson?.resourceUrl && lesson.resourceUrl.trim() !== "" && lesson.resourceUrl !== "[LOCAL_FILE: ]";
 
   return (
     <div className="space-y-4">
@@ -106,7 +125,7 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
           style={{ color: Colors.textSecondary }}
           className="block text-sm font-medium mb-2"
         >
-          Lesson Type
+          Lesson Type<span className="text-red-500 ml-1">*</span>
         </label>
         <select
           value={lesson?.type || "video"}
@@ -139,7 +158,7 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
           style={{ color: Colors.textSecondary }}
           className="block text-sm font-medium mb-2"
         >
-          Lesson Title
+          Lesson Title<span className="text-red-500 ml-1">*</span>
         </label>
         <div
           style={{
@@ -159,8 +178,12 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             borderColor: Colors.gray600,
             color: Colors.textPrimary,
           }}
+          placeholder="Enter lesson title"
           className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
         />
+        {showValidationErrors && lessonTitleEmpty && (
+          <p className="text-xs text-red-400 mt-1">Lesson title is required.</p>
+        )}
       </div>
       <div>
         <label
@@ -193,8 +216,13 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-2"
           >
-            PDF Document (required)
+            PDF Document<span className="text-red-500 ml-1">*</span>
           </label>
+          {showValidationErrors && !hasPdf && (
+            <p className="text-xs text-red-400 mb-2">
+              PDF URL or file is required.
+            </p>
+          )}
 
           <div className="flex gap-2 mb-2">
             <button
@@ -518,8 +546,13 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
             style={{ color: Colors.textSecondary }}
             className="block text-sm font-medium mb-2"
           >
-            Video (required)
+            Video<span className="text-red-500 ml-1">*</span>
           </label>
+          {showValidationErrors && !hasVideo && (
+            <p className="text-xs text-red-400 mb-2">
+              Video URL or file is required.
+            </p>
+          )}
           <div className="flex gap-2 mb-2">
             <button
               onClick={() => {
@@ -538,7 +571,7 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
               }}
               style={{
                 backgroundColor:
-                  videoInputType === "url" ? Colors.primary : "transparent",
+                  videoInputType === "url" ? Colors.accent : Colors.gray800,
                 color: Colors.textPrimary,
               }}
               className="px-3 py-1 rounded text-sm"
@@ -562,7 +595,7 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
               }}
               style={{
                 backgroundColor:
-                  videoInputType === "upload" ? Colors.primary : "transparent",
+                  videoInputType === "upload" ? Colors.accent : Colors.gray800,
                 color: Colors.textPrimary,
               }}
               className="px-3 py-1 rounded text-sm"
@@ -770,12 +803,22 @@ const QuizEditor = ({
   updateQuestion,
   addOption,
   removeOption,
+  showValidationErrors,
 }: any) => {
   const { deleteQuiz } = useContentManagement();
   const module = modules.find((m: any) =>
     m.quizzes.some((q: any) => q.id === selectedItem.id),
   );
   const quiz = module?.quizzes.find((q: any) => q.id === selectedItem.id);
+  const quizTitleEmpty = !(quiz?.baseTitle || "").trim();
+  const passingScoreInvalid =
+    quiz?.passingScore === undefined ||
+    quiz?.passingScore === null ||
+    Number.isNaN(Number(quiz?.passingScore));
+  const maxAttemptsInvalid =
+    quiz?.maxAttempts !== null &&
+    quiz?.maxAttempts !== undefined &&
+    Number(quiz?.maxAttempts) < 1;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -828,7 +871,7 @@ const QuizEditor = ({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="block text-sm font-medium text-slate-300">
-            Quiz Title
+            Quiz Title<span className="text-red-500 ml-1">*</span>
           </label>
         </div>
         <input
@@ -840,6 +883,9 @@ const QuizEditor = ({
           placeholder="Enter quiz title (e.g., 'Module 1 Assessment')"
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
         />
+        {showValidationErrors && quizTitleEmpty && (
+          <p className="text-xs text-red-400 mt-1">Quiz title is required.</p>
+        )}
       </div>
 
       {/* Quiz Settings */}
@@ -848,6 +894,7 @@ const QuizEditor = ({
           <div className="mr-4">
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Passing Score (%)
+              <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               type="number"
@@ -861,10 +908,15 @@ const QuizEditor = ({
               max="100"
               className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
             />
+            {showValidationErrors && passingScoreInvalid && (
+              <p className="text-xs text-red-400 mt-1">
+                Passing score is required.
+              </p>
+            )}
           </div>
           <div className="mr-4 flex flex-col">
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Max Attempts
+              Max Attempts<span className="text-red-500 ml-1">*</span>
             </label>
             <input
               type={quiz?.maxAttempts === null ? "text" : "number"}
@@ -878,6 +930,11 @@ const QuizEditor = ({
               readOnly={quiz?.maxAttempts === null}
               className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
             />
+            {showValidationErrors && maxAttemptsInvalid && (
+              <p className="text-xs text-red-400 mt-1">
+                Must be at least 1 or set to unlimited.
+              </p>
+            )}
             <label className="mt-2 flex items-center gap-2 text-xs text-slate-300">
               <input
                 type="checkbox"
@@ -952,7 +1009,7 @@ const QuizEditor = ({
             </h3>
             <button
               onClick={handleDeleteQuestion}
-              className="text-red-400 hover:text-red-300"
+              className="text-black hover:text-black"
             >
               <X className="h-4 w-4" />
             </button>
@@ -961,7 +1018,7 @@ const QuizEditor = ({
           {/* Question text */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Question Text
+              Question Text<span className="text-red-500 ml-1">*</span>
             </label>
             <textarea
               value={currentQuestion.text}
@@ -978,12 +1035,17 @@ const QuizEditor = ({
               rows={2}
               className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
             />
+            {showValidationErrors && !currentQuestion.text?.trim() && (
+              <p className="text-xs text-red-400 mt-1">
+                Question text is required.
+              </p>
+            )}
           </div>
 
           {/* Question Type Selection */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Question Type
+              Question Type<span className="text-red-500 ml-1">*</span>
             </label>
             <select
               value={currentQuestion.type}
@@ -1053,7 +1115,17 @@ const QuizEditor = ({
                   : currentQuestion.type === "multiple-correct"
                     ? "Options (Select all correct)"
                     : "Answer Options"}
+                <span className="text-red-500 ml-1">*</span>
               </label>
+              {showValidationErrors &&
+                (!currentQuestion.options ||
+                currentQuestion.options.filter((opt: any) =>
+                  String(opt).trim(),
+                ).length === 0) && (
+                <p className="text-xs text-red-400">
+                  At least one option is required.
+                </p>
+              )}
 
               {currentQuestion.type === "true-false" ? (
                 // True/False specific UI
@@ -1346,7 +1418,9 @@ const QuizEditor = ({
 
           {/* Points input */}
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Points</label>
+            <label className="block text-sm text-slate-300 mb-1">
+              Points<span className="text-red-500 ml-1">*</span>
+            </label>
             <input
               type="number"
               value={currentQuestion.points}
@@ -1362,6 +1436,9 @@ const QuizEditor = ({
               className="w-24 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
               min="0"
             />
+            {showValidationErrors && Number(currentQuestion.points) <= 0 && (
+              <p className="text-xs text-red-400 mt-1">Points are required.</p>
+            )}
           </div>
         </div>
       )}
@@ -1404,7 +1481,8 @@ const QuizEditor = ({
 
 /* ------------------------- MAIN CENTER CONTENT ------------------------- */
 export const CenterContent = () => {
-  const { selectedItem, setSelectedItem, modules } = useCourseBuilder();
+  const { selectedItem, setSelectedItem, modules, showValidationErrors } =
+    useCourseBuilder();
   const {
     updateModule,
     updateLesson,
@@ -1454,6 +1532,7 @@ export const CenterContent = () => {
             selectedItem={selectedItem}
             modules={modules}
             updateModule={updateModule}
+            showValidationErrors={showValidationErrors}
           />
         )}
         {selectedItem.type === "lesson" && (
@@ -1461,6 +1540,7 @@ export const CenterContent = () => {
             selectedItem={selectedItem}
             modules={modules}
             updateLesson={updateLesson}
+            showValidationErrors={showValidationErrors}
           />
         )}
         {selectedItem.type === "quiz" && (
@@ -1473,6 +1553,7 @@ export const CenterContent = () => {
             updateQuestion={updateQuestion}
             addOption={addOption}
             removeOption={removeOption}
+            showValidationErrors={showValidationErrors}
           />
         )}
       </div>
