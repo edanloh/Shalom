@@ -7,13 +7,21 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2 } from "lucide-react";
+import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2, X } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
 import { disableStudent } from "@/lib/disableStudent";
 import { courseService, studentService } from "@/services";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,6 +29,7 @@ const Students = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [profileCache, setProfileCache] = useState<Record<string, any>>({});
   const [profileLoadingId, setProfileLoadingId] = useState<string | null>(null);
 
@@ -29,6 +38,24 @@ const Students = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { toast } = useToast();
+
+  const [filterEnrolledFrom, setFilterEnrolledFrom] = useState("");
+  const [filterEnrolledTo, setFilterEnrolledTo] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
+  const [filterProgressMin, setFilterProgressMin] = useState("");
+  const [filterProgressMax, setFilterProgressMax] = useState("");
+  const [filterEngagementMin, setFilterEngagementMin] = useState("");
+  const [filterEngagementMax, setFilterEngagementMax] = useState("");
+  const [filterLastActivityDays, setFilterLastActivityDays] = useState("all");
+
+  const [draftEnrolledFrom, setDraftEnrolledFrom] = useState("");
+  const [draftEnrolledTo, setDraftEnrolledTo] = useState("");
+  const [draftStatus, setDraftStatus] = useState<"all" | "active" | "inactive">("all");
+  const [draftProgressMin, setDraftProgressMin] = useState("");
+  const [draftProgressMax, setDraftProgressMax] = useState("");
+  const [draftEngagementMin, setDraftEngagementMin] = useState("");
+  const [draftEngagementMax, setDraftEngagementMax] = useState("");
+  const [draftLastActivityDays, setDraftLastActivityDays] = useState("all");
 
 	const fetchStudents = async () => {
 		setLoading(true);
@@ -193,10 +220,93 @@ const Students = () => {
   //   }
   // ];
 
-  const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const parseDate = (value?: string) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+    return null;
+  };
+
+  const parseRelativeActivity = (value?: string) => {
+    if (!value) return null;
+    const normalized = value.toLowerCase().trim();
+    if (normalized === "unknown") return null;
+    if (normalized === "just now") return new Date();
+    const match = normalized.match(/(\d+)\s*(minute|hour|day|week|month|year)s?\s*ago/);
+    if (!match) return parseDate(value);
+    const amount = Number(match[1]);
+    const unit = match[2];
+    if (!Number.isFinite(amount)) return null;
+    const now = new Date();
+    const multipliers: Record<string, number> = {
+      minute: 60 * 1000,
+      hour: 60 * 60 * 1000,
+      day: 24 * 60 * 60 * 1000,
+      week: 7 * 24 * 60 * 60 * 1000,
+      month: 30 * 24 * 60 * 60 * 1000,
+      year: 365 * 24 * 60 * 60 * 1000,
+    };
+    return new Date(now.getTime() - amount * (multipliers[unit] || 0));
+  };
+
+  const filteredStudents = students.filter((student) => {
+    const matchesSearch =
+      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (filterStatus !== "all") {
+      const isActive = student.enabled === true;
+      if (filterStatus === "active" && !isActive) return false;
+      if (filterStatus === "inactive" && isActive) return false;
+    }
+
+    const progressValue = Number(student.progress ?? 0);
+    if (filterProgressMin !== "" && progressValue < Number(filterProgressMin)) {
+      return false;
+    }
+    if (filterProgressMax !== "" && progressValue > Number(filterProgressMax)) {
+      return false;
+    }
+
+    const engagementValue = Number(student.engagement ?? 0);
+    if (filterEngagementMin !== "" && engagementValue < Number(filterEngagementMin)) {
+      return false;
+    }
+    if (filterEngagementMax !== "" && engagementValue > Number(filterEngagementMax)) {
+      return false;
+    }
+
+    if (filterEnrolledFrom || filterEnrolledTo) {
+      const enrolledDate = parseDate(student.enrolledDate);
+      if (!enrolledDate) return false;
+      if (filterEnrolledFrom) {
+        const fromDate = parseDate(filterEnrolledFrom);
+        if (fromDate && enrolledDate < fromDate) return false;
+      }
+      if (filterEnrolledTo) {
+        const toDate = parseDate(filterEnrolledTo);
+        if (toDate) {
+          const endOfDay = new Date(toDate);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (enrolledDate > endOfDay) return false;
+        }
+      }
+    }
+
+    if (filterLastActivityDays !== "all") {
+      const lastActivityDate = parseRelativeActivity(student.lastActivity);
+      if (!lastActivityDate) return false;
+      const days = Number(filterLastActivityDays);
+      if (Number.isFinite(days)) {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        if (lastActivityDate < cutoff) return false;
+      }
+    }
+
+    return true;
+  });
 
   const paginatedStudents = filteredStudents.slice(
     (currentPage - 1) * itemsPerPage,
@@ -207,6 +317,43 @@ const Students = () => {
     if (score >= 80) return "success";
     if (score >= 60) return "warning";
     return "destructive";
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchQuery,
+    filterEnrolledFrom,
+    filterEnrolledTo,
+    filterStatus,
+    filterProgressMin,
+    filterProgressMax,
+    filterEngagementMin,
+    filterEngagementMax,
+    filterLastActivityDays,
+  ]);
+
+  const resetFilters = () => {
+    setDraftEnrolledFrom("");
+    setDraftEnrolledTo("");
+    setDraftStatus("all");
+    setDraftProgressMin("");
+    setDraftProgressMax("");
+    setDraftEngagementMin("");
+    setDraftEngagementMax("");
+    setDraftLastActivityDays("all");
+  };
+
+  const applyFilters = () => {
+    setFilterEnrolledFrom(draftEnrolledFrom);
+    setFilterEnrolledTo(draftEnrolledTo);
+    setFilterStatus(draftStatus);
+    setFilterProgressMin(draftProgressMin);
+    setFilterProgressMax(draftProgressMax);
+    setFilterEngagementMin(draftEngagementMin);
+    setFilterEngagementMax(draftEngagementMax);
+    setFilterLastActivityDays(draftLastActivityDays);
+    setIsFilterOpen(false);
   };
 
   return (
@@ -237,10 +384,165 @@ const Students = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Filters
-            </Button>
+            <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filters
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                side="bottom"
+                collisionPadding={16}
+                className="w-[420px] p-0 max-h-[55vh] flex flex-col"
+              >
+                <div className="flex items-center justify-between px-4 py-3">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Filter Students
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsFilterOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Enrollment Date
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="date"
+                        className="w-full min-w-[140px] pr-10"
+                        style={{ colorScheme: "dark" }}
+                        value={draftEnrolledFrom}
+                        onChange={(e) => setDraftEnrolledFrom(e.target.value)}
+                      />
+                      <span className="text-muted-foreground">-</span>
+                      <Input
+                        type="date"
+                        className="w-full min-w-[140px] pr-10"
+                        style={{ colorScheme: "dark" }}
+                        value={draftEnrolledTo}
+                        onChange={(e) => setDraftEnrolledTo(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Status
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {["all", "active", "inactive"].map((status) => (
+                        <Button
+                          key={status}
+                          type="button"
+                          variant={draftStatus === status ? "default" : "outline"}
+                          size="sm"
+                          onClick={() =>
+                            setDraftStatus(status as "all" | "active" | "inactive")
+                          }
+                        >
+                          {status === "all"
+                            ? "All"
+                            : status === "active"
+                              ? "Active"
+                              : "Inactive"}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Progress (%)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        placeholder="Min"
+                        className="w-full min-w-0"
+                        value={draftProgressMin}
+                        onChange={(e) => setDraftProgressMin(e.target.value)}
+                      />
+                      <span className="text-muted-foreground">-</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        placeholder="Max"
+                        className="w-full min-w-0"
+                        value={draftProgressMax}
+                        onChange={(e) => setDraftProgressMax(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Engagement (%)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        placeholder="Min"
+                        className="w-full min-w-0"
+                        value={draftEngagementMin}
+                        onChange={(e) => setDraftEngagementMin(e.target.value)}
+                      />
+                      <span className="text-muted-foreground">-</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        placeholder="Max"
+                        className="w-full min-w-0"
+                        value={draftEngagementMax}
+                        onChange={(e) => setDraftEngagementMax(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Last Activity
+                    </label>
+                    <Select
+                      value={draftLastActivityDays}
+                      onValueChange={setDraftLastActivityDays}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All time</SelectItem>
+                        <SelectItem value="7">Last 7 days</SelectItem>
+                        <SelectItem value="30">Last 30 days</SelectItem>
+                        <SelectItem value="90">Last 90 days</SelectItem>
+                        <SelectItem value="365">Last year</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex gap-2 px-4 py-3">
+                  <Button variant="outline" className="flex-1" onClick={resetFilters}>
+                    Reset
+                  </Button>
+                  <Button className="flex-1" onClick={applyFilters}>
+                    Apply
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </Card>
 
