@@ -86,7 +86,7 @@ serve(async (req) => {
   if (enabled === false) {
     const { error: banError } =
       await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-        ban_duration: "8766h",
+        ban_duration: "876600h",
       });
       const { data, error } = await supabaseAdmin
       .from("users")
