@@ -1,15 +1,9 @@
-type NotificationType =
-  | "system"
-  | "assignment"
-  | "course"
-  | "marketing"
-  | "weekly";
-
 const allowsNotificationType = (
   prefs: {
-    assignment_reminders?: boolean;
     course_updates?: boolean;
-    marketing_emails?: boolean;
+    achievement: boolean;
+    study_reminders?: boolean;
+    assignment_reminders?: boolean;
     weekly_progress_summary?: boolean;
   } | null,
   type: string
@@ -18,16 +12,19 @@ const allowsNotificationType = (
   if (!prefs) return true;
 
   switch (true) {
-    case type === "assignment":
-      return prefs.assignment_reminders !== false;
-
     case type.startsWith("course_"): // ✅ matches any course_* type
       return prefs.course_updates !== false;
 
-    case type === "marketing":
-      return prefs.marketing_emails !== false;
+    case type.startsWith("achievement"): 
+      return prefs.achievement !== false;
 
-    case type === "weekly":
+    case type.startsWith("study_reminders"):
+      return prefs.study_reminders !== false;
+
+    case type.startsWith("assignment_reminders"):
+      return prefs.assignment_reminders !== false;
+
+    case type.startsWith("weekly_progress_summary"):
       return prefs.weekly_progress_summary !== false;
 
     case type === "system":

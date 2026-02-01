@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   Linking,
+  ActivityIndicator
 } from 'react-native';
 import * as Notifications from "expo-notifications";
 import { Ionicons } from '@expo/vector-icons';
@@ -16,22 +17,23 @@ import { Colors, Spacing, TextStyles } from '../constants';
 import Screen from '../components/common/Screen';
 import CustomModal from "../components/common/CustomModal";
 import externalStyles from '../styles/styles';
+import { setUserPreferences, getUserPreferences } from '@/services/settingsService';
+import { useUser } from '@/contexts/UserContext';
 
 export default function SettingsScreen({ navigation }: any) {
   const { expoPushToken, reloadNotifications, requestAndRegisterPushToken } =
     useNotification();
   const [settings, setSettings] = useState({
-    courseUpdates: true,
+    course_updates: true,
     achievements: true,
-    reminders: true,
-    socialActivity: false,
-    systemUpdates: true,
-    emailNotifications: true,
+    study_reminders: true,
+    assignment_reminders: false,
+    auto_play_videos: true,
     pushNotifications: false,
-    darkMode: false,
-    autoPlay: true,
-    downloadOverWifi: true,
   });
+  const [loading, setLoading] = useState(true);
+
+  const { user } = useUser();
 
   const [activeModal, setActiveModal] = useState<
     "help" | "terms" | "about" | null
@@ -39,8 +41,28 @@ export default function SettingsScreen({ navigation }: any) {
 
   // Check notification permission status on mount
   useEffect(() => {
-    checkNotificationPermission();
+    const fetchSettings = async () => {
+      setLoading(true);
+      await checkNotificationPermission();
+      await fetchUserPreferences();
+      setLoading(false);
+    };
+    fetchSettings();
   }, []);
+
+  const fetchUserPreferences = async () => {
+    if (user?.uuid) {
+      try {
+        const prefs = await getUserPreferences(user.uuid);
+        if (prefs) {
+          const parsedPrefs = typeof prefs === 'string' ? JSON.parse(prefs) : prefs;
+          setSettings((s) => ({ ...s, ...parsedPrefs }));
+        }
+      } catch (error) {
+        console.error("Error fetching user preferences:", error);
+      }
+    }
+  };
 
   const checkNotificationPermission = async () => {
     const { status } = await Notifications.getPermissionsAsync();
@@ -95,18 +117,19 @@ export default function SettingsScreen({ navigation }: any) {
   };
 
   const notificationSettings = [
-    { key: 'courseUpdates',   title: 'Course Updates',     subtitle: 'Get notified about new lessons and course updates', icon: 'play-circle-outline' },
-    { key: 'achievements',    title: 'Achievements',       subtitle: 'Receive notifications for badges and milestones',   icon: 'trophy-outline' },
-    { key: 'reminders',       title: 'Study Reminders',    subtitle: 'Daily reminders to continue your learning',         icon: 'time-outline' },
-    { key: 'socialActivity',  title: 'Social Activity',    subtitle: 'Comments, replies, and forum activity',             icon: 'chatbubble-outline' },
-    { key: 'systemUpdates',   title: 'System Updates',     subtitle: 'App updates and maintenance notifications',         icon: 'download-outline' },
+    { key: 'course_updates',      title: 'Course Updates',          subtitle: 'Get notified about new lessons and course updates', icon: 'play-circle-outline' },
+    { key: 'achievements',        title: 'Achievements',            subtitle: 'Receive notifications for badges and milestones',   icon: 'trophy-outline' },
+    { key: 'study_reminders',     title: 'Study Reminders',         subtitle: 'Daily reminders to continue your learning',         icon: 'book-outline' },
+    { key: 'assignment_reminders',title: 'Assignment Reminders',    subtitle: 'Receive assignment reminders',                      icon: 'time-outline' },
+    // { key: 'socialActivity',      title: 'Social Activity',         subtitle: 'Comments, replies, and forum activity',             icon: 'chatbubble-outline' },
+    // { key: 'system',              title: 'System Updates',          subtitle: 'App system notifications',                          icon: 'cog-outline' },
   ];
 
   const generalSettings = [
-    { key: 'emailNotifications', title: 'Email Notifications',  subtitle: 'Receive notifications via email',         icon: 'mail-outline' },
-    { key: 'pushNotifications',  title: 'Push Notifications',   subtitle: 'Receive notifications on your device',    icon: 'notifications-outline' },
-    { key: 'autoPlay',           title: 'Auto-play Videos',     subtitle: 'Automatically play video lessons',        icon: 'play-outline' },
-    { key: 'downloadOverWifi',   title: 'Download over WiFi only', subtitle: 'Only download content when connected to WiFi', icon: 'wifi-outline' },
+    // { key: 'email_notifications', title: 'Email Notifications',  subtitle: 'Receive notifications via email',         icon: 'mail-outline' },
+    { key: 'auto_play_videos',           title: 'Auto-play Videos',     subtitle: 'Automatically play video lessons',        icon: 'play-outline' },
+    { key: 'push_notifications',  title: 'Push Notifications',   subtitle: 'Receive notifications on your device',    icon: 'notifications-outline' },
+    // { key: 'downloadOverWifi',   title: 'Download over WiFi only', subtitle: 'Only download content when connected to WiFi', icon: 'wifi-outline' },
   ];
 
   const accountItems = [
@@ -171,7 +194,15 @@ export default function SettingsScreen({ navigation }: any) {
       <View style={styles.switchWrap}>
         <Switch
           value={settings[item.key as keyof typeof settings]}
-          onValueChange={() => onToggle(item.key as keyof typeof settings)}
+          onValueChange={() => {
+            if (user?.uuid) {
+              setUserPreferences(
+                user.uuid,
+                JSON.stringify({ [`${item.key}`]: !settings[item.key as keyof typeof settings] })
+              );
+            }
+            onToggle(item.key as keyof typeof settings); 
+          }}
           trackColor={{ false: '#3A3A44', true: Colors.purple400 }}
           thumbColor={
             settings[item.key as keyof typeof settings]
@@ -193,241 +224,250 @@ export default function SettingsScreen({ navigation }: any) {
       customEdges={["top", "bottom"]}
       stickyHeader
     >
-      <>
-        {/* Notification Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notification Preferences</Text>
-          <View style={styles.card}>
-            {notificationSettings.map((item, idx) => (
-              <View key={item.key}>
-                {renderSettingItem(item)}
-                {idx < notificationSettings.length - 1 && <View style={styles.divider} />}
-              </View>
-            ))}
+      {loading ? (
+        <Screen title="" noHeader customEdges={["top", "bottom"]}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.purple400} />
+            <Text style={styles.loadingText}>Loading Settings...</Text>
           </View>
-        </View>
-
-        {/* General Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>General</Text>
-          <View style={styles.card}>
-            {generalSettings.map((item, idx) => (
-              <View key={item.key}>
-                {renderSettingItem(item)}
-                {idx < generalSettings.length - 1 && <View style={styles.divider} />}
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Account */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.card}>
-            {accountItems.map((item, idx) => (
-              <React.Fragment key={item.key}>
-                <Pressable
-                  onPress={item.onPress}
-                  android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
-                  accessibilityRole="button"
-                  accessibilityLabel={item.title}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
-                >
-                  <View style={styles.settingLeft}>
-                    <Ionicons name={item.icon} size={20} color={Colors.textSecondary} />
-                    <View style={styles.settingText}>
-                      <Text style={styles.settingTitle}>{item.title}</Text>
-                      <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
-                </Pressable>
-
-                {idx < accountItems.length - 1 && <View style={styles.divider} />}
-              </React.Fragment>
-            ))}
-          </View>
-        </View>
-
-        {/* Support & Legal */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Support & Legal</Text>
-          <View style={styles.card}>
-            {supportItems.map((item, idx) => (
-              <React.Fragment key={item.key}>
-                <Pressable
-                  onPress={item.onPress}
-                  android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
-                  accessibilityRole="button"
-                  accessibilityLabel={item.title}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
-                >
-                  <View style={styles.settingLeft}>
-                    <Ionicons name={item.icon} size={20} color={Colors.textSecondary} />
-                    <View style={styles.settingText}>
-                      <Text style={styles.settingTitle}>{item.title}</Text>
-                      <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
-                </Pressable>
-
-                {idx < supportItems.length - 1 && <View style={styles.divider} />}
-              </React.Fragment>
-            ))}
-          </View>
-        </View>
-
-        {/* Danger Zone */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Danger Zone</Text>
-          <View style={styles.card}>
-            <Pressable
-              onPress={() =>
-                Alert.alert('Delete Account', 'Are you sure? This cannot be undone.', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => {} },
-                ])
-              }
-              android_ripple={{ color: 'rgba(239,68,68,0.12)' }}
-              style={({ pressed }) => [styles.row, pressed && { opacity: 0.9 }]}
-            >
-              <View style={styles.rowLeft}>
-                <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                <View style={styles.rowTextWrap}>
-                  <Text style={styles.dangerTitle}>Delete Account</Text>
-                  <Text style={styles.rowSub}>Permanently delete your account and all data</Text>
+        </Screen>
+      ) : (
+        <>
+          {/* General Settings */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>General</Text>
+            <View style={styles.card}>
+              {generalSettings.map((item, idx) => (
+                <View key={item.key}>
+                  {renderSettingItem(item)}
+                  {idx < generalSettings.length - 1 && <View style={styles.divider} />}
                 </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Notification Settings */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notification Preferences</Text>
+            <View style={styles.card}>
+              {notificationSettings.map((item, idx) => (
+                <View key={item.key}>
+                  {renderSettingItem(item)}
+                  {idx < notificationSettings.length - 1 && <View style={styles.divider} />}
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Account */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account</Text>
+            <View style={styles.card}>
+              {accountItems.map((item, idx) => (
+                <React.Fragment key={item.key}>
+                  <Pressable
+                    onPress={item.onPress}
+                    android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.title}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
+                  >
+                    <View style={styles.settingLeft}>
+                      <Ionicons name={item.icon} size={20} color={Colors.textSecondary} />
+                      <View style={styles.settingText}>
+                        <Text style={styles.settingTitle}>{item.title}</Text>
+                        <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
+                  </Pressable>
+
+                  {idx < accountItems.length - 1 && <View style={styles.divider} />}
+                </React.Fragment>
+              ))}
+            </View>
+          </View>
+
+          {/* Support & Legal */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Support & Legal</Text>
+            <View style={styles.card}>
+              {supportItems.map((item, idx) => (
+                <React.Fragment key={item.key}>
+                  <Pressable
+                    onPress={item.onPress}
+                    android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.title}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
+                  >
+                    <View style={styles.settingLeft}>
+                      <Ionicons name={item.icon} size={20} color={Colors.textSecondary} />
+                      <View style={styles.settingText}>
+                        <Text style={styles.settingTitle}>{item.title}</Text>
+                        <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward-outline" size={16} color={Colors.textSecondary} />
+                  </Pressable>
+
+                  {idx < supportItems.length - 1 && <View style={styles.divider} />}
+                </React.Fragment>
+              ))}
+            </View>
+          </View>
+
+          {/* Danger Zone */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Danger Zone</Text>
+            <View style={styles.card}>
+              <Pressable
+                onPress={() =>
+                  Alert.alert('Delete Account', 'Are you sure? This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: () => {} },
+                  ])
+                }
+                android_ripple={{ color: 'rgba(239,68,68,0.12)' }}
+                style={({ pressed }) => [styles.row, pressed && { opacity: 0.9 }]}
+              >
+                <View style={styles.rowLeft}>
+                  <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                  <View style={styles.rowTextWrap}>
+                    <Text style={styles.dangerTitle}>Delete Account</Text>
+                    <Text style={styles.rowSub}>Permanently delete your account and all data</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward-outline" size={16} color="#ef4444" />
+              </Pressable>
+            </View>
+          </View>
+
+          <Text style={styles.version}>Version 1.0.0</Text>
+
+          {/* Help & Support Modal */}
+          <CustomModal
+            visible={activeModal === "help"}
+            onClose={() => setActiveModal(null)}
+          >
+            <View>
+              <View style={styles.modalHeader}>
+                <Ionicons name="help-circle" size={32} color={Colors.white} />
+                <Text style={TextStyles.h3}>Help & Support</Text>
               </View>
-              <Ionicons name="chevron-forward-outline" size={16} color="#ef4444" />
-            </Pressable>
-          </View>
-        </View>
+              <Text style={TextStyles.caption}>
+                Need assistance? We're here to help!
+              </Text>
+              <View style={{ marginTop: Spacing.lg }}>
+                <Text style={TextStyles.bodyMedium}>Contact Us:</Text>
+                <Text style={TextStyles.caption}>
+                  • Email: @gmail.com
+                </Text>
+                <Text style={TextStyles.caption}>• Phone: +65</Text>
+                <Text style={TextStyles.caption}>
+                  • Hours: Mon-Fri, 9am-6pm
+                </Text>
+              </View>
+            </View>
+          </CustomModal>
 
-        <Text style={styles.version}>Version 1.0.0</Text>
+          {/* Terms & Conditions Modal */}
+          <CustomModal
+            visible={activeModal === "terms"}
+            onClose={() => setActiveModal(null)}
+          >
+            <View>
+              <View style={styles.modalHeader}>
+                <Ionicons
+                  name="document-text"
+                  size={32}
+                  color={Colors.white}
+                />
+                <Text style={TextStyles.h3}>Terms & Conditions</Text>
+              </View>
+              <Text style={TextStyles.caption}>
+                Last updated: January 6, 2026
+              </Text>
+              <View style={{ marginTop: Spacing.lg }}>
+                <Text style={TextStyles.bodyMedium}>1. Acceptance of Terms</Text>
+                <Text style={TextStyles.caption}>
+                  By accessing and using this app, you accept and agree to be
+                  bound by the terms and provision of this agreement.
+                </Text>
+              </View>
+              <View style={{ marginTop: Spacing.lg }}>
+                <Text style={TextStyles.bodyMedium}>2. Use License</Text>
+                <Text style={TextStyles.caption}>
+                  Permission is granted to temporarily access the materials for
+                  personal, non-commercial use only.
+                </Text>
+              </View>
+              <View style={{ marginTop: Spacing.lg }}>
+                <Text style={TextStyles.bodyMedium}>
+                  3. User Responsibilities
+                </Text>
+                <Text style={TextStyles.caption}>
+                  You are responsible for maintaining the confidentiality of your
+                  account and password.
+                </Text>
+              </View>
+              <Text
+                style={[
+                  TextStyles.captionSmall,
+                  { marginTop: Spacing.lg, fontStyle: "italic" },
+                ]}
+              >
+                For full terms and conditions, please visit our website.
+              </Text>
+            </View>
+          </CustomModal>
 
-        {/* Help & Support Modal */}
-        <CustomModal
-          visible={activeModal === "help"}
-          onClose={() => setActiveModal(null)}
-        >
-          <View>
-            <View style={styles.modalHeader}>
-              <Ionicons name="help-circle" size={32} color={Colors.white} />
-              <Text style={TextStyles.h3}>Help & Support</Text>
+          {/* About Modal */}
+          <CustomModal
+            visible={activeModal === "about"}
+            onClose={() => setActiveModal(null)}
+          >
+            <View>
+              <View style={styles.modalHeader}>
+                <Ionicons
+                  name="information-circle"
+                  size={32}
+                  color={Colors.white}
+                />
+                <Text style={TextStyles.h3}>About</Text>
+              </View>
+              <Text style={TextStyles.caption}>Version 1.0.0</Text>
+              <View style={{ marginTop: Spacing.lg }}>
+                <Text style={TextStyles.bodyMedium}>Mission</Text>
+                <Text style={TextStyles.caption}>
+                  ---
+                </Text>
+              </View>
+              <View style={{ marginTop: Spacing.lg }}>
+                <Text style={TextStyles.bodyMedium}>Features</Text>
+                <Text style={TextStyles.caption}>
+                  • Interactive video courses
+                </Text>
+                <Text style={TextStyles.caption}>
+                  • Progress tracking & analytics
+                </Text>
+                <Text style={TextStyles.caption}>
+                  • Certificates of completion
+                </Text>
+                <Text style={TextStyles.caption}>• Community discussions</Text>
+              </View>
+              <View style={{ marginTop: Spacing.lg }}>
+                <Text style={TextStyles.bodyMedium}>Credits</Text>
+                <Text style={TextStyles.caption}>
+                  Shalom. All rights reserved.
+                </Text>
+              </View>
             </View>
-            <Text style={TextStyles.caption}>
-              Need assistance? We're here to help!
-            </Text>
-            <View style={{ marginTop: Spacing.lg }}>
-              <Text style={TextStyles.bodyMedium}>Contact Us:</Text>
-              <Text style={TextStyles.caption}>
-                • Email: @gmail.com
-              </Text>
-              <Text style={TextStyles.caption}>• Phone: +65</Text>
-              <Text style={TextStyles.caption}>
-                • Hours: Mon-Fri, 9am-6pm
-              </Text>
-            </View>
-          </View>
-        </CustomModal>
-
-        {/* Terms & Conditions Modal */}
-        <CustomModal
-          visible={activeModal === "terms"}
-          onClose={() => setActiveModal(null)}
-        >
-          <View>
-            <View style={styles.modalHeader}>
-              <Ionicons
-                name="document-text"
-                size={32}
-                color={Colors.white}
-              />
-              <Text style={TextStyles.h3}>Terms & Conditions</Text>
-            </View>
-            <Text style={TextStyles.caption}>
-              Last updated: January 6, 2026
-            </Text>
-            <View style={{ marginTop: Spacing.lg }}>
-              <Text style={TextStyles.bodyMedium}>1. Acceptance of Terms</Text>
-              <Text style={TextStyles.caption}>
-                By accessing and using this app, you accept and agree to be
-                bound by the terms and provision of this agreement.
-              </Text>
-            </View>
-            <View style={{ marginTop: Spacing.lg }}>
-              <Text style={TextStyles.bodyMedium}>2. Use License</Text>
-              <Text style={TextStyles.caption}>
-                Permission is granted to temporarily access the materials for
-                personal, non-commercial use only.
-              </Text>
-            </View>
-            <View style={{ marginTop: Spacing.lg }}>
-              <Text style={TextStyles.bodyMedium}>
-                3. User Responsibilities
-              </Text>
-              <Text style={TextStyles.caption}>
-                You are responsible for maintaining the confidentiality of your
-                account and password.
-              </Text>
-            </View>
-            <Text
-              style={[
-                TextStyles.captionSmall,
-                { marginTop: Spacing.lg, fontStyle: "italic" },
-              ]}
-            >
-              For full terms and conditions, please visit our website.
-            </Text>
-          </View>
-        </CustomModal>
-
-        {/* About Modal */}
-        <CustomModal
-          visible={activeModal === "about"}
-          onClose={() => setActiveModal(null)}
-        >
-          <View>
-            <View style={styles.modalHeader}>
-              <Ionicons
-                name="information-circle"
-                size={32}
-                color={Colors.white}
-              />
-              <Text style={TextStyles.h3}>About</Text>
-            </View>
-            <Text style={TextStyles.caption}>Version 1.0.0</Text>
-            <View style={{ marginTop: Spacing.lg }}>
-              <Text style={TextStyles.bodyMedium}>Mission</Text>
-              <Text style={TextStyles.caption}>
-                ---
-              </Text>
-            </View>
-            <View style={{ marginTop: Spacing.lg }}>
-              <Text style={TextStyles.bodyMedium}>Features</Text>
-              <Text style={TextStyles.caption}>
-                • Interactive video courses
-              </Text>
-              <Text style={TextStyles.caption}>
-                • Progress tracking & analytics
-              </Text>
-              <Text style={TextStyles.caption}>
-                • Certificates of completion
-              </Text>
-              <Text style={TextStyles.caption}>• Community discussions</Text>
-            </View>
-            <View style={{ marginTop: Spacing.lg }}>
-              <Text style={TextStyles.bodyMedium}>Credits</Text>
-              <Text style={TextStyles.caption}>
-                Shalom. All rights reserved.
-              </Text>
-            </View>
-          </View>
-        </CustomModal>
-      </>
+          </CustomModal>
+        </>   
+      )}
     </Screen>
   );
 }
@@ -517,5 +557,17 @@ const styles = StyleSheet.create({
   modalHeader: {
     flexDirection: "row",
     gap: 12,
-  }
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    color: Colors.textSecondary,
+    fontSize: TextStyles.body.fontSize,
+  },
 });
