@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { ValidationModal } from "@/components/CourseBuilder/ValidationModal";
 import { Plus, Award, Trash2, Search, Star, Trophy, Medal, Target, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,11 @@ const BadgeManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showCreateErrors, setShowCreateErrors] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationMessage, setValidationMessage] = useState({
+    title: "",
+    description: "",
+  });
 
   const iconOptions = [
     { value: "trophy", icon: Trophy, label: "Trophy" },
@@ -153,6 +159,7 @@ const BadgeManagement = () => {
     setNewBadgeIcon(null);
     setBadgeIconPreview("");
     setShowCreateErrors(false);
+    setShowValidationModal(false);
   };
 
   const handleCreateBadge = async () => {
@@ -160,29 +167,29 @@ const BadgeManagement = () => {
     const pointsValue = parseInt(newBadgePoints, 10);
     if (!newBadgeName.trim() || !newBadgeDescription.trim()) {
       setShowCreateErrors(true);
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive"
+      setValidationMessage({
+        title: "Missing required fields",
+        description: "Please fill in all required fields before creating a badge.",
       });
+      setShowValidationModal(true);
       return;
     }
     if (!newBadgeCriteriaType || !Number.isFinite(criteriaCount) || criteriaCount <= 0) {
       setShowCreateErrors(true);
-      toast({
-        title: "Error",
-        description: "Please set a valid criteria type and count",
-        variant: "destructive",
+      setValidationMessage({
+        title: "Invalid criteria",
+        description: "Please set a valid criteria type and count.",
       });
+      setShowValidationModal(true);
       return;
     }
     if (!Number.isFinite(pointsValue) || pointsValue <= 0) {
       setShowCreateErrors(true);
-      toast({
-        title: "Error",
-        description: "Please enter a valid points value",
-        variant: "destructive",
+      setValidationMessage({
+        title: "Invalid points value",
+        description: "Please enter a valid points value greater than 0.",
       });
+      setShowValidationModal(true);
       return;
     }
 
@@ -321,6 +328,7 @@ const BadgeManagement = () => {
             onOpenChange={(open) => {
               if (!open) resetCreateForm();
               if (open) setShowCreateErrors(false);
+              if (open) setShowValidationModal(false);
               setIsCreateDialogOpen(open);
             }}
           >
@@ -451,6 +459,12 @@ const BadgeManagement = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <ValidationModal
+            open={showValidationModal}
+            onOpenChange={setShowValidationModal}
+            title={validationMessage.title}
+            description={validationMessage.description}
+          />
         </div>
 
         {/* Search */}
