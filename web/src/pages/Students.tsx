@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2, X } from "lucide-react";
+import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2, X, HelpCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
 import { disableStudent } from "@/lib/disableStudent";
@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -56,6 +57,42 @@ const Students = () => {
   const [draftEngagementMin, setDraftEngagementMin] = useState("");
   const [draftEngagementMax, setDraftEngagementMax] = useState("");
   const [draftLastActivityDays, setDraftLastActivityDays] = useState("all");
+  const SectionHelp = ({
+    title,
+    items,
+  }: {
+    title: string;
+    items: Array<{ label: string; description: string; className?: string }>;
+  }) => (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
+            aria-label={`${title} help`}
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="max-w-xs text-sm">
+          <div className="space-y-3">
+            <p className="font-semibold text-foreground">{title}</p>
+            <div className="space-y-2">
+              {items.map((item) => (
+                <div key={item.label} className="space-y-1">
+                  <p className={`text-sm font-medium ${item.className ?? ""}`}>
+                    {item.label}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{item.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 
 	const fetchStudents = async () => {
 		setLoading(true);
@@ -784,7 +821,26 @@ const Students = () => {
                                 </div>
 
                                 <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
-                                  <h4 className="font-semibold mb-2">Performance Summary</h4>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <h4 className="font-semibold">Performance Summary</h4>
+                                    <SectionHelp
+                                      title="Performance Summary"
+                                      items={[
+                                        {
+                                          label: "Strengths",
+                                          description:
+                                            "Quiz Performance (avg score >= 85), Course Completion (completed courses > 0), Consistency (engagement >= 70).",
+                                          className: "text-success",
+                                        },
+                                        {
+                                          label: "Areas to Improve",
+                                          description:
+                                            "Quiz Performance (0 < avg score < 70), Low Engagement (engagement < 50), Course Progress (avg progress < 50).",
+                                          className: "text-destructive",
+                                        },
+                                      ]}
+                                    />
+                                  </div>
                                   <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                       <p className="text-muted-foreground">Strengths</p>
@@ -847,7 +903,24 @@ const Students = () => {
                                 </div>
 
                                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                                  <h4 className="font-semibold mb-2 text-sm">Activity Status</h4>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <h4 className="font-semibold text-sm">Activity Status</h4>
+                                    <SectionHelp
+                                      title="Activity Status"
+                                      items={[
+                                        {
+                                          label: "Engagement",
+                                          description:
+                                            "Based on last activity recency: <= 7 days (100), <= 14 (70), <= 30 (50), > 30 or none (30).",
+                                        },
+                                        {
+                                          label: "Status",
+                                          description:
+                                            "Highly Engaged if engagement >= 70, otherwise Needs Attention.",
+                                        },
+                                      ]}
+                                    />
+                                  </div>
                                   <Badge className={activeProfile.engagement >= 70 ? "status-badge-published" : "status-badge-draft"}>
                                     {activeProfile.engagement >= 70 ? "Highly Engaged" : "Needs Attention"}
                                   </Badge>
