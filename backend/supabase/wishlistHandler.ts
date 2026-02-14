@@ -134,6 +134,33 @@ serve(async (req) => {
 
       if (wishlistError) throw wishlistError;
 
+      const courseIds = (wishlistItems || []).map((item: any) => item.courses.id);
+      const sectionCountsMap = new Map<string, number>();
+      const videoCountsMap = new Map<string, number>();
+      const quizCountsMap = new Map<string, number>();
+
+      if (courseIds.length > 0) {
+        const [
+          { data: sectionCountsData },
+          { data: videoCountsData },
+          { data: quizCountsData },
+        ] = await Promise.all([
+          supabaseClient.rpc('get_section_counts_by_course', { course_ids: courseIds }),
+          supabaseClient.rpc('get_video_counts_by_course', { course_ids: courseIds }),
+          supabaseClient.rpc('get_quiz_counts_by_course', { course_ids: courseIds })
+        ]);
+
+        for (const row of sectionCountsData ?? []) {
+          sectionCountsMap.set(row.course_id, row.count ?? 0);
+        }
+        for (const row of videoCountsData ?? []) {
+          videoCountsMap.set(row.course_id, row.count ?? 0);
+        }
+        for (const row of quizCountsData ?? []) {
+          quizCountsMap.set(row.course_id, row.count ?? 0);
+        }
+      }
+
       // Format response to match Lambda structure
       const courses = (wishlistItems || []).map((item: any) => ({
         courseid: item.courses.id,
@@ -148,6 +175,9 @@ serve(async (req) => {
         tags: item.courses.tags,
         category_name: item.courses.categories?.name,
         category_color: item.courses.categories?.color,
+        total_sections: sectionCountsMap.get(item.courses.id) ?? 0,
+        total_videos: videoCountsMap.get(item.courses.id) ?? 0,
+        total_quizzes: quizCountsMap.get(item.courses.id) ?? 0,
         added_at: item.created_at
       }));
 

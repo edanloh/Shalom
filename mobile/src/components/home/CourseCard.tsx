@@ -28,7 +28,7 @@ const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
     <Ionicons name="star" size={12} color="#FACC15" />
     <Text style={styles.metaText}>{rating?.toFixed?.(1) ?? rating}</Text>
     <Text style={styles.metaDot}>•</Text>
-    <Text style={styles.metaText}>{modules ?? 12} modules</Text>
+    <Text style={styles.metaText}>{modules ?? 0} modules</Text>
   </View>
 );
 

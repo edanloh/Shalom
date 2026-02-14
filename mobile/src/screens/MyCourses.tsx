@@ -40,14 +40,6 @@ export default function MyCourses({ navigation }: any) {
   const { wishlist = [], toggleWishlist } = useCourses();
 
   const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
-  const isWishlisted = (c: Course) => wishIds.has(c.id);
-
-  // useEffect(() => {
-  //   console.log("MyCourses - Current user from AuthContext:", user);
-  //   if (user) {
-  //     console.log("MyCourses - User ID for enrollment fetch:", user.id);
-  //   }
-  // }, [user]);
 
   // Filter courses into categories
   const { continueWatching, completed, notStarted } = useMemo(() => {
@@ -55,18 +47,18 @@ export default function MyCourses({ navigation }: any) {
 
     // Continue Watching: courses with progress > 0% but < 100%
     const cw = allCourses.filter((c) => {
-      const progress = c.progress?.percentage ?? 0;
+      const progress = c.progress_percentage ?? 0;
       return progress > 0 && progress < 100;
     });
 
     // Completed: courses with 100% progress
     const comp = allCourses.filter((c) => {
-      const progress = c.progress?.percentage ?? 0;
+      const progress = c.progress_percentage ?? 0;
       return progress >= 100;
     });
 
     // Not Started: courses with 0% progress
-    const ns = allCourses.filter((c) => (c.progress?.percentage ?? 0) === 0);
+    const ns = allCourses.filter((c) => (c.progress_percentage ?? 0) === 0);
 
     console.log("MyCourses - Filtered courses:", {
       total: allCourses.length,
@@ -84,23 +76,8 @@ export default function MyCourses({ navigation }: any) {
   }, [continueWatching, notStarted]);
 
   const getModuleLabel = (course: Course): string => {
-    const completed = course?.progress?.completed ?? 0;
-    const total = course?.progress?.total ?? 1;
-    const pct = course?.progress?.percentage ?? 0;
-
-    const isDone = pct >= 100 || completed >= total;
-    const index = isDone
-      ? Math.max(1, Math.min(completed, total))
-      : Math.max(1, Math.min(completed + 1, total));
-
-    const raw =
-      typeof course.progress?.currentModule === "string"
-        ? course.progress!.currentModule!.trim()
-        : "";
-
-    if (!raw) return `Module ${index}`;
-    if (/^module\s*\d+/i.test(raw)) return raw;
-    return `Module ${index}: ${raw}`;
+    const modules = course.modules ?? 0;
+    return `Module ${modules > 0 ? 1 : 0}`;
   };
 
   if (!user) {
@@ -150,7 +127,6 @@ export default function MyCourses({ navigation }: any) {
               )}
               extraData={wishlist}
               renderItem={({ item }) => {
-                const moduleLabel = getModuleLabel(item);
                 return (
                   <TouchableOpacity
                     style={styles.cwCard}
@@ -164,20 +140,15 @@ export default function MyCourses({ navigation }: any) {
                         fallback={Images.coursePlaceholder}
                         style={styles.cwThumb}
                       />
-
-                      <View style={styles.progressOverlay}>
-                        <Text style={styles.progressText}>
-                          {Math.round(item.progress?.percentage || 0)}%
-                        </Text>
-                      </View>
                     </View>
-
-                    <Text style={TextStyles.bodyMedium} numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                    <Text style={TextStyles.caption} numberOfLines={1}>
-                      {moduleLabel}
-                    </Text>
+                    <View style={{ paddingHorizontal: Spacing.md, gap: 4 }}>
+                      <Text style={TextStyles.bodyMedium} numberOfLines={2}>
+                        {item.title}
+                      </Text>
+                      <Text style={[TextStyles.caption, { fontWeight: "600" }]} numberOfLines={1}>
+                        {item.modules ?? 0} modules
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               }}
@@ -215,8 +186,7 @@ export default function MyCourses({ navigation }: any) {
         ) : (
           <View>
             {courses.map((item) => {
-              const pct = item.progress?.percentage ?? 0;
-              const moduleLabel = getModuleLabel(item);
+              const pct = Math.round(item.progress_percentage ?? 0);
               return (
                 <TouchableOpacity
                   key={item.id}
@@ -238,12 +208,20 @@ export default function MyCourses({ navigation }: any) {
                       </Text>
                       <Text style={styles.ipMetaDot}>•</Text>
                       <Text style={styles.ipMetaText}>
-                        {item.modules ?? 12} modules
+                        {item.modules ?? 0} modules
                       </Text>
                     </View>
 
                     <View style={styles.ipPercentRow}>
-                      <View style={styles.categoryBadge}>
+                      <View
+                        style={[
+                          styles.categoryBadge,
+                          {
+                            backgroundColor:
+                              item.categoryColor || Colors.purple400,
+                          },
+                        ]}
+                      >
                         <Text style={styles.categoryText}>{item.category}</Text>
                       </View>
                       <Text style={styles.ipMetaText}>{pct}% complete</Text>
@@ -312,19 +290,24 @@ const styles = StyleSheet.create({
   // Continue Watching (horizontal)
   cwCard: {
     width: Math.min(w * 0.72, 300),
+    height: "100%",
     gap: Spacing.sm,
+    backgroundColor: Colors.gray600 ,
+    borderRadius: CARD_RADIUS,
+    overflow: "hidden",
+    paddingBottom: Spacing.sm,
+    ...Shadows.medium,
   },
   cwThumbWrapper: {
     borderRadius: CARD_RADIUS,
     overflow: "hidden",
-    backgroundColor: Colors.loadingBackdrop,
     ...Shadows.medium,
   },
   // Image fills wrapper; NO borderRadius here
   cwThumb: {
     width: "100%",
     height: 150,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
   badgeRow: {
     position: "absolute",
@@ -336,15 +319,14 @@ const styles = StyleSheet.create({
   categoryBadge: {
     backgroundColor: Colors.purple400,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginRight: 8,
-    marginBottom: Spacing.xs,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: Spacing.sm,
   },
   categoryText: {
     color: Colors.white,
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   heartBtn: {
     backgroundColor: "rgba(0,0,0,0.55)",
@@ -355,24 +337,24 @@ const styles = StyleSheet.create({
   // In Progress (vertical cards)
   ipCard: {
     flexDirection: "row",
-    backgroundColor: Colors.cardDark,
+    backgroundColor: Colors.gray600,
     borderRadius: CARD_RADIUS,
     marginBottom: Spacing.md,
     overflow: "hidden",
-    minHeight: 100,
-    maxHeight: 150,
+    minHeight: 110,
+    maxHeight: 160,
+    ...Shadows.medium,
   },
   ipLeft: {
     flex: 1,
-    padding: Spacing.md,
-    justifyContent: "center",
+    padding: Spacing.lg,
+    justifyContent: "space-between",
     paddingRight: Spacing.md,
     flexShrink: 1,
   },
   ipRight: {
-    width: 150,
+    width: 140,
     alignSelf: "stretch",
-    backgroundColor: "#E7F0EC",
     position: "relative",
     overflow: "hidden",
   },
@@ -385,24 +367,25 @@ const styles = StyleSheet.create({
     ...TextStyles.bodyMedium,
     color: Colors.textPrimary,
     fontWeight: "700",
-    fontSize: 15,
-    marginBottom: 6,
+    fontSize: 16,
+    marginBottom: 8,
+    lineHeight: 20,
   },
   ipMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     paddingTop: 2,
     marginBottom: 6,
   },
   ipMetaText: {
     color: Colors.textSecondary,
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "500",
   },
   ipMetaDot: {
     color: Colors.textSecondary,
-    marginHorizontal: 4,
+    marginHorizontal: 3,
   },
   ipSubtitle: {
     ...TextStyles.caption,
@@ -411,19 +394,23 @@ const styles = StyleSheet.create({
   ipPercentRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginVertical: 6,
+    alignItems: "center",
+    marginVertical: Spacing.sm,
+    // gap: Spacing.sm,
   },
 
   // progress bar
   pbTrack: {
-    height: 4,
+    height: 5,
     backgroundColor: Colors.progressTrack,
     borderRadius: BorderRadius.base,
     overflow: "hidden",
+    marginTop: Spacing.xs,
   },
   pbFill: {
     height: "100%",
     backgroundColor: Colors.progressFill,
+    borderRadius: BorderRadius.base,
   },
 
   // New styles for better UX
@@ -446,19 +433,5 @@ const styles = StyleSheet.create({
     color: Colors.red,
     textAlign: "center",
     marginBottom: Spacing.md,
-  },
-  progressOverlay: {
-    position: "absolute",
-    bottom: Spacing.base,
-    right: Spacing.base,
-    backgroundColor: Colors.overlay,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  progressText: {
-    ...TextStyles.small,
-    color: Colors.white,
-    fontWeight: "600",
   },
 });

@@ -24,7 +24,7 @@ const CACHE_CONFIG = {
 // Course service endpoints - Supabase Edge Functions
 const ENDPOINTS = {
   COURSES: '/getAllPublishedCourse', 
-  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}?includeDetails=false&sortBy=last_activity_at&sortOrder=desc`, 
+  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}?includeDetails=true&sortBy=last_activity_at&sortOrder=desc`, 
   COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, 
   COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, 
   POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, 
@@ -247,6 +247,32 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=50&background=3B82F6&color=fff`;
   };
 
+  const explicitModules =
+    awsCourse.total_sections ??
+    awsCourse.sections_count ??
+    awsCourse.section_count ??
+    awsCourse.modules ??
+    awsCourse.module_count ??
+    awsCourse.module_total;
+  const explicitLessons =
+    awsCourse.total_videos ??
+    awsCourse.videos_count ??
+    awsCourse.video_count ??
+    awsCourse.lessons ??
+    awsCourse.lesson_count ??
+    awsCourse.lesson_total;
+
+  const modulesFromExplicit = Number(explicitModules);
+  const lessonsFromExplicit = Number(explicitLessons);
+  const durationHours = Number(awsCourse.duration_hours ?? 0);
+
+  const resolvedModules = Number.isFinite(modulesFromExplicit) && modulesFromExplicit > 0
+    ? modulesFromExplicit
+    : (Number.isFinite(durationHours) && durationHours > 0 ? Math.floor(durationHours / 2) : 0);
+  const resolvedLessons = Number.isFinite(lessonsFromExplicit) && lessonsFromExplicit > 0
+    ? lessonsFromExplicit
+    : 0;
+
   return {
     id: String(awsCourse.courseid || awsCourse.id || 'unknown'),
     title: awsCourse.title || 'Untitled Course',
@@ -274,7 +300,8 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
       'https://via.placeholder.com/400x250',
     category: awsCourse.category_name || 'General',
     categoryColor: awsCourse.category_color || Colors.categoryDefault,
-    modules: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
+    modules: resolvedModules,
+    lessons: resolvedLessons,
     tags: Array.isArray(awsCourse.tags) ? awsCourse.tags : [],
     prerequisites: [],
     outcomes: [],
@@ -343,16 +370,16 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     ? Math.round((progressCompleted / progressTotal) * 100) 
     : 0;
   
-  // console.log(`[courseService] Converting enrollment for "${enrollment.title}":`, {
-  //   hasSectionData,
-  //   totalSections,
-  //   completedSections,
-  //   totalItems,
-  //   completedItems,
-  //   progressTotal,
-  //   progressCompleted,
-  //   calculatedPercentage,
-  // });
+  console.log(`[courseService] Converting enrollment for "${enrollment.title}":`, {
+    hasSectionData,
+    totalSections,
+    completedSections,
+    totalItems,
+    completedItems,
+    progressTotal,
+    progressCompleted,
+    calculatedPercentage,
+  });
   
   // Generate avatar from instructor name
   const generateAvatar = (name: string): string => {
@@ -395,7 +422,8 @@ class CourseService {
   async getCourses(params?: CourseListParams): Promise<Course[]> {
     try {
       // Check cache first
-      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_${JSON.stringify(params || {})}`;
+      const paramString = params ? JSON.stringify(params) : 'default';
+      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_${paramString}`;
       const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
       if (cachedCourses) {
         return cachedCourses;
@@ -583,10 +611,9 @@ class CourseService {
 
 async getWishlist(userId: string): Promise<Course[]> {
   if (!userId) userId = DEFAULT_USER_ID;
-  const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`;
+  const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_wishlist_v2_${userId}`;
   const cached = await CacheManager.get<Course[]>(cacheKey);
   if (cached) return cached;
-  // remove later - temporary override for testing
 
   const resp = await apiService.get<any>(WISHLIST.BASE(userId), { userId });
   const array = resp?.courses ?? resp?.data?.courses ?? [];
@@ -599,14 +626,14 @@ async addToWishlist(userId: string, courseId: string): Promise<void> {
   if (!userId) userId = DEFAULT_USER_ID;
   if (!courseId) throw new Error('Missing courseId');
   await apiService.post(WISHLIST.ITEM(userId , courseId), { userId, courseId });
-  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
+  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_v2_${userId}`);
 }
 
 async removeFromWishlist(userId: string, courseId: string): Promise<void> {
   if (!userId) userId = DEFAULT_USER_ID;
   if (!courseId) throw new Error('Missing courseId');
   await apiService.delete(WISHLIST.ITEM(userId, courseId));
-  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
+  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_v2_${userId}`);
 }
 
   /**
