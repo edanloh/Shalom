@@ -21,19 +21,21 @@ interface BackendQuizQuestion {
   explanation: string;
   points: number;
   order_index: number;
+  image_url?: string; // Optional question image
 }
 
 // Frontend Question Structure (after transformation)
 export interface QuizQuestion {
   id: string;
   question_text: string;
-  question_type: 'multiple-choice' | 'true-false';
+  question_type: 'multiple-choice' | 'multiple-correct' | 'true-false' | 'short-answer' | 'matching';
   order_index: number;
   options: QuizOption[];
   explanation?: string;
   points: number;
   correct_answer?: string;
   image_url?: string; // Optional question image
+  matching_pairs?: Array<{ left: string; right: string }>; // For matching type
 }
 
 // Backend Quiz Detail Response
@@ -138,19 +140,52 @@ class QuizService {
    * Converts string array options to QuizOption objects
    */
   private transformQuestion(backendQuestion: BackendQuizQuestion): QuizQuestion {
-    return {
+    // Map question types properly
+    let questionType: 'multiple-choice' | 'multiple-correct' | 'true-false' | 'short-answer' | 'matching';
+    
+    switch (backendQuestion.question_type) {
+      case 'true-false':
+        questionType = 'true-false';
+        break;
+      case 'multiple-correct':
+        questionType = 'multiple-correct';
+        break;
+      case 'short-answer':
+      case 'text':
+        questionType = 'short-answer';
+        break;
+      case 'matching':
+        questionType = 'matching';
+        break;
+      default:
+        questionType = 'multiple-choice';
+    }
+
+    const transformed: QuizQuestion = {
       id: backendQuestion.id,
       question_text: backendQuestion.question_text,
-      question_type: backendQuestion.question_type === 'true-false' ? 'true-false' : 'multiple-choice',
+      question_type: questionType,
       order_index: backendQuestion.order_index,
-      options: backendQuestion.options.map((optionText, index) => ({
+      options: (backendQuestion.options || []).map((optionText, index) => ({
         id: `${backendQuestion.id}-option-${index}`,
         option_text: optionText,
       })),
       explanation: backendQuestion.explanation,
       points: backendQuestion.points,
       correct_answer: backendQuestion.correct_answer,
+      image_url: backendQuestion.image_url,
     };
+
+    // For matching questions, parse the correct_answer JSON
+    if (questionType === 'matching') {
+      try {
+        transformed.matching_pairs = JSON.parse(backendQuestion.correct_answer || '[]');
+      } catch {
+        transformed.matching_pairs = [];
+      }
+    }
+
+    return transformed;
   }
 
   /**

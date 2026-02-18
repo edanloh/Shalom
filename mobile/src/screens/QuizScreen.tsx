@@ -767,96 +767,190 @@ const QuizScreen = () => {
 
       {/* Question Card */}
       <View style={styles.modernQuestionCard}>
-        {/* Question Image - Only show if image_url exists */}
+        {/* Question Image - Show if image_url exists */}
         {currentQuestion.image_url && (
           <View style={styles.questionImageContainer}>
-            <View style={styles.questionImagePlaceholder}>
-              <Ionicons
-                name="image"
-                size={64}
-                color={Colors.purple400 + "40"}
-              />
-              {/* TODO: Replace with actual image when available */}
-              {/* <Image source={{ uri: currentQuestion.image_url }} style={styles.questionImage} /> */}
-            </View>
+            <Image
+              source={{ uri: currentQuestion.image_url }}
+              style={styles.questionImage}
+              resizeMode="contain"
+              onError={() => {
+                console.log('Failed to load question image');
+              }}
+            />
           </View>
         )}
 
         <Text style={styles.modernQuestionText}>
           {currentQuestion.question_text}
         </Text>
+
+        {/* Question Type Indicator */}
+        {currentQuestion.question_type === 'multiple-correct' && (
+          <Text style={styles.questionTypeHint}>
+            ℹ️ Select all correct answers
+          </Text>
+        )}
+        {currentQuestion.question_type === 'short-answer' && (
+          <Text style={styles.questionTypeHint}>
+            ℹ️ Short answer question (manually graded)
+          </Text>
+        )}
+        {currentQuestion.question_type === 'matching' && (
+          <Text style={styles.questionTypeHint}>
+            ℹ️ Match the pairs correctly
+          </Text>
+        )}
       </View>
 
-      {/* Options */}
-      <View style={styles.modernOptionsContainer}>
-        {currentQuestion.options?.filter(Boolean).map((option, index) => {
-          const isSelected =
-            selectedAnswers.get(currentQuestion.id) === option.option_text;
+      {/* Options - Only for MCQ types */}
+      {(currentQuestion.question_type === 'multiple-choice' || 
+        currentQuestion.question_type === 'multiple-correct' ||
+        currentQuestion.question_type === 'true-false') && (
+        <View style={styles.modernOptionsContainer}>
+          {currentQuestion.options?.filter(Boolean).map((option, index) => {
+            const isSelected =
+              selectedAnswers.get(currentQuestion.id) === option.option_text;
 
-          /* ----------  review-mode colours / icons  ---------- */
-          let borderColor = "#3a3a4e";
-          let backgroundColor = "#2a2a3e";
-          let showCheckmark = false;
-          let showCross = false;
+            /* ----------  review-mode colours / icons  ---------- */
+            let borderColor = "#3a3a4e";
+            let backgroundColor = "#2a2a3e";
+            let showCheckmark = false;
+            let showCross = false;
 
-          if (reviewMode && correctAnswerForCurrentQuestion) {
-            const isCorrectAnswer =
-              option.option_text ===
-              correctAnswerForCurrentQuestion.correctAnswer;
-            const userAnswer = selectedAnswers.get(currentQuestion.id);
-            const wasUserAnswer = option.option_text === userAnswer;
-
-            if (isCorrectAnswer) {
-              borderColor = Colors.green;
-              backgroundColor = "#1a3a2a";
-              showCheckmark = true;
-            } else if (wasUserAnswer && !isCorrectAnswer) {
-              borderColor = Colors.red;
-              backgroundColor = "#3a1a1a";
-              showCross = true;
-            }
-          } else if (isSelected) {
-            borderColor = Colors.purple400;
-            backgroundColor = "#3a2a5e";
-          }
-
-          return (
-            <TouchableOpacity
-              key={option.id}
-              style={[
-                styles.modernOptionCard,
-                { borderColor, backgroundColor },
-              ]}
-              onPress={() =>
-                !reviewMode &&
-                handleAnswerSelect(currentQuestion.id, option.option_text)
+            if (reviewMode && correctAnswerForCurrentQuestion) {
+              // For multiple-correct, need to check if this option is in the array
+              let isCorrectAnswer = false;
+              const correctAns = correctAnswerForCurrentQuestion.correctAnswer;
+              
+              if (currentQuestion.question_type === 'multiple-correct') {
+                try {
+                  const correctAnswers = JSON.parse(correctAns);
+                  isCorrectAnswer = Array.isArray(correctAnswers) && correctAnswers.includes(index);
+                } catch {
+                  isCorrectAnswer = option.option_text === correctAns || String(index) === correctAns;
+                }
+              } else {
+                isCorrectAnswer = option.option_text === correctAns || String(index) === correctAns;
               }
-              activeOpacity={reviewMode ? 1 : 0.7}
-              disabled={reviewMode}
-            >
-              <View style={[styles.modernOptionRadio, { borderColor }]}>
-                {isSelected && !reviewMode && (
-                  <View style={styles.modernOptionRadioInner} />
-                )}
-                {reviewMode && showCheckmark && (
-                  <Ionicons name="checkmark" size={20} color={Colors.green} />
-                )}
-                {reviewMode && showCross && (
-                  <Ionicons name="close" size={20} color={Colors.red} />
-                )}
-              </View>
-              <Text
+              
+              const userAnswer = selectedAnswers.get(currentQuestion.id);
+              const wasUserAnswer = option.option_text === userAnswer;
+
+              if (isCorrectAnswer) {
+                borderColor = Colors.green;
+                backgroundColor = "#1a3a2a";
+                showCheckmark = true;
+              } else if (wasUserAnswer && !isCorrectAnswer) {
+                borderColor = Colors.red;
+                backgroundColor = "#3a1a1a";
+                showCross = true;
+              }
+            } else if (isSelected) {
+              borderColor = Colors.purple400;
+              backgroundColor = "#3a2a5e";
+            }
+
+            return (
+              <TouchableOpacity
+                key={option.id}
                 style={[
-                  styles.modernOptionText,
-                  isSelected && !reviewMode && styles.modernOptionTextSelected,
+                  styles.modernOptionCard,
+                  { borderColor, backgroundColor },
                 ]}
+                onPress={() =>
+                  !reviewMode &&
+                  handleAnswerSelect(currentQuestion.id, option.option_text)
+                }
+                activeOpacity={reviewMode ? 1 : 0.7}
+                disabled={reviewMode}
               >
-                {option.option_text}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                <View style={[styles.modernOptionRadio, { borderColor }]}>
+                  {isSelected && !reviewMode && (
+                    <View style={styles.modernOptionRadioInner} />
+                  )}
+                  {reviewMode && showCheckmark && (
+                    <Ionicons name="checkmark" size={20} color={Colors.green} />
+                  )}
+                  {reviewMode && showCross && (
+                    <Ionicons name="close" size={20} color={Colors.red} />
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.modernOptionText,
+                    isSelected && !reviewMode && styles.modernOptionTextSelected,
+                  ]}
+                >
+                  {option.option_text}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Short Answer Questions */}
+      {currentQuestion.question_type === 'short-answer' && (
+        <View style={styles.shortAnswerContainer}>
+          <Text style={styles.shortAnswerLabel}>
+            This question requires a written answer and will be manually graded.
+          </Text>
+          {reviewMode && currentQuestion.explanation && (
+            <View style={styles.explanationCard}>
+              <Text style={styles.explanationTitle}>Sample Answer:</Text>
+              <Text style={styles.explanationText}>{currentQuestion.explanation}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Matching Questions */}
+      {currentQuestion.question_type === 'matching' && (
+        <View style={styles.matchingContainer}>
+          <Text style={styles.matchingLabel}>
+            Match the following pairs:
+          </Text>
+          {reviewMode && (
+            <View style={styles.matchingPairsContainer}>
+              {(() => {
+                let matchingPairs: any[] = [];
+                const correctAns = currentQuestion.correct_answer || '';
+                
+                if (typeof correctAns === 'string') {
+                  try {
+                    matchingPairs = JSON.parse(correctAns);
+                  } catch (e) {
+                    console.error('Failed to parse matching pairs:', e);
+                    matchingPairs = [];
+                  }
+                } else if (Array.isArray(correctAns)) {
+                  matchingPairs = correctAns;
+                }
+                
+                return matchingPairs.map((pair: any, index: number) => (
+                  <View key={index} style={styles.matchingPair}>
+                    <Text style={styles.matchingText}>{pair.left}</Text>
+                    <Ionicons name="arrow-forward" size={20} color={Colors.textSecondary} />
+                    <Text style={styles.matchingText}>{pair.right}</Text>
+                  </View>
+                ));
+              })()}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Show explanation in review mode for MCQ types */}
+      {reviewMode && currentQuestion.explanation && 
+        (currentQuestion.question_type === 'multiple-choice' || 
+         currentQuestion.question_type === 'multiple-correct' ||
+         currentQuestion.question_type === 'true-false') && (
+        <View style={styles.explanationCard}>
+          <Text style={styles.explanationTitle}>Explanation:</Text>
+          <Text style={styles.explanationText}>{currentQuestion.explanation}</Text>
+        </View>
+      )}
 
       <View style={styles.questionNavRow}>
         <TouchableOpacity
@@ -1056,8 +1150,9 @@ const styles = StyleSheet.create({
   },
   questionImage: {
     width: "100%",
-    height: "100%",
+    height: 200,
     borderRadius: 16,
+    backgroundColor: "#1a1a2e",
   },
   modernQuestionText: {
     fontSize: 20,
@@ -1065,6 +1160,12 @@ const styles = StyleSheet.create({
     color: Colors.white,
     lineHeight: 28,
     textAlign: "left",
+  },
+  questionTypeHint: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: Spacing.sm,
+    fontStyle: 'italic',
   },
 
   // Modern Options
@@ -1111,6 +1212,70 @@ const styles = StyleSheet.create({
   modernOptionTextSelected: {
     fontWeight: "600",
     color: Colors.white,
+  },
+
+  // Short Answer Styles
+  shortAnswerContainer: {
+    backgroundColor: Colors.surface,
+    padding: Spacing.lg,
+    borderRadius: 16,
+    marginBottom: Spacing.md,
+  },
+  shortAnswerLabel: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+  },
+
+  // Matching Styles
+  matchingContainer: {
+    backgroundColor: Colors.surface,
+    padding: Spacing.lg,
+    borderRadius: 16,
+    marginBottom: Spacing.md,
+  },
+  matchingLabel: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+    fontWeight: '600',
+  },
+  matchingPairsContainer: {
+    gap: Spacing.sm,
+  },
+  matchingPair: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.md,
+    backgroundColor: Colors.textInputBg,
+    borderRadius: 12,
+  },
+  matchingText: {
+    flex: 1,
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+
+  // Explanation Card
+  explanationCard: {
+    backgroundColor: Colors.surface,
+    padding: Spacing.lg,
+    borderRadius: 16,
+    marginTop: Spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.purple400,
+  },
+  explanationTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.purple400,
+    marginBottom: Spacing.sm,
+  },
+  explanationText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    lineHeight: 22,
   },
 
   // Results Screen Styles

@@ -79,6 +79,17 @@ export class StorageService {
   }
 
   /**
+   * Upload quiz question image file
+   * @param file - The image file to upload
+   * @param courseId - Optional course ID for organizing files
+   * @returns The public URL of the uploaded image
+   */
+  static async uploadQuestionImage(file: File, courseId?: string): Promise<{ url: string; error: string | null }> {
+    const path = courseId ? `courses/${courseId}/questions/` : 'questions/';
+    return this.uploadFile('quiz-questions', file, path);
+  }
+
+  /**
    * Delete a file from storage
    * @param bucket - The storage bucket name
    * @param filePath - The path of the file to delete

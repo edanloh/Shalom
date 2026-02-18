@@ -1086,6 +1086,8 @@ export const CourseBuilderProvider = ({
               explanation: q.sampleAnswer || "",
               points: q.points || 1,
               order: qIndex, // Add order for questions
+              imageUrl: q.imageUrl || null, // Include image URL
+              matchingPairs: q.matchingPairs || [], // Include matching pairs
             };
           }),
         })),
