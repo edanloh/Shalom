@@ -1600,7 +1600,7 @@ const QuizEditor = ({
   showValidationErrors,
 }: any) => {
   const { deleteQuiz } = useContentManagement();
-  const { currentCourseId } = useCourseBuilder();
+  const { currentCourseId, setCurrentCourseId } = useCourseBuilder();
   const module = modules.find((m: any) =>
     m.quizzes.some((q: any) => q.id === selectedItem.id),
   );
@@ -1734,6 +1734,53 @@ const QuizEditor = ({
     // Delete the entire quiz
     deleteQuiz(module.id, quiz.id);
     setShowDeleteDialog(false);
+  };
+
+  // Handle image URL input - download and upload to Supabase
+  const handleImageUrlChange = async (url: string) => {
+    // Update the input immediately for user feedback
+    updateQuestion(
+      module.id,
+      quiz.id,
+      currentQuestion.id,
+      "imageUrl",
+      url,
+    );
+
+    // If empty or not a valid URL, just return
+    if (!url || !url.trim()) {
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(url);
+    } catch {
+      // Invalid URL format, but we'll store it anyway and let save handle it
+      return;
+    }
+
+    // Check if it's already a Supabase URL (already uploaded)
+    if (url.includes('supabase.co/storage')) {
+      // Already uploaded, just store it
+      updateQuestion(
+        module.id,
+        quiz.id,
+        currentQuestion.id,
+        "imageUrl",
+        url,
+      );
+      return;
+    }
+
+    // Store the external URL directly - will be uploaded during save
+    updateQuestion(
+      module.id,
+      quiz.id,
+      currentQuestion.id,
+      "imageUrl",
+      url,
+    );
   };
 
   return (
@@ -2064,15 +2111,7 @@ const QuizEditor = ({
                       ? ""
                       : currentQuestion.imageUrl || ""
                   }
-                  onChange={(e) =>
-                    updateQuestion(
-                      module.id,
-                      quiz.id,
-                      currentQuestion.id,
-                      "imageUrl",
-                      e.target.value,
-                    )
-                  }
+                  onChange={(e) => handleImageUrlChange(e.target.value)}
                   style={{
                     backgroundColor: Colors.textInputBg,
                     borderColor: Colors.gray600,
@@ -2088,9 +2127,6 @@ const QuizEditor = ({
                         src={currentQuestion.imageUrl}
                         alt="Question image"
                         className="max-w-full h-32 object-cover rounded border border-slate-600"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
                       />
                     </div>
                   )}
@@ -2112,7 +2148,7 @@ const QuizEditor = ({
                       return;
                     }
 
-                    // Store local reference and cache for preview
+                    // Store local reference and cache for preview (upload happens during save)
                     updateQuestion(
                       module.id,
                       quiz.id,
@@ -2129,47 +2165,6 @@ const QuizEditor = ({
 
                     // Clear the file input
                     e.target.value = "";
-
-                    try {
-                      // Upload to Supabase
-                      const { url, error } = await StorageService.uploadQuestionImage(file, currentCourseId);
-                      
-                      if (error) {
-                        console.error("Upload error:", error);
-                        alert("Failed to upload image: " + error);
-                        // Clear the local reference on error
-                        updateQuestion(
-                          module.id,
-                          quiz.id,
-                          currentQuestion.id,
-                          "imageUrl",
-                          "",
-                        );
-                        (window as any).__questionImageCache?.delete(cacheKey);
-                        return;
-                      }
-
-                      // Store the uploaded URL
-                      updateQuestion(
-                        module.id,
-                        quiz.id,
-                        currentQuestion.id,
-                        "imageUrl",
-                        url,
-                      );
-                    } catch (err) {
-                      console.error("Upload error:", err);
-                      alert("Failed to upload image");
-                      // Clear on error
-                      updateQuestion(
-                        module.id,
-                        quiz.id,
-                        currentQuestion.id,
-                        "imageUrl",
-                        "",
-                      );
-                      (window as any).__questionImageCache?.delete(cacheKey);
-                    }
                   }}
                   style={{
                     backgroundColor: Colors.textInputBg,
