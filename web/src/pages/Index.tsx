@@ -422,7 +422,7 @@ const Index = () => {
             <div className="gradient-card border-border rounded-xl p-6 h-[450px] flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-accent" />
+                  <BookOpen className="h-5 w-5 text-primary" />
                   Pending Tasks
                 </h3>
                 <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
@@ -489,13 +489,19 @@ const Index = () => {
 
                       return (
                         <>
-                          {customTasks.length > 0 && (
-                            <div className="min-h-0 flex-1 flex flex-col gap-2">
-                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                Custom Tasks
-                              </p>
-                              <div className="space-y-3 overflow-y-auto pr-2 min-h-0 flex-1">
-                                {customTasks.map((task: any) => (
+                          <div className="min-h-0 flex-1 flex flex-col gap-2">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Custom Tasks
+                            </p>
+                            <div
+                              className={`min-h-0 flex-1 ${
+                                customTasks.length > 0
+                                  ? "space-y-3 overflow-y-auto pr-2"
+                                  : "flex items-center justify-center"
+                              }`}
+                            >
+                              {customTasks.length > 0 ? (
+                                customTasks.map((task: any) => (
                                   <div
                                     key={task.id}
                                     className="flex items-center justify-between p-3 rounded-lg bg-background/50"
@@ -542,10 +548,14 @@ const Index = () => {
                                       </Button>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
+                                ))
+                              ) : (
+                                <div className="text-sm text-muted-foreground">
+                                  No custom tasks yet
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
                           {derivedTasks.length > 0 && (
                             <div className="space-y-2 shrink-0">
                               <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -579,7 +589,7 @@ const Index = () => {
                                       <span className="text-sm text-foreground">
                                         {task.title}
                                       </span>
-                                      <span className="font-bold text-accent">
+                                      <span className="font-bold text-primary">
                                         {task.count}
                                       </span>
                                     </div>
