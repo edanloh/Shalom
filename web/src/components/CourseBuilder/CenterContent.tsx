@@ -1588,6 +1588,105 @@ const LessonEditor = ({
 };
 
 /* ------------------------- PAGED QUIZ EDITOR ------------------------- */
+
+// Helper: Get errors for a single question
+const getQuestionErrors = (question: any): string[] => {
+  const errors: string[] = [];
+
+  if (!question.text?.trim()) {
+    errors.push("Question text is required");
+  }
+
+  // Points validation - catch NaN properly
+  const points = Number(question.points);
+  if (isNaN(points) || points < 1) {
+    errors.push("Points must be at least 1");
+  }
+
+  // Type-specific validation
+  if (question.type === "multiple-choice") {
+    // Must have a correct answer selected
+    if (
+      question.correctAnswer === null ||
+      question.correctAnswer === undefined
+    ) {
+      errors.push("Select a correct answer");
+    }
+    // The selected answer must point to a non-empty option
+    if (
+      question.correctAnswer !== null &&
+      question.correctAnswer !== undefined
+    ) {
+      const selectedOption = question.options?.[question.correctAnswer];
+      if (!selectedOption || !String(selectedOption).trim()) {
+        errors.push("Correct answer points to an empty option");
+      }
+    }
+    // At least one non-empty option
+    const hasOptions = question.options?.some((opt: any) => String(opt).trim());
+    if (!hasOptions) {
+      errors.push("At least one option is required");
+    }
+  }
+
+  if (question.type === "multiple-correct") {
+    // Must have at least one answer checked
+    const checkedAnswers = Array.isArray(question.correctAnswer)
+      ? question.correctAnswer
+      : [];
+    if (checkedAnswers.length === 0) {
+      errors.push("Select at least one correct answer");
+    }
+    // None of the checked answers should point to empty options
+    for (const idx of checkedAnswers) {
+      const option = question.options?.[idx];
+      if (!option || !String(option).trim()) {
+        errors.push("A correct answer points to an empty option");
+        break;
+      }
+    }
+    // At least one non-empty option
+    const hasOptions = question.options?.some((opt: any) => String(opt).trim());
+    if (!hasOptions) {
+      errors.push("At least one option is required");
+    }
+  }
+
+  if (question.type === "true-false") {
+    // correctAnswer must be explicitly 0 or 1
+    if (question.correctAnswer !== 0 && question.correctAnswer !== 1) {
+      errors.push("Select either True or False");
+    }
+  }
+
+  if (question.type === "short-answer") {
+    // sampleAnswer (Explanation) is required as grading guideline
+    if (!question.sampleAnswer?.trim()) {
+      errors.push(
+        "Explanation/Sample Answer is required for short-answer questions",
+      );
+    }
+  }
+
+  if (question.type === "matching") {
+    // Must have at least 1 pair
+    if (!question.matchingPairs || question.matchingPairs.length === 0) {
+      errors.push("At least one matching pair is required");
+    }
+    // Every pair must have both left and right filled
+    const hasMissingFields = question.matchingPairs?.some(
+      (pair: any) => !pair.left?.trim() || !pair.right?.trim(),
+    );
+    if (hasMissingFields) {
+      errors.push(
+        "All matching pairs must have both left and right items filled",
+      );
+    }
+  }
+
+  return errors;
+};
+
 const QuizEditor = ({
   selectedItem,
   modules,
@@ -1606,10 +1705,16 @@ const QuizEditor = ({
   );
   const quiz = module?.quizzes.find((q: any) => q.id === selectedItem.id);
   const quizTitleEmpty = !(quiz?.baseTitle || "").trim();
+
+  // Enhanced passing score validation
+  const passingScoreValue = Number(quiz?.passingScore);
   const passingScoreInvalid =
     quiz?.passingScore === undefined ||
     quiz?.passingScore === null ||
-    Number.isNaN(Number(quiz?.passingScore));
+    Number.isNaN(passingScoreValue) ||
+    passingScoreValue < 0 ||
+    passingScoreValue > 100;
+
   const maxAttemptsInvalid =
     quiz?.maxAttempts !== null &&
     quiz?.maxAttempts !== undefined &&
@@ -1618,7 +1723,22 @@ const QuizEditor = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   // FIX 1: Declare questionImagePreviewUrl state here in QuizEditor (not LessonEditor)
-  const [questionImagePreviewUrl, setQuestionImagePreviewUrl] = useState<string>("");
+  const [questionImagePreviewUrl, setQuestionImagePreviewUrl] =
+    useState<string>("");
+
+  // Calculate errors for all questions
+  const questions = quiz?.questions || [];
+  const questionErrorsMap = new Map<string, string[]>();
+  questions.forEach((q: any) => {
+    const errors = getQuestionErrors(q);
+    if (errors.length > 0) {
+      questionErrorsMap.set(q.id, errors);
+    }
+  });
+  const totalErrorCount = Array.from(questionErrorsMap.values()).reduce(
+    (sum, errors) => sum + errors.length,
+    0,
+  );
 
   // Reset currentIndex when quiz changes
   useEffect(() => {
@@ -1638,7 +1758,6 @@ const QuizEditor = ({
     );
   }
 
-  const questions = quiz?.questions || [];
   const currentQuestion = questions[currentIndex];
 
   // Effect to sync options/correctAnswer when question type changes.
@@ -1646,7 +1765,8 @@ const QuizEditor = ({
   // and can reliably reset dependent fields without racing the type update.
   const prevQuestionTypeRef = React.useRef<string | undefined>(undefined);
   const prevQuestionIdRef = React.useRef<string | undefined>(undefined);
-  useEffect(() => { // eslint-disable-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    // eslint-disable-line react-hooks/rules-of-hooks
     if (!currentQuestion) return;
 
     // When navigating to a different question, reset the ref so we don't
@@ -1662,10 +1782,22 @@ const QuizEditor = ({
           currentQuestion.options[0] === "True" &&
           currentQuestion.options[1] === "False";
         if (!hasValidOptions) {
-          updateQuestion(module.id, quiz.id, currentQuestion.id, "options", ["True", "False"]);
+          updateQuestion(module.id, quiz.id, currentQuestion.id, "options", [
+            "True",
+            "False",
+          ]);
         }
-        if (currentQuestion.correctAnswer !== 0 && currentQuestion.correctAnswer !== 1) {
-          updateQuestion(module.id, quiz.id, currentQuestion.id, "correctAnswer", 0);
+        if (
+          currentQuestion.correctAnswer !== 0 &&
+          currentQuestion.correctAnswer !== 1
+        ) {
+          updateQuestion(
+            module.id,
+            quiz.id,
+            currentQuestion.id,
+            "correctAnswer",
+            0,
+          );
         }
       }
       return;
@@ -1679,15 +1811,33 @@ const QuizEditor = ({
 
     if (currType === "true-false") {
       // Arriving at true-false: always set canonical options so the validator never sees empty options
-      updateQuestion(module.id, quiz.id, currentQuestion.id, "options", ["True", "False"]);
-      if (currentQuestion.correctAnswer !== 0 && currentQuestion.correctAnswer !== 1) {
-        updateQuestion(module.id, quiz.id, currentQuestion.id, "correctAnswer", 0);
+      updateQuestion(module.id, quiz.id, currentQuestion.id, "options", [
+        "True",
+        "False",
+      ]);
+      if (
+        currentQuestion.correctAnswer !== 0 &&
+        currentQuestion.correctAnswer !== 1
+      ) {
+        updateQuestion(
+          module.id,
+          quiz.id,
+          currentQuestion.id,
+          "correctAnswer",
+          0,
+        );
       }
     } else if (prevType === "true-false") {
       // Leaving true-false: clear the True/False options so the new type starts blank
-      updateQuestion(module.id, quiz.id, currentQuestion.id, "options", ["", ""]);
+      updateQuestion(module.id, quiz.id, currentQuestion.id, "options", [
+        "",
+        "",
+      ]);
       updateQuestion(
-        module.id, quiz.id, currentQuestion.id, "correctAnswer",
+        module.id,
+        quiz.id,
+        currentQuestion.id,
+        "correctAnswer",
         currType === "multiple-correct" ? [] : null,
       );
     }
@@ -1701,7 +1851,9 @@ const QuizEditor = ({
     if (cachedFile) {
       const url = URL.createObjectURL(cachedFile);
       setQuestionImagePreviewUrl(url);
-      return () => { URL.revokeObjectURL(url); };
+      return () => {
+        URL.revokeObjectURL(url);
+      };
     } else {
       setQuestionImagePreviewUrl("");
       return undefined;
@@ -1739,13 +1891,7 @@ const QuizEditor = ({
   // Handle image URL input - download and upload to Supabase
   const handleImageUrlChange = async (url: string) => {
     // Update the input immediately for user feedback
-    updateQuestion(
-      module.id,
-      quiz.id,
-      currentQuestion.id,
-      "imageUrl",
-      url,
-    );
+    updateQuestion(module.id, quiz.id, currentQuestion.id, "imageUrl", url);
 
     // If empty or not a valid URL, just return
     if (!url || !url.trim()) {
@@ -1761,26 +1907,14 @@ const QuizEditor = ({
     }
 
     // Check if it's already a Supabase URL (already uploaded)
-    if (url.includes('supabase.co/storage')) {
+    if (url.includes("supabase.co/storage")) {
       // Already uploaded, just store it
-      updateQuestion(
-        module.id,
-        quiz.id,
-        currentQuestion.id,
-        "imageUrl",
-        url,
-      );
+      updateQuestion(module.id, quiz.id, currentQuestion.id, "imageUrl", url);
       return;
     }
 
     // Store the external URL directly - will be uploaded during save
-    updateQuestion(
-      module.id,
-      quiz.id,
-      currentQuestion.id,
-      "imageUrl",
-      url,
-    );
+    updateQuestion(module.id, quiz.id, currentQuestion.id, "imageUrl", url);
   };
 
   return (
@@ -1879,6 +2013,53 @@ const QuizEditor = ({
         </div>
       </div>
 
+      {/* Cross-Question Error Banner */}
+      {showValidationErrors && totalErrorCount > 0 && (
+        <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <svg
+                className="w-5 h-5 text-red-400"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-red-300 mb-1">
+                {totalErrorCount} {totalErrorCount === 1 ? "error" : "errors"}{" "}
+                found in questions
+              </h4>
+              <div className="text-xs text-red-200 space-y-1">
+                {Array.from(questionErrorsMap.entries()).map(
+                  ([questionId, errors]) => {
+                    const qIndex = questions.findIndex(
+                      (q: any) => q.id === questionId,
+                    );
+                    return (
+                      <div key={questionId}>
+                        <button
+                          onClick={() => setCurrentIndex(qIndex)}
+                          className="text-red-300 hover:text-red-100 underline font-medium"
+                        >
+                          Question {qIndex + 1}
+                        </button>
+                        : {errors.join(", ")}
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Question Navigation */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -1922,11 +2103,29 @@ const QuizEditor = ({
 
       {/* Question Page */}
       {currentQuestion && (
-        <div className="relative bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-md space-y-6">
+        <div
+          className={`relative bg-slate-800 rounded-xl p-6 shadow-md space-y-6 ${
+            showValidationErrors && questionErrorsMap.has(currentQuestion.id)
+              ? "border-2 border-red-500"
+              : "border border-slate-700"
+          }`}
+        >
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-white">
-              Question {currentIndex + 1}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-white">
+                Question {currentIndex + 1}
+              </h3>
+              {/* Error pill badge */}
+              {showValidationErrors &&
+                questionErrorsMap.has(currentQuestion.id) && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-900/40 text-red-300 border border-red-700/50">
+                    {questionErrorsMap.get(currentQuestion.id)!.length}{" "}
+                    {questionErrorsMap.get(currentQuestion.id)!.length === 1
+                      ? "error"
+                      : "errors"}
+                  </span>
+                )}
+            </div>
             <button
               onClick={handleDeleteQuestion}
               className="text-black hover:text-black"
@@ -1934,6 +2133,20 @@ const QuizEditor = ({
               <X className="h-4 w-4" />
             </button>
           </div>
+
+          {/* Inline question errors */}
+          {showValidationErrors &&
+            questionErrorsMap.has(currentQuestion.id) && (
+              <div className="bg-red-900/20 border border-red-700/50 rounded p-3">
+                <ul className="text-xs text-red-300 space-y-1">
+                  {questionErrorsMap
+                    .get(currentQuestion.id)!
+                    .map((error, idx) => (
+                      <li key={idx}>• {error}</li>
+                    ))}
+                </ul>
+              </div>
+            )}
 
           {/* Question text */}
           <div>
@@ -1973,7 +2186,13 @@ const QuizEditor = ({
                 // Only update the type here. The useEffect above watches for type changes
                 // and resets options/correctAnswer after the render, avoiding race conditions
                 // that occur when calling updateQuestion multiple times in one event handler.
-                updateQuestion(module.id, quiz.id, currentQuestion.id, "type", e.target.value);
+                updateQuestion(
+                  module.id,
+                  quiz.id,
+                  currentQuestion.id,
+                  "type",
+                  e.target.value,
+                );
               }}
               className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
             >
@@ -2262,7 +2481,13 @@ const QuizEditor = ({
                       name={`question-${currentQuestion.id}`}
                       checked={currentQuestion.correctAnswer === 0}
                       onChange={() => {
-                        updateQuestion(module.id, quiz.id, currentQuestion.id, "correctAnswer", 0);
+                        updateQuestion(
+                          module.id,
+                          quiz.id,
+                          currentQuestion.id,
+                          "correctAnswer",
+                          0,
+                        );
                       }}
                       className="w-4 h-4 accent-blue-500"
                     />
@@ -2274,7 +2499,13 @@ const QuizEditor = ({
                       name={`question-${currentQuestion.id}`}
                       checked={currentQuestion.correctAnswer === 1}
                       onChange={() => {
-                        updateQuestion(module.id, quiz.id, currentQuestion.id, "correctAnswer", 1);
+                        updateQuestion(
+                          module.id,
+                          quiz.id,
+                          currentQuestion.id,
+                          "correctAnswer",
+                          1,
+                        );
                       }}
                       className="w-4 h-4 accent-blue-500"
                     />
@@ -2345,7 +2576,11 @@ const QuizEditor = ({
                             newOptions,
                           );
                         }}
-                        className="flex-1 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
+                        className={`flex-1 px-3 py-1 bg-slate-700 border rounded text-white text-sm focus:outline-none ${
+                          showValidationErrors && !String(option).trim()
+                            ? "border-red-500 focus:border-red-500"
+                            : "border-slate-600 focus:border-blue-500"
+                        }`}
                         placeholder={`Option ${idx + 1}`}
                       />
                       {currentQuestion.options.length > 2 && (
@@ -2421,7 +2656,11 @@ const QuizEditor = ({
                           );
                         }}
                         placeholder="Left item"
-                        className="flex-1 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
+                        className={`flex-1 px-3 py-1 bg-slate-700 border rounded text-white text-sm focus:outline-none ${
+                          showValidationErrors && !pair.left?.trim()
+                            ? "border-red-500 focus:border-red-500"
+                            : "border-slate-600 focus:border-blue-500"
+                        }`}
                       />
                       <span className="text-slate-400">↔</span>
                       <input
@@ -2444,7 +2683,11 @@ const QuizEditor = ({
                           );
                         }}
                         placeholder="Right item"
-                        className="flex-1 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
+                        className={`flex-1 px-3 py-1 bg-slate-700 border rounded text-white text-sm focus:outline-none ${
+                          showValidationErrors && !pair.right?.trim()
+                            ? "border-red-500 focus:border-red-500"
+                            : "border-slate-600 focus:border-blue-500"
+                        }`}
                       />
                       <button
                         onClick={() => {
@@ -2493,6 +2736,9 @@ const QuizEditor = ({
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Explanation / Feedback
+              {currentQuestion.type === "short-answer" && (
+                <span className="text-red-500 ml-1">*</span>
+              )}
               <span className="text-slate-400 text-xs ml-2">
                 (Shown to students after answering)
               </span>
@@ -2510,11 +2756,23 @@ const QuizEditor = ({
               }
               placeholder="Enter explanation for the correct answer (e.g., why this is the correct choice)"
               rows={3}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+              className={`w-full px-3 py-2 bg-slate-700 border rounded text-white focus:outline-none resize-none ${
+                showValidationErrors &&
+                currentQuestion.type === "short-answer" &&
+                !currentQuestion.sampleAnswer?.trim()
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-slate-600 focus:border-blue-500"
+              }`}
             />
             <p className="text-xs text-slate-400 mt-1">
               This explanation helps students understand why the answer is
               correct
+              {currentQuestion.type === "short-answer" && (
+                <span className="text-yellow-400 font-medium">
+                  {" "}
+                  (Required for grading guidelines)
+                </span>
+              )}
             </p>
           </div>
 
@@ -2535,12 +2793,22 @@ const QuizEditor = ({
                   parseInt(e.target.value) || 0,
                 )
               }
-              className="w-24 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
-              min="0"
+              className={`w-24 px-3 py-1 bg-slate-700 border rounded text-white text-sm focus:outline-none ${
+                showValidationErrors &&
+                (isNaN(Number(currentQuestion.points)) ||
+                  Number(currentQuestion.points) < 1)
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-slate-600 focus:border-blue-500"
+              }`}
+              min="1"
             />
-            {showValidationErrors && Number(currentQuestion.points) <= 0 && (
-              <p className="text-xs text-red-400 mt-1">Points are required.</p>
-            )}
+            {showValidationErrors &&
+              (isNaN(Number(currentQuestion.points)) ||
+                Number(currentQuestion.points) < 1) && (
+                <p className="text-xs text-red-400 mt-1">
+                  Points must be at least 1.
+                </p>
+              )}
           </div>
         </div>
       )}
