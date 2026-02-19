@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, FileText, CheckCircle, Clock, Filter, X, ChevronDown, BookOpen, Layers } from "lucide-react";
+import { Plus, Search, FileText, CheckCircle, Clock, Filter, X, ChevronDown, BookOpen, Layers, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/Pagination";
+import { courseService, Course, moduleService } from "@/services";
+import { useUser } from "@/contexts/UserContext";
+import { useNavigate } from "react-router-dom";
 
 const Assessments = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -20,52 +23,87 @@ const Assessments = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(9);
   const [isCourseDialogOpen, setIsCourseDialogOpen] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [modules, setModules] = useState<any[]>([]);
+  const [quizzes, setQuizzes] = useState<any[]>([]);
   const { toast } = useToast();
+  const { user } = useUser();
+  const navigate = useNavigate();
+  const [isFetchingCourse, setIsFetchingCourse] = useState(false);
 
-  // Generate more courses for demonstration
-  const allCourses = useMemo(() => {
-    const baseCourses = [
-      { id: "1", name: "Data Science Fundamentals", modules: 8, students: 124 },
-      { id: "2", name: "Machine Learning A-Z", modules: 12, students: 98 },
-      { id: "3", name: "Python for Beginners", modules: 6, students: 203 },
-      { id: "4", name: "Advanced Analytics", modules: 10, students: 67 },
-      { id: "5", name: "Deep Learning Specialization", modules: 15, students: 89 },
-      { id: "6", name: "Natural Language Processing", modules: 9, students: 56 },
-      { id: "7", name: "Computer Vision Basics", modules: 11, students: 73 },
-      { id: "8", name: "Web Development Bootcamp", modules: 14, students: 156 },
-      { id: "9", name: "React & Redux Masterclass", modules: 8, students: 112 },
-      { id: "10", name: "Node.js Backend Development", modules: 10, students: 94 },
-      { id: "11", name: "Full Stack JavaScript", modules: 16, students: 145 },
-      { id: "12", name: "Database Design & SQL", modules: 7, students: 89 },
-      { id: "13", name: "Cloud Computing with AWS", modules: 13, students: 78 },
-      { id: "14", name: "DevOps Engineering", modules: 11, students: 65 },
-      { id: "15", name: "Cybersecurity Fundamentals", modules: 9, students: 102 },
-    ];
-    return baseCourses;
+  const statusColors = {
+    published: "status-badge-published",
+    draft: "status-badge-draft",
+    archived: "bg-muted text-muted-foreground",
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const data = await courseService.getCourses();
+      setCourses(data);
+      console.log('Fetched courses:', data);
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+      toast({
+        title: "Error",
+        description: "Failed to load courses. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Fetch courses on mount
+  useEffect(() => {
+    fetchCourses();
   }, []);
 
+  useEffect(() => {
+    if (selectedCourse) {
+      setIsFetchingCourse(true);
+      fetchCourseData().finally(() => setIsFetchingCourse(false));
+    }
+  }, [selectedCourse]);
+
   const filteredCoursesForSelection = useMemo(() => {
-    return allCourses.filter(course =>
-      course.name.toLowerCase().includes(courseSearchQuery.toLowerCase())
+    return courses.filter(course =>
+      course.title.toLowerCase().includes(courseSearchQuery.toLowerCase())
     );
-  }, [allCourses, courseSearchQuery]);
+  }, [courses, courseSearchQuery]);
 
-  const courses = allCourses;
+  const fetchCourseData = async () => {
+    console.log('Fetching data for course ID:', selectedCourse);
+    if (!selectedCourse) return;
+    const courseId = selectedCourse;
 
-  const modules = selectedCourse ? [
-    { id: "1", name: "Module 1: Introduction", courseId: selectedCourse },
-    { id: "2", name: "Module 2: Fundamentals", courseId: selectedCourse },
-    { id: "3", name: "Module 3: Advanced Topics", courseId: selectedCourse },
-    { id: "4", name: "Module 4: Practical Applications", courseId: selectedCourse },
-  ] : [];
+    try {
+      // Use instructor endpoint to get full course details
+      // TODO: Get actual admin ID from auth context
+      const adminId = user.uuid;
 
-  const quizzes = [
-    { id: 1, title: "Data Science Basics Quiz", course: "Data Science Fundamentals", courseId: "1", moduleId: "1", questions: 15, type: "Multiple Choice", status: "published" },
-    { id: 2, title: "ML Algorithms Test", course: "Machine Learning A-Z", courseId: "2", moduleId: "2", questions: 20, type: "Mixed", status: "published" },
-    { id: 3, title: "Python Syntax Assessment", course: "Python for Beginners", courseId: "3", moduleId: "1", questions: 25, type: "Code Review", status: "draft" },
-    { id: 4, title: "Advanced Analytics Final", course: "Advanced Analytics", courseId: "4", moduleId: "3", questions: 30, type: "Mixed", status: "published" },
-    { id: 5, title: "Neural Networks Quiz", course: "Deep Learning Specialization", courseId: "5", moduleId: "2", questions: 18, type: "Multiple Choice", status: "published" },
-  ];
+      const data = await moduleService.getCourseModules(courseId, adminId);
+      console.log('Fetched course modules and quizzes:', data);
+      
+      // Set sections (modules) from the instructor API response
+      if (data) {
+        setModules(data);
+        // Fetch quizzes for the course and its modules
+        const allQuizzes = data.flatMap((module: any) => module.quizzes || []);
+        console.log(`Fetched ${allQuizzes.length} quizzes for course ${courseId}`);
+        setQuizzes(allQuizzes);
+        console.log('Quizzes set in state:', allQuizzes);
+      } else {
+        setModules([]);
+      }
+
+    } catch (err) {
+      console.error('Error fetching course data:', err);
+      toast({
+        title: "Error",
+        description: "Failed to load course details. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const pendingGrading = [
     { id: 1, student: "Sarah Johnson", assignment: "Final Project", course: "Data Science Fundamentals", courseId: "1", moduleId: "1", submitted: "2 hours ago", score: null },
@@ -75,17 +113,10 @@ const Assessments = () => {
   ];
 
   const filteredQuizzes = quizzes.filter(quiz => {
-    const matchesSearch = quiz.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCourse = !selectedCourse || quiz.courseId === selectedCourse;
-    const matchesModule = !selectedModule || quiz.moduleId === selectedModule;
-    return matchesSearch && matchesCourse && matchesModule;
+    return quiz.title.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const filteredGrading = pendingGrading.filter(item => {
-    const matchesCourse = !selectedCourse || item.courseId === selectedCourse;
-    const matchesModule = !selectedModule || item.moduleId === selectedModule;
-    return matchesCourse && matchesModule;
-  });
+  const filteredGrading = pendingGrading;
 
   const handleGradeSubmission = (id: number, score: number) => {
     toast({
@@ -94,7 +125,7 @@ const Assessments = () => {
     });
   };
 
-  const handleCourseSelect = (courseId: string) => {
+  const handleCourseSelect = async (courseId: string) => {
     setSelectedCourse(courseId);
     setSelectedModule("");
     setIsCourseDialogOpen(false);
@@ -175,23 +206,27 @@ const Assessments = () => {
                             filteredCoursesForSelection.map(course => (
                               <button
                                 key={course.id}
+                                disabled={course.status !== "published"}
                                 onClick={() => handleCourseSelect(course.id)}
-                                className="w-full p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all text-left group"
+                                className={`w-full p-4 rounded-lg border border-border transition-all text-left group ${course.status !== "published" ? "opacity-50 cursor-not-allowed " : "hover:border-primary hover:bg-primary/5"}`}
                               >
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors mb-1">
-                                      {course.name}
+                                    <h4 className={`font-semibold text-foreground ${course.status !== "published" ? "opacity-50 cursor-not-allowed " : "group-hover:text-primary"} transition-colors mb-1`}>
+                                      {course.title}
                                     </h4>
                                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                       <span className="flex items-center gap-1">
+                                        <Badge className={`mr-1 ${statusColors[course.status]}`}>
+                                          {course.status.toUpperCase()}
+                                        </Badge>
                                         <Layers className="h-3.5 w-3.5" />
-                                        {course.modules} modules
+                                        {course.quizzes} quizzes
                                       </span>
-                                      <span>{course.students} students</span>
+                                      <span>{course.enrolledCount} students</span>
                                     </div>
                                   </div>
-                                  <ChevronDown className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors rotate-[-90deg]" />
+                                  <ChevronDown className={`h-5 w-5 text-muted-foreground ${course.status !== "published" ? "opacity-50 cursor-not-allowed " : "group-hover:text-primary"} transition-colors rotate-[-90deg]`} />
                                 </div>
                               </button>
                             ))
@@ -208,15 +243,15 @@ const Assessments = () => {
                           <div className="flex items-center gap-2 mb-1">
                             <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
                             <p className="font-semibold text-foreground truncate">
-                              {selectedCourseData?.name}
+                              {selectedCourseData?.title}
                             </p>
                           </div>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Layers className="h-3 w-3" />
-                              {selectedCourseData?.modules} modules
+                              {selectedCourseData?.quizzes} quizzes
                             </span>
-                            <span>{selectedCourseData?.students} students</span>
+                            <span>{selectedCourseData?.enrolledCount} students</span>
                           </div>
                         </div>
                         <Button
@@ -241,6 +276,10 @@ const Assessments = () => {
                   <div className="p-4 rounded-lg border border-dashed border-border bg-muted/30 flex items-center justify-center h-[72px]">
                     <p className="text-sm text-muted-foreground">Select a course first</p>
                   </div>
+                ) : isFetchingCourse ? (
+                  <div className="p-4 rounded-lg border border-dashed border-border bg-muted/30 flex items-center justify-center h-[72px]">
+                    <Loader2 className="animate-spin text-muted-foreground" />
+                  </div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {modules.map(module => (
@@ -251,7 +290,7 @@ const Assessments = () => {
                         onClick={() => setSelectedModule(module.id === selectedModule ? "" : module.id)}
                         className="rounded-full"
                       >
-                        {module.name}
+                        {module.title}
                       </Button>
                     ))}
                   </div>
@@ -267,12 +306,12 @@ const Assessments = () => {
                     <span className="text-sm text-muted-foreground">Active filters:</span>
                     {selectedCourse && (
                       <Badge variant="secondary" className="gap-1">
-                        {selectedCourseData?.name}
+                        {selectedCourseData?.title}
                       </Badge>
                     )}
                     {selectedModule && (
                       <Badge variant="secondary" className="gap-1">
-                        {modules.find(m => m.id === selectedModule)?.name}
+                        {modules.find(m => m.id === selectedModule)?.title}
                       </Badge>
                     )}
                   </div>
@@ -350,20 +389,20 @@ const Assessments = () => {
                               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                                 <FileText className="h-6 w-6 text-primary" />
                               </div>
-                              <Badge variant={quiz.status === "published" ? "default" : "secondary"}>
+                              {/* <Badge variant={quiz.status === "published" ? "default" : "secondary"}>
                                 {quiz.status}
-                              </Badge>
+                              </Badge> */}
                             </div>
                             <div>
                               <h3 className="font-semibold text-lg text-foreground mb-1">{quiz.title}</h3>
                               <p className="text-sm text-muted-foreground line-clamp-1">{quiz.course}</p>
                             </div>
                             <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">{quiz.questions} questions</span>
+                              <span className="text-muted-foreground">{Array.isArray(quiz.questions) ? quiz.questions.length : (typeof quiz.questions === 'number' ? quiz.questions : 0)} questions</span>
                               <span className="text-muted-foreground">{quiz.type}</span>
                             </div>
                             <div className="flex gap-2">
-                              <Button variant="outline" size="sm" className="flex-1">Edit</Button>
+                              <Button variant="outline" size="sm" className="flex-1" onClick={() => navigate(`/course-builder/${selectedCourse}`)}>Edit</Button>
                               <Button size="sm" className="flex-1">View Results</Button>
                             </div>
                           </div>
@@ -413,7 +452,7 @@ const Assessments = () => {
                       {filteredGrading.length} Submission{filteredGrading.length !== 1 ? 's' : ''} Pending
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      {selectedCourseData?.name}
+                      {selectedCourseData?.title}
                     </p>
                   </div>
                 </div>
