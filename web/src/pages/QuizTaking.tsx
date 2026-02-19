@@ -48,7 +48,7 @@ const QuizTaking = () => {
 
       const adminId =
         user?.id ||
-        user?.sub ||
+        (user as any)?.sub ||
         (user as any)?.["cognito:username"] ||
         "550e8400-e29b-41d4-a716-446655440101";
 
@@ -208,15 +208,19 @@ const QuizTaking = () => {
                   {currentQ.question || currentQ.text}
                 </h2>
               </div>
-              {currentQ.image && (
+              {(currentQ.image || currentQ.image_url || currentQ.imageUrl) && (
                 <img
-                  src={currentQ.image}
+                  src={currentQ.image || currentQ.image_url || currentQ.imageUrl}
                   alt="Question"
-                  className="w-full max-w-2xl rounded-lg mb-4"
+                  className="w-full max-w-2xl rounded-lg mb-4 border border-border"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
                 />
               )}
             </div>
 
+            {/* Multiple Choice (Single Answer) */}
             {(currentQ.type === "mcq" || currentQ.type === "multiple-choice") &&
               currentQ.options && (
                 <div className="space-y-3">
@@ -234,13 +238,8 @@ const QuizTaking = () => {
                     } else if (Array.isArray(correctAns)) {
                       isCorrect =
                         correctAns.includes(index) ||
-                        correctAns.includes(option);
+                        (correctAns as any[]).includes(option);
                     }
-
-                    console.log(
-                      `Option ${index}: "${option}" - isCorrect: ${isCorrect}, correctAns:`,
-                      correctAns,
-                    );
 
                     return (
                       <div
@@ -272,15 +271,187 @@ const QuizTaking = () => {
                 </div>
               )}
 
-            {currentQ.type === "short_answer" && (
+            {/* Multiple Correct Answers */}
+            {currentQ.type === "multiple-correct" && currentQ.options && (
+              <div className="space-y-3">
+                {currentQ.options.map((option, index) => {
+                  let isCorrect = false;
+                  let correctIndices: number[] = [];
+                  
+                  const correctAns = currentQ.correctAnswer ?? currentQ.correct_answer;
+                  
+                  // Parse correct answers - these are option VALUES, map to indices
+                  if (Array.isArray(correctAns)) {
+                    // Map each correct answer value to its index in options array
+                    correctIndices = correctAns
+                      .map(ansValue => currentQ.options.findIndex((opt: any) => String(opt).trim() === String(ansValue).trim()))
+                      .filter((idx: number) => idx !== -1);
+                  } else if (typeof correctAns === "string") {
+                    try {
+                      const parsed = JSON.parse(correctAns);
+                      if (Array.isArray(parsed)) {
+                        // Map parsed values to indices
+                        correctIndices = parsed
+                          .map(ansValue => currentQ.options.findIndex((opt: any) => String(opt).trim() === String(ansValue).trim()))
+                          .filter((idx: number) => idx !== -1);
+                      } else {
+                        // Single value - find its index
+                        const idx = currentQ.options.findIndex((opt: any) => String(opt).trim() === String(correctAns).trim());
+                        if (idx !== -1) correctIndices = [idx];
+                      }
+                    } catch {
+                      // Single value - find its index
+                      const idx = currentQ.options.findIndex((opt: any) => String(opt).trim() === String(correctAns).trim());
+                      if (idx !== -1) correctIndices = [idx];
+                    }
+                  } else if (typeof correctAns === "number") {
+                    // If it's a number, it's already an index
+                    correctIndices = [correctAns];
+                  }
+
+                  isCorrect = correctIndices.includes(index);
+
+                  return (
+                    <div
+                      key={index}
+                      className={`flex items-center space-x-3 p-4 rounded-lg border transition-all ${isCorrect ? "border-green-500 bg-green-500/10" : "border-border bg-background"}`}
+                    >
+                      <div
+                        className={`w-5 h-5 rounded flex items-center justify-center border-2 text-xs font-bold ${isCorrect ? "border-green-500 bg-green-500 text-white" : "border-muted-foreground bg-transparent text-muted-foreground"}`}
+                      >
+                        {isCorrect && "✓"}
+                      </div>
+                      <Label
+                        className={`flex-1 cursor-pointer font-medium ${
+                          isCorrect ? "text-green-600" : ""
+                        }`}
+                      >
+                        {option}
+                        {isCorrect && (
+                          <span className="ml-2 text-xs font-semibold text-green-600">
+                            (Correct)
+                          </span>
+                        )}
+                      </Label>
+                    </div>
+                  );
+                })}
+                <p className="text-xs text-muted-foreground mt-2">
+                  ℹ️ Multiple answers are correct for this question
+                </p>
+              </div>
+            )}
+
+            {/* True/False */}
+            {currentQ.type === "true-false" && currentQ.options && (
+              <div className="space-y-3">
+                {currentQ.options.map((option, index) => {
+                  let isCorrect = false;
+                  const correctAns = currentQ.correctAnswer ?? currentQ.correct_answer;
+                  
+                  if (typeof correctAns === "number") {
+                    isCorrect = correctAns === index;
+                  } else if (typeof correctAns === "string") {
+                    // For true-false, correct_answer might be "True" or "False" (the actual text)
+                    // or "0"/"1" (index as string)
+                    const parsedIndex = parseInt(correctAns);
+                    if (!isNaN(parsedIndex)) {
+                      isCorrect = parsedIndex === index;
+                    } else {
+                      // Match the actual option text ("True" or "False")
+                      isCorrect = correctAns === option;
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={index}
+                      className={`flex items-center space-x-3 p-4 rounded-lg border transition-all ${isCorrect ? "border-green-500 bg-green-500/10" : "border-border bg-background"}`}
+                    >
+                      <div
+                        className={`w-5 h-5 rounded-full flex items-center justify-center border-2 text-xs font-bold ${isCorrect ? "border-green-500 bg-green-500 text-white" : "border-muted-foreground bg-transparent text-muted-foreground"}`}
+                      >
+                        {isCorrect && "✓"}
+                      </div>
+                      <Label
+                        className={`flex-1 cursor-pointer font-medium ${
+                          isCorrect ? "text-green-600" : ""
+                        }`}
+                      >
+                        {option}
+                        {isCorrect && (
+                          <span className="ml-2 text-xs font-semibold text-green-600">
+                            (Correct Answer)
+                          </span>
+                        )}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Short Answer */}
+            {(currentQ.type === "short-answer" || currentQ.type === "short_answer") && (
               <div className="space-y-4">
                 <div className="p-4 rounded-lg border border-border bg-muted/5">
                   <p className="text-sm font-semibold text-muted-foreground mb-2">
                     Sample Answer:
                   </p>
                   <p className="text-foreground">
-                    {currentQ.explanation || "No sample answer provided."}
+                    {currentQ.explanation || currentQ.sampleAnswer || "No sample answer provided."}
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Matching */}
+            {currentQ.type === "matching" && (
+              <div className="space-y-4">
+                <div className="p-6 rounded-lg border border-border bg-muted/5">
+                  <p className="text-sm font-semibold text-muted-foreground mb-4">
+                    Correct Matches:
+                  </p>
+                  {(() => {
+                    let matchingPairs: any[] = [];
+                    const correctAns = currentQ.correctAnswer ?? currentQ.correct_answer;
+                    
+                    if (Array.isArray(correctAns)) {
+                      matchingPairs = correctAns;
+                    } else if (typeof correctAns === "string") {
+                      try {
+                        matchingPairs = JSON.parse(correctAns);
+                      } catch {
+                        matchingPairs = [];
+                      }
+                    }
+
+                    return (
+                      <div className="space-y-3">
+                        {matchingPairs.map((pair, index) => (
+                          <div key={index} className="relative">
+                            <div className="flex items-center gap-4">
+                              {/* Left side */}
+                              <div className="flex-1 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                                <span className="text-foreground font-medium">{pair.left}</span>
+                              </div>
+                              
+                              {/* Connection line */}
+                              <div className="flex items-center gap-1">
+                                <div className="h-0.5 w-8 bg-gradient-to-r from-blue-500 to-green-500"></div>
+                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                              </div>
+                              
+                              {/* Right side */}
+                              <div className="flex-1 bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                                <span className="text-foreground font-medium">{pair.right}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -288,7 +459,9 @@ const QuizTaking = () => {
             {/* Explanation Section */}
             {currentQ.explanation &&
               (currentQ.type === "mcq" ||
-                currentQ.type === "multiple-choice") && (
+                currentQ.type === "multiple-choice" ||
+                currentQ.type === "multiple-correct" ||
+                currentQ.type === "true-false") && (
                 <div className="mt-6 p-4 rounded-lg bg-primary/5 border border-primary/20">
                   <p className="text-sm font-semibold text-primary mb-2">
                     Explanation:

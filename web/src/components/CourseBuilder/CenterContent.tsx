@@ -119,9 +119,11 @@ const LessonEditor = ({
   } = useVideoUpload(updateLesson, module.id, lesson.id, lesson);
 
   // Wrap thumbnail file change handler to check for validation errors
-  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleThumbnailFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     originalHandleThumbnailFileChange(e);
-    
+
     // Check if there was a validation error
     const errorInfo = (window as any).__thumbnailUploadError;
     if (errorInfo) {
@@ -134,7 +136,7 @@ const LessonEditor = ({
   // Wrap video file change handler to check for validation errors
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     originalHandleVideoFileChange(e);
-    
+
     // Check if there was a validation error
     const errorInfo = (window as any).__videoUploadError;
     if (errorInfo) {
@@ -147,7 +149,7 @@ const LessonEditor = ({
   // Check lesson type
   const isVideoLesson = lesson?.type === "video";
   const isDocumentLesson = !isVideoLesson;
-  const documentSubType = lesson?.resourceType || 'pdf'; // 'pdf', 'document', 'slides'
+  const documentSubType = lesson?.resourceType || "pdf"; // 'pdf', 'document', 'slides'
   const remoteResourceUrl =
     lesson?.resourceUrl && !lesson.resourceUrl.startsWith("[LOCAL_FILE:")
       ? lesson.resourceUrl
@@ -175,26 +177,32 @@ const LessonEditor = ({
   const [localVideoPreviewUrl, setLocalVideoPreviewUrl] = useState("");
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [documentUploadError, setDocumentUploadError] = useState("");
-  
+
   // Validation states
   const MAX_FILE_SIZE_MB = 50;
   const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
   const [showValidationModal, setShowValidationModal] = useState(false);
-  const [validationMessage, setValidationMessage] = useState({ title: "", description: "" });
+  const [validationMessage, setValidationMessage] = useState({
+    title: "",
+    description: "",
+  });
   const [videoPreviewError, setVideoPreviewError] = useState(false);
   const [documentPreviewError, setDocumentPreviewError] = useState(false);
 
   // Detect and handle unsupported document types
   useEffect(() => {
-    if (lesson?.resourceUrl && 
-        !lesson.resourceUrl.startsWith('[LOCAL_FILE:') &&
-        !officeOnlinePreviewUrl &&
-        !isRemotePdf &&
-        lesson.resourceUrl.trim() !== '') {
+    if (
+      lesson?.resourceUrl &&
+      !lesson.resourceUrl.startsWith("[LOCAL_FILE:") &&
+      !officeOnlinePreviewUrl &&
+      !isRemotePdf &&
+      lesson.resourceUrl.trim() !== ""
+    ) {
       // Unsupported document type detected
       setValidationMessage({
         title: "Unsupported Document Type",
-        description: "The document URL provided is not in a supported format (PDF, DOCX, or PPTX). Please upload a PDF, Word document, or PowerPoint presentation, or use the 'Upload File' option to upload your document directly.",
+        description:
+          "The document URL provided is not in a supported format (PDF, DOCX, or PPTX). Please upload a PDF, Word document, or PowerPoint presentation, or use the 'Upload File' option to upload your document directly.",
       });
       setShowValidationModal(true);
       updateLesson(module.id, lesson.id, { resourceUrl: "" });
@@ -208,7 +216,7 @@ const LessonEditor = ({
         .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, "\"")
+        .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
         .replace(/&nbsp;/g, " ");
     }
@@ -223,7 +231,7 @@ const LessonEditor = ({
     const cachedFiles = (window as any).__lessonFileCache?.get(cacheKey);
     const pdfFile = cachedFiles?.pdfFile;
 
-    if (pdfFile && pdfFile.name.toLowerCase().endsWith('.docx')) {
+    if (pdfFile && pdfFile.name.toLowerCase().endsWith(".docx")) {
       const convertDocx = async () => {
         setIsConvertingDocx(true);
         try {
@@ -232,7 +240,9 @@ const LessonEditor = ({
           setHtmlContent(result.value);
         } catch (error) {
           console.error("Error converting DOCX:", error);
-          setHtmlContent("<p style='color: red;'>Failed to convert document</p>");
+          setHtmlContent(
+            "<p style='color: red;'>Failed to convert document</p>",
+          );
         } finally {
           setIsConvertingDocx(false);
         }
@@ -250,7 +260,7 @@ const LessonEditor = ({
     const cachedFiles = (window as any).__lessonFileCache?.get(cacheKey);
     const pdfFile = cachedFiles?.pdfFile;
 
-    if (pdfFile && pdfFile.name.toLowerCase().endsWith('.pptx')) {
+    if (pdfFile && pdfFile.name.toLowerCase().endsWith(".pptx")) {
       const parsePptx = async () => {
         setIsConvertingPptx(true);
         setCurrentSlideIndex(0);
@@ -258,48 +268,56 @@ const LessonEditor = ({
           const arrayBuffer = await pdfFile.arrayBuffer();
           const zip = new JSZip();
           await zip.loadAsync(arrayBuffer);
-          
+
           // Find slide XML files more robustly
           const slideFilePaths: string[] = [];
           zip.forEach((relativePath) => {
-            if (relativePath.startsWith('ppt/slides/slide') && 
-                relativePath.endsWith('.xml') && 
-                !relativePath.includes('_rels') &&
-                !relativePath.includes('slidemaster') &&
-                !relativePath.includes('slideLayout')) {
+            if (
+              relativePath.startsWith("ppt/slides/slide") &&
+              relativePath.endsWith(".xml") &&
+              !relativePath.includes("_rels") &&
+              !relativePath.includes("slidemaster") &&
+              !relativePath.includes("slideLayout")
+            ) {
               slideFilePaths.push(relativePath);
             }
           });
 
           // Sort slides numerically
           slideFilePaths.sort((a, b) => {
-            const numA = parseInt(a.match(/slide(\d+)/)?.[1] || '0');
-            const numB = parseInt(b.match(/slide(\d+)/)?.[1] || '0');
+            const numA = parseInt(a.match(/slide(\d+)/)?.[1] || "0");
+            const numB = parseInt(b.match(/slide(\d+)/)?.[1] || "0");
             return numA - numB;
           });
 
-          console.log("Slide files found:", slideFilePaths.length, slideFilePaths);
-          
+          console.log(
+            "Slide files found:",
+            slideFilePaths.length,
+            slideFilePaths,
+          );
+
           const slidePreviews: string[] = [];
-          
+
           for (let i = 0; i < slideFilePaths.length; i++) {
             try {
-              const slideXml = await zip.file(slideFilePaths[i])?.async('text');
+              const slideXml = await zip.file(slideFilePaths[i])?.async("text");
               if (slideXml) {
                 // Extract all text content
-                const textMatches = slideXml.match(/<a:t>([^<]*)<\/a:t>/g) || [];
+                const textMatches =
+                  slideXml.match(/<a:t>([^<]*)<\/a:t>/g) || [];
                 const slideTexts = textMatches
-                  .map(match =>
+                  .map((match) =>
                     decodeXmlEntities(
-                      match.replace(/<a:t>|<\/a:t>/g, '').trim(),
+                      match.replace(/<a:t>|<\/a:t>/g, "").trim(),
                     ),
                   )
-                  .filter(text => text.length > 0);
-                
-                const slideContent = slideTexts.length > 0 
-                  ? slideTexts.join('\n')
-                  : `[Slide ${i + 1}]`;
-                
+                  .filter((text) => text.length > 0);
+
+                const slideContent =
+                  slideTexts.length > 0
+                    ? slideTexts.join("\n")
+                    : `[Slide ${i + 1}]`;
+
                 console.log(`Slide ${i + 1}:`, slideContent);
                 slidePreviews.push(slideContent);
               }
@@ -312,7 +330,7 @@ const LessonEditor = ({
           if (slidePreviews.length === 0) {
             slidePreviews.push("Presentation loaded - click through slides");
           }
-          
+
           setPptxSlides(slidePreviews);
         } catch (error) {
           console.error("Error parsing PPTX:", error);
@@ -347,8 +365,14 @@ const LessonEditor = ({
     return undefined;
   }, [selectedVideoFile, lesson?.videoUrl, module.id, lesson.id]);
   const lessonTitleEmpty = !(lesson?.baseTitle || "").trim();
-  const hasVideo = !!lesson?.videoUrl && lesson.videoUrl.trim() !== "" && lesson.videoUrl !== "[LOCAL_FILE: ]";
-  const hasPdf = !!lesson?.resourceUrl && lesson.resourceUrl.trim() !== "" && lesson.resourceUrl !== "[LOCAL_FILE: ]";
+  const hasVideo =
+    !!lesson?.videoUrl &&
+    lesson.videoUrl.trim() !== "" &&
+    lesson.videoUrl !== "[LOCAL_FILE: ]";
+  const hasPdf =
+    !!lesson?.resourceUrl &&
+    lesson.resourceUrl.trim() !== "" &&
+    lesson.resourceUrl !== "[LOCAL_FILE: ]";
 
   return (
     <div className="space-y-4">
@@ -649,10 +673,11 @@ const LessonEditor = ({
                   if (isDocx || isPptx) {
                     setIsUploadingDocument(true);
                     try {
-                      const { url, error } = await StorageService.uploadDocument(
-                        file,
-                        currentCourseId,
-                      );
+                      const { url, error } =
+                        await StorageService.uploadDocument(
+                          file,
+                          currentCourseId,
+                        );
 
                       if (error || !url) {
                         setDocumentUploadError(
@@ -789,9 +814,9 @@ const LessonEditor = ({
 
                       if (pdfFile) {
                         const fileName = pdfFile.name.toLowerCase();
-                        const isPdf = fileName.endsWith('.pdf');
-                        const isDocx = fileName.endsWith('.docx');
-                        const isPptx = fileName.endsWith('.pptx');
+                        const isPdf = fileName.endsWith(".pdf");
+                        const isDocx = fileName.endsWith(".docx");
+                        const isPptx = fileName.endsWith(".pptx");
 
                         if (isPdf) {
                           const fileUrl = URL.createObjectURL(pdfFile);
@@ -840,9 +865,13 @@ const LessonEditor = ({
                                     color: Colors.textMuted,
                                   }}
                                 >
-                                  <p className="text-sm">Converting document...</p>
+                                  <p className="text-sm">
+                                    Converting document...
+                                  </p>
                                 </div>
-                              ) : htmlContent && htmlContent !== "<p style='color: red;'>Failed to convert document</p>" ? (
+                              ) : htmlContent &&
+                                htmlContent !==
+                                  "<p style='color: red;'>Failed to convert document</p>" ? (
                                 <div
                                   className="rounded overflow-auto border flex flex-col"
                                   style={{
@@ -881,87 +910,30 @@ const LessonEditor = ({
                                       line-height: 1.3;
                                       color: #000000;
                                     }
-                                    .docx-preview h1 {
-                                      font-size: 28px;
-                                    }
-                                    .docx-preview h2 {
-                                      font-size: 24px;
-                                    }
-                                    .docx-preview h3 {
-                                      font-size: 20px;
-                                    }
-                                    .docx-preview h4 {
-                                      font-size: 16px;
-                                    }
-                                    .docx-preview strong, .docx-preview b {
-                                      font-weight: 700;
-                                      color: #000000;
-                                    }
-                                    .docx-preview em, .docx-preview i {
-                                      font-style: italic;
-                                      color: #000000;
-                                    }
-                                    .docx-preview u {
-                                      text-decoration: underline;
-                                      color: #000000;
-                                    }
-                                    .docx-preview ul {
-                                      margin: 10px 0 10px 40px;
-                                      list-style-type: disc;
-                                    }
-                                    .docx-preview ol {
-                                      margin: 10px 0 10px 40px;
-                                      list-style-type: decimal;
-                                    }
-                                    .docx-preview li {
-                                      margin-bottom: 6px;
-                                      line-height: 1.5;
-                                      color: #000000;
-                                    }
-                                    .docx-preview ul ul {
-                                      list-style-type: circle;
-                                      margin-left: 30px;
-                                    }
-                                    .docx-preview ul ul ul {
-                                      list-style-type: square;
-                                      margin-left: 30px;
-                                    }
-                                    .docx-preview table {
-                                      border-collapse: collapse;
-                                      width: 100%;
-                                      margin: 12px 0;
-                                      border: 1px solid #a6a6a6;
-                                    }
-                                    .docx-preview td, .docx-preview th {
-                                      border: 1px solid #a6a6a6;
-                                      padding: 8px;
-                                      text-align: left;
-                                      color: #000000;
-                                    }
-                                    .docx-preview th {
-                                      background-color: #f0f0f0;
-                                      font-weight: 600;
-                                    }
-                                    .docx-preview a {
-                                      color: #0563c1;
-                                      text-decoration: underline;
-                                    }
-                                    .docx-preview blockquote {
-                                      margin: 10px 0 10px 30px;
-                                      border-left: 4px solid #a6a6a6;
-                                      padding-left: 15px;
-                                      color: #595959;
-                                      font-style: italic;
-                                    }
-                                    .docx-preview hr {
-                                      border: none;
-                                      border-top: 1px solid #a6a6a6;
-                                      margin: 12px 0;
-                                    }
+                                    .docx-preview h1 { font-size: 28px; }
+                                    .docx-preview h2 { font-size: 24px; }
+                                    .docx-preview h3 { font-size: 20px; }
+                                    .docx-preview h4 { font-size: 16px; }
+                                    .docx-preview strong, .docx-preview b { font-weight: 700; color: #000000; }
+                                    .docx-preview em, .docx-preview i { font-style: italic; color: #000000; }
+                                    .docx-preview u { text-decoration: underline; color: #000000; }
+                                    .docx-preview ul { margin: 10px 0 10px 40px; list-style-type: disc; }
+                                    .docx-preview ol { margin: 10px 0 10px 40px; list-style-type: decimal; }
+                                    .docx-preview li { margin-bottom: 6px; line-height: 1.5; color: #000000; }
+                                    .docx-preview ul ul { list-style-type: circle; margin-left: 30px; }
+                                    .docx-preview ul ul ul { list-style-type: square; margin-left: 30px; }
+                                    .docx-preview table { border-collapse: collapse; width: 100%; margin: 12px 0; border: 1px solid #a6a6a6; }
+                                    .docx-preview td, .docx-preview th { border: 1px solid #a6a6a6; padding: 8px; text-align: left; color: #000000; }
+                                    .docx-preview th { background-color: #f0f0f0; font-weight: 600; }
+                                    .docx-preview a { color: #0563c1; text-decoration: underline; }
+                                    .docx-preview blockquote { margin: 10px 0 10px 30px; border-left: 4px solid #a6a6a6; padding-left: 15px; color: #595959; font-style: italic; }
+                                    .docx-preview hr { border: none; border-top: 1px solid #a6a6a6; margin: 12px 0; }
                                   `}</style>
                                   <div
                                     className="docx-preview"
-                                    dangerouslySetInnerHTML={{ __html: htmlContent }}
+                                    dangerouslySetInnerHTML={{
+                                      __html: htmlContent,
+                                    }}
                                   />
                                 </div>
                               ) : (
@@ -977,7 +949,9 @@ const LessonEditor = ({
                                     justifyContent: "center",
                                   }}
                                 >
-                                  <p className="text-sm">No content to display</p>
+                                  <p className="text-sm">
+                                    No content to display
+                                  </p>
                                 </div>
                               )}
                               <div
@@ -987,7 +961,9 @@ const LessonEditor = ({
                                   color: Colors.textMuted,
                                 }}
                               >
-                                💡 This is a basic preview. Save the lesson to view with pixel-perfect formatting via Microsoft Office Online
+                                💡 This is a basic preview. Save the lesson to
+                                view with pixel-perfect formatting via Microsoft
+                                Office Online
                               </div>
                             </div>
                           );
@@ -1009,7 +985,9 @@ const LessonEditor = ({
                                     color: Colors.textMuted,
                                   }}
                                 >
-                                  <p className="text-sm">Parsing presentation...</p>
+                                  <p className="text-sm">
+                                    Parsing presentation...
+                                  </p>
                                 </div>
                               ) : pptxSlides.length > 0 ? (
                                 <div
@@ -1052,16 +1030,27 @@ const LessonEditor = ({
                                     }}
                                   >
                                     <button
-                                      onClick={() => setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1))}
+                                      onClick={() =>
+                                        setCurrentSlideIndex(
+                                          Math.max(0, currentSlideIndex - 1),
+                                        )
+                                      }
                                       disabled={currentSlideIndex === 0}
                                       style={{
                                         padding: "6px 12px",
-                                        backgroundColor: currentSlideIndex === 0 ? Colors.gray800 : Colors.accent,
+                                        backgroundColor:
+                                          currentSlideIndex === 0
+                                            ? Colors.gray800
+                                            : Colors.accent,
                                         color: Colors.textPrimary,
                                         border: "none",
                                         borderRadius: "4px",
-                                        cursor: currentSlideIndex === 0 ? "not-allowed" : "pointer",
-                                        opacity: currentSlideIndex === 0 ? 0.5 : 1,
+                                        cursor:
+                                          currentSlideIndex === 0
+                                            ? "not-allowed"
+                                            : "pointer",
+                                        opacity:
+                                          currentSlideIndex === 0 ? 0.5 : 1,
                                         fontSize: "12px",
                                       }}
                                     >
@@ -1073,19 +1062,42 @@ const LessonEditor = ({
                                         fontSize: "12px",
                                       }}
                                     >
-                                      Slide {currentSlideIndex + 1} of {pptxSlides.length}
+                                      Slide {currentSlideIndex + 1} of{" "}
+                                      {pptxSlides.length}
                                     </span>
                                     <button
-                                      onClick={() => setCurrentSlideIndex(Math.min(pptxSlides.length - 1, currentSlideIndex + 1))}
-                                      disabled={currentSlideIndex === pptxSlides.length - 1}
+                                      onClick={() =>
+                                        setCurrentSlideIndex(
+                                          Math.min(
+                                            pptxSlides.length - 1,
+                                            currentSlideIndex + 1,
+                                          ),
+                                        )
+                                      }
+                                      disabled={
+                                        currentSlideIndex ===
+                                        pptxSlides.length - 1
+                                      }
                                       style={{
                                         padding: "6px 12px",
-                                        backgroundColor: currentSlideIndex === pptxSlides.length - 1 ? Colors.gray800 : Colors.accent,
+                                        backgroundColor:
+                                          currentSlideIndex ===
+                                          pptxSlides.length - 1
+                                            ? Colors.gray800
+                                            : Colors.accent,
                                         color: Colors.textPrimary,
                                         border: "none",
                                         borderRadius: "4px",
-                                        cursor: currentSlideIndex === pptxSlides.length - 1 ? "not-allowed" : "pointer",
-                                        opacity: currentSlideIndex === pptxSlides.length - 1 ? 0.5 : 1,
+                                        cursor:
+                                          currentSlideIndex ===
+                                          pptxSlides.length - 1
+                                            ? "not-allowed"
+                                            : "pointer",
+                                        opacity:
+                                          currentSlideIndex ===
+                                          pptxSlides.length - 1
+                                            ? 0.5
+                                            : 1,
                                         fontSize: "12px",
                                       }}
                                     >
@@ -1100,7 +1112,9 @@ const LessonEditor = ({
                                       color: Colors.textMuted,
                                     }}
                                   >
-                                    💡 This is a text preview. Save the lesson to view with full formatting via Microsoft Office Online
+                                    💡 This is a text preview. Save the lesson
+                                    to view with full formatting via Microsoft
+                                    Office Online
                                   </div>
                                 </div>
                               ) : (
@@ -1117,8 +1131,16 @@ const LessonEditor = ({
                                     flexDirection: "column",
                                   }}
                                 >
-                                  <p className="text-sm font-medium mb-2">Preparing presentation...</p>
-                                  <p className="text-xs" style={{ color: Colors.textMuted }}>If this takes too long, the file may not be a valid PowerPoint document</p>
+                                  <p className="text-sm font-medium mb-2">
+                                    Preparing presentation...
+                                  </p>
+                                  <p
+                                    className="text-xs"
+                                    style={{ color: Colors.textMuted }}
+                                  >
+                                    If this takes too long, the file may not be
+                                    a valid PowerPoint document
+                                  </p>
                                 </div>
                               )}
                             </div>
@@ -1193,9 +1215,7 @@ const LessonEditor = ({
                 lesson.videoUrl !== "[LOCAL_FILE: ]"
               }
               style={{
-                backgroundColor: !lesson?.videoUrl?.startsWith(
-                  "[LOCAL_FILE:",
-                )
+                backgroundColor: !lesson?.videoUrl?.startsWith("[LOCAL_FILE:")
                   ? Colors.accent
                   : Colors.gray800,
                 color: Colors.textPrimary,
@@ -1237,8 +1257,7 @@ const LessonEditor = ({
                 setVideoInputType("upload");
               }}
               disabled={
-                lesson?.videoUrl &&
-                !lesson.videoUrl.startsWith("[LOCAL_FILE:")
+                lesson?.videoUrl && !lesson.videoUrl.startsWith("[LOCAL_FILE:")
               }
               style={{
                 backgroundColor: lesson?.videoUrl?.startsWith("[LOCAL_FILE:")
@@ -1351,7 +1370,8 @@ const LessonEditor = ({
                                 setVideoPreviewError(true);
                                 setValidationMessage({
                                   title: "Video Preview Error",
-                                  description: "The video preview cannot be loaded. This might be due to an invalid URL, restricted content, or network issues. Please ensure the video URL is accessible and try again. For best results, consider hosting your video on YouTube.",
+                                  description:
+                                    "The video preview cannot be loaded. This might be due to an invalid URL, restricted content, or network issues. Please ensure the video URL is accessible and try again. For best results, consider hosting your video on YouTube.",
                                 });
                                 setShowValidationModal(true);
                               }
@@ -1359,7 +1379,9 @@ const LessonEditor = ({
                           />
                         </div>
                       </div>
-                    ) : lesson.videoUrl && lesson.videoUrl.trim() && lesson.videoUrl !== "[LOCAL_FILE: ]" ? (
+                    ) : lesson.videoUrl &&
+                      lesson.videoUrl.trim() &&
+                      lesson.videoUrl !== "[LOCAL_FILE: ]" ? (
                       <div className="mt-4">
                         <label
                           style={{ color: Colors.textSecondary }}
@@ -1390,7 +1412,8 @@ const LessonEditor = ({
                                 setVideoPreviewError(true);
                                 setValidationMessage({
                                   title: "Video Cannot Be Loaded",
-                                  description: "The video file cannot be loaded properly. This could be due to an unsupported video format, a corrupted file, or network issues. Please ensure the video URL is accessible and in a standard format (MP4, WebM, or OGG), or consider hosting your video on YouTube and using the URL option instead.",
+                                  description:
+                                    "The video file cannot be loaded properly. This could be due to an unsupported video format, a corrupted file, or network issues. Please ensure the video URL is accessible and in a standard format (MP4, WebM, or OGG), or consider hosting your video on YouTube and using the URL option instead.",
                                 });
                                 setShowValidationModal(true);
                               }
@@ -1484,7 +1507,8 @@ const LessonEditor = ({
                               setVideoPreviewError(true);
                               setValidationMessage({
                                 title: "Video Cannot Be Loaded",
-                                description: "The uploaded video file cannot be loaded properly. This could be due to an unsupported video format or a corrupted file. Please try uploading a different video file in a standard format (MP4, WebM, or OGG), or consider hosting your video on YouTube and using the URL option instead.",
+                                description:
+                                  "The uploaded video file cannot be loaded properly. This could be due to an unsupported video format or a corrupted file. Please try uploading a different video file in a standard format (MP4, WebM, or OGG), or consider hosting your video on YouTube and using the URL option instead.",
                               });
                               setShowValidationModal(true);
                             }
@@ -1524,11 +1548,11 @@ const LessonEditor = ({
                 const hours = Math.floor(seconds / 3600);
                 const minutes = Math.floor((seconds % 3600) / 60);
                 const secs = seconds % 60;
-                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
               })()}
               onChange={(e) => {
                 const value = e.target.value;
-                const parts = value.split(':');
+                const parts = value.split(":");
                 if (parts.length === 3) {
                   const hours = parseInt(parts[0]) || 0;
                   const minutes = parseInt(parts[1]) || 0;
@@ -1576,6 +1600,7 @@ const QuizEditor = ({
   showValidationErrors,
 }: any) => {
   const { deleteQuiz } = useContentManagement();
+  const { currentCourseId } = useCourseBuilder();
   const module = modules.find((m: any) =>
     m.quizzes.some((q: any) => q.id === selectedItem.id),
   );
@@ -1592,8 +1617,17 @@ const QuizEditor = ({
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  // FIX 1: Declare questionImagePreviewUrl state here in QuizEditor (not LessonEditor)
+  const [questionImagePreviewUrl, setQuestionImagePreviewUrl] = useState<string>("");
+
+  // Reset currentIndex when quiz changes
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [quiz?.id]);
 
   // Return null if quiz or module not found (e.g., after deletion)
+  // FIX 2: Guard clause moved BEFORE useEffect that depends on currentQuestion,
+  // so we derive currentQuestion after the guard and pass it as a dep safely.
   if (!module || !quiz) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -1606,6 +1640,73 @@ const QuizEditor = ({
 
   const questions = quiz?.questions || [];
   const currentQuestion = questions[currentIndex];
+
+  // Effect to sync options/correctAnswer when question type changes.
+  // This runs AFTER the render where type was updated, so it always sees the new type
+  // and can reliably reset dependent fields without racing the type update.
+  const prevQuestionTypeRef = React.useRef<string | undefined>(undefined);
+  const prevQuestionIdRef = React.useRef<string | undefined>(undefined);
+  useEffect(() => { // eslint-disable-line react-hooks/rules-of-hooks
+    if (!currentQuestion) return;
+
+    // When navigating to a different question, reset the ref so we don't
+    // incorrectly treat a type-change as happening on the new question
+    if (prevQuestionIdRef.current !== currentQuestion.id) {
+      prevQuestionIdRef.current = currentQuestion.id;
+      prevQuestionTypeRef.current = currentQuestion.type;
+
+      // If the question is already true-false but has no/wrong options, fix it now
+      if (currentQuestion.type === "true-false") {
+        const hasValidOptions =
+          Array.isArray(currentQuestion.options) &&
+          currentQuestion.options[0] === "True" &&
+          currentQuestion.options[1] === "False";
+        if (!hasValidOptions) {
+          updateQuestion(module.id, quiz.id, currentQuestion.id, "options", ["True", "False"]);
+        }
+        if (currentQuestion.correctAnswer !== 0 && currentQuestion.correctAnswer !== 1) {
+          updateQuestion(module.id, quiz.id, currentQuestion.id, "correctAnswer", 0);
+        }
+      }
+      return;
+    }
+
+    const prevType = prevQuestionTypeRef.current;
+    const currType = currentQuestion.type;
+
+    if (prevType === currType) return; // no change
+    prevQuestionTypeRef.current = currType;
+
+    if (currType === "true-false") {
+      // Arriving at true-false: always set canonical options so the validator never sees empty options
+      updateQuestion(module.id, quiz.id, currentQuestion.id, "options", ["True", "False"]);
+      if (currentQuestion.correctAnswer !== 0 && currentQuestion.correctAnswer !== 1) {
+        updateQuestion(module.id, quiz.id, currentQuestion.id, "correctAnswer", 0);
+      }
+    } else if (prevType === "true-false") {
+      // Leaving true-false: clear the True/False options so the new type starts blank
+      updateQuestion(module.id, quiz.id, currentQuestion.id, "options", ["", ""]);
+      updateQuestion(
+        module.id, quiz.id, currentQuestion.id, "correctAnswer",
+        currType === "multiple-correct" ? [] : null,
+      );
+    }
+  }, [currentQuestion?.type, currentQuestion?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Image preview effect: creates a stable object URL from the cached File object
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    const cacheKey = `question-${module?.id}-${quiz?.id}-${currentQuestion?.id}`;
+    const cachedFile = (window as any).__questionImageCache?.get(cacheKey);
+    if (cachedFile) {
+      const url = URL.createObjectURL(cachedFile);
+      setQuestionImagePreviewUrl(url);
+      return () => { URL.revokeObjectURL(url); };
+    } else {
+      setQuestionImagePreviewUrl("");
+      return undefined;
+    }
+  }, [currentQuestion?.id, currentQuestion?.imageUrl, module?.id, quiz?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNext = () => {
     if (currentIndex < questions.length - 1) setCurrentIndex(currentIndex + 1);
@@ -1690,7 +1791,9 @@ const QuizEditor = ({
             </label>
             <input
               type={quiz?.maxAttempts === null ? "text" : "number"}
-              value={quiz?.maxAttempts === null ? "-" : quiz?.maxAttempts ?? 1}
+              value={
+                quiz?.maxAttempts === null ? "-" : (quiz?.maxAttempts ?? 1)
+              }
               onChange={(e) =>
                 updateQuiz(module.id, quiz.id, {
                   maxAttempts: Math.max(1, parseInt(e.target.value) || 1),
@@ -1819,15 +1922,12 @@ const QuizEditor = ({
             </label>
             <select
               value={currentQuestion.type}
-              onChange={(e) =>
-                updateQuestion(
-                  module.id,
-                  quiz.id,
-                  currentQuestion.id,
-                  "type",
-                  e.target.value,
-                )
-              }
+              onChange={(e) => {
+                // Only update the type here. The useEffect above watches for type changes
+                // and resets options/correctAnswer after the render, avoiding race conditions
+                // that occur when calling updateQuestion multiple times in one event handler.
+                updateQuestion(module.id, quiz.id, currentQuestion.id, "type", e.target.value);
+              }}
               className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
             >
               <option value="multiple-choice">
@@ -1840,36 +1940,295 @@ const QuizEditor = ({
             </select>
           </div>
 
-          {/* Image Upload/URL */}
+          {/* Question Image */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Question Image (optional)
             </label>
-            <input
-              type="url"
-              value={currentQuestion.imageUrl || ""}
-              onChange={(e) =>
-                updateQuestion(
-                  module.id,
-                  quiz.id,
-                  currentQuestion.id,
-                  "imageUrl",
-                  e.target.value,
-                )
-              }
-              placeholder="Enter image URL"
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
-            />
-            {currentQuestion.imageUrl && (
-              <div className="mt-2">
-                <img
-                  src={currentQuestion.imageUrl}
-                  alt="Question"
-                  className="max-w-full h-32 object-cover rounded border border-slate-600"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => {
+                  // Don't allow switching if there's a local file
+                  if (
+                    currentQuestion.imageUrl?.startsWith("[LOCAL_FILE:") &&
+                    currentQuestion.imageUrl !== "[LOCAL_FILE: ]"
+                  ) {
+                    return;
+                  }
+                  // Clear if switching from placeholder
+                  if (currentQuestion.imageUrl?.startsWith("[LOCAL_FILE:")) {
+                    updateQuestion(
+                      module.id,
+                      quiz.id,
+                      currentQuestion.id,
+                      "imageUrl",
+                      "",
+                    );
+                    // Clear from cache
+                    const cacheKey = `question-${module.id}-${quiz.id}-${currentQuestion.id}`;
+                    (window as any).__questionImageCache?.delete(cacheKey);
+                  }
+                }}
+                disabled={
+                  currentQuestion.imageUrl?.startsWith("[LOCAL_FILE:") &&
+                  currentQuestion.imageUrl !== "[LOCAL_FILE: ]"
+                }
+                style={{
+                  backgroundColor: !currentQuestion.imageUrl?.startsWith(
+                    "[LOCAL_FILE:",
+                  )
+                    ? Colors.accent
+                    : Colors.gray800,
+                  color: Colors.textPrimary,
+                  opacity:
+                    currentQuestion.imageUrl?.startsWith("[LOCAL_FILE:") &&
+                    currentQuestion.imageUrl !== "[LOCAL_FILE: ]"
+                      ? 0.5
+                      : 1,
+                  cursor:
+                    currentQuestion.imageUrl?.startsWith("[LOCAL_FILE:") &&
+                    currentQuestion.imageUrl !== "[LOCAL_FILE: ]"
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+                className="px-3 py-1 rounded text-sm"
+              >
+                URL
+              </button>
+              <button
+                onClick={() => {
+                  // Don't allow switching if there's a URL
+                  if (
+                    currentQuestion.imageUrl &&
+                    !currentQuestion.imageUrl.startsWith("[LOCAL_FILE:")
+                  ) {
+                    return;
+                  }
+                  // Clear if switching from placeholder
+                  if (
+                    currentQuestion.imageUrl &&
+                    !currentQuestion.imageUrl.startsWith("[LOCAL_FILE:")
+                  ) {
+                    updateQuestion(
+                      module.id,
+                      quiz.id,
+                      currentQuestion.id,
+                      "imageUrl",
+                      "",
+                    );
+                  }
+                  // Force to upload mode by setting a placeholder if empty
+                  if (!currentQuestion.imageUrl) {
+                    updateQuestion(
+                      module.id,
+                      quiz.id,
+                      currentQuestion.id,
+                      "imageUrl",
+                      "[LOCAL_FILE: ]",
+                    );
+                  }
+                }}
+                disabled={
+                  currentQuestion.imageUrl &&
+                  !currentQuestion.imageUrl.startsWith("[LOCAL_FILE:")
+                }
+                style={{
+                  backgroundColor: currentQuestion.imageUrl?.startsWith(
+                    "[LOCAL_FILE:",
+                  )
+                    ? Colors.accent
+                    : Colors.gray800,
+                  color: Colors.textPrimary,
+                  opacity:
+                    currentQuestion.imageUrl &&
+                    !currentQuestion.imageUrl.startsWith("[LOCAL_FILE:")
+                      ? 0.5
+                      : 1,
+                  cursor:
+                    currentQuestion.imageUrl &&
+                    !currentQuestion.imageUrl.startsWith("[LOCAL_FILE:")
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+                className="px-3 py-1 rounded text-sm"
+              >
+                Upload File
+              </button>
+            </div>
+            {!currentQuestion.imageUrl?.startsWith("[LOCAL_FILE:") ? (
+              <div>
+                <input
+                  type="url"
+                  value={
+                    currentQuestion.imageUrl?.startsWith("[LOCAL_FILE:")
+                      ? ""
+                      : currentQuestion.imageUrl || ""
+                  }
+                  onChange={(e) =>
+                    updateQuestion(
+                      module.id,
+                      quiz.id,
+                      currentQuestion.id,
+                      "imageUrl",
+                      e.target.value,
+                    )
+                  }
+                  style={{
+                    backgroundColor: Colors.textInputBg,
+                    borderColor: Colors.gray600,
+                    color: Colors.textPrimary,
                   }}
+                  className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
+                  placeholder="https://example.com/image.jpg"
                 />
+                {currentQuestion.imageUrl &&
+                  !currentQuestion.imageUrl.startsWith("[LOCAL_FILE:") && (
+                    <div className="mt-2">
+                      <img
+                        src={currentQuestion.imageUrl}
+                        alt="Question image"
+                        className="max-w-full h-32 object-cover rounded border border-slate-600"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    </div>
+                  )}
+              </div>
+            ) : (
+              <div>
+                <input
+                  key={`question-img-${currentQuestion.id}`}
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    // Validate file is image
+                    if (!file.type.startsWith("image/")) {
+                      alert("Please select an image file");
+                      e.target.value = "";
+                      return;
+                    }
+
+                    // Store local reference and cache for preview
+                    updateQuestion(
+                      module.id,
+                      quiz.id,
+                      currentQuestion.id,
+                      "imageUrl",
+                      `[LOCAL_FILE: ${file.name}]`,
+                    );
+
+                    const cacheKey = `question-${module.id}-${quiz.id}-${currentQuestion.id}`;
+                    if (!(window as any).__questionImageCache) {
+                      (window as any).__questionImageCache = new Map();
+                    }
+                    (window as any).__questionImageCache.set(cacheKey, file);
+
+                    // Clear the file input
+                    e.target.value = "";
+
+                    try {
+                      // Upload to Supabase
+                      const { url, error } = await StorageService.uploadQuestionImage(file, currentCourseId);
+                      
+                      if (error) {
+                        console.error("Upload error:", error);
+                        alert("Failed to upload image: " + error);
+                        // Clear the local reference on error
+                        updateQuestion(
+                          module.id,
+                          quiz.id,
+                          currentQuestion.id,
+                          "imageUrl",
+                          "",
+                        );
+                        (window as any).__questionImageCache?.delete(cacheKey);
+                        return;
+                      }
+
+                      // Store the uploaded URL
+                      updateQuestion(
+                        module.id,
+                        quiz.id,
+                        currentQuestion.id,
+                        "imageUrl",
+                        url,
+                      );
+                    } catch (err) {
+                      console.error("Upload error:", err);
+                      alert("Failed to upload image");
+                      // Clear on error
+                      updateQuestion(
+                        module.id,
+                        quiz.id,
+                        currentQuestion.id,
+                        "imageUrl",
+                        "",
+                      );
+                      (window as any).__questionImageCache?.delete(cacheKey);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: Colors.textInputBg,
+                    borderColor: Colors.gray600,
+                    color: Colors.textPrimary,
+                  }}
+                  className="w-full px-3 py-2 border rounded cursor-pointer"
+                />
+                {currentQuestion.imageUrl?.startsWith("[LOCAL_FILE:") &&
+                  currentQuestion.imageUrl !== "[LOCAL_FILE: ]" && (
+                    <>
+                      <div
+                        className="mt-2 px-2 py-1 rounded flex items-center justify-between"
+                        style={{ backgroundColor: Colors.gray800 }}
+                      >
+                        <span
+                          style={{
+                            color: Colors.textSecondary,
+                            fontSize: "13px",
+                          }}
+                        >
+                          🖼️{" "}
+                          {currentQuestion.imageUrl
+                            .replace("[LOCAL_FILE: ", "")
+                            .replace("]", "")}
+                        </span>
+                        <button
+                          onClick={() => {
+                            updateQuestion(
+                              module.id,
+                              quiz.id,
+                              currentQuestion.id,
+                              "imageUrl",
+                              "",
+                            );
+                            const cacheKey = `question-${module.id}-${quiz.id}-${currentQuestion.id}`;
+                            (window as any).__questionImageCache?.delete(
+                              cacheKey,
+                            );
+                          }}
+                          style={{ color: Colors.textSecondary }}
+                          className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
+                          title="Clear image"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {/* FIX 4: Replace inline IIFE with stable state-driven preview */}
+                      {questionImagePreviewUrl && (
+                        <div className="mt-2">
+                          <img
+                            src={questionImagePreviewUrl}
+                            alt="Question image preview"
+                            className="max-w-full h-32 object-cover rounded border border-slate-600"
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
               </div>
             )}
           </div>
@@ -1888,66 +2247,44 @@ const QuizEditor = ({
                 <span className="text-red-500 ml-1">*</span>
               </label>
               {showValidationErrors &&
+                currentQuestion.type !== "true-false" &&
                 (!currentQuestion.options ||
-                currentQuestion.options.filter((opt: any) =>
-                  String(opt).trim(),
-                ).length === 0) && (
-                <p className="text-xs text-red-400">
-                  At least one option is required.
-                </p>
-              )}
+                  currentQuestion.options.filter((opt: any) =>
+                    String(opt).trim(),
+                  ).length === 0) && (
+                  <p className="text-xs text-red-400">
+                    At least one option is required.
+                  </p>
+                )}
 
               {currentQuestion.type === "true-false" ? (
-                // True/False specific UI
+                // True/False specific UI — use <label> wrapping so the entire row is clickable,
+                // and onChange on the input directly so React fires reliably on every selection.
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 bg-slate-700/40 rounded p-2">
+                  <label className="flex items-center gap-2 bg-slate-700/40 rounded p-2 cursor-pointer hover:bg-slate-700/60 transition-colors">
                     <input
                       type="radio"
                       name={`question-${currentQuestion.id}`}
                       checked={currentQuestion.correctAnswer === 0}
                       onChange={() => {
-                        updateQuestion(
-                          module.id,
-                          quiz.id,
-                          currentQuestion.id,
-                          "correctAnswer",
-                          0,
-                        );
-                        updateQuestion(
-                          module.id,
-                          quiz.id,
-                          currentQuestion.id,
-                          "options",
-                          ["True", "False"],
-                        );
+                        updateQuestion(module.id, quiz.id, currentQuestion.id, "correctAnswer", 0);
                       }}
+                      className="w-4 h-4 accent-blue-500"
                     />
-                    <span className="text-white">True</span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-slate-700/40 rounded p-2">
+                    <span className="text-white flex-1">True</span>
+                  </label>
+                  <label className="flex items-center gap-2 bg-slate-700/40 rounded p-2 cursor-pointer hover:bg-slate-700/60 transition-colors">
                     <input
                       type="radio"
                       name={`question-${currentQuestion.id}`}
                       checked={currentQuestion.correctAnswer === 1}
                       onChange={() => {
-                        updateQuestion(
-                          module.id,
-                          quiz.id,
-                          currentQuestion.id,
-                          "correctAnswer",
-                          1,
-                        );
-                        updateQuestion(
-                          module.id,
-                          quiz.id,
-                          currentQuestion.id,
-                          "options",
-                          ["True", "False"],
-                        );
+                        updateQuestion(module.id, quiz.id, currentQuestion.id, "correctAnswer", 1);
                       }}
+                      className="w-4 h-4 accent-blue-500"
                     />
-                    <span className="text-white">False</span>
-                  </div>
+                    <span className="text-white flex-1">False</span>
+                  </label>
                 </div>
               ) : (
                 // Multiple choice/Multiple correct options

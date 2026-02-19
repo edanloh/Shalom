@@ -159,8 +159,8 @@ serve(async (req) => {
       supabaseClient
         .from('quiz_questions')
         .select(`
-          id, quiz_id, question, question_type,
-          options, correct_answer, explanation, points, order_index
+          id, quiz_id, question, question_type, 
+          options, correct_answer, explanation, points, order_index, image_url
         `)
         .in('quiz_id', await getQuizIds(supabaseClient, courseId))
         .order('quiz_id', { ascending: true })
@@ -272,7 +272,8 @@ serve(async (req) => {
               explanation: qq.explanation,
               points: qq.points,
               order: qq.order_index,
-              order_index: qq.order_index // Also include as 'order_index' for compatibility
+              order_index: qq.order_index, // Also include as 'order_index' for compatibility
+              image_url: qq.image_url
             }));
 
           return {

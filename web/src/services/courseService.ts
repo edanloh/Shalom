@@ -99,22 +99,6 @@ export interface Lesson {
   order_index: number;
 }
 
-export interface Quiz {
-  id: number;
-  title: string;
-  description?: string;
-  questions: Question[];
-}
-
-export interface Question {
-  id: number;
-  question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'short_answer';
-  options?: string[];
-  correct_answer: string;
-  explanation?: string;
-}
-
 export interface Review {
   id: number;
   studentName: string;
@@ -264,16 +248,25 @@ export interface CourseSection {
 
 export interface QuizQuestion {
   id: number;
-  type: 'mcq' | 'multiple-choice' | 'true-false' | 'short_answer' | 'multiple-correct';
+  type: 'mcq' | 'multiple-choice' | 'true-false' | 'short_answer' | 'short-answer' | 'multiple-correct' | 'matching' | 'true_false';
   question: string;
   text?: string; // Backend might use 'text' instead of 'question'
+  question_text?: string; // Alternative backend format
+  question_type?: string; // Backend format
   image?: string | null;
+  image_url?: string; // Backend format
+  imageUrl?: string; // Frontend format
   options?: string[];
   correctAnswer?: number | number[] | string;
   correct_answer?: number | number[] | string; // Backend format
   explanation?: string;
   points?: number;
+  sampleAnswer?: string; // For short answer questions
+  matching_pairs?: { left: string; right: string }[]; // For matching questions
 }
+
+// Alias for compatibility
+export type Question = QuizQuestion;
 
 export interface Quiz {
   id: string;
@@ -741,6 +734,7 @@ class CourseService {
                 options: q.options || [],
                 correct_answer: q.correctAnswer || q.correct_answer,
                 explanation: q.explanation,
+                image_url: q.image_url || q.imageUrl || null,
               })),
             })) || [];
 
@@ -793,47 +787,67 @@ class CourseService {
             questions: (quiz.questions || []).map((question: any) => {
               console.log("Transforming question:", question);
 
+              // Parse options and correct_answer if they're JSON strings
+              let options = question.options || [];
+              if (typeof options === 'string') {
+                try {
+                  options = JSON.parse(options);
+                } catch (e) {
+                  console.error('Failed to parse options:', options);
+                  options = [];
+                }
+              }
+
+              let rawCorrectAnswer = question.correct_answer;
+              if (typeof rawCorrectAnswer === 'string') {
+                try {
+                  // Try parsing as JSON first
+                  rawCorrectAnswer = JSON.parse(rawCorrectAnswer);
+                } catch (e) {
+                  // If it fails, it's just a plain string (for MCQ or true-false)
+                }
+              }
+
               // Parse correctAnswer: Backend stores actual answer text, convert to index
               let correctAnswer: number | number[];
               const questionType = question.question_type || question.type || "multiple-choice";
-              const options = question.options || [];
 
               if (questionType === "multiple-choice" || questionType === "multiple_choice") {
                 // Backend stores answer as text, find its index in options
-                if (typeof question.correct_answer === "string") {
+                if (typeof rawCorrectAnswer === "string") {
                   const answerIndex = options.findIndex(
-                    (opt: string) => opt === question.correct_answer
+                    (opt: string) => String(opt).trim() === String(rawCorrectAnswer).trim()
                   );
                   correctAnswer = answerIndex >= 0 ? answerIndex : 0;
-                } else if (typeof question.correct_answer === "number") {
-                  correctAnswer = question.correct_answer;
+                } else if (typeof rawCorrectAnswer === "number") {
+                  correctAnswer = rawCorrectAnswer;
                 } else {
                   correctAnswer = 0;
                 }
               } else if (questionType === "true-false") {
                 // For true/false, convert text answer to index (0 = True, 1 = False)
                 if (
-                  question.correct_answer === "True" ||
-                  question.correct_answer === true
+                  rawCorrectAnswer === "True" ||
+                  rawCorrectAnswer === true
                 ) {
                   correctAnswer = 0;
                 } else if (
-                  question.correct_answer === "False" ||
-                  question.correct_answer === false
+                  rawCorrectAnswer === "False" ||
+                  rawCorrectAnswer === false
                 ) {
                   correctAnswer = 1;
                 } else {
                   correctAnswer =
-                    typeof question.correct_answer === "number"
-                      ? question.correct_answer
+                    typeof rawCorrectAnswer === "number"
+                      ? rawCorrectAnswer
                       : 0;
                 }
               } else if (questionType === "multiple-correct") {
                 // Multiple correct answers - convert array of texts to array of indices
-                if (Array.isArray(question.correct_answer)) {
-                  correctAnswer = question.correct_answer.map((ans: any) => {
+                if (Array.isArray(rawCorrectAnswer)) {
+                  correctAnswer = rawCorrectAnswer.map((ans: any) => {
                     if (typeof ans === "string") {
-                      const idx = options.findIndex((opt: string) => opt === ans);
+                      const idx = options.findIndex((opt: string) => String(opt).trim() === String(ans).trim());
                       return idx >= 0 ? idx : 0;
                     }
                     return typeof ans === "number" ? ans : 0;
@@ -845,16 +859,35 @@ class CourseService {
                 correctAnswer = 0;
               }
 
+              // Parse matching pairs - for matching type, correct_answer contains the pairs
+              let matchingPairs: any[] = [];
+              if (questionType === "matching") {
+                // For matching, rawCorrectAnswer is already the pairs array
+                if (Array.isArray(rawCorrectAnswer)) {
+                  matchingPairs = rawCorrectAnswer;
+                } else if (typeof rawCorrectAnswer === 'string') {
+                  try {
+                    matchingPairs = JSON.parse(rawCorrectAnswer);
+                  } catch (e) {
+                    matchingPairs = [];
+                  }
+                }
+                // Ensure it's an array
+                if (!Array.isArray(matchingPairs)) {
+                  matchingPairs = [];
+                }
+              }
+
               return {
                 id: question.id.toString(),
                 text: question.question_text || question.text || "",
                 type: questionType,
                 options: options,
                 correctAnswer,
-                imageUrl: question.imageUrl || null,
+                imageUrl: question.imageUrl || question.image_url || null,
                 points: question.points || 1,
                 sampleAnswer: question.explanation || "",
-                matchingPairs: question.matchingPairs || [],
+                matchingPairs: matchingPairs,
               };
             }),
             order: quiz.order_index || 0,
@@ -958,15 +991,6 @@ class CourseService {
    */
   async getQuizData(courseId: string, moduleId: string, quizId: string, adminId: string): Promise<QuizData> {
     try {
-      console.log('CourseService: Fetching quiz data for:', { courseId, moduleId, quizId, adminId });
-      
-      // Fetch course sections (which includes all quizzes)
-      // const response = await apiService.get<{
-      //   data?: {
-      //     sections?: CourseSection[];
-      //   };
-      // }>(`/getModuleDetailInstructor/${adminId}/${courseId}`);
-
       const response = await apiService.get<any>(ENDPOINTS.COURSE_BY_ID_INSTRUCTOR(adminId, courseId), {});
       
       if (!response?.data?.sections) {
@@ -1013,30 +1037,16 @@ class CourseService {
       if (!foundQuiz) {
         throw new Error(`Quiz with ID ${quizId} not found in course ${courseId}`);
       }
-
-      console.log('CourseService: Found quiz:', foundQuiz);
-      console.log('CourseService: Quiz questions:', foundQuiz.questions);
-      console.log('CourseService: Quiz questions length:', foundQuiz.questions?.length || 0);
-
       // Transform quiz data to the expected format
       const transformedQuestions: QuizQuestion[] = (foundQuiz.questions || []).map((q: any, index: number) => {
-        const questionType = q.type || q.question_type || 'mcq';
-        
-        console.log(`CourseService: Transforming question ${index}:`, {
-          id: q.id,
-          type: questionType,
-          text: q.text || q.question_text,
-          correct_answer: q.correct_answer,
-          correctAnswer: q.correctAnswer,
-          options: q.options,
-        });
+        const questionType = q.question_type || 'mcq';
         
         return {
           id: q.id || index + 1,
           type: questionType,
           question: q.text || q.question_text || q.question || '',
           text: q.text || q.question_text || q.question || '',
-          image: q.image_url || q.imageUrl || null,
+          image_url: q.image_url || q.imageUrl || null,
           options: q.options || [],
           correctAnswer: q.correct_answer !== undefined ? q.correct_answer : q.correctAnswer,
           correct_answer: q.correct_answer !== undefined ? q.correct_answer : q.correctAnswer,

@@ -273,13 +273,31 @@ serve(async (req) => {
         for (let q = 0; q < questions.length; q++) {
           const question = questions[q];
 
+          // Map question types to database-supported types
           let questionType = question.type || 'multiple-choice';
+          // Support all question types: multiple-choice, multiple-correct, true-false, short-answer, matching, text
+          if (questionType === 'text') {
+            questionType = 'short-answer'; // Normalize legacy 'text' to 'short-answer'
+          }
+
+          // Serialize correctAnswer properly based on type
+          let correctAnswerStr = '';
+          let optionsArray = [];
+          
           if (questionType === 'multiple-correct') {
-            questionType = 'multiple-choice';
-          } else if (questionType === 'short-answer') {
-            questionType = 'text';
+            // For multiple-correct, store as JSON array of indices
+            correctAnswerStr = JSON.stringify(Array.isArray(question.correctAnswer) ? question.correctAnswer : [question.correctAnswer]);
+            optionsArray = question.options || [];
           } else if (questionType === 'matching') {
-            questionType = 'text';
+            // For matching, store matchingPairs in correct_answer
+            correctAnswerStr = JSON.stringify(question.matchingPairs || []);
+            // For matching, options can be derived from matchingPairs or left empty
+            // The matchingPairs structure is [{ left: string, right: string }, ...]
+            optionsArray = [];
+          } else {
+            // For single-answer types (multiple-choice, true-false, short-answer)
+            correctAnswerStr = String(question.correctAnswer ?? '');
+            optionsArray = question.options || [];
           }
 
           const { data: questionData, error: questionError } = await supabaseClient
@@ -288,11 +306,12 @@ serve(async (req) => {
               quiz_id: quizData.id,
               question: question.text || '',
               question_type: questionType,
-              options: question.options || [],
-              correct_answer: String(question.correctAnswer || ''),
+              options: optionsArray,
+              correct_answer: correctAnswerStr,
               explanation: question.explanation || question.sampleAnswer || '',
               points: question.points || 1,
-              order_index: q
+              order_index: q,
+              image_url: question.imageUrl || null
             })
             .select()
             .single();

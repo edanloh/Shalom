@@ -262,6 +262,7 @@ export const useContentManagement = () => {
                       correctAnswer: null,
                       imageUrl: null,
                       points: 1,
+                      matchingPairs: [],
                     },
                   ],
                 };
