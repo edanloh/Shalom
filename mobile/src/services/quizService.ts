@@ -322,19 +322,35 @@ class QuizService {
 
   /**
    * Validate that all questions are answered
+   * For multiple-correct, ensure at least one option is selected
    */
-  validateAnswers(answers: Map<string, string>, totalQuestions: number): boolean {
-    return answers.size === totalQuestions;
+  validateAnswers(answers: Map<string, string | string[]>, totalQuestions: number): boolean {
+    if (answers.size !== totalQuestions) {
+      return false;
+    }
+    
+    // Check that all answers have content (including non-empty arrays for multiple-correct)
+    for (const answer of answers.values()) {
+      if (Array.isArray(answer) && answer.length === 0) {
+        return false;
+      }
+      if (!Array.isArray(answer) && !answer) {
+        return false;
+      }
+    }
+    
+    return true;
   }
 
   /**
    * Convert Map to array format for API
    * Maps question IDs to the selected option text
+   * For multiple-correct questions, the answer is an array that gets stringified
    */
-  convertAnswersToArray(answers: Map<string, string>): Array<{ questionId: string; answer: string }> {
+  convertAnswersToArray(answers: Map<string, string | string[]>): Array<{ questionId: string; answer: string }> {
     return Array.from(answers.entries()).map(([questionId, answerText]) => ({
       questionId,
-      answer: answerText,
+      answer: Array.isArray(answerText) ? JSON.stringify(answerText) : answerText,
     }));
   }
 }

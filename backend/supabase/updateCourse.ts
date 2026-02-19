@@ -124,28 +124,111 @@ serve(async (req) => {
 
     const { data: existingCourse, error: existingError } = await supabaseClient
       .from('courses')
-      .select('id,is_published,instructor_id,instructor_name,title')
+      .select('id,is_published,instructor_id,instructor_name,title,category_id')
       .eq('id', courseId)
       .single();
-
-    if (existingError || !existingCourse) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: "Course not found"
-        }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
 
     const body = await req.json();
     console.log('Update course request:', courseId);
 
     // Extract modules and outcomes for separate handling
     const { modules, outcomes, ...courseFields } = body;
+
+    // Track the course data (either existing or newly created)
+    let courseData = existingCourse;
+
+    // If course doesn't exist, create it with the provided courseId (upsert pattern)
+    // This handles the case where images were uploaded with a pre-generated UUID
+    if (existingError || !existingCourse) {
+      console.log('Course not found, creating new course with ID:', courseId);
+      
+      // Handle category for new course
+      let finalCategoryId = courseFields.category || null;
+      
+      if (!finalCategoryId) {
+        const { data: generalCategory } = await supabaseClient
+          .from('categories')
+          .select('id')
+          .eq('name', 'General')
+          .single();
+
+        if (generalCategory) {
+          finalCategoryId = generalCategory.id;
+        } else {
+          const { data: newGeneral, error: generalError } = await supabaseClient
+            .from('categories')
+            .insert({
+              name: 'General',
+              color: '#6B7280',
+              course_count: 0
+            })
+            .select('id')
+            .single();
+
+          if (generalError) throw generalError;
+          finalCategoryId = newGeneral.id;
+        }
+      }
+
+      // Compute duration from modules if provided
+      let computedDurationMinutes = 0;
+      if (modules && Array.isArray(modules)) {
+        for (const module of modules) {
+          const lessons = module?.lessons || [];
+          for (const lesson of lessons) {
+            if ((lesson?.type || 'video') === 'pdf') {
+              const fileSizeBytes = lesson?.fileSize ?? null;
+              if (Number.isFinite(fileSizeBytes) && (fileSizeBytes ?? 0) > 0) {
+                const bytesPerPage = 200 * 1024;
+                const pages = Math.max(1, Math.round((fileSizeBytes as number) / bytesPerPage));
+                computedDurationMinutes += Math.max(1, pages * 2);
+              }
+            } else {
+              const seconds =
+                Number(lesson?.durationSeconds) ||
+                Number(lesson?.durationMinutes || 0) * 60 ||
+                0;
+              computedDurationMinutes += Math.round(seconds / 60);
+            }
+          }
+        }
+      }
+      const computedDurationHours =
+        computedDurationMinutes > 0
+          ? Math.round((computedDurationMinutes / 60) * 100) / 100
+          : 0;
+
+      // Create the course with the specified ID
+      const { data: newCourse, error: createError } = await supabaseClient
+        .from('courses')
+        .insert({
+          id: courseId,
+          title: courseFields.title || 'Untitled Course',
+          description: courseFields.description || '',
+          category_id: finalCategoryId,
+          instructor_id: courseFields.instructorId,
+          instructor_name: courseFields.instructorName || 'Instructor',
+          thumbnail_url: courseFields.thumbnailUrl || null,
+          duration_hours: courseFields.durationHours || computedDurationHours,
+          tags: courseFields.tags || [],
+          is_published: courseFields.isPublished || false,
+          rating: 0,
+          student_count: 0
+        })
+        .select('id,is_published,instructor_id,instructor_name,title,category_id')
+        .single();
+
+      if (createError) {
+        console.error('Failed to create course:', createError);
+        throw createError;
+      }
+
+      // Use the newly created course data
+      courseData = newCourse;
+      
+      // Set a flag to indicate this was a creation, not an update
+      body._wasCreated = true;
+    }
 
     // Build update object for course fields
     const updateData: any = {};
@@ -244,10 +327,10 @@ serve(async (req) => {
 
       course = updatedCourse;
     } else {
-      course = existingCourse;
+      course = courseData;
     }
 
-    if (updateData.is_published === true && existingCourse.is_published === false && course?.is_published) {
+    if (updateData.is_published === true && courseData.is_published === false && course?.is_published) {
       const instructor = await resolveInstructorId(supabaseClient, course);
       if (instructor?.id) {
         await sendNotification(supabaseClient, {
@@ -262,7 +345,7 @@ serve(async (req) => {
       }
     } else if (
       updateData.is_published === false &&
-      existingCourse.is_published === true &&
+      courseData.is_published === true &&
       course &&
       course.is_published === false
     ) {
@@ -558,6 +641,11 @@ serve(async (req) => {
               optionsArray = question.options || [];
             }
 
+            // Filter out LOCAL_FILE placeholders - only save actual URLs
+            const imageUrlToSave = question.imageUrl && !question.imageUrl.startsWith('[LOCAL_FILE:') 
+              ? question.imageUrl 
+              : null;
+
             if (question.id && existingQuestionIds.includes(question.id)) {
               // UPDATE existing question
               await supabaseClient
@@ -570,7 +658,7 @@ serve(async (req) => {
                   explanation: question.explanation || question.sampleAnswer || '',
                   points: question.points || 1,
                   order_index: q,
-                  image_url: question.imageUrl || null
+                  image_url: imageUrlToSave
                 })
                 .eq('id', question.id);
 
@@ -588,7 +676,7 @@ serve(async (req) => {
                   explanation: question.explanation || question.sampleAnswer || '',
                   points: question.points || 1,
                   order_index: q,
-                  image_url: question.imageUrl || null
+                  image_url: imageUrlToSave
                 })
                 .select('id')
                 .single();

@@ -122,8 +122,8 @@ serve(async (req) => {
       correct_answer: q.correct_answer,
       explanation: q.explanation,
       points: q.points,
-      image_url: q.image_url,
-      order_index: q.order_index
+      order_index: q.order_index,
+      image_url: q.image_url
     }));
 
     // ========================================

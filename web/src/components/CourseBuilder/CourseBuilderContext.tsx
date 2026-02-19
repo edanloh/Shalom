@@ -200,6 +200,7 @@ interface CourseBuilderContextType {
     validationErrors?: string[];
   }>;
   currentCourseId: string | undefined;
+  setCurrentCourseId: (id: string | undefined) => void;
   isSaving: boolean;
 }
 
@@ -430,6 +431,7 @@ export const CourseBuilderProvider = ({
   const [currentCourseId, setCurrentCourseId] = useState<string | undefined>(
     courseId,
   );
+  const [courseExistsInDb, setCourseExistsInDb] = useState(courseId !== "new" && courseId !== undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
@@ -582,6 +584,139 @@ export const CourseBuilderProvider = ({
                 );
                 hasErrors = true;
               }
+            }
+          }
+        }
+      }
+    }
+
+    // Upload all quiz question images
+    for (
+      let moduleIndex = 0;
+      moduleIndex < uploadedModules.length;
+      moduleIndex++
+    ) {
+      const module = uploadedModules[moduleIndex];
+
+      for (let quizIndex = 0; quizIndex < module.quizzes.length; quizIndex++) {
+        const quiz = module.quizzes[quizIndex];
+
+        for (
+          let questionIndex = 0;
+          questionIndex < quiz.questions.length;
+          questionIndex++
+        ) {
+          const question = quiz.questions[questionIndex];
+          const imageUrl = question.imageUrl;
+
+          if (!imageUrl || imageUrl.trim() === "") {
+            continue;
+          }
+
+          // Check if it's already a Supabase URL
+          if (imageUrl.includes("supabase.co/storage")) {
+            continue;
+          }
+
+          // Ensure we have a valid course ID
+          let courseIdForUpload = currentCourseId;
+          if (!courseIdForUpload || courseIdForUpload === "new") {
+            // Generate a new UUID for the course
+            courseIdForUpload = crypto.randomUUID();
+            setCurrentCourseId(courseIdForUpload);
+          }
+
+          // Handle local file upload
+          if (imageUrl.startsWith("[LOCAL_FILE:")) {
+            const cacheKey = `question-${module.id}-${quiz.id}-${question.id}`;
+            const cachedFile = (window as any).__questionImageCache?.get(
+              cacheKey,
+            );
+
+            if (cachedFile) {
+              try {
+                const { url, error } =
+                  await StorageService.uploadQuestionImage(
+                    cachedFile,
+                    courseIdForUpload,
+                  );
+                if (error) {
+                  console.error(
+                    `Question image upload failed for quiz ${quiz.baseTitle || quiz.title}:`,
+                    error,
+                  );
+                  hasErrors = true;
+                } else {
+                  uploadedModules[moduleIndex].quizzes[quizIndex].questions[
+                    questionIndex
+                  ].imageUrl = url;
+                }
+              } catch (err) {
+                console.error(
+                  `Question image upload error for quiz ${quiz.baseTitle || quiz.title}:`,
+                  err,
+                );
+                hasErrors = true;
+              }
+            }
+          }
+          // Handle external URL (download and upload)
+          else {
+            try {
+              // Fetch the image
+              const response = await fetch(imageUrl);
+              if (!response.ok) {
+                console.error(
+                  `Failed to fetch image from ${imageUrl}:`,
+                  response.statusText,
+                );
+                hasErrors = true;
+                continue;
+              }
+
+              // Check if it's actually an image
+              const contentType = response.headers.get("content-type");
+              if (!contentType || !contentType.startsWith("image/")) {
+                console.error(
+                  `URL does not point to an image: ${imageUrl} (type: ${contentType})`,
+                );
+                hasErrors = true;
+                continue;
+              }
+
+              // Convert to blob
+              const blob = await response.blob();
+
+              // Get filename from URL or use default
+              const urlPath = new URL(imageUrl).pathname;
+              const filename = urlPath.split("/").pop() || "image.jpg";
+
+              // Convert blob to File
+              const file = new File([blob], filename, { type: blob.type });
+
+              // Upload to Supabase
+              const { url, error } = await StorageService.uploadQuestionImage(
+                file,
+                courseIdForUpload,
+              );
+
+              if (error) {
+                console.error(
+                  `Question image upload failed from URL ${imageUrl}:`,
+                  error,
+                );
+                hasErrors = true;
+              } else {
+                uploadedModules[moduleIndex].quizzes[quizIndex].questions[
+                  questionIndex
+                ].imageUrl = url;
+              }
+            } catch (err) {
+              console.error(
+                `Error processing image URL ${imageUrl}:`,
+                err,
+              );
+              hasErrors = true;
             }
           }
         }
@@ -1094,11 +1229,12 @@ export const CourseBuilderProvider = ({
       }));
 
       // Step 1: Create or update the course WITH full module structure
-      if (!currentCourseId || currentCourseId === "new") {
+      if (!courseExistsInDb) {
         console.log("Creating new course with modules:", courseName);
 
         // Use courseService.createCourseWithModules which calls /createCourse endpoint
         const courseData = {
+          courseId: currentCourseId && currentCourseId !== "new" ? currentCourseId : undefined, // Pass pre-generated ID if exists
           title: courseName,
           category: finalCategoryId || "",
           description: courseDescription || "Course description",
@@ -1119,6 +1255,7 @@ export const CourseBuilderProvider = ({
         }
 
         setCurrentCourseId(finalCourseId);
+        setCourseExistsInDb(true);
         console.log("Course created with ID:", finalCourseId);
 
         // Update URL to reflect the new course ID (so subsequent saves use UPDATE)
@@ -1191,6 +1328,7 @@ export const CourseBuilderProvider = ({
   // Update currentCourseId when courseId prop changes
   useEffect(() => {
     setCurrentCourseId(courseId);
+    setCourseExistsInDb(courseId !== "new" && courseId !== undefined);
   }, [courseId]);
 
   const value = {
@@ -1244,6 +1382,7 @@ export const CourseBuilderProvider = ({
     toggleModuleExpansion,
     saveCourse,
     currentCourseId,
+    setCurrentCourseId,
     isSaving,
 
     localCategories,

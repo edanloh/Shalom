@@ -50,7 +50,8 @@ serve(async (req) => {
       durationHours = 0,
       tags = [],
       modules = [],
-      outcomes = []
+      outcomes = [],
+      courseId = null  // Optional pre-generated course ID
     } = body;
 
     let computedDurationMinutes = 0;
@@ -137,21 +138,28 @@ serve(async (req) => {
     }
 
     // Create course
+    const courseInsertData: any = {
+      title,
+      description: description || '',
+      category_id: finalCategoryId,
+      instructor_id: instructorId,
+      instructor_name: instructorName || 'Shalom Instructor',
+      thumbnail_url: thumbnailUrl || null,
+      duration_hours: durationHours > 0 ? durationHours : computedDurationHours,
+      tags,
+      is_published: false,
+      rating: 0,
+      student_count: 0
+    };
+    
+    // Include courseId if provided (for pre-organized file uploads)
+    if (courseId) {
+      courseInsertData.id = courseId;
+    }
+    
     const { data: course, error: courseError } = await supabaseClient
       .from('courses')
-      .insert({
-        title,
-        description: description || '',
-        category_id: finalCategoryId,
-        instructor_id: instructorId,
-        instructor_name: instructorName || 'Shalom Instructor',
-        thumbnail_url: thumbnailUrl || null,
-        duration_hours: durationHours > 0 ? durationHours : computedDurationHours,
-        tags,
-        is_published: false,
-        rating: 0,
-        student_count: 0
-      })
+      .insert(courseInsertData)
       .select()
       .single();
 
@@ -300,6 +308,11 @@ serve(async (req) => {
             optionsArray = question.options || [];
           }
 
+          // Filter out LOCAL_FILE placeholders - only save actual URLs
+          const imageUrlToSave = question.imageUrl && !question.imageUrl.startsWith('[LOCAL_FILE:') 
+            ? question.imageUrl 
+            : null;
+
           const { data: questionData, error: questionError } = await supabaseClient
             .from('quiz_questions')
             .insert({
@@ -311,7 +324,7 @@ serve(async (req) => {
               explanation: question.explanation || question.sampleAnswer || '',
               points: question.points || 1,
               order_index: q,
-              image_url: question.imageUrl || null
+              image_url: imageUrlToSave
             })
             .select()
             .single();
