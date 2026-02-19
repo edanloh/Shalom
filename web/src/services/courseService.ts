@@ -799,58 +799,79 @@ class CourseService {
               }
 
               let rawCorrectAnswer = question.correct_answer;
-              if (typeof rawCorrectAnswer === 'string') {
+              // Only parse as JSON if it looks like an array (for multiple-correct)
+              // Don't parse simple strings like "8" or "blue" which would be converted incorrectly
+              if (typeof rawCorrectAnswer === 'string' && rawCorrectAnswer.trim().startsWith('[')) {
                 try {
-                  // Try parsing as JSON first
                   rawCorrectAnswer = JSON.parse(rawCorrectAnswer);
                 } catch (e) {
-                  // If it fails, it's just a plain string (for MCQ or true-false)
+                  // If parsing fails, keep as string
                 }
               }
 
-              // Parse correctAnswer: Backend stores actual answer text, convert to index
+              // Parse correctAnswer: Backend stores index as string, convert to number
               let correctAnswer: number | number[];
               const questionType = question.question_type || question.type || "multiple-choice";
 
               if (questionType === "multiple-choice" || questionType === "multiple_choice") {
-                // Backend stores answer as text, find its index in options
-                if (typeof rawCorrectAnswer === "string") {
+                // Handle both old format (text values) and new format (numeric indices)
+                if (typeof rawCorrectAnswer === "number") {
+                  // NEW format: numeric index like 1, use directly
+                  correctAnswer = rawCorrectAnswer;
+                } else if (typeof rawCorrectAnswer === "string") {
+                  // First, try to find the text in options (handles old format like "8")
                   const answerIndex = options.findIndex(
                     (opt: string) => String(opt).trim() === String(rawCorrectAnswer).trim()
                   );
-                  correctAnswer = answerIndex >= 0 ? answerIndex : 0;
-                } else if (typeof rawCorrectAnswer === "number") {
-                  correctAnswer = rawCorrectAnswer;
+                  if (answerIndex >= 0) {
+                    // Found the text in options, use its index
+                    correctAnswer = answerIndex;
+                  } else {
+                    // Not found as text, try parsing as numeric index (handles "0", "1", etc.)
+                    const numericAnswer = parseInt(rawCorrectAnswer, 10);
+                    correctAnswer = !isNaN(numericAnswer) ? numericAnswer : 0;
+                  }
                 } else {
                   correctAnswer = 0;
                 }
               } else if (questionType === "true-false") {
-                // For true/false, convert text answer to index (0 = True, 1 = False)
-                if (
-                  rawCorrectAnswer === "True" ||
-                  rawCorrectAnswer === true
-                ) {
+                // For true/false, backend stores index as string ("0" or "1")
+                if (typeof rawCorrectAnswer === "string") {
+                  // Try to parse as number first
+                  const numericAnswer = parseInt(rawCorrectAnswer, 10);
+                  if (!isNaN(numericAnswer) && (numericAnswer === 0 || numericAnswer === 1)) {
+                    correctAnswer = numericAnswer;
+                  } else if (rawCorrectAnswer === "True" || rawCorrectAnswer === "true") {
+                    correctAnswer = 0;
+                  } else if (rawCorrectAnswer === "False" || rawCorrectAnswer === "false") {
+                    correctAnswer = 1;
+                  } else {
+                    correctAnswer = 0;
+                  }
+                } else if (typeof rawCorrectAnswer === "number") {
+                  correctAnswer = rawCorrectAnswer;
+                } else if (rawCorrectAnswer === true) {
                   correctAnswer = 0;
-                } else if (
-                  rawCorrectAnswer === "False" ||
-                  rawCorrectAnswer === false
-                ) {
+                } else if (rawCorrectAnswer === false) {
                   correctAnswer = 1;
                 } else {
-                  correctAnswer =
-                    typeof rawCorrectAnswer === "number"
-                      ? rawCorrectAnswer
-                      : 0;
+                  correctAnswer = 0;
                 }
               } else if (questionType === "multiple-correct") {
-                // Multiple correct answers - convert array of texts to array of indices
+                // Multiple correct answers - can be stored as:
+                // - NEW format: array of numeric indices [0, 1, 2]
+                // - OLD format: array of text values ["2", "4", "3"]
                 if (Array.isArray(rawCorrectAnswer)) {
                   correctAnswer = rawCorrectAnswer.map((ans: any) => {
-                    if (typeof ans === "string") {
+                    if (typeof ans === "number") {
+                      // NEW format: numeric index, use directly
+                      return ans;
+                    } else if (typeof ans === "string") {
+                      // OLD format: text value, find in options array
                       const idx = options.findIndex((opt: string) => String(opt).trim() === String(ans).trim());
                       return idx >= 0 ? idx : 0;
                     }
-                    return typeof ans === "number" ? ans : 0;
+                    return 0;
                   });
                 } else {
                   correctAnswer = [0];

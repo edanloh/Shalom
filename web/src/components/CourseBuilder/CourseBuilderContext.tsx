@@ -660,64 +660,12 @@ export const CourseBuilderProvider = ({
               }
             }
           }
-          // Handle external URL (download and upload)
-          else {
-            try {
-              // Fetch the image
-              const response = await fetch(imageUrl);
-              if (!response.ok) {
-                console.error(
-                  `Failed to fetch image from ${imageUrl}:`,
-                  response.statusText,
-                );
-                hasErrors = true;
-                continue;
-              }
-
-              // Check if it's actually an image
-              const contentType = response.headers.get("content-type");
-              if (!contentType || !contentType.startsWith("image/")) {
-                console.error(
-                  `URL does not point to an image: ${imageUrl} (type: ${contentType})`,
-                );
-                hasErrors = true;
-                continue;
-              }
-
-              // Convert to blob
-              const blob = await response.blob();
-
-              // Get filename from URL or use default
-              const urlPath = new URL(imageUrl).pathname;
-              const filename = urlPath.split("/").pop() || "image.jpg";
-
-              // Convert blob to File
-              const file = new File([blob], filename, { type: blob.type });
-
-              // Upload to Supabase
-              const { url, error } = await StorageService.uploadQuestionImage(
-                file,
-                courseIdForUpload,
-              );
-
-              if (error) {
-                console.error(
-                  `Question image upload failed from URL ${imageUrl}:`,
-                  error,
-                );
-                hasErrors = true;
-              } else {
-                uploadedModules[moduleIndex].quizzes[quizIndex].questions[
-                  questionIndex
-                ].imageUrl = url;
-              }
-            } catch (err) {
-              console.error(
-                `Error processing image URL ${imageUrl}:`,
-                err,
-              );
-              hasErrors = true;
-            }
+          // Skip external URLs - they should already be uploaded to bucket
+          // (handled immediately when URL is pasted in QuestionImageUpload component)
+          else if (!imageUrl.includes("supabase.co/storage")) {
+            console.warn(
+              `Question image URL is not a Supabase storage URL: ${imageUrl}. This should have been uploaded when the URL was entered.`,
+            );
           }
         }
       }
@@ -1186,26 +1134,26 @@ export const CourseBuilderProvider = ({
           maxAttempts: quiz.maxAttempts === null ? null : quiz.maxAttempts ?? 1,
           order: quiz.order ?? quizIndex, // Use existing order or index
           questions: quiz.questions.map((q, qIndex) => {
-            // Convert correctAnswer index back to actual answer text for database
-            let correctAnswerForDb: string | string[];
+            // Prepare correctAnswer for database storage
+            // Save actual option values (not indices) so options can be scrambled on mobile
+            let correctAnswerForDb: string | string[] | number[];
 
             if (q.type === "multiple-choice" || q.type === "multiple_choice") {
-              // Single answer: convert index to text
-              correctAnswerForDb =
-                typeof q.correctAnswer === "number"
-                  ? q.options[q.correctAnswer] || ""
-                  : String(q.correctAnswer);
+              // Single answer: store the actual option text
+              const answerIndex = typeof q.correctAnswer === "number" ? q.correctAnswer : 0;
+              correctAnswerForDb = q.options[answerIndex] || "";
             } else if (q.type === "true-false") {
-              // True/False: convert index to text
-              correctAnswerForDb = q.correctAnswer === 0 ? "True" : "False";
+              // True/False: store the actual option text ("True" or "False")
+              const answerIndex = q.correctAnswer === 0 ? 0 : 1;
+              correctAnswerForDb = q.options[answerIndex] || "True";
             } else if (q.type === "multiple-correct") {
-              // Multiple answers: convert array of indices to array of texts
+              // Multiple answers: store array of actual option texts
               if (Array.isArray(q.correctAnswer)) {
-                correctAnswerForDb = q.correctAnswer.map((idx: number) =>
-                  typeof idx === "number" ? q.options[idx] || "" : String(idx),
-                );
+                correctAnswerForDb = q.correctAnswer
+                  .filter((idx: any) => typeof idx === "number" && idx >= 0 && idx < q.options.length)
+                  .map((idx: number) => q.options[idx]);
               } else {
-                correctAnswerForDb = [String(q.correctAnswer)];
+                correctAnswerForDb = [];
               }
             } else {
               // For other types (short-answer, matching), store as-is
