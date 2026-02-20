@@ -11,14 +11,13 @@ import {
 import {
   Users,
   Star,
-  BarChart3,
+  BookOpen,
   MoreVertical,
   Edit,
   Copy,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Progress } from "@/components/ui/progress";
 import { useState } from "react";
 import { courseService } from "@/services/courseService";
 
@@ -26,22 +25,28 @@ interface CourseCardProps {
   id?: string;
   title: string;
   category: string;
+  categoryColor: string;
   thumbnail: string;
   enrolledCount: number;
-  completionRate: number;
   rating: number;
+  totalRatings: number;
+  modules: number;  // This is what courseService returns (from total_sections)
+  lessons: number;  // This is what courseService returns (from total_videos)
   status: "published" | "draft" | "archived";
-  onCourseUpdated?: () => void; // Callback to refresh parent component
+  onCourseUpdated?: (duplicatedCourseId?: string) => void;
 }
 
 export const CourseCard = ({
   id = "1",
   title,
   category,
+  categoryColor,
   thumbnail,
   enrolledCount,
-  completionRate,
   rating,
+  totalRatings,
+  modules,  // Receives modules count
+  lessons,  // Receives lessons count
   status,
   onCourseUpdated,
 }: CourseCardProps) => {
@@ -76,9 +81,9 @@ export const CourseCard = ({
         variant: "default",
       });
       
-      // Notify parent component to refresh the course list
+      // Notify parent component to refresh the course list and pass the duplicated course ID
       if (onCourseUpdated) {
-        onCourseUpdated();
+        onCourseUpdated(duplicatedCourse.id);
       }
       
       // Optional: Navigate to edit the duplicated course
@@ -101,10 +106,10 @@ export const CourseCard = ({
 
   return (
     <Card
-      className="overflow-hidden hover-lift border-border group cursor-pointer"
+      className="overflow-hidden hover-lift border-border group cursor-pointer flex flex-col h-full"
       onClick={handleCardClick}
     >
-      <div className="relative h-48 bg-muted overflow-hidden">
+      <div className="relative h-48 bg-muted overflow-hidden flex-shrink-0">
         <img
           src={thumbnail || DEFAULT_COURSE_THUMBNAIL}
           alt={title}
@@ -143,16 +148,6 @@ export const CourseCard = ({
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
-                handleViewAnalytics();
-              }}
-              disabled={isLoading}
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              View Analytics
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
                 handleDuplicate();
               }}
               disabled={isLoading}
@@ -164,44 +159,39 @@ export const CourseCard = ({
         </DropdownMenu>
       </div>
 
-      <div className="p-6 space-y-4">
-        <div>
-          <Badge variant="secondary" className="mb-2 text-xs">
-            {category}
+      <div className="p-6 space-y-4 flex flex-col flex-grow">
+        <div className="flex-grow">
+          <Badge variant="secondary" className="mb-2 text-xs" style={{backgroundColor: categoryColor}}>
+            {category} 
           </Badge>
-          <h3 className="text-lg font-semibold text-foreground line-clamp-2">
+          <h3 className="text-lg font-semibold text-foreground line-clamp-2 min-h-[3.5rem]">
             {title}
           </h3>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Course Progress</span>
-            <span className="font-medium text-foreground">
-              {completionRate}%
-            </span>
-          </div>
-          <Progress value={completionRate} />
-        </div>
-
         <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-center gap-1">
             <Users className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium text-foreground">
-              {enrolledCount}
+              {enrolledCount || 0}
             </span>
+            <span className="text-xs text-muted-foreground">Students</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-center gap-1">
             <Star className="h-4 w-4 text-warning fill-warning" />
             <span className="text-sm font-medium text-foreground">
-              {rating}
+              {totalRatings > 0 ? `${rating.toFixed(1)} (${totalRatings})` : '-'}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {totalRatings > 0 ? "Ratings" : 'No ratings'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-success" />
+          <div className="flex flex-col items-center gap-1">
+            <BookOpen className="h-4 w-4 text-success" />
             <span className="text-sm font-medium text-foreground">
-              {completionRate}%
+              {modules || 0}
             </span>
+            <span className="text-xs text-muted-foreground">Modules</span>
           </div>
         </div>
 

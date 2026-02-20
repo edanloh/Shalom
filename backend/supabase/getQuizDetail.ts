@@ -105,7 +105,8 @@ serve(async (req) => {
         correct_answer,
         explanation,
         points,
-        order_index
+        order_index,
+        image_url
       `)
       .eq('quiz_id', quizId)
       .order('order_index', { ascending: true });
@@ -121,7 +122,8 @@ serve(async (req) => {
       correct_answer: q.correct_answer,
       explanation: q.explanation,
       points: q.points,
-      order_index: q.order_index
+      order_index: q.order_index,
+      image_url: q.image_url
     }));
 
     // ========================================
@@ -136,7 +138,11 @@ serve(async (req) => {
           .select(`
             attempt_number,
             score,
+            total_questions,
+            correct_answers,
+            time_taken_minutes,
             is_passed,
+            answers,
             completed_at
           `)
           .eq('user_id', userId)

@@ -65,6 +65,7 @@ serve(async (req) => {
       .select(`
         progress_percentage,
         updated_at,
+        last_activity_at,
         enrollment_date,
         is_completed,
         completion_date,
@@ -85,7 +86,9 @@ serve(async (req) => {
     // Process and format student data
     const students = (enrollments || []).map((enrollment: any) => {
       // Calculate hours since last access
-      const lastAccessDate = new Date(enrollment.updated_at);
+      const lastAccessDate = new Date(
+        enrollment.last_activity_at || enrollment.updated_at || enrollment.enrollment_date
+      );
       const hoursSinceAccess = (Date.now() - lastAccessDate.getTime()) / (1000 * 60 * 60);
 
       return {

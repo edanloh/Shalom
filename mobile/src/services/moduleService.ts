@@ -5,10 +5,10 @@
 
 import { apiService } from './apiService';
 
-// Module Item (Video or Quiz)
+// Module Item (Video, Document, or Quiz)
 export interface ModuleItem {
   id: string;
-  type: 'video' | 'quiz' | 'pdf';
+  type: 'video' | 'quiz' | 'pdf' | 'document' | 'ppt';
   title: string;
   description?: string;
   order_index: number;
@@ -18,10 +18,15 @@ export interface ModuleItem {
   duration_seconds?: number;
   thumbnail_url?: string;
   is_preview?: boolean;
+  // Document specific fields (PDF, DOCX, PPTX)
+  resource_url?: string;
+  resource_type?: string;
+  file_size_bytes?: number;
+  is_downloadable?: boolean;
   // Quiz specific fields
   passing_score?: number;
   time_limit_minutes?: number;
-  max_attempts?: number;
+  max_attempts?: number | null;
 }
 
 // Course Section with Items
@@ -72,10 +77,8 @@ export interface ModuleDetailResponse {
       title: string;
       description: string;
       instructor_name: string;
-      level: string;
       duration_hours: number;
       thumbnail_url?: string;
-      video_preview_url?: string;
       rating: string;
       total_ratings: number;
       student_count: number;
@@ -141,7 +144,7 @@ class ModuleService {
   }
 
   /**
-   * Get item progress (video or quiz)
+   * Get item progress (video, quiz, document)
    */
   getItemProgress(
     itemId: string,
@@ -154,8 +157,8 @@ class ModuleService {
       return userProgress.videoProgress?.find(vp => vp.video_id === itemId);
     } else if (itemType === 'quiz') {
       return userProgress.quizAttempts?.find(qa => qa.quiz_id === itemId);
-    } else if (itemType === 'pdf') {
-      return null; // No progress tracking for PDFs
+    } else if (itemType === 'pdf' || itemType === 'document' || itemType === 'ppt') {
+      return null; // No granular progress tracking for documents
     }
 
     return null;
@@ -174,7 +177,7 @@ class ModuleService {
       const attempt = userProgress.quizAttempts?.find(qa => qa.quiz_id === item.id);
       return attempt?.is_passed || false;
     }
-    else if (item.type === 'pdf') {
+    else if (item.type === 'pdf' || item.type === 'document' || item.type === 'ppt') {
       return item.is_completed || false;
     }
     return false;

@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import mammoth from "mammoth";
+import JSZip from "jszip";
 import { useCourseBuilder } from "./CourseBuilderContext";
 import { useContentManagement } from "./useContentManagement";
 import { useVideoUpload } from "./useVideoUpload";
 import { Button } from "../ui/button";
 import { Colors } from "../../constants/Colors";
+import { StorageService } from "../../services/storageService";
 import {
   Dialog,
   DialogContent,
@@ -13,70 +16,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-
-/* ------------------------- MODULE EDITOR ------------------------- */
-const ModuleEditor = ({ selectedItem, modules, updateModule }: any) => {
-  const module = modules.find((m: any) => m.id === selectedItem.id);
-
-  // Extract the base title without "Module X:" prefix for editing
-  const baseTitle = module?.title?.replace(/^Module \d+:\s*/, "") || "";
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Module Title
-        </label>
-        <input
-          type="text"
-          value={baseTitle}
-          onChange={(e) => {
-            // Update with the user's input, the prefix will be added by the numbering system
-            const moduleNumber =
-              modules.findIndex((m: any) => m.id === selectedItem.id) + 1;
-            updateModule(selectedItem.id, {
-              title: `Module ${moduleNumber}: ${e.target.value}`,
-            });
-          }}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Description
-        </label>
-        <textarea
-          value={module?.description || ""}
-          onChange={(e) =>
-            updateModule(selectedItem.id, { description: e.target.value })
-          }
-          rows={3}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Status
-        </label>
-        <select
-          value={module?.status || "draft"}
-          onChange={(e) =>
-            updateModule(selectedItem.id, { status: e.target.value })
-          }
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
-        >
-          <option value="published">Published</option>
-          <option value="draft">Draft</option>
-        </select>
-      </div>
-    </div>
-  );
-};
+import StyledPDFViewer from "@/components/document/StyledPDFViewer";
+import OfficeOnlinePreview from "@/components/document/OfficeOnlinePreview";
+import { ValidationModal } from "./ValidationModal";
+import {
+  MatchingEditor,
+  OptionsEditor,
+  QuizHeader,
+  QuestionNavigation,
+  ErrorBanner,
+  QuestionImageUpload,
+  QuestionCardHeader,
+} from "./Quiz";
+import { LessonBasicInfo, DocumentUpload, VideoUpload } from "./Lesson/index";
+import { ModuleEditor } from "./Module/index";
 
 /* ------------------------- LESSON EDITOR ------------------------- */
-const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
+const LessonEditor = ({
+  selectedItem,
+  modules,
+  updateLesson,
+  showValidationErrors,
+}: any) => {
+  const { currentCourseId } = useCourseBuilder();
   const module = modules.find((m: any) =>
-    m.lessons.some((l: any) => l.id === selectedItem.id)
+    m.lessons.some((l: any) => l.id === selectedItem.id),
   );
   const lesson = module?.lessons.find((l: any) => l.id === selectedItem.id);
 
@@ -84,7 +48,9 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
   if (!module || !lesson) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p style={{ color: Colors.textSecondary }}>Lesson not found. Please select a lesson from the sidebar.</p>
+        <p style={{ color: Colors.textSecondary }}>
+          Lesson not found. Please select a lesson from the sidebar.
+        </p>
       </div>
     );
   }
@@ -102,556 +68,292 @@ const LessonEditor = ({ selectedItem, modules, updateLesson }: any) => {
     selectedVideoFile,
     extractYouTubeId,
     handleVideoUrlChange,
-    handleThumbnailFileChange,
-    handleVideoFileChange,
+    handleThumbnailFileChange: originalHandleThumbnailFileChange,
+    handleVideoFileChange: originalHandleVideoFileChange,
     clearThumbnail,
     clearVideo,
   } = useVideoUpload(updateLesson, module.id, lesson.id, lesson);
 
+  // Wrap thumbnail file change handler to check for validation errors
+  const handleThumbnailFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    originalHandleThumbnailFileChange(e);
+
+    // Check if there was a validation error
+    const errorInfo = (window as any).__thumbnailUploadError;
+    if (errorInfo) {
+      setValidationMessage(errorInfo);
+      setShowValidationModal(true);
+      delete (window as any).__thumbnailUploadError;
+    }
+  };
+
+  // Wrap video file change handler to check for validation errors
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    originalHandleVideoFileChange(e);
+
+    // Check if there was a validation error
+    const errorInfo = (window as any).__videoUploadError;
+    if (errorInfo) {
+      setValidationMessage(errorInfo);
+      setShowValidationModal(true);
+      delete (window as any).__videoUploadError;
+    }
+  };
+
   // Check lesson type
-  const isPdfLesson = lesson?.type === 'pdf';
+  const isVideoLesson = lesson?.type === "video";
+  const isDocumentLesson = !isVideoLesson;
+
+  // State for video preview
+  const [localVideoPreviewUrl, setLocalVideoPreviewUrl] = useState("");
+
+  // Validation states
+  const MAX_FILE_SIZE_MB = 50;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationMessage, setValidationMessage] = useState({
+    title: "",
+    description: "",
+  });
+  const [videoPreviewError, setVideoPreviewError] = useState(false);
+
+  useEffect(() => {
+    const cacheKey = `${module.id}-${lesson.id}`;
+    const cachedFiles = (window as any).__lessonFileCache?.get(cacheKey);
+    const cachedVideoFile = cachedFiles?.videoFile as File | undefined;
+    const activeVideoFile = selectedVideoFile || cachedVideoFile;
+
+    if (activeVideoFile) {
+      const url = URL.createObjectURL(activeVideoFile);
+      setLocalVideoPreviewUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    }
+
+    setLocalVideoPreviewUrl("");
+    return undefined;
+  }, [selectedVideoFile, lesson?.videoUrl, module.id, lesson.id]);
+  const lessonTitleEmpty = !(lesson?.baseTitle || "").trim();
+  const hasVideo =
+    !!lesson?.videoUrl &&
+    lesson.videoUrl.trim() !== "" &&
+    lesson.videoUrl !== "[LOCAL_FILE: ]";
+  const hasPdf =
+    !!lesson?.resourceUrl &&
+    lesson.resourceUrl.trim() !== "" &&
+    lesson.resourceUrl !== "[LOCAL_FILE: ]";
 
   return (
     <div className="space-y-4">
-      <div>
-        <label
-          style={{ color: Colors.textSecondary }}
-          className="block text-sm font-medium mb-2"
-        >
-          Lesson Type
-        </label>
-        <select
-          value={lesson?.type || 'video'}
-          onChange={(e) => {
-            const newType = e.target.value as 'video' | 'pdf';
-            updateLesson(module.id, lesson.id, { 
-              type: newType,
-              videoUrl: newType === 'pdf' ? '' : lesson?.videoUrl,
-              resourceUrl: newType === 'pdf' ? lesson?.resourceUrl || '' : undefined,
-              isDownloadable: newType === 'pdf' ? lesson?.isDownloadable ?? true : undefined,
-            });
-          }}
-          style={{
-            backgroundColor: Colors.textInputBg,
-            borderColor: Colors.gray600,
-            color: Colors.textPrimary,
-          }}
-          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-        >
-          <option value="video">Video Lesson</option>
-          <option value="pdf">PDF Document</option>
-        </select>
-      </div>
-      <div>
-        <label
-          style={{ color: Colors.textSecondary }}
-          className="block text-sm font-medium mb-2"
-        >
-          Lesson Title
-        </label>
-        <div
-          style={{
-            color: Colors.textMuted,
-            fontSize: "12px",
-            marginBottom: "8px",
-          }}
-        ></div>
-        <input
-          type="text"
-          value={lesson?.baseTitle || ""}
-          onChange={(e) =>
-            updateLesson(module.id, lesson.id, { baseTitle: e.target.value })
-          }
-          style={{
-            backgroundColor: Colors.textInputBg,
-            borderColor: Colors.gray600,
-            color: Colors.textPrimary,
-          }}
-          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-        />
-      </div>
-      <div>
-        <label
-          style={{ color: Colors.textSecondary }}
-          className="block text-sm font-medium mb-2"
-        >
-          Description / Content
-        </label>
-        <textarea
-          value={lesson?.content || ""}
-          onChange={(e) =>
-            updateLesson(module.id, lesson.id, { content: e.target.value })
-          }
-          rows={8}
-          style={{
-            backgroundColor: Colors.textInputBg,
-            borderColor: Colors.gray600,
-            color: Colors.textPrimary,
-          }}
-          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80 resize-none"
-          placeholder="Enter lesson description..."
-        />
-      </div>
-      
+      <LessonBasicInfo
+        lesson={lesson}
+        moduleId={module.id}
+        updateLesson={updateLesson}
+        showValidationErrors={showValidationErrors}
+        lessonTitleEmpty={lessonTitleEmpty}
+      />
+
       {/* Conditional rendering based on lesson type */}
-      {isPdfLesson ? (
-        // PDF Upload Section
-        <div>
-          <label
-            style={{ color: Colors.textSecondary }}
-            className="block text-sm font-medium mb-2"
-          >
-            PDF Document (required)
-          </label>
-          
-          <div className="flex gap-2 mb-2">
-            <button
-              onClick={() => {
-                // Don't allow switching if there's a local file
-                if (lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]') {
-                  return;
-                }
-                if (lesson?.resourceUrl?.startsWith('[LOCAL_FILE:')) {
-                  updateLesson(module.id, lesson.id, { resourceUrl: '', fileSize: 0 });
-                  // Clear from cache
-                  const cacheKey = `${module.id}-${lesson.id}`;
-                  const existingCache = (window as any).__lessonFileCache?.get(cacheKey) || {};
-                  delete existingCache.pdfFile;
-                  (window as any).__lessonFileCache?.set(cacheKey, existingCache);
-                }
-              }}
-              disabled={lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]'}
-              style={{
-                backgroundColor: !lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') ? Colors.accent : Colors.gray800,
-                color: Colors.textPrimary,
-                opacity: (lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]') ? 0.5 : 1,
-                cursor: (lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]') ? 'not-allowed' : 'pointer',
-              }}
-              className="px-3 py-1 rounded text-sm"
-            >
-              URL
-            </button>
-            <button
-              onClick={() => {
-                // Don't allow switching if there's a URL
-                if (lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')) {
-                  return;
-                }
-                if (lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')) {
-                  updateLesson(module.id, lesson.id, { resourceUrl: '', fileSize: 0 });
-                }
-                // Force to upload mode by setting a placeholder if empty
-                if (!lesson?.resourceUrl) {
-                  updateLesson(module.id, lesson.id, { resourceUrl: '[LOCAL_FILE: ]' });
-                }
-              }}
-              disabled={lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')}
-              style={{
-                backgroundColor: lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') ? Colors.accent : Colors.gray800,
-                color: Colors.textPrimary,
-                opacity: (lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')) ? 0.5 : 1,
-                cursor: (lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:')) ? 'not-allowed' : 'pointer',
-              }}
-              className="px-3 py-1 rounded text-sm"
-            >
-              Upload File
-            </button>
-          </div>
-          
-          {!lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') ? (
-            // URL Input
-            <div>
-              <input
-                type="url"
-                value={lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') ? '' : (lesson?.resourceUrl || "")}
-                onChange={(e) =>
-                  updateLesson(module.id, lesson.id, { resourceUrl: e.target.value })
-                }
-                style={{
-                  backgroundColor: Colors.textInputBg,
-                  borderColor: Colors.gray600,
-                  color: Colors.textPrimary,
-                }}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-                placeholder="https://example.com/document.pdf"
-              />
-              {lesson?.resourceUrl && !lesson.resourceUrl.startsWith('[LOCAL_FILE:') && (
-                <>
-                  <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: Colors.gray800 }}>
-                    <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
-                      📄 PDF URL added
-                    </span>
-                    <button
-                      onClick={() => updateLesson(module.id, lesson.id, { resourceUrl: '' })}
-                      style={{ color: Colors.textSecondary }}
-                      className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
-                      title="Clear PDF"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="mt-3">
-                    <label
-                      style={{ color: Colors.textSecondary }}
-                      className="block text-sm font-medium mb-2"
-                    >
-                      PDF Preview
-                    </label>
-                    <div
-                      className="rounded overflow-hidden border"
-                      style={{
-                        borderColor: Colors.gray600,
-                        height: '500px'
-                      }}
-                    >
-                      <iframe
-                        src={lesson.resourceUrl}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          border: 'none'
-                        }}
-                        title="PDF preview"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            // File Upload
-            <div>
-              <input
-                key={`pdf-${lesson.id}`}
-                type="file"
-                accept=".pdf,application/pdf"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    // Store file reference with [LOCAL_FILE:] marker
-                    updateLesson(module.id, lesson.id, { 
-                      resourceUrl: `[LOCAL_FILE: ${file.name}]`,
-                      fileSize: file.size
-                    });
-                    
-                    // Cache the file
-                    const cacheKey = `${module.id}-${lesson.id}`;
-                    const existingCache = (window as any).__lessonFileCache?.get(cacheKey) || {};
-                    (window as any).__lessonFileCache?.set(cacheKey, {
-                      ...existingCache,
-                      pdfFile: file
-                    });
-                  }
-                }}
-                style={{
-                  backgroundColor: Colors.textInputBg,
-                  borderColor: Colors.gray600,
-                  color: Colors.textPrimary,
-                }}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-              />
-              {lesson?.resourceUrl?.startsWith('[LOCAL_FILE:') && lesson.resourceUrl !== '[LOCAL_FILE: ]' && (
-                <>
-                  <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: Colors.gray800 }}>
-                    <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
-                      📄 {lesson.resourceUrl.split('[LOCAL_FILE: ')[1]?.replace(']', '')}
-                      {lesson.fileSize && <span style={{ color: Colors.textMuted, marginLeft: '8px' }}>({(lesson.fileSize / (1024 * 1024)).toFixed(2)} MB)</span>}
-                    </span>
-                    <button
-                      onClick={() => {
-                        updateLesson(module.id, lesson.id, { resourceUrl: '', fileSize: 0 });
-                        // Clear from cache
-                        const cacheKey = `${module.id}-${lesson.id}`;
-                        const existingCache = (window as any).__lessonFileCache?.get(cacheKey) || {};
-                        delete existingCache.pdfFile;
-                        (window as any).__lessonFileCache?.set(cacheKey, existingCache);
-                      }}
-                      style={{ color: Colors.textSecondary }}
-                      className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
-                      title="Clear PDF"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {(() => {
-                    const cacheKey = `${module.id}-${lesson.id}`;
-                    const cachedFiles = (window as any).__lessonFileCache?.get(cacheKey);
-                    const pdfFile = cachedFiles?.pdfFile;
-                    if (pdfFile) {
-                      return (
-                        <div className="mt-3">
-                          <label
-                            style={{ color: Colors.textSecondary }}
-                            className="block text-sm font-medium mb-2"
-                          >
-                            PDF Preview
-                          </label>
-                          <div
-                            className="rounded overflow-hidden border"
-                            style={{
-                              borderColor: Colors.gray600,
-                              height: '500px'
-                            }}
-                          >
-                            <iframe
-                              src={URL.createObjectURL(pdfFile)}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                border: 'none'
-                              }}
-                              title="PDF preview"
-                            />
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                </>
-              )}
-            </div>
-          )}
-          
-          {/* PDF Options */}
-          <div className="mt-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={lesson?.isDownloadable ?? true}
-                onChange={(e) =>
-                  updateLesson(module.id, lesson.id, { isDownloadable: e.target.checked })
-                }
-                className="w-4 h-4"
-              />
-              <span style={{ color: Colors.textSecondary, fontSize: '14px' }}>
-                Allow students to download this PDF
-              </span>
-            </label>
-          </div>
-        </div>
+      {isDocumentLesson ? (
+        <DocumentUpload
+          module={module}
+          lesson={lesson}
+          updateLesson={updateLesson}
+          showValidationErrors={showValidationErrors}
+          hasPdf={hasPdf}
+          setValidationMessage={setValidationMessage}
+          setShowValidationModal={setShowValidationModal}
+          currentCourseId={currentCourseId}
+        />
       ) : (
-        // Video Upload Section (existing code)
-        <div>
-          <label
-            style={{ color: Colors.textSecondary }}
-            className="block text-sm font-medium mb-2"
-          >
-            Video (required)
-          </label>
-        <div className="flex gap-2 mb-2">
-          <button
-            onClick={() => {
-              // Clear local file when switching to URL mode (check BEFORE setting new mode)
-              if (videoInputType === 'upload' && (selectedVideoFile || lesson?.videoUrl?.startsWith('[LOCAL_FILE:'))) {
-                updateLesson(module.id, lesson.id, { videoUrl: '', durationSeconds: 0 });
-              }
-              setVideoInputType('url');
-            }}
-            style={{
-              backgroundColor: videoInputType === 'url' ? Colors.primary : 'transparent',
-              color: Colors.textPrimary,
-            }}
-            className="px-3 py-1 rounded text-sm"
-          >
-            URL
-          </button>
-          <button
-            onClick={() => {
-              // Clear URL when switching to upload mode (check BEFORE setting new mode)
-              if (videoInputType === 'url' && lesson?.videoUrl && !lesson.videoUrl.startsWith('[LOCAL_FILE:')) {
-                updateLesson(module.id, lesson.id, { videoUrl: '', durationSeconds: 0 });
-              }
-              setVideoInputType('upload');
-            }}
-            style={{
-              backgroundColor: videoInputType === 'upload' ? Colors.primary : 'transparent',
-              color: Colors.textPrimary,
-            }}
-            className="px-3 py-1 rounded text-sm"
-          >
-            Upload File
-          </button>
-        </div>
-        {videoInputType === 'url' ? (
-          <div>
-            <input
-              type="url"
-              value={lesson?.videoUrl?.startsWith('[LOCAL_FILE:') ? '' : (lesson?.videoUrl || "")}
-              onChange={(e) =>
-                handleVideoUrlChange(e.target.value)
-              }
-              style={{
-                backgroundColor: Colors.textInputBg,
-                borderColor: Colors.gray600,
-                color: Colors.textPrimary,
-              }}
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-              placeholder="https://youtube.com/watch?v=... or any video URL"
-            />
-            {lesson?.videoUrl && !lesson.videoUrl.startsWith('[LOCAL_FILE:') && (
-              <>
-                <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: 'transparent' }}>
-                  <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
-                    🎥 Video URL added
-                  </span>
-                  <button
-                    onClick={clearVideo}
-                    style={{ color: Colors.textSecondary }}
-                    className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
-                    title="Clear video"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                {(lesson.videoUrl.includes('youtube.com') || lesson.videoUrl.includes('youtu.be')) && (
-                  <p style={{ color: Colors.textMuted, fontSize: '12px', marginTop: '4px' }}>
-                    YouTube video detected - duration will be auto-fetched
-                  </p>
-                )}
-                {/* Video Preview */}
-                {extractYouTubeId(lesson.videoUrl) && (
-                  <div className="mt-4">
-                    <label
-                      style={{ color: Colors.textSecondary }}
-                      className="block text-sm font-medium mb-2"
-                    >
-                      Video Preview
-                    </label>
-                    <div 
-                      className="rounded overflow-hidden" 
-                      style={{ 
-                        backgroundColor: Colors.gray800,
-                        aspectRatio: '16/9',
-                        position: 'relative'
-                      }}
-                    >
-                      <iframe
-                        key={lesson.videoUrl}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          border: 'none'
-                        }}
-                        src={`https://www.youtube.com/embed/${extractYouTubeId(lesson.videoUrl)}`}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        title="Video preview"
-                      />
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        ) : (
-          <div>
-            <div>
-              <input
-                key={`video-${lesson.id}`}
-                type="file"
-                accept="video/*"
-                onChange={handleVideoFileChange}
-                disabled={isUploading}
-                style={{
-                  backgroundColor: Colors.textInputBg,
-                  borderColor: Colors.gray600,
-                  color: Colors.textPrimary,
-                }}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-              />
-              {(selectedVideoFile || lesson?.videoUrl?.startsWith('[LOCAL_FILE:')) && (
-                <div className="mt-2 px-2 py-1 rounded flex items-center justify-between" style={{ backgroundColor: 'transparent' }}>
-                  <span style={{ color: Colors.textSecondary, fontSize: '13px' }}>
-                    🎥 {selectedVideoFile?.name || lesson?.videoUrl?.split('[LOCAL_FILE: ')[1]?.replace(']', '')}
-                    {selectedVideoFile && <span style={{ color: Colors.textMuted, marginLeft: '8px' }}>({(selectedVideoFile.size / (1024 * 1024)).toFixed(2)} MB)</span>}
-                  </span>
-                  <button
-                    onClick={clearVideo}
-                    style={{ color: Colors.textSecondary }}
-                    className="ml-2 hover:text-red-500 hover:bg-red-900/20 p-1 rounded transition-colors"
-                    title="Clear video"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+        <VideoUpload
+          module={module}
+          lesson={lesson}
+          updateLesson={updateLesson}
+          showValidationErrors={showValidationErrors}
+          hasVideo={hasVideo}
+          videoInputType={videoInputType}
+          setVideoInputType={setVideoInputType}
+          handleVideoUrlChange={handleVideoUrlChange}
+          handleVideoFileChange={handleVideoFileChange}
+          clearVideo={clearVideo}
+          selectedVideoFile={selectedVideoFile}
+          localVideoPreviewUrl={localVideoPreviewUrl}
+          setLocalVideoPreviewUrl={setLocalVideoPreviewUrl}
+          isUploading={isUploading}
+          extractYouTubeId={extractYouTubeId}
+          setValidationMessage={setValidationMessage}
+          setShowValidationModal={setShowValidationModal}
+        />
       )}
-      
-      {/* Duration and Preview settings - show for both types */}
+
+      {/* Duration and Preview settings - show for video only */}
       <div className="grid grid-cols-2 gap-4">
-        {!isPdfLesson && (
+        {isVideoLesson && (
           <div>
             <label
               style={{ color: Colors.textSecondary }}
               className="block text-sm font-medium mb-2"
             >
-              Duration (seconds)
+              Duration (HH:MM:SS)
               {isFetchingDuration && (
-                <span className="ml-2 text-xs" style={{ color: Colors.textMuted }}>
+                <span
+                  className="ml-2 text-xs"
+                  style={{ color: Colors.textMuted }}
+                >
                   Fetching...
                 </span>
               )}
             </label>
             <input
-              type="number"
-              value={lesson?.durationSeconds || 0}
-              onChange={(e) =>
-                updateLesson(module.id, lesson.id, {
-                  durationSeconds: parseInt(e.target.value) || 0,
-                })
-              }
+              type="text"
+              value={(() => {
+                const seconds = lesson?.durationSeconds || 0;
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+              })()}
+              onChange={(e) => {
+                const value = e.target.value;
+                const parts = value.split(":");
+                if (parts.length === 3) {
+                  const hours = parseInt(parts[0]) || 0;
+                  const minutes = parseInt(parts[1]) || 0;
+                  const secs = parseInt(parts[2]) || 0;
+                  const totalSeconds = hours * 3600 + minutes * 60 + secs;
+                  updateLesson(module.id, lesson.id, {
+                    durationSeconds: totalSeconds,
+                  });
+                }
+              }}
               style={{
                 backgroundColor: Colors.textInputBg,
                 borderColor: Colors.gray600,
                 color: Colors.textPrimary,
               }}
               className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
-              placeholder="Auto-fetched from YouTube"
-              min="0"
+              placeholder="00:00:00"
               disabled={isFetchingDuration}
             />
           </div>
         )}
-        <div>
-          <label
-            style={{ color: Colors.textSecondary }}
-            className="block text-sm font-medium mb-2"
-          >
-            Preview Lesson
-          </label>
-          <label className="flex items-center gap-2 mt-2">
-            <input
-              type="checkbox"
-              checked={lesson?.isPreview || false}
-              onChange={(e) =>
-                updateLesson(module.id, lesson.id, {
-                  isPreview: e.target.checked,
-                })
-              }
-              style={{
-                accentColor: Colors.secondary,
-              }}
-              className="w-5 h-5 rounded"
-            />
-            <span style={{ color: Colors.textSecondary }} className="text-sm">
-              Allow preview without enrollment
-            </span>
-          </label>
-        </div>
       </div>
+
+      {/* Validation Modal */}
+      <ValidationModal
+        open={showValidationModal}
+        onOpenChange={setShowValidationModal}
+        title={validationMessage.title}
+        description={validationMessage.description}
+      />
     </div>
   );
 };
 
 /* ------------------------- PAGED QUIZ EDITOR ------------------------- */
+
+// Helper: Get errors for a single question
+const getQuestionErrors = (question: any): string[] => {
+  const errors: string[] = [];
+
+  if (!question.text?.trim()) {
+    errors.push("Question text is required");
+  }
+
+  // Points validation - catch NaN properly
+  const points = Number(question.points);
+  if (isNaN(points) || points < 1) {
+    errors.push("Points must be at least 1");
+  }
+
+  // Type-specific validation
+  if (question.type === "multiple-choice") {
+    // Must have a correct answer selected
+    if (
+      question.correctAnswer === null ||
+      question.correctAnswer === undefined
+    ) {
+      errors.push("Select a correct answer");
+    }
+    // The selected answer must point to a non-empty option
+    if (
+      question.correctAnswer !== null &&
+      question.correctAnswer !== undefined
+    ) {
+      const selectedOption = question.options?.[question.correctAnswer];
+      if (!selectedOption || !String(selectedOption).trim()) {
+        errors.push("Correct answer points to an empty option");
+      }
+    }
+    // At least one non-empty option
+    const hasOptions = question.options?.some((opt: any) => String(opt).trim());
+    if (!hasOptions) {
+      errors.push("At least one option is required");
+    }
+  }
+
+  if (question.type === "multiple-correct") {
+    // Must have at least one answer checked
+    const checkedAnswers = Array.isArray(question.correctAnswer)
+      ? question.correctAnswer
+      : [];
+    if (checkedAnswers.length === 0) {
+      errors.push("Select at least one correct answer");
+    }
+    // None of the checked answers should point to empty options
+    for (const idx of checkedAnswers) {
+      const option = question.options?.[idx];
+      if (!option || !String(option).trim()) {
+        errors.push("A correct answer points to an empty option");
+        break;
+      }
+    }
+    // At least one non-empty option
+    const hasOptions = question.options?.some((opt: any) => String(opt).trim());
+    if (!hasOptions) {
+      errors.push("At least one option is required");
+    }
+  }
+
+  if (question.type === "true-false") {
+    // correctAnswer must be explicitly 0 or 1
+    if (question.correctAnswer !== 0 && question.correctAnswer !== 1) {
+      errors.push("Select either True or False");
+    }
+  }
+
+  if (question.type === "short-answer") {
+    // sampleAnswer (Explanation) is required as grading guideline
+    if (!question.sampleAnswer?.trim()) {
+      errors.push(
+        "Explanation/Sample Answer is required for short-answer questions",
+      );
+    }
+  }
+
+  if (question.type === "matching") {
+    // Must have at least 1 pair
+    if (!question.matchingPairs || question.matchingPairs.length === 0) {
+      errors.push("At least one matching pair is required");
+    }
+    // Every pair must have both left and right filled
+    const hasMissingFields = question.matchingPairs?.some(
+      (pair: any) => !pair.left?.trim() || !pair.right?.trim(),
+    );
+    if (hasMissingFields) {
+      errors.push(
+        "All matching pairs must have both left and right items filled",
+      );
+    }
+  }
+
+  return errors;
+};
+
 const QuizEditor = ({
   selectedItem,
   modules,
@@ -661,33 +363,169 @@ const QuizEditor = ({
   updateQuestion,
   addOption,
   removeOption,
+  showValidationErrors,
 }: any) => {
   const { deleteQuiz } = useContentManagement();
+  const { currentCourseId, setCurrentCourseId } = useCourseBuilder();
   const module = modules.find((m: any) =>
-    m.quizzes.some((q: any) => q.id === selectedItem.id)
+    m.quizzes.some((q: any) => q.id === selectedItem.id),
   );
   const quiz = module?.quizzes.find((q: any) => q.id === selectedItem.id);
+  const quizTitleEmpty = !(quiz?.baseTitle || "").trim();
+
+  // Enhanced passing score validation
+  const passingScoreValue = Number(quiz?.passingScore);
+  const passingScoreInvalid =
+    quiz?.passingScore === undefined ||
+    quiz?.passingScore === null ||
+    Number.isNaN(passingScoreValue) ||
+    passingScoreValue < 0 ||
+    passingScoreValue > 100;
+
+  const maxAttemptsInvalid =
+    quiz?.maxAttempts !== null &&
+    quiz?.maxAttempts !== undefined &&
+    Number(quiz?.maxAttempts) < 1;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  // FIX 1: Declare questionImagePreviewUrl state here in QuizEditor (not LessonEditor)
+  const [questionImagePreviewUrl, setQuestionImagePreviewUrl] =
+    useState<string>("");
+
+  // Calculate errors for all questions
+  const questions = quiz?.questions || [];
+  const questionErrorsMap = new Map<string, string[]>();
+  questions.forEach((q: any) => {
+    const errors = getQuestionErrors(q);
+    if (errors.length > 0) {
+      questionErrorsMap.set(q.id, errors);
+    }
+  });
+  const totalErrorCount = Array.from(questionErrorsMap.values()).reduce(
+    (sum, errors) => sum + errors.length,
+    0,
+  );
+
+  // Reset currentIndex when quiz changes
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [quiz?.id]);
 
   // Return null if quiz or module not found (e.g., after deletion)
+  // FIX 2: Guard clause moved BEFORE useEffect that depends on currentQuestion,
+  // so we derive currentQuestion after the guard and pass it as a dep safely.
   if (!module || !quiz) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p style={{ color: Colors.textSecondary }}>Quiz not found. Please select a quiz from the sidebar.</p>
+        <p style={{ color: Colors.textSecondary }}>
+          Quiz not found. Please select a quiz from the sidebar.
+        </p>
       </div>
     );
   }
 
-  const questions = quiz?.questions || [];
   const currentQuestion = questions[currentIndex];
 
-  // Debug logging
-  console.log("QuizEditor - Quiz:", quiz?.title);
-  console.log("QuizEditor - Questions:", questions);
-  console.log("QuizEditor - Current Question:", currentQuestion);
-  console.log("QuizEditor - Current Question Text:", currentQuestion?.text);
+  // Effect to sync options/correctAnswer when question type changes.
+  // This runs AFTER the render where type was updated, so it always sees the new type
+  // and can reliably reset dependent fields without racing the type update.
+  const prevQuestionTypeRef = React.useRef<string | undefined>(undefined);
+  const prevQuestionIdRef = React.useRef<string | undefined>(undefined);
+  useEffect(() => {
+    // eslint-disable-line react-hooks/rules-of-hooks
+    if (!currentQuestion) return;
+
+    // When navigating to a different question, reset the ref so we don't
+    // incorrectly treat a type-change as happening on the new question
+    if (prevQuestionIdRef.current !== currentQuestion.id) {
+      prevQuestionIdRef.current = currentQuestion.id;
+      prevQuestionTypeRef.current = currentQuestion.type;
+
+      // If the question is already true-false but has no/wrong options, fix it now
+      if (currentQuestion.type === "true-false") {
+        const hasValidOptions =
+          Array.isArray(currentQuestion.options) &&
+          currentQuestion.options[0] === "True" &&
+          currentQuestion.options[1] === "False";
+        if (!hasValidOptions) {
+          updateQuestion(module.id, quiz.id, currentQuestion.id, "options", [
+            "True",
+            "False",
+          ]);
+        }
+        if (
+          currentQuestion.correctAnswer !== 0 &&
+          currentQuestion.correctAnswer !== 1
+        ) {
+          updateQuestion(
+            module.id,
+            quiz.id,
+            currentQuestion.id,
+            "correctAnswer",
+            0,
+          );
+        }
+      }
+      return;
+    }
+
+    const prevType = prevQuestionTypeRef.current;
+    const currType = currentQuestion.type;
+
+    if (prevType === currType) return; // no change
+    prevQuestionTypeRef.current = currType;
+
+    if (currType === "true-false") {
+      // Arriving at true-false: always set canonical options so the validator never sees empty options
+      updateQuestion(module.id, quiz.id, currentQuestion.id, "options", [
+        "True",
+        "False",
+      ]);
+      if (
+        currentQuestion.correctAnswer !== 0 &&
+        currentQuestion.correctAnswer !== 1
+      ) {
+        updateQuestion(
+          module.id,
+          quiz.id,
+          currentQuestion.id,
+          "correctAnswer",
+          0,
+        );
+      }
+    } else if (prevType === "true-false") {
+      // Leaving true-false: clear the True/False options so the new type starts blank
+      updateQuestion(module.id, quiz.id, currentQuestion.id, "options", [
+        "",
+        "",
+      ]);
+      updateQuestion(
+        module.id,
+        quiz.id,
+        currentQuestion.id,
+        "correctAnswer",
+        currType === "multiple-correct" ? [] : null,
+      );
+    }
+  }, [currentQuestion?.type, currentQuestion?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Image preview effect: creates a stable object URL from the cached File object
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    const cacheKey = `question-${module?.id}-${quiz?.id}-${currentQuestion?.id}`;
+    const cachedFile = (window as any).__questionImageCache?.get(cacheKey);
+    if (cachedFile) {
+      const url = URL.createObjectURL(cachedFile);
+      setQuestionImagePreviewUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    } else {
+      setQuestionImagePreviewUrl("");
+      return undefined;
+    }
+  }, [currentQuestion?.id, currentQuestion?.imageUrl, module?.id, quiz?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNext = () => {
     if (currentIndex < questions.length - 1) setCurrentIndex(currentIndex + 1);
@@ -720,122 +558,66 @@ const QuizEditor = ({
   return (
     <div className="space-y-6">
       {/* Quiz Header */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-slate-300">
-            Quiz Title
-          </label>
-        </div>
-        <input
-          type="text"
-          value={quiz?.baseTitle || ""}
-          onChange={(e) =>
-            updateQuiz(module.id, quiz.id, { baseTitle: e.target.value })
-          }
-          placeholder="Enter quiz title (e.g., 'Module 1 Assessment')"
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
-        />
-      </div>
+      <QuizHeader
+        quiz={quiz}
+        questions={questions}
+        showValidationErrors={showValidationErrors}
+        quizTitleEmpty={quizTitleEmpty}
+        passingScoreInvalid={passingScoreInvalid}
+        maxAttemptsInvalid={maxAttemptsInvalid}
+        updateQuiz={updateQuiz}
+        moduleId={module.id}
+      />
 
-      {/* Quiz Settings */}
-      <div className="space-y-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="mr-4">
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Passing Score (%)
-            </label>
-            <input
-              type="number"
-              value={quiz?.passingScore || 70}
-              onChange={(e) =>
-                updateQuiz(module.id, quiz.id, {
-                  passingScore: parseInt(e.target.value) || 70,
-                })
-              }
-              min="0"
-              max="100"
-              className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          <div className="ml-4">
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Total Points
-            </label>
-            <div className="w-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-slate-400">
-              {questions.reduce((sum, q) => sum + (q.points || 0), 0)} points
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Cross-Question Error Banner */}
+      <ErrorBanner
+        showValidationErrors={showValidationErrors}
+        totalErrorCount={totalErrorCount}
+        questionErrorsMap={questionErrorsMap}
+        questions={questions}
+        onNavigateToQuestion={setCurrentIndex}
+      />
 
       {/* Question Navigation */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handlePrev}
-            disabled={currentIndex === 0}
-            className="p-2 bg-slate-700 rounded disabled:opacity-40"
-          >
-            <ChevronLeft className="h-4 w-4 text-white" />
-          </button>
-          <span className="text-slate-300 text-sm">
-            Question {currentIndex + 1} of {questions.length || 0}
-          </span>
-          <button
-            onClick={handleNext}
-            disabled={currentIndex >= questions.length - 1}
-            className="p-2 bg-slate-700 rounded disabled:opacity-40"
-          >
-            <ChevronRight className="h-4 w-4 text-white" />
-          </button>
-        </div>
-
-        {/* <button
-          onClick={() => addQuestion(module.id, quiz.id)}
-          className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Question
-        </button> */}
-
-        <Button
-          onClick={() => {
-            addQuestion(module.id, quiz.id);
-            setCurrentIndex(questions.length);
-          }}
-          className="w-auto gap-2 mt-2 mb-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Question
-        </Button>
-      </div>
+      <QuestionNavigation
+        currentIndex={currentIndex}
+        questionsLength={questions.length}
+        handlePrev={handlePrev}
+        handleNext={handleNext}
+        onAddQuestion={() => {
+          addQuestion(module.id, quiz.id);
+          setCurrentIndex(questions.length);
+        }}
+      />
 
       {/* Empty State */}
       {!currentQuestion && (
         <div className="text-slate-400 text-center py-8">
-          No questions yet. Click “Add Question” to begin.
+          No questions yet. Click "Add Question" to begin.
         </div>
       )}
 
       {/* Question Page */}
       {currentQuestion && (
-        <div className="relative bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-md space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-white">
-              Question {currentIndex + 1}
-            </h3>
-            <button
-              onClick={handleDeleteQuestion}
-              className="text-red-400 hover:text-red-300"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+        <div
+          className={`relative bg-slate-800 rounded-xl p-6 shadow-md space-y-6 ${
+            showValidationErrors && questionErrorsMap.has(currentQuestion.id)
+              ? "border-2 border-red-500"
+              : "border border-slate-700"
+          }`}
+        >
+          <QuestionCardHeader
+            currentIndex={currentIndex}
+            currentQuestion={currentQuestion}
+            showValidationErrors={showValidationErrors}
+            questionErrorsMap={questionErrorsMap}
+            onDeleteQuestion={handleDeleteQuestion}
+          />
 
           {/* Question text */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Question Text
+              Question Text<span className="text-red-500 ml-1">*</span>
             </label>
             <textarea
               value={currentQuestion.text}
@@ -845,31 +627,39 @@ const QuizEditor = ({
                   quiz.id,
                   currentQuestion.id,
                   "text",
-                  e.target.value
+                  e.target.value,
                 )
               }
               placeholder="Enter question text"
               rows={2}
               className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
             />
+            {showValidationErrors && !currentQuestion.text?.trim() && (
+              <p className="text-xs text-red-400 mt-1">
+                Question text is required.
+              </p>
+            )}
           </div>
 
           {/* Question Type Selection */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Question Type
+              Question Type<span className="text-red-500 ml-1">*</span>
             </label>
             <select
               value={currentQuestion.type}
-              onChange={(e) =>
+              onChange={(e) => {
+                // Only update the type here. The useEffect above watches for type changes
+                // and resets options/correctAnswer after the render, avoiding race conditions
+                // that occur when calling updateQuestion multiple times in one event handler.
                 updateQuestion(
                   module.id,
                   quiz.id,
                   currentQuestion.id,
                   "type",
-                  e.target.value
-                )
-              }
+                  e.target.value,
+                );
+              }}
               className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
             >
               <option value="multiple-choice">
@@ -882,201 +672,25 @@ const QuizEditor = ({
             </select>
           </div>
 
-          {/* Image Upload/URL */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Question Image (optional)
-            </label>
-            <input
-              type="url"
-              value={currentQuestion.imageUrl || ""}
-              onChange={(e) =>
-                updateQuestion(
-                  module.id,
-                  quiz.id,
-                  currentQuestion.id,
-                  "imageUrl",
-                  e.target.value
-                )
-              }
-              placeholder="Enter image URL"
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
-            />
-            {currentQuestion.imageUrl && (
-              <div className="mt-2">
-                <img
-                  src={currentQuestion.imageUrl}
-                  alt="Question"
-                  className="max-w-full h-32 object-cover rounded border border-slate-600"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              </div>
-            )}
-          </div>
+          {/* Question Image */}
+          <QuestionImageUpload
+            currentQuestion={currentQuestion}
+            updateQuestion={updateQuestion}
+            moduleId={module.id}
+            quizId={quiz.id}
+            questionImagePreviewUrl={questionImagePreviewUrl}
+          />
 
           {/* Options - Only show for certain question types */}
-          {(currentQuestion.type === "multiple-choice" ||
-            currentQuestion.type === "multiple-correct" ||
-            currentQuestion.type === "true-false") && (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                {currentQuestion.type === "true-false"
-                  ? "True/False Options"
-                  : currentQuestion.type === "multiple-correct"
-                  ? "Options (Select all correct)"
-                  : "Answer Options"}
-              </label>
-
-              {currentQuestion.type === "true-false" ? (
-                // True/False specific UI
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 bg-slate-700/40 rounded p-2">
-                    <input
-                      type="radio"
-                      name={`question-${currentQuestion.id}`}
-                      checked={currentQuestion.correctAnswer === 0}
-                      onChange={() => {
-                        updateQuestion(
-                          module.id,
-                          quiz.id,
-                          currentQuestion.id,
-                          "correctAnswer",
-                          0
-                        );
-                        updateQuestion(
-                          module.id,
-                          quiz.id,
-                          currentQuestion.id,
-                          "options",
-                          ["True", "False"]
-                        );
-                      }}
-                    />
-                    <span className="text-white">True</span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-slate-700/40 rounded p-2">
-                    <input
-                      type="radio"
-                      name={`question-${currentQuestion.id}`}
-                      checked={currentQuestion.correctAnswer === 1}
-                      onChange={() => {
-                        updateQuestion(
-                          module.id,
-                          quiz.id,
-                          currentQuestion.id,
-                          "correctAnswer",
-                          1
-                        );
-                        updateQuestion(
-                          module.id,
-                          quiz.id,
-                          currentQuestion.id,
-                          "options",
-                          ["True", "False"]
-                        );
-                      }}
-                    />
-                    <span className="text-white">False</span>
-                  </div>
-                </div>
-              ) : (
-                // Multiple choice/Multiple correct options
-                <div className="space-y-2">
-                  {currentQuestion.options?.map((option: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 bg-slate-700/40 rounded p-2"
-                    >
-                      <input
-                        type={
-                          currentQuestion.type === "multiple-correct"
-                            ? "checkbox"
-                            : "radio"
-                        }
-                        name={`question-${currentQuestion.id}`}
-                        checked={
-                          currentQuestion.type === "multiple-correct"
-                            ? Array.isArray(currentQuestion.correctAnswer)
-                              ? currentQuestion.correctAnswer.includes(idx)
-                              : currentQuestion.correctAnswer === idx
-                            : currentQuestion.correctAnswer === idx
-                        }
-                        onChange={() => {
-                          if (currentQuestion.type === "multiple-correct") {
-                            const currentAnswers = Array.isArray(
-                              currentQuestion.correctAnswer
-                            )
-                              ? currentQuestion.correctAnswer
-                              : [currentQuestion.correctAnswer];
-                            const newAnswers = currentAnswers.includes(idx)
-                              ? currentAnswers.filter((i) => i !== idx)
-                              : [...currentAnswers, idx];
-                            updateQuestion(
-                              module.id,
-                              quiz.id,
-                              currentQuestion.id,
-                              "correctAnswer",
-                              newAnswers
-                            );
-                          } else {
-                            updateQuestion(
-                              module.id,
-                              quiz.id,
-                              currentQuestion.id,
-                              "correctAnswer",
-                              idx
-                            );
-                          }
-                        }}
-                      />
-                      <input
-                        type="text"
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...currentQuestion.options];
-                          newOptions[idx] = e.target.value;
-                          updateQuestion(
-                            module.id,
-                            quiz.id,
-                            currentQuestion.id,
-                            "options",
-                            newOptions
-                          );
-                        }}
-                        className="flex-1 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
-                        placeholder={`Option ${idx + 1}`}
-                      />
-                      {currentQuestion.options.length > 2 && (
-                        <button
-                          onClick={() =>
-                            removeOption(
-                              module.id,
-                              quiz.id,
-                              currentQuestion.id,
-                              idx
-                            )
-                          }
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    onClick={() =>
-                      addOption(module.id, quiz.id, currentQuestion.id)
-                    }
-                    className="text-blue-400 hover:text-blue-300 text-sm"
-                  >
-                    + Add Option
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          <OptionsEditor
+            currentQuestion={currentQuestion}
+            showValidationErrors={showValidationErrors}
+            updateQuestion={updateQuestion}
+            addOption={addOption}
+            removeOption={removeOption}
+            moduleId={module.id}
+            quizId={quiz.id}
+          />
 
           {/* Short Answer Note */}
           {currentQuestion.type === "short-answer" && (
@@ -1090,109 +704,22 @@ const QuizEditor = ({
 
           {/* Matching Type UI */}
           {currentQuestion.type === "matching" && (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Matching Pairs
-              </label>
-              <div className="space-y-2">
-                {currentQuestion.matchingPairs?.map(
-                  (pair: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 bg-slate-700/40 rounded p-2"
-                    >
-                      <input
-                        type="text"
-                        value={pair.left || ""}
-                        onChange={(e) => {
-                          const newPairs = [
-                            ...(currentQuestion.matchingPairs || []),
-                          ];
-                          newPairs[idx] = {
-                            ...newPairs[idx],
-                            left: e.target.value,
-                          };
-                          updateQuestion(
-                            module.id,
-                            quiz.id,
-                            currentQuestion.id,
-                            "matchingPairs",
-                            newPairs
-                          );
-                        }}
-                        placeholder="Left item"
-                        className="flex-1 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
-                      />
-                      <span className="text-slate-400">↔</span>
-                      <input
-                        type="text"
-                        value={pair.right || ""}
-                        onChange={(e) => {
-                          const newPairs = [
-                            ...(currentQuestion.matchingPairs || []),
-                          ];
-                          newPairs[idx] = {
-                            ...newPairs[idx],
-                            right: e.target.value,
-                          };
-                          updateQuestion(
-                            module.id,
-                            quiz.id,
-                            currentQuestion.id,
-                            "matchingPairs",
-                            newPairs
-                          );
-                        }}
-                        placeholder="Right item"
-                        className="flex-1 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
-                      />
-                      <button
-                        onClick={() => {
-                          const newPairs =
-                            currentQuestion.matchingPairs?.filter(
-                              (_: any, i: number) => i !== idx
-                            ) || [];
-                          updateQuestion(
-                            module.id,
-                            quiz.id,
-                            currentQuestion.id,
-                            "matchingPairs",
-                            newPairs
-                          );
-                        }}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )
-                )}
-                <button
-                  onClick={() => {
-                    const newPairs = [
-                      ...(currentQuestion.matchingPairs || []),
-                      { left: "", right: "" },
-                    ];
-                    updateQuestion(
-                      module.id,
-                      quiz.id,
-                      currentQuestion.id,
-                      "matchingPairs",
-                      newPairs
-                    );
-                  }}
-                  className="text-blue-400 hover:text-blue-300 text-sm"
-                >
-                  + Add Matching Pair
-                </button>
-              </div>
-            </div>
+            <MatchingEditor
+              currentQuestion={currentQuestion}
+              showValidationErrors={showValidationErrors}
+              updateQuestion={updateQuestion}
+              moduleId={module.id}
+              quizId={quiz.id}
+            />
           )}
 
           {/* Explanation/Feedback Section - For all question types */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Explanation / Feedback
+              {currentQuestion.type === "short-answer" && (
+                <span className="text-red-500 ml-1">*</span>
+              )}
               <span className="text-slate-400 text-xs ml-2">
                 (Shown to students after answering)
               </span>
@@ -1205,22 +732,36 @@ const QuizEditor = ({
                   quiz.id,
                   currentQuestion.id,
                   "sampleAnswer",
-                  e.target.value
+                  e.target.value,
                 )
               }
               placeholder="Enter explanation for the correct answer (e.g., why this is the correct choice)"
               rows={3}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+              className={`w-full px-3 py-2 bg-slate-700 border rounded text-white focus:outline-none resize-none ${
+                showValidationErrors &&
+                currentQuestion.type === "short-answer" &&
+                !currentQuestion.sampleAnswer?.trim()
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-slate-600 focus:border-blue-500"
+              }`}
             />
             <p className="text-xs text-slate-400 mt-1">
               This explanation helps students understand why the answer is
               correct
+              {currentQuestion.type === "short-answer" && (
+                <span className="text-yellow-400 font-medium">
+                  {" "}
+                  (Required for grading guidelines)
+                </span>
+              )}
             </p>
           </div>
 
           {/* Points input */}
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Points</label>
+            <label className="block text-sm text-slate-300 mb-1">
+              Points<span className="text-red-500 ml-1">*</span>
+            </label>
             <input
               type="number"
               value={currentQuestion.points}
@@ -1230,12 +771,25 @@ const QuizEditor = ({
                   quiz.id,
                   currentQuestion.id,
                   "points",
-                  parseInt(e.target.value) || 0
+                  parseInt(e.target.value) || 0,
                 )
               }
-              className="w-24 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
-              min="0"
+              className={`w-24 px-3 py-1 bg-slate-700 border rounded text-white text-sm focus:outline-none ${
+                showValidationErrors &&
+                (isNaN(Number(currentQuestion.points)) ||
+                  Number(currentQuestion.points) < 1)
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-slate-600 focus:border-blue-500"
+              }`}
+              min="1"
             />
+            {showValidationErrors &&
+              (isNaN(Number(currentQuestion.points)) ||
+                Number(currentQuestion.points) < 1) && (
+                <p className="text-xs text-red-400 mt-1">
+                  Points must be at least 1.
+                </p>
+              )}
           </div>
         </div>
       )}
@@ -1278,7 +832,8 @@ const QuizEditor = ({
 
 /* ------------------------- MAIN CENTER CONTENT ------------------------- */
 export const CenterContent = () => {
-  const { selectedItem, setSelectedItem, modules } = useCourseBuilder();
+  const { selectedItem, setSelectedItem, modules, showValidationErrors } =
+    useCourseBuilder();
   const {
     updateModule,
     updateLesson,
@@ -1310,8 +865,8 @@ export const CenterContent = () => {
           {selectedItem.type === "module"
             ? "Module"
             : selectedItem.type === "lesson"
-            ? "Lesson"
-            : "Quiz"}
+              ? "Lesson"
+              : "Quiz"}
         </h2>
         <button
           onClick={() => setSelectedItem(null)}
@@ -1328,6 +883,7 @@ export const CenterContent = () => {
             selectedItem={selectedItem}
             modules={modules}
             updateModule={updateModule}
+            showValidationErrors={showValidationErrors}
           />
         )}
         {selectedItem.type === "lesson" && (
@@ -1335,6 +891,7 @@ export const CenterContent = () => {
             selectedItem={selectedItem}
             modules={modules}
             updateLesson={updateLesson}
+            showValidationErrors={showValidationErrors}
           />
         )}
         {selectedItem.type === "quiz" && (
@@ -1347,6 +904,7 @@ export const CenterContent = () => {
             updateQuestion={updateQuestion}
             addOption={addOption}
             removeOption={removeOption}
+            showValidationErrors={showValidationErrors}
           />
         )}
       </div>

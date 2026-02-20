@@ -9,15 +9,15 @@ export type MainStackParamList = {
     userId?: string;
     videoCompleted?: boolean;
     quizCompleted?: boolean;
-    pdfCompleted?: boolean;
+    documentCompleted?: boolean; // Covers PDF, DOCX, PPTX
     completedVideoId?: string;
     completedQuizId?: string;
-    completedPdfId?: string;
+    completedDocumentId?: string; // Covers all document types
     timestamp?: number;
   };
   LessonPlayer: { videoId: string; courseId: string; sectionId?: string; userId?: string };
   QuizScreen: { quizId: string; courseId: string; sectionId?: string; userId?: string };
-  PDFView: { pdfId: string; courseId: string; sectionId?: string; userId?: string;};
+  DocumentView: { documentId: string; courseId: string; sectionId?: string; userId?: string; documentType?: 'pdf' | 'document' | 'ppt' };
   LeaveReview: { courseId: string };
   Settings: undefined;
   EditProfile: undefined;

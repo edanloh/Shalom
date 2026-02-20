@@ -37,7 +37,6 @@ serve(async (req) => {
 
     const allowedSortFields = [
       "title",
-      "level",
       "rating",
       "student_count",
       "created_at",
@@ -50,12 +49,11 @@ serve(async (req) => {
 
     // Build query
     let query = supabaseClient
-      .from('courses')
+      .from('courses_with_stats')
       .select(`
         *,
         categories (
           name,
-          description,
           color
         )
       `, { count: 'exact' })
@@ -63,12 +61,15 @@ serve(async (req) => {
       .order(safeSortBy, { ascending });
 
     // Apply filters
-    if (filterField && filterValue) {
+    if (filterField && filterValue && filterField !== "level") {
       if (filterField === "category_name") {
         query = query.ilike('categories.name', `%${filterValue}%`);
       } else if (filterField === "instructor_name") {
         query = query.ilike('instructor_name', `%${filterValue}%`);
-      } else {
+      } else if (filterField === "category_color") {
+        query = query.ilike('categories.color', `%${filterValue}%`);
+      } 
+      else {
         query = query.ilike(filterField, `%${filterValue}%`);
       }
     }

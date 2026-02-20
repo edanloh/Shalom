@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/Colors';
 import { apiService } from './apiService';
 
 export interface CourseDetailResponse {
@@ -10,10 +11,8 @@ export interface CourseDetailResponse {
       description: string;
       instructor_id: string;
       category_id: string;
-      level: string;
       duration_hours: number;
       thumbnail_url: string;
-      video_preview_url: string | null;
       rating: string | number;
       total_ratings?: number;
       totalRatings?: number;
@@ -108,8 +107,8 @@ export interface ProcessedCourseDetail {
   totalRatings: number;
   studentCount: number;
   duration: string;
-  level: string;
   category: string;
+  categoryColor: string;
   tags: string[];
   modules: CourseModule[];
   reviews: Array<{
@@ -195,8 +194,8 @@ class CourseDetailService {
       ),
       studentCount: course.student_count || 0,
       duration: this.formatDuration(course.duration_hours || 0),
-      level: course.level,
       category: course.category_name || 'Uncategorized',
+      categoryColor: course.category_color || Colors.accent,
       tags: course.tags || [],
       modules,
       reviews: processedReviews,

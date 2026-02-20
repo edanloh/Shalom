@@ -1,22 +1,20 @@
+import { useEffect, useState } from "react";
 import {
   Bell,
-  Search,
   Star,
   Home,
   BookOpen,
   BarChart3,
   Users,
   ClipboardCheck,
-  MessageSquare,
   Settings,
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUser } from "@/contexts/UserContext";
+import { notificationService } from "@/services";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +23,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useEffect, useState } from "react";
 import { getAvatarUri } from "@/utils/avatar";
 import { Avatar } from "./ui/avatar";
 
@@ -34,12 +31,37 @@ export const Header = () => {
   const location = useLocation();
   const { logout } = useAuth();
   const { user } = useUser();
+  const [unreadCount, setUnreadCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState(null);
 
   useEffect(() => {
     setAvatarUrl(getAvatarUri(user?.avatar_url));
   }, [user]);
-  
+
+  const userId =
+    user?.uuid || "550e8400-e29b-41d4-a716-446655440201";
+
+  useEffect(() => {
+    let isActive = true;
+    const loadUnreadCount = async () => {
+      try {
+        const items = await notificationService.getNotifications(userId, 50);
+        if (!isActive) return;
+        setUnreadCount(items.filter((item) => !item.read).length);
+      } catch (error) {
+        console.error("Failed to load notification count:", error);
+        if (isActive) setUnreadCount(0);
+      }
+    };
+
+    if (userId) {
+      loadUnreadCount();
+    }
+
+    return () => {
+      isActive = false;
+    };
+  }, [userId, location.pathname]);
 
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/" },
@@ -133,9 +155,11 @@ export const Header = () => {
               onClick={() => navigate("/notifications")}
             >
               <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-accent text-xs flex items-center justify-center text-accent-foreground font-semibold">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-accent text-xs flex items-center justify-center text-accent-foreground font-semibold">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </Button>
 
             <Button

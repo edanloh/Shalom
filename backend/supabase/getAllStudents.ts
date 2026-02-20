@@ -67,7 +67,7 @@ serve(async (req) => {
     // Get enrollment data for all students
     const { data: enrollments, error: enrollmentsError } = await supabaseClient
       .from('course_enrollments')
-      .select('user_id, course_id, is_completed, progress_percentage, total_watch_time_minutes, updated_at');
+      .select('user_id, course_id, is_completed, progress_percentage, total_watch_time_minutes, updated_at, last_activity_at');
 
     if (enrollmentsError) {
       throw enrollmentsError;
@@ -90,8 +90,10 @@ serve(async (req) => {
 
       const lastActivity = userEnrollments.length > 0
         ? userEnrollments.reduce((latest: string | null, e: any) => {
-            if (!latest) return e.updated_at;
-            return new Date(e.updated_at) > new Date(latest) ? e.updated_at : latest;
+            const candidate = e.last_activity_at || e.updated_at;
+            if (!candidate) return latest;
+            if (!latest) return candidate;
+            return new Date(candidate) > new Date(latest) ? candidate : latest;
           }, null)
         : null;
 
@@ -103,7 +105,7 @@ serve(async (req) => {
       // Calculate engagement score
       const engagementScore = userEnrollments.length > 0
         ? userEnrollments.reduce((sum: number, e: any) => {
-            return sum + calculateEngagementScore(e.updated_at);
+            return sum + calculateEngagementScore(e.last_activity_at || e.updated_at);
           }, 0) / userEnrollments.length
         : 0;
 

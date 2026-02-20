@@ -61,14 +61,15 @@ serve(async (req) => {
     const { data: course, error: courseError } = await supabaseClient
       .from('courses')
       .select(`
-        id, title, description, instructor_name, level,
-        duration_hours, thumbnail_url, video_preview_url,
+        id, title, description, instructor_name,
+        duration_hours, thumbnail_url,
         rating, total_ratings, student_count, is_published,
-        is_featured, language, subtitles, tags,
+        is_featured, language, tags,
         created_at, updated_at,
         categories (
           id,
-          name
+          name, 
+          color
         )
       `)
       .eq('id', courseId)
@@ -103,7 +104,7 @@ serve(async (req) => {
     // }
 
     // ========================================
-    // 2. Fetch sections, lessons, quizzes, quiz questions, requirements, outcomes, reviews in parallel
+    // 2. Fetch sections, lessons, quizzes, quiz questions, outcomes, reviews in parallel
     // ========================================
     // First, get section IDs for filtering videos
     const sectionIds = await getSectionIds(supabaseClient, courseId);
@@ -115,7 +116,6 @@ serve(async (req) => {
       { data: pdfResources, error: pdfResourcesError },
       { data: quizzes, error: quizzesError },
       { data: quizQuestions, error: quizQuestionsError },
-      { data: requirements, error: requirementsError },
       { data: outcomes, error: outcomesError },
       { data: reviews, error: reviewsError }
     ] = await Promise.all([
@@ -139,7 +139,7 @@ serve(async (req) => {
         .from('course_resources')
         .select(`
           id, section_id, title, description, resource_url,
-          order_index, resource_type, is_preview, thumbnail_url,
+          order_index, resource_type, is_preview,
           file_size_bytes, is_downloadable
         `)
         .in('section_id', sectionIds)
@@ -159,17 +159,11 @@ serve(async (req) => {
       supabaseClient
         .from('quiz_questions')
         .select(`
-          id, quiz_id, question, question_type,
-          options, correct_answer, explanation, points, order_index
+          id, quiz_id, question, question_type, 
+          options, correct_answer, explanation, points, order_index, image_url
         `)
         .in('quiz_id', await getQuizIds(supabaseClient, courseId))
         .order('quiz_id', { ascending: true })
-        .order('order_index', { ascending: true }),
-      
-      supabaseClient
-        .from('course_requirements')
-        .select('requirement, order_index')
-        .eq('course_id', courseId)
         .order('order_index', { ascending: true }),
       
       supabaseClient
@@ -196,7 +190,6 @@ serve(async (req) => {
     if (pdfResourcesError) console.error('PDF resources error:', pdfResourcesError);
     if (quizzesError) console.error('Quizzes error:', quizzesError);
     if (quizQuestionsError) console.error('Quiz questions error:', quizQuestionsError);
-    if (requirementsError) console.error('Requirements error:', requirementsError);
     if (outcomesError) console.error('Outcomes error:', outcomesError);
     if (reviewsError) console.error('Reviews error:', reviewsError);
 
@@ -219,23 +212,46 @@ serve(async (req) => {
           duration_seconds: l.duration_seconds || 0 // Already in seconds
         }));
 
-      // Get PDF resources for this section
+      // Helper function to detect file type from URL extension
+      const detectFileTypeFromUrl = (url: string): 'pdf' | 'document' | 'ppt' => {
+        if (!url) return 'pdf';
+        const lowercaseUrl = url.toLowerCase();
+        if (lowercaseUrl.includes('.docx') || lowercaseUrl.includes('.doc')) {
+          return 'document';
+        }
+        if (lowercaseUrl.includes('.pptx') || lowercaseUrl.includes('.ppt')) {
+          return 'ppt';
+        }
+        return 'pdf';
+      };
+
+      // Get document resources (PDFs, DOCX, PPTX) for this section
       const sectionPdfResources = (pdfResources || [])
         .filter((r: any) => r.section_id === section.id)
-        .map((r: any) => ({
-          id: r.id,
-          section_id: r.section_id,
-          title: r.title,
-          description: r.description,
-          resource_url: r.resource_url,
-          resource_type: r.resource_type,
-          thumbnail_url: r.thumbnail_url,
-          is_preview: r.is_preview,
-          is_downloadable: r.is_downloadable,
-          file_size_bytes: r.file_size_bytes,
-          order_index: r.order_index,
-          type: "pdf"
-        }));
+        .map((r: any) => {
+          // Determine type: prioritize resource_type from DB, fallback to URL extension
+          const dbType = r.resource_type?.toLowerCase();
+          let finalType = dbType || detectFileTypeFromUrl(r.resource_url);
+          
+          // If DB says "document" but URL is actually a PDF, use the URL extension
+          if (dbType === 'document' && r.resource_url.toLowerCase().includes('.pdf')) {
+            finalType = 'pdf';
+          }
+          
+          return {
+            id: r.id,
+            section_id: r.section_id,
+            title: r.title,
+            description: r.description,
+            resource_url: r.resource_url,
+            resource_type: finalType,
+            is_preview: r.is_preview,
+            is_downloadable: r.is_downloadable,
+            file_size_bytes: r.file_size_bytes,
+            order_index: r.order_index,
+            type: finalType
+          };
+        });
 
       // Get quizzes for this section and add questions
       const sectionQuizzes = (quizzes || [])
@@ -256,7 +272,8 @@ serve(async (req) => {
               explanation: qq.explanation,
               points: qq.points,
               order: qq.order_index,
-              order_index: qq.order_index // Also include as 'order_index' for compatibility
+              order_index: qq.order_index, // Also include as 'order_index' for compatibility
+              image_url: qq.image_url
             }));
 
           return {
@@ -318,7 +335,8 @@ serve(async (req) => {
         ...course,
         category_name: course.categories?.name,
         category_id: course.categories?.id,
-        requirements: (requirements || []).map((r: any) => r.requirement),
+        category_color: course.categories?.color,
+        requirements: [],
         outcomes: (outcomes || []).map((o: any) => o.outcome),
         rating: averageRating,
         totalRatings: processedReviews.length,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { CourseCard } from "@/components/CourseCard";
 import { Button } from "@/components/ui/button";
@@ -13,15 +13,12 @@ import {
 import { Plus, Search, Grid3x3, List, Filter, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { Pagination } from "@/components/Pagination";
 import { courseService, Course } from "@/services";
 
 const Courses = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(8);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -29,18 +26,41 @@ const Courses = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [highlightedCourseId, setHighlightedCourseId] = useState<string | null>(null);
+  
+  // Refs for scrolling to sections
+  const draftSectionRef = useRef<HTMLDivElement>(null);
+  const publishedSectionRef = useRef<HTMLDivElement>(null);
 
   // Fetch courses from API
   useEffect(() => {
     fetchCourses();
   }, []);
 
-  const fetchCourses = async () => {
+  const fetchCourses = async (newlyDuplicatedCourseId?: string) => {
     try {
       setLoading(true);
       setError(null);
       const data = await courseService.getCourses();
       setCourses(data);
+      
+      // If we just duplicated a course, highlight it and scroll to it
+      if (newlyDuplicatedCourseId) {
+        setHighlightedCourseId(newlyDuplicatedCourseId);
+        
+        // Scroll to draft section after courses are loaded
+        setTimeout(() => {
+          draftSectionRef.current?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }, 100);
+        
+        // Remove highlight after 3 seconds
+        setTimeout(() => {
+          setHighlightedCourseId(null);
+        }, 3000);
+      }
     } catch (err) {
       console.error('Error fetching courses:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch courses');
@@ -54,6 +74,7 @@ const Courses = () => {
     }
   };
 
+  // Filter courses based on search and status
   const filteredCourses = courses.filter((course) => {
     const matchesSearch =
       course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -63,10 +84,9 @@ const Courses = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const paginatedCourses = filteredCourses.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Separate courses into published and draft
+  const publishedCourses = filteredCourses.filter(course => course.status === 'published');
+  const draftCourses = filteredCourses.filter(course => course.status === 'draft');
 
   return (
     <div className="min-h-screen bg-background">
@@ -141,10 +161,21 @@ const Courses = () => {
         ) : error ? (
           <div className="text-center py-12">
             <p className="text-destructive mb-4">{error}</p>
-            <Button onClick={fetchCourses}>Retry</Button>
+            <Button onClick={() => fetchCourses()}>Retry</Button>
           </div>
-        ) : paginatedCourses.length > 0 ? (
-          <>
+        ) : filteredCourses.length > 0 ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-foreground">
+                {statusFilter === 'all' && 'All Courses'}
+                {statusFilter === 'published' && 'Published Courses'}
+                {statusFilter === 'draft' && 'Draft Courses'}
+              </h2>
+              <span className="text-sm text-muted-foreground">
+                {filteredCourses.length} {filteredCourses.length === 1 ? 'course' : 'courses'}
+              </span>
+            </div>
+            
             <div
               className={
                 viewMode === "grid"
@@ -152,26 +183,30 @@ const Courses = () => {
                   : "space-y-4"
               }
             >
-              {paginatedCourses.map((course) => (
-                <CourseCard key={course.id} {...course} />
+              {filteredCourses.map((course) => (
+                <div
+                  key={course.id}
+                  className={`transition-all duration-500 ${
+                    highlightedCourseId === course.id
+                      ? 'ring-4 ring-primary ring-offset-4 ring-offset-background rounded-lg'
+                      : ''
+                  }`}
+                >
+                  <CourseCard 
+                    {...course} 
+                    onCourseUpdated={(duplicatedCourseId) => {
+                      console.log('🔄 Course updated callback triggered:', duplicatedCourseId);
+                      fetchCourses(duplicatedCourseId);
+                    }} 
+                  />
+                </div>
               ))}
             </div>
-
-            <Pagination
-              currentPage={currentPage}
-              totalPages={Math.ceil(filteredCourses.length / itemsPerPage)}
-              onPageChange={(page) => {
-                setCurrentPage(page);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              itemsPerPage={itemsPerPage}
-              totalItems={filteredCourses.length}
-            />
-          </>
+          </div>
         ) : (
           <div className="text-center py-12">
             <p className="text-muted-foreground">
-              No courses found matching your criteria
+              No courses available
             </p>
             <Button className="mt-4" onClick={() => navigate('/course-builder/new')}>
               <Plus className="h-4 w-4 mr-2" />

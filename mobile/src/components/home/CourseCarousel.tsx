@@ -29,7 +29,6 @@ type NavigationProp = StackNavigationProp<MainStackParamList, "MainTabs">;
 interface CourseCarouselProps {
   courses: Course[];
   onCourseComplete?: (courseId: string) => void;
-  onCourseLike?: (courseId: string) => void;
   onToggleWishlist?: (course: Course) => void;
   isWishlisted?: (courseId: string) => boolean;
 }
@@ -37,7 +36,6 @@ interface CourseCarouselProps {
 export default function CourseCarousel({
   courses,
   onCourseComplete,
-  onCourseLike,
   onToggleWishlist,
   isWishlisted,
 }: CourseCarouselProps) {
@@ -48,7 +46,7 @@ export default function CourseCarousel({
 
   const CARD_WIDTH = useMemo(
     () => Math.min(screenWidth * 0.7, 400),
-    [screenWidth]
+    [screenWidth],
   );
 
   const scrollHandler = useAnimatedScrollHandler({
@@ -68,7 +66,10 @@ export default function CourseCarousel({
         decelerationRate="fast"
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingRight: (screenWidth - CARD_WIDTH) / 2, paddingLeft: Spacing["3xl"]},
+          {
+            paddingRight: (screenWidth - CARD_WIDTH) / 2,
+            paddingLeft: Spacing["3xl"],
+          },
         ]}
       >
         {courses.map((course, index) => {
@@ -146,14 +147,14 @@ function CourseCardItem({
       scrollX.value,
       inputRange,
       [0.92, 1.05, 0.92],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     const opacity = interpolate(
       scrollX.value,
       inputRange,
       [0.6, 1, 0.6],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     return {
@@ -176,10 +177,10 @@ function CourseCardItem({
           />
 
           {/* Category Badge - Top Left */}
-          <View style={styles.catBadge}>
-            <Text style={TextStyles.bodySmall}>
-              {course.category || course.level}
-            </Text>
+          <View
+            style={[styles.catBadge, { backgroundColor: course.categoryColor }]}
+          >
+            <Text style={TextStyles.bodySmall}>{course.category}</Text>
           </View>
 
           <View style={styles.imageOverlay} />
@@ -198,18 +199,19 @@ function CourseCardItem({
           </Text>
 
           {/* Progress Section */}
-          <Text style={[TextStyles.bodySmall, { marginVertical: Spacing.sm }]}>
-            {course.progress?.completed || 0} of{" "}
-            {course.progress?.total || course.modules || 0} items completed
-          </Text>
+          <View style={styles.progressRow}>
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${course.progress_percentage || 0}%` },
+                ]}
+              />
+            </View>
 
-          <View style={styles.progressBarContainer}>
-            <View
-              style={[
-                styles.progressBarFill,
-                { width: `${course.progress?.percentage || 0}%` },
-              ]}
-            />
+            <Text style={styles.progressText}>
+              {Math.round(Number(course.progress_percentage)) || 0}% {"\n"} Complete
+            </Text>
           </View>
 
           {/* Instructor Section */}
@@ -230,7 +232,7 @@ function CourseCardItem({
           <View style={styles.statsSection}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
-                {course.progress?.percentage || 0}%
+                {Math.round(Number(course.progress_percentage)) || 0}%
               </Text>
               <Text style={styles.statLabel}>Complete</Text>
             </View>
@@ -292,14 +294,14 @@ function PaginationDot({
       scrollX.value,
       inputRange,
       [8, 24, 8],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     const opacity = interpolate(
       scrollX.value,
       inputRange,
       [0.3, 1, 0.3],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     return {
@@ -329,14 +331,14 @@ function LimitedPaginationDots({
       {Array.from({ length: MAX_DOTS }).map((_, i) => {
         const animatedDotStyle = useAnimatedStyle(() => {
           const currentIndex = Math.round(
-            scrollX.value / (cardWidth + Spacing.md)
+            scrollX.value / (cardWidth + Spacing.md),
           );
 
           // Calculate which dots to show based on current position
           let startIndex = Math.max(0, currentIndex - Math.floor(MAX_DOTS / 2));
           const endIndex = Math.min(
             totalCourses - 1,
-            startIndex + MAX_DOTS - 1
+            startIndex + MAX_DOTS - 1,
           );
 
           // Adjust start if we're near the end
@@ -361,14 +363,14 @@ function LimitedPaginationDots({
             scrollX.value,
             inputRange,
             [8, 24, 8],
-            Extrapolation.CLAMP
+            Extrapolation.CLAMP,
           );
 
           const opacity = interpolate(
             scrollX.value,
             inputRange,
             [0.3, 1, 0.3],
-            Extrapolation.CLAMP
+            Extrapolation.CLAMP,
           );
 
           return {
@@ -445,7 +447,6 @@ const styles = StyleSheet.create({
     top: 12,
     left: 14,
     zIndex: 10,
-    backgroundColor: Colors.purple400,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
@@ -479,17 +480,30 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 18,
   },
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  progressText: {
+    marginLeft: Spacing.sm,
+    fontFamily: Typography.fontFamily.medium,
+    fontSize: TextStyles.caption.fontSize,
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
   progressLabel: {
     fontFamily: Typography.fontFamily.medium,
     fontSize: TextStyles.caption.fontSize,
     color: Colors.textSecondary,
   },
   progressBarContainer: {
-    width: "100%",
+    flex: 1, // take remaining horizontal space
     height: 6,
     backgroundColor: Colors.gray200,
     borderRadius: 3,
-    marginBottom: Spacing.md,
     overflow: "hidden",
   },
   progressBarFill: {

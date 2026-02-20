@@ -71,8 +71,7 @@ serve(async (req) => {
         courses (
           id,
           title,
-          instructor_name,
-          level
+          instructor_name
         ),
         course_sections (
           id,
@@ -106,8 +105,7 @@ serve(async (req) => {
           courses (
             id,
             title,
-            instructor_name,
-            level
+            instructor_name
           ),
           course_sections (
             id,
@@ -115,7 +113,7 @@ serve(async (req) => {
           )
         `)
         .eq('id', videoId)
-        .eq('resource_type', 'pdf')
+        .in('resource_type', ['pdf', 'document', 'ppt'])
         .single();
 
       if (resourceError || !resource) {
@@ -166,7 +164,7 @@ serve(async (req) => {
       .select('id, title, order_index')
       .eq('section_id', video.section_id)
       .eq('course_id', video.course_id)
-      .eq('resource_type', 'pdf')
+      .in('resource_type', ['pdf', 'document', 'ppt'])
       .order('order_index', { ascending: true });
 
     const { data: allQuizzes, error: quizNavError } = await supabaseClient
@@ -215,7 +213,7 @@ serve(async (req) => {
     if (userId) {
       try {
         const { data: progress, error: progressError } = await supabaseClient
-          .from('video_progress')
+          .from('user_video_progress')
           .select(`
             watch_time_seconds,
             is_completed,
@@ -257,8 +255,7 @@ serve(async (req) => {
       course: {
         id: video.courses.id,
         title: video.courses.title,
-        instructor_name: video.courses.instructor_name,
-        level: video.courses.level
+        instructor_name: video.courses.instructor_name
       },
       section: {
         id: video.course_sections.id,

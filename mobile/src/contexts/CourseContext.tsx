@@ -80,7 +80,6 @@ export default function CourseProvider({ children }: { children: React.ReactNode
     
     try {
       const coursesData = await courseService.getCourses();
-      console.log('CourseContext: Loaded', coursesData.length, 'courses');
       setCourses(coursesData);
     } catch (err) {
       console.error('CourseContext: Error loading courses:', err);

@@ -22,7 +22,6 @@ import BadgeManagement from "./pages/BadgeManagement";
 import Notifications from "./pages/Notification";
 import LessonDetail from "./pages/LessonDetail";
 import QuizTaking from "./pages/QuizTaking";
-import CoursePreview from "./pages/CoursePreview";
 import { UserProvider } from "./contexts/UserContext";
 
 const queryClient = new QueryClient();
@@ -55,10 +54,6 @@ const App = () => (
                   element={<CourseBuilder />}
                 />
                 <Route path="/course/:courseId" element={<CourseDetail />} />
-                <Route
-                  path="/course/:courseId/preview"
-                  element={<CoursePreview />}
-                />
                 <Route
                   path="/course/:courseId/module/:moduleId/lesson/:lessonId"
                   element={<LessonDetail />}

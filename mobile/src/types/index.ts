@@ -168,12 +168,13 @@ export interface Course {
   title: string;
   description: string;
   instructor: Instructor;
-  progress: CourseProgress;
+  progress_percentage?: number;
+  // progress: CourseProgress;
   duration: string;
   rating: number;
   image: string;
   category: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
+  categoryColor?: string;
   modules: number;
   tags?: string[];
   prerequisites?: string[];
@@ -286,7 +287,6 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 //   rating: number;
 //   image: string;
 //   category: string;
-//   level: string;
 //   modules: number;
 // }
 
@@ -302,7 +302,6 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 // Filter and Search types
 export interface CourseFilters {
   category?: string[];
-  level?: ('beginner' | 'intermediate' | 'advanced')[];
   rating?: number;
   duration?: {
     min?: number;

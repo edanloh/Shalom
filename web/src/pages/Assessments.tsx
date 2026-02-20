@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, FileText, CheckCircle, Clock, Filter, X, ChevronDown, BookOpen, Layers, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/Pagination";
-import { courseService, Course, moduleService } from "@/services";
+import { courseService, Course } from "@/services";
+import moduleService from "@/services/moduleService";
 import { useUser } from "@/contexts/UserContext";
 import { useNavigate } from "react-router-dom";
 

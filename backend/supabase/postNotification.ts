@@ -1,9 +1,15 @@
+type NotificationType =
+  | "system"
+  | "assignment"
+  | "course"
+  | "marketing"
+  | "weekly";
+
 const allowsNotificationType = (
   prefs: {
-    course_updates?: boolean;
-    achievement: boolean;
-    study_reminders?: boolean;
     assignment_reminders?: boolean;
+    course_updates?: boolean;
+    marketing_emails?: boolean;
     weekly_progress_summary?: boolean;
   } | null,
   type: string
@@ -11,23 +17,20 @@ const allowsNotificationType = (
   // No prefs row → allow all
   if (!prefs) return true;
 
-  switch (true) {
-    case type.startsWith("course_"): // ✅ matches any course_* type
-      return prefs.course_updates !== false;
-
-    case type.startsWith("achievement"): 
-      return prefs.achievement !== false;
-
-    case type.startsWith("study_reminders"):
-      return prefs.study_reminders !== false;
-
-    case type.startsWith("assignment_reminders"):
+  switch (type) {
+    case "assignment":
       return prefs.assignment_reminders !== false;
 
-    case type.startsWith("weekly_progress_summary"):
+    case "course":
+      return prefs.course_updates !== false;
+
+    case "marketing":
+      return prefs.marketing_emails !== false;
+
+    case "weekly":
       return prefs.weekly_progress_summary !== false;
 
-    case type === "system":
+    case "system":
     default:
       // System notifications are always allowed
       return true;
@@ -194,7 +197,6 @@ serve(async (req) => {
         );
 
         const prefs = prefsByUser.get(row.user_id);
-        console.log("prefs for ", row.user_id, "are: ", prefs)
 
         // 🚫 Push disabled
         if (!allowsPush(prefs)) continue;

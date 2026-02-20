@@ -4,42 +4,42 @@
 
 import apiService from './apiService';
 
-export interface ModuleDetail {
-  id: number;
-  title: string;
-  description: string;
-  order_index: number;
-  lessons: Lesson[];
-  quizzes: Quiz[];
-}
+// export interface ModuleDetail {
+//   id: number;
+//   title: string;
+//   description: string;
+//   order_index: number;
+//   lessons: Lesson[];
+//   quizzes: Quiz[];
+// }
 
-export interface Lesson {
-  id: number;
-  title: string;
-  content: string;
-  video_url?: string;
-  thumbnail_url?: string;
-  duration: string;
-  duration_seconds?: number;
-  is_preview?: boolean;
-  order_index: number;
-}
+// export interface Lesson {
+//   id: number;
+//   title: string;
+//   content: string;
+//   video_url?: string;
+//   thumbnail_url?: string;
+//   duration: string;
+//   duration_seconds?: number;
+//   is_preview?: boolean;
+//   order_index: number;
+// }
 
-export interface Quiz {
-  id: number;
-  title: string;
-  description: string;
-  questions: Question[];
-}
+// export interface Quiz {
+//   id: number;
+//   title: string;
+//   description: string;
+//   questions: Question[];
+// }
 
-export interface Question {
-  id: number;
-  question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'short_answer';
-  options?: string[];
-  correct_answer: string;
-  explanation?: string;
-}
+// export interface Question {
+//   id: number;
+//   question_text: string;
+//   question_type: 'multiple_choice' | 'true_false' | 'short_answer';
+//   options?: string[];
+//   correct_answer: string;
+//   explanation?: string;
+// }
 
 class ModuleService {
   /**

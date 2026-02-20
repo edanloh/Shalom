@@ -8,9 +8,10 @@ export interface LessonDetail {
   id: string;
   title: string;
   description: string;
-  type: 'video' | 'pdf';
+  type: 'video' | 'pdf' | 'document' | 'slides' | 'ppt';
   video_url?: string;
   resource_url?: string;
+  resource_type?: string; // The specific document type (pdf, document, ppt, pptx, docx)
   file_size_bytes?: number;
   is_downloadable?: boolean;
   duration_seconds?: number;
@@ -21,7 +22,6 @@ export interface LessonDetail {
     id: string;
     title: string;
     instructor_name: string;
-    level: string;
   };
   section: {
     id: string;
@@ -31,21 +31,22 @@ export interface LessonDetail {
     id: string;
     title: string;
     order_index: number;
-    type: 'video' | 'pdf';
+    type: 'video' | 'pdf' | 'document' | 'slides' | 'ppt' | 'quiz';
   }>;
   navigation: {
     previousVideo: {
       id: string;
       title: string;
-      type: 'video' | 'pdf';
+      type: 'video' | 'pdf' | 'document' | 'slides' | 'ppt' | 'quiz';
     } | null;
     nextVideo: {
       id: string;
       title: string;
-      type: 'video' | 'pdf';
+      type: 'video' | 'pdf' | 'document' | 'slides' | 'ppt' | 'quiz';
     } | null;
   };
   userProgress?: {
+    progress_percentage: number;
     watch_time_seconds: number;
     is_completed: boolean;
     last_position_seconds: number;

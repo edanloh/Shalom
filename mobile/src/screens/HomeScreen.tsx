@@ -19,7 +19,6 @@ import { ActionButton, Screen } from '@/components';
 // components (values)
 import ProfileHeader from '../components/home/ProfileHeader';
 import ProgressSection from '../components/home/ProgressSection';
-import SwipeableCourseCards from '../components/home/SwipeableCourseCards';
 import CourseCard from '../components/home/CourseCard';
 
 // Import hooks and types
@@ -364,41 +363,6 @@ export default function HomeScreen({ navigation, route }: any) {
     navigation.navigate('Wishlist');
   };
 
-  // Handle course actions for swipeable cards
-  const handleCourseComplete = (courseId: string) => {
-    console.log('Course marked as completed:', courseId);
-    if (user?.id) {
-      creditService
-        .recordCreditEvent({
-          userId: user.id,
-          type: 'course_completed',
-          title: 'Course completed',
-          points: 120,
-          courseId,
-        })
-        .then(() =>
-          showToast({
-            title: 'Credits earned',
-            message: '+120 for completing a course',
-            type: 'success',
-          })
-        )
-        .catch((err) => {
-          console.warn('Failed to record course credit', err);
-          showToast({
-            title: 'Unable to record credits',
-            message: 'Something unexpected happened. Please try again later.',
-            type: 'error',
-          });
-        });
-    }
-    // TODO: Update course completion status via API
-  };
-
-  const handleCourseLike = (courseId: string) => {
-    console.log('Course liked/continued:', courseId);
-    // TODO: Update course like status or mark as in-progress via API
-  };
 
   const handleRecommendationClick = async (course: Course) => {
     if (user?.id) {
@@ -435,10 +399,9 @@ export default function HomeScreen({ navigation, route }: any) {
   }, [user?.id, recommendedList]);
 
   const getTop10Courses = (courses: Course[]): Course[] => {
-    // Sort by percentage completed descending and return top 10
-    return courses
-      .sort((a, b) => b.progress.percentage - a.progress.percentage)
-      .slice(0, 10);
+    // Return top 10 courses - already sorted by last_activity_at from API
+    // Do NOT re-sort here to preserve the most recently active order
+    return courses.slice(0, 10);
   }
 
   // Handle user loading state
@@ -517,16 +480,8 @@ export default function HomeScreen({ navigation, route }: any) {
               </View>
             ) : (
               <>
-              {/* <SwipeableCourseCards 
-                courses={myCoursesData}
-                onCourseComplete={handleCourseComplete}
-                onCourseLike={handleCourseLike}
-                onToggleWishlist={toggleWishlist}
-                isWishlisted={(id) => isWishlisted?.(id) ?? false}
-              /> */}
               <CourseCarousel
                 courses={getTop10Courses(myCoursesData)}
-                // onCourseLike={(courseId: string) => {console.log("Liked" + courseId)}}
                 onToggleWishlist={toggleWishlist}
                 isWishlisted={(id) => isWishlisted?.(id) ?? false}
               />

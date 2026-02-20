@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, useNavigation } from "@react-navigation/native";
@@ -15,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, TextStyles } from "@/constants";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { MainStackParamList } from "@/types/navigation";
-import { quizService, moduleService } from "@/services";
+import { quizService } from "@/services";
 import creditService from "../services/creditService";
 import { showToast } from "@/components/common/Toast";
 import { Images } from "../../assets";
@@ -26,7 +27,7 @@ import type {
 } from "@/services";
 import Screen from "@/components/common/Screen";
 import ActionButton from "@/components/ActionButton";
-import { CourseCompletionCard } from "@/components";
+import MatchingQuestion from "@/components/MatchingQuestion";
 import { useCourseNavigation } from "@/hooks";
 
 type QuizDetail = QuizDetailResponse["data"];
@@ -44,12 +45,15 @@ const QuizScreen = () => {
 
   const [loading, setLoading] = useState(true);
   const [quizDetail, setQuizDetail] = useState<QuizDetail | null>(null);
-  const [selectedAnswers, setSelectedAnswers] = useState<Map<string, string>>(
-    new Map()
-  );
+  const [selectedAnswers, setSelectedAnswers] = useState<
+    Map<string, string | string[]>
+  >(new Map());
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [attemptsRemainingDisplay, setAttemptsRemainingDisplay] = useState<
+    number | null
+  >(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [initialTime, setInitialTime] = useState<number | null>(null);
   const [timerActive, setTimerActive] = useState(false);
@@ -57,6 +61,18 @@ const QuizScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
+  const [attemptsBlocked, setAttemptsBlocked] = useState(false);
+
+  // Matching question states
+  const [matchingState, setMatchingState] = useState<
+    Map<string, Map<string, string>>
+  >(new Map()); // questionId -> (leftItem -> rightItem)
+  const [selectedMatchingLeft, setSelectedMatchingLeft] = useState<
+    string | null
+  >(null);
+  const [scrambledMatchingOptions, setScrambledMatchingOptions] = useState<
+    Map<string, any[]>
+  >(new Map());
 
   // Use course navigation hook
   const { nextItem: nextItemInModule, isLastItem } = useCourseNavigation(
@@ -64,7 +80,7 @@ const QuizScreen = () => {
     userId,
     quizId,
     "quiz",
-    sectionId
+    sectionId,
   );
 
   useEffect(() => {
@@ -101,8 +117,106 @@ const QuizScreen = () => {
       setError(null);
 
       const data = await quizService.getQuizDetail(courseId, quizId, userId);
-      setQuizDetail(data);
 
+      // Scramble options for all questions
+      const scrambledData = {
+        ...data,
+        questions: data.questions.map((question) => {
+          // Scramble MCQ options (except true-false)
+          if (
+            question.question_type === "multiple-choice" ||
+            question.question_type === "multiple-correct"
+          ) {
+            const shuffledOptions = [...question.options].sort(
+              () => Math.random() - 0.5,
+            );
+            return { ...question, options: shuffledOptions };
+          }
+          return question;
+        }),
+      };
+
+      setQuizDetail(scrambledData);
+
+      // Initialize scrambled matching options
+      const scrambledMatching = new Map();
+      scrambledData.questions.forEach((question) => {
+        if (question.question_type === "matching" && question.matching_pairs) {
+          // Scramble the right side options
+          const rightOptions = question.matching_pairs.map(
+            (pair) => pair.right,
+          );
+          const shuffled = [...rightOptions].sort(() => Math.random() - 0.5);
+          scrambledMatching.set(question.id, shuffled);
+        }
+      });
+      setScrambledMatchingOptions(scrambledMatching);
+
+      const attempts = data.userAttempts || [];
+      const attemptsRemaining = quizService.getAttemptsRemaining(
+        attempts,
+        data.max_attempts,
+      );
+      setAttemptsRemainingDisplay(attemptsRemaining);
+      const isPassed = quizService.isQuizPassed(attempts);
+      setAttemptsBlocked(attemptsRemaining === 0 && !isPassed);
+
+      const buildResultFromAttempt = (
+        attempt: any,
+        passedOverride?: boolean,
+      ) => {
+        const totalQuestions =
+          Number(attempt.total_questions) || data.questions.length || 0;
+        const correctAnswers =
+          Number(attempt.correct_answers) ||
+          Math.round((attempt.score / 100) * totalQuestions);
+        const answersMap = attempt.answers || {};
+        const gradedAnswers = data.questions
+          .map((question) => {
+            const selected = answersMap[question.id];
+            if (!selected) return null;
+            const correctAnswer = question.correct_answer || "";
+            return {
+              questionId: question.id,
+              isCorrect: selected === correctAnswer,
+              correctAnswer,
+            };
+          })
+          .filter(Boolean) as Array<{
+          questionId: string;
+          isCorrect: boolean;
+          correctAnswer: string;
+        }>;
+
+        setSelectedAnswers(new Map(Object.entries(answersMap)));
+        setQuizResult({
+          score: attempt.score,
+          totalQuestions,
+          correctAnswers,
+          isPassed: passedOverride ?? attempt.is_passed,
+          attemptNumber: attempt.attempt_number,
+          attemptsRemaining,
+          answers: gradedAnswers,
+        });
+      };
+
+      // If user has any attempts (passed or failed), show results screen
+      if (attempts.length > 0) {
+        const latestAttempt = isPassed 
+          ? attempts.find((attempt) => attempt.is_passed) 
+          : quizService.getLatestAttempt(attempts);
+        
+        if (latestAttempt) {
+          buildResultFromAttempt(latestAttempt, isPassed);
+          setAttemptsRemainingDisplay(attemptsRemaining);
+          setShowResults(true);
+          setReviewMode(false);
+          setTimerActive(false);
+          return;
+        }
+      }
+
+      // No attempts yet - start fresh quiz
       // Record start time for all quizzes
       setQuizStartTime(new Date());
 
@@ -121,25 +235,142 @@ const QuizScreen = () => {
     }
   };
 
-  const fetchCourseSections = async () => {
-    try {
-      const moduleDetail = await moduleService.getModuleDetail(
-        courseId,
-        userId
-      );
-      setCourseSections(moduleDetail.sections);
-    } catch (err) {
-      console.error("Error fetching course sections:", err);
-    }
-  };
-
-  const handleAnswerSelect = (questionId: string, optionText: string) => {
+  const handleAnswerSelect = (
+    questionId: string,
+    optionText: string,
+    isMultipleCorrect: boolean = false,
+  ) => {
     setSelectedAnswers((prev) => {
       const newMap = new Map(prev);
-      newMap.set(questionId, optionText);
+
+      if (isMultipleCorrect) {
+        // For multiple-correct, toggle the option in an array
+        const currentAnswers = newMap.get(questionId);
+        let answersArray: string[] = [];
+
+        if (Array.isArray(currentAnswers)) {
+          answersArray = [...currentAnswers];
+        } else if (currentAnswers) {
+          answersArray = [currentAnswers];
+        }
+
+        const optionIndex = answersArray.indexOf(optionText);
+        if (optionIndex > -1) {
+          // Remove if already selected
+          answersArray.splice(optionIndex, 1);
+        } else {
+          // Add if not selected
+          answersArray.push(optionText);
+        }
+
+        newMap.set(questionId, answersArray);
+      } else {
+        // For single-answer questions, just set the value
+        newMap.set(questionId, optionText);
+      }
+
       return newMap;
     });
   };
+
+  // const handleMatchingSelect = (
+  //   questionId: string,
+  //   optionText: string,
+  //   side: "left" | "right",
+  // ) => {
+  //   if (side === "left") {
+  //     setSelectedMatchingLeft(optionText);
+  //   } else if (side === "right" && selectedMatchingLeft) {
+  //     // Create the match
+  //     setMatchingState((prev) => {
+  //       const newState = new Map(prev);
+  //       let questionMatches = newState.get(questionId);
+  //       if (!questionMatches) {
+  //         questionMatches = new Map();
+  //       } else {
+  //         questionMatches = new Map(questionMatches);
+  //       }
+  //       questionMatches.set(selectedMatchingLeft, optionText);
+  //       newState.set(questionId, questionMatches);
+  //       return newState;
+  //     });
+
+  //     // Store in selectedAnswers as JSON string
+  //     setSelectedAnswers((prev) => {
+  //       const newMap = new Map(prev);
+  //       const questionMatches = matchingState.get(questionId) || new Map();
+  //       const updatedMatches = new Map(questionMatches);
+  //       updatedMatches.set(selectedMatchingLeft, optionText);
+
+  //       const matchArray = Array.from(updatedMatches.entries()).map(
+  //         ([left, right]) => ({
+  //           left,
+  //           right,
+  //         }),
+  //       );
+  //       newMap.set(questionId, JSON.stringify(matchArray));
+  //       return newMap;
+  //     });
+
+  //     setSelectedMatchingLeft(null);
+  //   }
+  // };
+
+  const handleClearMatch = (questionId: string, leftItem: string) => {
+    setMatchingState((prev) => {
+      const newState = new Map(prev);
+      const questionMatches = newState.get(questionId);
+      if (questionMatches) {
+        const updated = new Map(questionMatches);
+        updated.delete(leftItem);
+        newState.set(questionId, updated);
+      }
+      return newState;
+    });
+
+    // Update selectedAnswers
+    setSelectedAnswers((prev) => {
+      const newMap = new Map(prev);
+      const questionMatches = matchingState.get(questionId);
+      if (questionMatches) {
+        const updated = new Map(questionMatches);
+        updated.delete(leftItem);
+        const matchArray = Array.from(updated.entries()).map(
+          ([left, right]) => ({
+            left,
+            right,
+          }),
+        );
+        newMap.set(questionId, JSON.stringify(matchArray));
+      }
+      return newMap;
+    });
+  };
+
+  const handleMatch = useCallback(
+    (questionId: string, leftItem: string, rightItem: string) => {
+      setMatchingState((prev) => {
+        const next = new Map(prev);
+        const qMap = new Map(next.get(questionId) ?? []);
+        qMap.set(leftItem, rightItem);
+        next.set(questionId, qMap);
+        return next;
+      });
+      setSelectedAnswers((prev) => {
+        const next = new Map(prev);
+        const qMap = matchingState.get(questionId) ?? new Map();
+        const updated = new Map(qMap);
+        updated.set(leftItem, rightItem);
+        const arr = Array.from(updated.entries()).map(([l, r]) => ({
+          left: l,
+          right: r,
+        }));
+        next.set(questionId, JSON.stringify(arr));
+        return next;
+      });
+    },
+    [matchingState],
+  );
 
   const handleNextQuestion = () => {
     if (quizDetail && currentQuestionIndex < quizDetail.questions.length - 1) {
@@ -155,6 +386,16 @@ const QuizScreen = () => {
 
   const handleSubmitQuiz = async () => {
     if (!quizDetail) return;
+    if (attemptsBlocked) {
+      Alert.alert(
+        "Attempts limit reached",
+        "You’ve used all attempts. Review your last submission.",
+      );
+      setReviewMode(true);
+      setShowResults(false);
+      setTimerActive(false);
+      return;
+    }
 
     // Check if all questions are answered
     if (
@@ -163,7 +404,7 @@ const QuizScreen = () => {
       Alert.alert(
         "Incomplete Quiz",
         "Please answer all questions before submitting.",
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
       return;
     }
@@ -193,6 +434,12 @@ const QuizScreen = () => {
       });
 
       setQuizResult(result);
+      // Update attempts remaining display after submission
+      if (result.attemptsRemaining !== undefined && result.attemptsRemaining !== null) {
+        setAttemptsRemainingDisplay(result.attemptsRemaining);
+        // Update attemptsBlocked based on new attempts remaining
+        setAttemptsBlocked(result.attemptsRemaining === 0 && !result.isPassed);
+      }
       setShowResults(true);
 
       // Award credits for passing quizzes
@@ -223,7 +470,56 @@ const QuizScreen = () => {
       }
     } catch (err: any) {
       console.error("Error submitting quiz:", err);
-      Alert.alert("Error", err.message || "Failed to submit quiz");
+      if (String(err?.message || "").includes("Maximum attempts reached")) {
+        Alert.alert(
+          "Attempts limit reached",
+          "You’ve used all attempts. Review your last submission.",
+        );
+        const attempts = quizDetail.userAttempts || [];
+        const latestAttempt = quizService.getLatestAttempt(attempts);
+        if (latestAttempt) {
+          const totalQuestions =
+            Number(latestAttempt.total_questions) ||
+            quizDetail.questions.length ||
+            0;
+          const correctAnswers =
+            Number(latestAttempt.correct_answers) ||
+            Math.round((latestAttempt.score / 100) * totalQuestions);
+          const answersMap = latestAttempt.answers || {};
+          const gradedAnswers = quizDetail.questions
+            .map((question) => {
+              const selected = answersMap[question.id];
+              if (!selected) return null;
+              const correctAnswer = question.correct_answer || "";
+              return {
+                questionId: question.id,
+                isCorrect: selected === correctAnswer,
+                correctAnswer,
+              };
+            })
+            .filter(Boolean) as Array<{
+            questionId: string;
+            isCorrect: boolean;
+            correctAnswer: string;
+          }>;
+          setSelectedAnswers(new Map(Object.entries(answersMap)));
+          setQuizResult({
+            score: latestAttempt.score,
+            totalQuestions,
+            correctAnswers,
+            isPassed: false,
+            attemptNumber: latestAttempt.attempt_number,
+            attemptsRemaining: 0,
+            answers: gradedAnswers,
+          });
+          setReviewMode(true);
+          setShowResults(false);
+          setTimerActive(false);
+          return;
+        }
+      } else {
+        Alert.alert("Error", err.message || "Failed to submit quiz");
+      }
       // Restart timer if submission failed
       setTimerActive(true);
     } finally {
@@ -236,10 +532,13 @@ const QuizScreen = () => {
 
     // Reset quiz state completely
     setSelectedAnswers(new Map());
+    setMatchingState(new Map());
+    setSelectedMatchingLeft(null);
     setCurrentQuestionIndex(0);
     setShowResults(false);
     setQuizResult(null);
     setReviewMode(false);
+    setAttemptsBlocked(false);
 
     // Reset start time for all quizzes
     setQuizStartTime(new Date());
@@ -251,6 +550,9 @@ const QuizScreen = () => {
       setInitialTime(timeInSeconds);
       setTimerActive(true);
     }
+
+    // Don't call fetchQuizDetail() - it would show results screen again
+    // Just use the existing quizDetail data to start fresh
   };
 
   const handleReview = () => {
@@ -264,69 +566,93 @@ const QuizScreen = () => {
     setReviewMode(false);
     setShowResults(true);
   };
- const handleComplete = () => {
-    console.log('🎯 handleComplete called:', {
+  const handleComplete = () => {
+    console.log("🎯 handleComplete called:", {
       isPassed: quizResult?.isPassed,
       nextItemInModule: nextItemInModule,
       hasItem: nextItemInModule ? !!nextItemInModule.item : false,
       isLastItem,
     });
 
-    // Only auto-navigate if quiz was passed
+    // Only mark as complete and auto-navigate if quiz is passed
     if (quizResult && quizResult.isPassed) {
-      console.log('🎯 Quiz passed! Checking next item...', {
+      console.log("🎯 Quiz passed! Checking next item...", {
         currentQuizId: quizId,
         currentSectionId: sectionId,
         isLastItem,
         nextItemInModule,
       });
-      
+
       // Extra safety check - make sure nextItemInModule AND nextItemInModule.item exist
       if (nextItemInModule && nextItemInModule.item) {
-        console.log('✅ Next item found:', {
+        console.log("✅ Next item found:", {
           id: nextItemInModule.item.id,
           type: nextItemInModule.item.type,
           title: nextItemInModule.item.title,
           sectionId: nextItemInModule.sectionId,
         });
 
-        // Navigate to next item (video, quiz, or pdf)
-        if (nextItemInModule.item.type === 'video') {
-          navigation.replace('LessonPlayer', {
+        // Navigate to next item (video, quiz, or document)
+        if (nextItemInModule.item.type === "video") {
+          navigation.replace("LessonPlayer", {
             videoId: nextItemInModule.item.id,
             courseId,
             sectionId: nextItemInModule.sectionId,
             userId,
           });
-        } else if (nextItemInModule.item.type === 'quiz') {
-          navigation.replace('QuizScreen', {
+        } else if (nextItemInModule.item.type === "quiz") {
+          navigation.replace("QuizScreen", {
             quizId: nextItemInModule.item.id,
             courseId,
             sectionId: nextItemInModule.sectionId,
             userId,
           });
-        } else if (nextItemInModule.item.type === 'pdf') {
-          navigation.replace('PDFView', {
-            pdfId: nextItemInModule.item.id,
+        } else if (
+          ["pdf", "document", "ppt"].includes(nextItemInModule.item.type)
+        ) {
+          navigation.replace("DocumentView", {
+            documentId: nextItemInModule.item.id,
             courseId,
             sectionId: nextItemInModule.sectionId,
             userId,
+            documentType: nextItemInModule.item.type,
           });
         }
         return;
       } else {
-        console.log('⚠️ No valid next item - nextItemInModule:', nextItemInModule);
+        console.log(
+          "⚠️ No valid next item - nextItemInModule:",
+          nextItemInModule,
+        );
       }
+    } else {
+      // Quiz not passed - just go back without marking as complete
+      console.log("⚠️ Quiz not passed - navigating back without marking complete");
+      navigation.goBack();
+      return;
     }
-    
+
+    if (isLastItem) {
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: "MainTabs", params: { screen: "Home" } as any },
+          {
+            name: "CourseDetail",
+            params: { courseId, quizCompleted: true, quizId } as any,
+          },
+        ],
+      });
+      return;
+    }
+
     // Default: Navigate back with state to refresh CourseDetail
-    navigation.navigate('CourseDetail', {
+    navigation.navigate("CourseDetail", {
       courseId,
       quizCompleted: true,
       quizId,
     } as any);
   };
-
 
   const formatTime = (seconds: number) => {
     return quizService.formatTime(seconds);
@@ -429,8 +755,8 @@ const QuizScreen = () => {
             </View>
           </View>
 
-          {/* Course Completion Card - Show only if passed and is last item */}
-          {isPassed && isLastItem && (
+          {/* Course Completion Card - Show only on first pass of last item */}
+          {isPassed && isLastItem && isFirstPass && (
             <View style={styles.courseCompletionCard}>
               <View style={styles.courseCompletionHeader}>
                 <Ionicons name="trophy" size={32} color={Colors.starGold} />
@@ -454,46 +780,83 @@ const QuizScreen = () => {
             </View>
           )}
 
-          {/* Action Buttons - Only show if NOT last item or if failed */}
-          {(!isLastItem || !isPassed) && (
+          {/* Action Buttons - Show different buttons based on pass/fail */}
+          {!(isPassed && isLastItem && isFirstPass) && (
             <View style={styles.resultActions}>
-              {quizResult.attemptsRemaining > 0 && !isPassed ? (
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={handleRetry}
-                >
-                  <Image
-                    source={Images.quizRetry}
-                    style={styles.actionButtonIcon}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.actionButtonText}>Retry</Text>
-                </TouchableOpacity>
+              {!isPassed ? (
+                // Failed: Show Retry + Back (if attempts remain) OR Review + Back (if no attempts)
+                <>
+                  {!attemptsBlocked ? (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={handleRetry}
+                    >
+                      <Image
+                        source={Images.quizRetry}
+                        style={styles.actionButtonIcon}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.actionButtonText}>Retry</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={handleReview}
+                    >
+                      <Image
+                        source={Images.quizReview}
+                        style={styles.actionButtonIcon}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.actionButtonText}>Review</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => navigation.goBack()}
+                  >
+                    <Ionicons name="arrow-back" size={32} color={Colors.white} />
+                    <Text style={styles.actionButtonText}>Back</Text>
+                  </TouchableOpacity>
+                </>
               ) : (
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={handleReview}
-                >
-                  <Image
-                    source={Images.quizReview}
-                    style={styles.actionButtonIcon}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.actionButtonText}>Review</Text>
-                </TouchableOpacity>
+                // Passed: Show Retry + Review + Complete
+                <>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={handleRetry}
+                  >
+                    <Image
+                      source={Images.quizRetry}
+                      style={styles.actionButtonIcon}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.actionButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={handleReview}
+                  >
+                    <Image
+                      source={Images.quizReview}
+                      style={styles.actionButtonIcon}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.actionButtonText}>Review</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={handleComplete}
+                  >
+                    <Image
+                      source={Images.quizComplete}
+                      style={styles.actionButtonIcon}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.actionButtonText}>Complete</Text>
+                  </TouchableOpacity>
+                </>
               )}
-
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleComplete}
-              >
-                <Image
-                  source={Images.quizComplete}
-                  style={styles.actionButtonIcon}
-                  resizeMode="contain"
-                />
-                <Text style={styles.actionButtonText}>Complete</Text>
-              </TouchableOpacity>
             </View>
           )}
         </ScrollView>
@@ -514,7 +877,23 @@ const QuizScreen = () => {
     );
   }
   const answeredCount = selectedAnswers.size;
-  const isCurrentQuestionAnswered = selectedAnswers.has(currentQuestion.id);
+
+  // Check if current question is answered (for arrays, must have at least one selection)
+  const isCurrentQuestionAnswered = (() => {
+    if (!selectedAnswers.has(currentQuestion.id)) return false;
+    const answer = selectedAnswers.get(currentQuestion.id);
+    if (Array.isArray(answer)) return answer.length > 0;
+    return Boolean(answer);
+  })();
+
+  const allQuestionsAnswered = quizDetail
+    ? quizDetail.questions.every((question) => {
+        if (!selectedAnswers.has(question.id)) return false;
+        const answer = selectedAnswers.get(question.id);
+        if (Array.isArray(answer)) return answer.length > 0;
+        return Boolean(answer);
+      })
+    : false;
 
   // Get the correct answer for current question (if in review mode)
   const correctAnswerForCurrentQuestion =
@@ -524,16 +903,17 @@ const QuizScreen = () => {
 
   // Generate progress segments
   const progressSegments = quizDetail.questions.map((question, index) => {
-    const isAnswered = Array.from(selectedAnswers.keys()).includes(
-      quizDetail.questions[index].id
-    );
+    const answer = selectedAnswers.get(question.id);
+    const isAnswered =
+      answer !== undefined &&
+      (Array.isArray(answer) ? answer.length > 0 : Boolean(answer));
     const isCurrent = index === currentQuestionIndex;
 
     // In review mode, check if answer was correct
     let isCorrect = false;
     if (reviewMode && quizResult) {
       const answer = quizResult.answers.find(
-        (a) => a.questionId === question.id
+        (a) => a.questionId === question.id,
       );
       isCorrect = answer?.isCorrect || false;
     }
@@ -562,7 +942,7 @@ const QuizScreen = () => {
               style: "destructive",
               onPress: () => navigation.goBack(),
             },
-          ]
+          ],
         );
       }}
       headerRightComponent={
@@ -581,10 +961,20 @@ const QuizScreen = () => {
     >
       {/* Segmented Progress Bar */}
       <View style={styles.segmentedProgressContainer}>
-        <Text style={styles.progressLabel}>
-          {reviewMode ? "Review Mode - " : ""}Question{" "}
-          {currentQuestionIndex + 1} of {quizDetail.questions.length}
-        </Text>
+        {!reviewMode && quizDetail?.max_attempts !== undefined && (
+          <Text style={styles.attemptsInline}>
+            Attempts left:{" "}
+            {quizDetail.max_attempts === null
+              ? "Unlimited"
+              : attemptsRemainingDisplay}
+          </Text>
+        )}
+        <View style={styles.progressHeaderRow}>
+          <Text style={styles.progressLabel}>
+            {reviewMode ? "Review Mode - " : ""}Question{" "}
+            {currentQuestionIndex + 1} of {quizDetail.questions.length}
+          </Text>
+        </View>
         <View style={styles.segmentsWrapper}>
           {progressSegments.map((segment, index) => (
             <View
@@ -597,10 +987,10 @@ const QuizScreen = () => {
                       ? Colors.green // Correct answer: green
                       : Colors.red // Incorrect answer: red
                     : segment.isAnswered
-                    ? Colors.purple400 // Answered: bright purple
-                    : segment.isCurrent
-                    ? Colors.secondary // Current: medium purple
-                    : Colors.gray600, // Not answered: gray
+                      ? Colors.purple400 // Answered: bright purple
+                      : segment.isCurrent
+                        ? Colors.secondary // Current: medium purple
+                        : Colors.gray600, // Not answered: gray
                 },
               ]}
             />
@@ -610,130 +1000,298 @@ const QuizScreen = () => {
 
       {/* Question Card */}
       <View style={styles.modernQuestionCard}>
-        {/* Question Image - Only show if image_url exists */}
-        {currentQuestion.image_url && (
-          <View style={styles.questionImageContainer}>
-            <View style={styles.questionImagePlaceholder}>
-              <Ionicons
-                name="image"
-                size={64}
-                color={Colors.purple400 + "40"}
+        {/* Question Image - Show if image_url exists and is a valid URL */}
+        {currentQuestion.image_url &&
+          !currentQuestion.image_url.startsWith("[LOCAL_FILE:") &&
+          currentQuestion.image_url.trim() !== "" && (
+            <View style={styles.questionImageContainer}>
+              <Image
+                source={{ uri: currentQuestion.image_url }}
+                style={styles.questionImage}
+                resizeMode="contain"
+                onError={(error) => {
+                  console.log(
+                    "Failed to load question image:",
+                    error.nativeEvent.error,
+                  );
+                }}
               />
-              {/* TODO: Replace with actual image when available */}
-              {/* <Image source={{ uri: currentQuestion.image_url }} style={styles.questionImage} /> */}
             </View>
-          </View>
-        )}
+          )}
 
         <Text style={styles.modernQuestionText}>
           {currentQuestion.question_text}
         </Text>
+
+        {/* Question Type Indicator */}
+        {currentQuestion.question_type === "multiple-correct" && (
+          <Text style={styles.questionTypeHint}>
+            ℹ️ Select all correct answers
+          </Text>
+        )}
+        {currentQuestion.question_type === "short-answer" && (
+          <Text style={styles.questionTypeHint}>
+            ℹ️ Short answer question (manually graded)
+          </Text>
+        )}
       </View>
 
-      {/* Options */}
-      <View style={styles.modernOptionsContainer}>
-        {currentQuestion.options?.filter(Boolean).map((option, index) => {
-          const isSelected =
-            selectedAnswers.get(currentQuestion.id) === option.option_text;
-
-          /* ----------  review-mode colours / icons  ---------- */
-          let borderColor = "#3a3a4e";
-          let backgroundColor = "#2a2a3e";
-          let showCheckmark = false;
-          let showCross = false;
-
-          if (reviewMode && correctAnswerForCurrentQuestion) {
-            const isCorrectAnswer =
-              option.option_text ===
-              correctAnswerForCurrentQuestion.correctAnswer;
+      {/* Options - Only for MCQ types */}
+      {(currentQuestion.question_type === "multiple-choice" ||
+        currentQuestion.question_type === "multiple-correct" ||
+        currentQuestion.question_type === "true-false") && (
+        <View style={styles.modernOptionsContainer}>
+          {currentQuestion.options?.filter(Boolean).map((option, index) => {
             const userAnswer = selectedAnswers.get(currentQuestion.id);
-            const wasUserAnswer = option.option_text === userAnswer;
+            const isSelected = Array.isArray(userAnswer)
+              ? userAnswer.includes(option.option_text)
+              : userAnswer === option.option_text;
 
-            if (isCorrectAnswer) {
-              borderColor = Colors.green;
-              backgroundColor = "#1a3a2a";
-              showCheckmark = true;
-            } else if (wasUserAnswer && !isCorrectAnswer) {
-              borderColor = Colors.red;
-              backgroundColor = "#3a1a1a";
-              showCross = true;
-            }
-          } else if (isSelected) {
-            borderColor = Colors.purple400;
-            backgroundColor = "#3a2a5e";
-          }
+            /* ----------  review-mode colours / icons  ---------- */
+            let borderColor = "#3a3a4e";
+            let backgroundColor = "#2a2a3e";
+            let showCheckmark = false;
+            let showCross = false;
 
-          return (
-            <TouchableOpacity
-              key={option.id}
-              style={[
-                styles.modernOptionCard,
-                { borderColor, backgroundColor },
-              ]}
-              onPress={() =>
-                !reviewMode &&
-                handleAnswerSelect(currentQuestion.id, option.option_text)
+            if (reviewMode && correctAnswerForCurrentQuestion) {
+              let isCorrectAnswer = false;
+              const correctAns = correctAnswerForCurrentQuestion.correctAnswer;
+
+              if (currentQuestion.question_type === "multiple-correct") {
+                // For multiple-correct, correct_answer contains option TEXT values like ["2", "4", "3"]
+                try {
+                  const correctAnswers = Array.isArray(correctAns)
+                    ? correctAns
+                    : JSON.parse(correctAns);
+                  // Map option text values to their indices and check
+                  isCorrectAnswer = correctAnswers.some(
+                    (correctOptText: string) => {
+                      const correctOptIndex = currentQuestion.options.findIndex(
+                        (opt: any) => opt.option_text === correctOptText,
+                      );
+                      return correctOptIndex === index;
+                    },
+                  );
+                } catch {
+                  isCorrectAnswer = false;
+                }
+              } else if (currentQuestion.question_type === "true-false") {
+                // True/false: correct_answer might be "True"/"False" (text) or "0"/"1" (index)
+                const parsedIndex = parseInt(correctAns);
+                if (!isNaN(parsedIndex)) {
+                  isCorrectAnswer = parsedIndex === index;
+                } else {
+                  isCorrectAnswer = correctAns === option.option_text;
+                }
+              } else {
+                // Multiple-choice: compare text or index
+                isCorrectAnswer =
+                  option.option_text === correctAns ||
+                  String(index) === correctAns;
               }
-              activeOpacity={reviewMode ? 1 : 0.7}
-              disabled={reviewMode}
-            >
-              <View style={[styles.modernOptionRadio, { borderColor }]}>
-                {isSelected && !reviewMode && (
-                  <View style={styles.modernOptionRadioInner} />
-                )}
-                {reviewMode && showCheckmark && (
-                  <Ionicons name="checkmark" size={20} color={Colors.green} />
-                )}
-                {reviewMode && showCross && (
-                  <Ionicons name="close" size={20} color={Colors.red} />
-                )}
-              </View>
-              <Text
+
+              const wasUserAnswer = Array.isArray(userAnswer)
+                ? userAnswer.includes(option.option_text)
+                : option.option_text === userAnswer;
+
+              if (isCorrectAnswer) {
+                borderColor = Colors.green;
+                backgroundColor = "#1a3a2a";
+                showCheckmark = true;
+              } else if (wasUserAnswer && !isCorrectAnswer) {
+                borderColor = Colors.red;
+                backgroundColor = "#3a1a1a";
+                showCross = true;
+              }
+            } else if (isSelected) {
+              borderColor = Colors.purple400;
+              backgroundColor = "#3a2a5e";
+            }
+
+            return (
+              <TouchableOpacity
+                key={option.id}
                 style={[
-                  styles.modernOptionText,
-                  isSelected && !reviewMode && styles.modernOptionTextSelected,
+                  styles.modernOptionCard,
+                  { borderColor, backgroundColor },
                 ]}
+                onPress={() =>
+                  !reviewMode &&
+                  handleAnswerSelect(
+                    currentQuestion.id,
+                    option.option_text,
+                    currentQuestion.question_type === "multiple-correct",
+                  )
+                }
+                activeOpacity={reviewMode ? 1 : 0.7}
+                disabled={reviewMode}
               >
-                {option.option_text}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+                <View
+                  style={[
+                    currentQuestion.question_type === "multiple-correct"
+                      ? styles.modernOptionCheckbox
+                      : styles.modernOptionRadio,
+                    { borderColor },
+                  ]}
+                >
+                  {isSelected && !reviewMode && (
+                    <View
+                      style={
+                        currentQuestion.question_type === "multiple-correct"
+                          ? styles.modernOptionCheckboxInner
+                          : styles.modernOptionRadioInner
+                      }
+                    />
+                  )}
+                  {reviewMode && showCheckmark && (
+                    <Ionicons name="checkmark" size={20} color={Colors.green} />
+                  )}
+                  {reviewMode && showCross && (
+                    <Ionicons name="close" size={20} color={Colors.red} />
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.modernOptionText,
+                    isSelected &&
+                      !reviewMode &&
+                      styles.modernOptionTextSelected,
+                  ]}
+                >
+                  {option.option_text}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Short Answer Questions */}
+      {currentQuestion.question_type === "short-answer" && (
+        <View style={styles.shortAnswerContainer}>
+          <Text style={styles.shortAnswerLabel}>
+            This question requires a written answer and will be manually graded.
+          </Text>
+          {!reviewMode && (
+            <TextInput
+              style={styles.shortAnswerInput}
+              placeholder="Type your answer here..."
+              placeholderTextColor={Colors.textSecondary}
+              multiline
+              numberOfLines={4}
+              value={(selectedAnswers.get(currentQuestion.id) as string) || ""}
+              onChangeText={(text) =>
+                handleAnswerSelect(currentQuestion.id, text, false)
+              }
+              editable={!reviewMode}
+            />
+          )}
+          {reviewMode && (
+            <View style={styles.shortAnswerReviewContainer}>
+              <View style={styles.shortAnswerUserAnswer}>
+                <Text style={styles.shortAnswerUserAnswerLabel}>
+                  Your Answer:
+                </Text>
+                <Text style={styles.shortAnswerUserAnswerText}>
+                  {selectedAnswers.get(currentQuestion.id) ||
+                    "No answer provided"}
+                </Text>
+              </View>
+              {currentQuestion.explanation && (
+                <View style={styles.explanationCard}>
+                  <Text style={styles.explanationTitle}>Sample Answer:</Text>
+                  <Text style={styles.explanationText}>
+                    {currentQuestion.explanation}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Matching Questions */}
+      {currentQuestion.question_type === "matching" && (
+        <MatchingQuestion
+          question={currentQuestion}
+          matchingState={matchingState}
+          reviewMode={reviewMode}
+          onMatch={handleMatch}
+          onClearMatch={handleClearMatch}
+        />
+      )}
+      {/* Show explanation in review mode for MCQ types */}
+      {reviewMode &&
+        currentQuestion.explanation &&
+        (currentQuestion.question_type === "multiple-choice" ||
+          currentQuestion.question_type === "multiple-correct" ||
+          currentQuestion.question_type === "true-false") && (
+          <View style={styles.explanationCard}>
+            <Text style={styles.explanationTitle}>Explanation:</Text>
+            <Text style={styles.explanationText}>
+              {currentQuestion.explanation}
+            </Text>
+          </View>
+        )}
+
+      <View style={styles.questionNavRow}>
+        <TouchableOpacity
+          style={[
+            styles.navIconButtonLarge,
+            currentQuestionIndex === 0 && styles.navIconButtonDisabled,
+          ]}
+          onPress={handlePreviousQuestion}
+          disabled={currentQuestionIndex === 0}
+        >
+          <Ionicons
+            name="chevron-back"
+            size={22}
+            color={
+              currentQuestionIndex === 0 ? Colors.gray600 : Colors.textPrimary
+            }
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.navIconButtonLarge,
+            (!reviewMode && !isCurrentQuestionAnswered) ||
+            currentQuestionIndex === quizDetail.questions.length - 1
+              ? styles.navIconButtonDisabled
+              : null,
+          ]}
+          onPress={handleNextQuestion}
+          disabled={
+            (!reviewMode && !isCurrentQuestionAnswered) ||
+            currentQuestionIndex === quizDetail.questions.length - 1
+          }
+        >
+          <Ionicons
+            name="chevron-forward"
+            size={22}
+            color={
+              (!reviewMode && !isCurrentQuestionAnswered) ||
+              currentQuestionIndex === quizDetail.questions.length - 1
+                ? Colors.gray600
+                : Colors.textPrimary
+            }
+          />
+        </TouchableOpacity>
       </View>
 
       {/* Bottom Navigation */}
       <View style={{ paddingVertical: Spacing.lg }}>
-        {reviewMode ? (
-          <View style={{ flexDirection: "column" }}>
-            {currentQuestionIndex < quizDetail.questions.length - 1 ? (
-              <ActionButton onPress={handleNextQuestion} text={"Next"} />
-            ) : (
+        {reviewMode
+          ? currentQuestionIndex === quizDetail.questions.length - 1 && (
               <ActionButton onPress={handleDoneReview} text={"Done"} />
-            )}
-            {currentQuestionIndex > 0 && (
+            )
+          : allQuestionsAnswered && (
               <ActionButton
-                onPress={handlePreviousQuestion}
-                text={"Previous"}
+                onPress={handleSubmitQuiz}
+                loading={submitting}
+                disabled={submitting}
+                text={"Submit"}
               />
             )}
-          </View>
-        ) : currentQuestionIndex === quizDetail.questions.length - 1 ? (
-          <ActionButton
-            onPress={handleSubmitQuiz}
-            loading={submitting}
-            disabled={submitting}
-            text={"Submit"}
-          />
-        ) : (
-          <ActionButton
-            onPress={handleNextQuestion}
-            text={"Next"}
-            disabled={!reviewMode && !isCurrentQuestionAnswered}
-            style={
-              !reviewMode && !isCurrentQuestionAnswered && { opacity: 0.2 }
-            }
-          />
-        )}
       </View>
     </Screen>
   );
@@ -790,11 +1348,55 @@ const styles = StyleSheet.create({
   segmentedProgressContainer: {
     paddingVertical: Spacing.lg,
   },
+  progressHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    gap: 8,
+  },
+  navIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.gray800,
+    borderWidth: 1,
+    borderColor: Colors.purple400,
+  },
+  navIconButtonDisabled: {
+    opacity: 0.4,
+    borderColor: Colors.gray600,
+  },
   progressLabel: {
     fontSize: 15,
     color: Colors.textSecondary,
-    marginBottom: 10,
     textAlign: "left",
+    flex: 1,
+  },
+  attemptsInline: {
+    marginBottom: 6,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: "600",
+    textAlign: "right",
+  },
+  questionNavRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
+    paddingVertical: Spacing.md,
+  },
+  navIconButtonLarge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.gray800,
+    borderWidth: 1,
+    borderColor: Colors.purple400,
   },
   segmentsWrapper: {
     flexDirection: "row",
@@ -828,8 +1430,9 @@ const styles = StyleSheet.create({
   },
   questionImage: {
     width: "100%",
-    height: "100%",
+    height: 200,
     borderRadius: 16,
+    backgroundColor: "#1a1a2e",
   },
   modernQuestionText: {
     fontSize: 20,
@@ -837,6 +1440,12 @@ const styles = StyleSheet.create({
     color: Colors.white,
     lineHeight: 28,
     textAlign: "left",
+  },
+  questionTypeHint: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: Spacing.sm,
+    fontStyle: "italic",
   },
 
   // Modern Options
@@ -874,6 +1483,22 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: Colors.purple400,
   },
+  modernOptionCheckbox: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    borderWidth: 3,
+    borderColor: "#3a3a4e",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: Spacing.md,
+  },
+  modernOptionCheckboxInner: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+    backgroundColor: Colors.purple400,
+  },
   modernOptionText: {
     flex: 1,
     fontSize: 16,
@@ -883,6 +1508,72 @@ const styles = StyleSheet.create({
   modernOptionTextSelected: {
     fontWeight: "600",
     color: Colors.white,
+  },
+
+  // Short Answer Styles
+  shortAnswerContainer: {
+    backgroundColor: Colors.surface,
+    padding: Spacing.lg,
+    borderRadius: 16,
+    marginBottom: Spacing.md,
+  },
+  shortAnswerLabel: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+    marginBottom: Spacing.md,
+  },
+  shortAnswerInput: {
+    backgroundColor: Colors.textInputBg,
+    borderRadius: 12,
+    padding: Spacing.md,
+    fontSize: 16,
+    color: Colors.textPrimary,
+    minHeight: 100,
+    textAlignVertical: "top",
+    borderWidth: 2,
+    borderColor: Colors.gray600,
+  },
+  shortAnswerReviewContainer: {
+    marginTop: Spacing.md,
+  },
+  shortAnswerUserAnswer: {
+    backgroundColor: Colors.textInputBg,
+    borderRadius: 12,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  shortAnswerUserAnswerLabel: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: "600",
+    marginBottom: Spacing.xs,
+  },
+  shortAnswerUserAnswerText: {
+    fontSize: 15,
+    color: Colors.textPrimary,
+    lineHeight: 22,
+  },
+
+  // Explanation Card
+  explanationCard: {
+    backgroundColor: Colors.surface,
+    padding: Spacing.lg,
+    borderRadius: 16,
+    marginTop: Spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.purple400,
+  },
+  explanationTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.purple400,
+    marginBottom: Spacing.sm,
+  },
+  explanationText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    lineHeight: 22,
   },
 
   // Results Screen Styles
@@ -997,7 +1688,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   backToCourseButton: {
-    backgroundColor: Colors.purple600,
+    backgroundColor: Colors.purple400,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

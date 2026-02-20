@@ -3,7 +3,8 @@
  * Updated to work with Supabase endpoints
  */
 
-import { Course, AWSApiResponse, AWSCoursesResponse, AWSCourse } from '../types';
+import { Colors } from '@/constants';
+import { Course } from '../types';
 import apiService from './apiService';
 import * as SecureStore from 'expo-secure-store';
 
@@ -16,16 +17,18 @@ const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEFAULT_USER_ID || '550e8400-e29
 // Cache configuration
 const CACHE_CONFIG = {
   COURSES_KEY: 'cached_courses',
+  CATEGORIES_KEY: 'cached_categories',
   CACHE_DURATION: 5 * 60 * 1000, // 5 minutes in milliseconds
 };
 
 // Course service endpoints - Supabase Edge Functions
 const ENDPOINTS = {
-  COURSES: '/getAllCourse', // Maps to getAllCourse.mjs
-  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}`, // Maps to getUserEnrollment.mjs
-  COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, // Maps to getModuleDetail.mjs
-  COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, // Maps to courseReviewHandler
-  POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, // Maps to postUserEnrollment.mjs
+  COURSES: '/getAllPublishedCourse', 
+  USER_ENROLLMENTS: (uid: string) => `/getUserEnrollment/${encodeURIComponent(uid)}?includeDetails=true&sortBy=last_activity_at&sortOrder=desc`, 
+  COURSE_DETAILS: (courseId: string) => `/getModuleDetail/${encodeURIComponent(courseId)}`, 
+  COURSE_REVIEWS: (courseId: string) => `/courseReviewHandler/${encodeURIComponent(courseId)}`, 
+  POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, 
+  CATEGORIES: '/categoryHandler',
   RECOMMENDATIONS: '/getRecommendations',
   RECOMMENDATION_EVENT: '/postRecommendationEvent',
 };
@@ -33,7 +36,7 @@ const ENDPOINTS = {
 
 // Wishlist endpoints - Supabase Edge Functions
 const WISHLIST = {
-  BASE: (uid: string) => `/wishlistHandler/${encodeURIComponent(uid)}`, // Maps to wishlistHandler.mjs
+  BASE: (uid: string) => `/wishlistHandler/${encodeURIComponent(uid)}`,
   ITEM: (uid: string, courseId: string) =>
     `/wishlistHandler/${encodeURIComponent(uid)}?courseId=${encodeURIComponent(courseId)}`,
 };
@@ -41,7 +44,6 @@ const WISHLIST = {
 export interface CourseListParams {
   limit?: number;
   category?: string;
-  level?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -51,7 +53,7 @@ export interface EnrollmentCourse {
   enrollment_id: string;
   enrollment_date: string;
   completion_date: string | null;
-  progress_percentage: string;
+  progress_percentage: number;
   is_completed: boolean;
   is_in_wishlist: boolean;
   last_accessed: string;
@@ -59,7 +61,6 @@ export interface EnrollmentCourse {
   course_id: string;
   title: string;
   description: string;
-  level: string;
   duration_hours: number;
   thumbnail_url: string;
   rating: string;
@@ -160,12 +161,29 @@ export interface AddReviewApiResponse {
   data?: CourseReview;
 }
 
-// services/courseService.ts
 export interface UpdateReviewPayload {
   userId: string;
   rating: number;
   review: string;
   isAnonymous?: boolean;
+}
+
+// Category types
+export interface Category {
+  id: string;
+  name: string;
+  color: string;
+  course_count: number;
+  created_at: string;
+}
+
+export interface CategoryApiResponse {
+  success: boolean;
+  data: Category[];
+  meta: {
+    timestamp: string;
+    count: number;
+  };
 }
 
 // Cache utility functions
@@ -223,22 +241,38 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   // Calculate duration string from hours
   const durationStr = awsCourse.duration_hours ? `${awsCourse.duration_hours}h` : '0h';
   
-  // Map level to lowercase format expected by types/index.ts
-  const mapLevel = (level: string): 'beginner' | 'intermediate' | 'advanced' => {
-    const levelLower = level?.toLowerCase();
-    switch (levelLower) {
-      case 'intermediate': return 'intermediate';
-      case 'advanced': return 'advanced';
-      default: return 'beginner';
-    }
-  };
-
   // Generate avatar from instructor name
   const generateAvatar = (name: string): string => {
     if (!name) return 'https://via.placeholder.com/50x50';
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=50&background=3B82F6&color=fff`;
   };
-  
+
+  const explicitModules =
+    awsCourse.total_sections ??
+    awsCourse.sections_count ??
+    awsCourse.section_count ??
+    awsCourse.modules ??
+    awsCourse.module_count ??
+    awsCourse.module_total;
+  const explicitLessons =
+    awsCourse.total_videos ??
+    awsCourse.videos_count ??
+    awsCourse.video_count ??
+    awsCourse.lessons ??
+    awsCourse.lesson_count ??
+    awsCourse.lesson_total;
+
+  const modulesFromExplicit = Number(explicitModules);
+  const lessonsFromExplicit = Number(explicitLessons);
+  const durationHours = Number(awsCourse.duration_hours ?? 0);
+
+  const resolvedModules = Number.isFinite(modulesFromExplicit) && modulesFromExplicit > 0
+    ? modulesFromExplicit
+    : (Number.isFinite(durationHours) && durationHours > 0 ? Math.floor(durationHours / 2) : 0);
+  const resolvedLessons = Number.isFinite(lessonsFromExplicit) && lessonsFromExplicit > 0
+    ? lessonsFromExplicit
+    : 0;
+
   return {
     id: String(awsCourse.courseid || awsCourse.id || 'unknown'),
     title: awsCourse.title || 'Untitled Course',
@@ -251,12 +285,13 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
       rating: parseFloat(awsCourse.instructor_rating || '4.5'),
       bio: awsCourse.instructor_bio || 'No bio available',
     },
-    progress: {
-      completed: 0, // Default values - would come from enrollment data
-      total: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
-      percentage: 0,
-      lastAccessed: new Date().toISOString(),
-    },
+    progress_percentage: awsCourse.progress_percentage,
+    // progress: {
+    //   completed: 0, // Default values - would come from enrollment data
+    //   total: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
+    //   percentage: 0,
+    //   lastAccessed: new Date().toISOString(),
+    // },
     duration: durationStr,
     rating: parseFloat(awsCourse.rating || '4.0'),
     image:
@@ -264,8 +299,9 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
       awsCourse.image ||
       'https://via.placeholder.com/400x250',
     category: awsCourse.category_name || 'General',
-    level: mapLevel(awsCourse.level),
-    modules: Math.floor((awsCourse.duration_hours || 10) / 2) || 10,
+    categoryColor: awsCourse.category_color || Colors.categoryDefault,
+    modules: resolvedModules,
+    lessons: resolvedLessons,
     tags: Array.isArray(awsCourse.tags) ? awsCourse.tags : [],
     prerequisites: [],
     outcomes: [],
@@ -275,13 +311,47 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   };
 };
 
+
+/**
+ * Fetch all categories from the API
+ * @returns Promise<Category[]> - Array of categories
+ */
+export const getAllCategories = async (): Promise<Category[]> => {
+  try {
+    // Check cache first
+    const cached = await CacheManager.get<Category[]>(CACHE_CONFIG.CATEGORIES_KEY);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from API
+    const response = await apiService.get<CategoryApiResponse>(ENDPOINTS.CATEGORIES);
+    const categories = unwrap<Category[]>(response);
+
+    // Cache the results
+    await CacheManager.set(CACHE_CONFIG.CATEGORIES_KEY, categories);
+
+    return categories;
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    throw error;
+  }
+};
+
+/**
+ * Clear categories cache (useful after category updates)
+ */
+export const clearCategoriesCache = async (): Promise<void> => {
+  await CacheManager.clear(CACHE_CONFIG.CATEGORIES_KEY);
+};
+
 // Helper function to convert enrollment data to Course format
 const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
-  // Use section counts if available (after backend redeploy), otherwise calculate from items
+  // Primary: Use section counts if available (preferred method)
   const totalSections = enrollment.total_sections || 0;
   const completedSections = enrollment.completed_sections || 0;
   
-  // Calculate from video/quiz data for accurate item-level tracking
+  // Fallback: Calculate from video/quiz data if sections aren't available
   const totalVideos = parseInt(enrollment.total_videos) || 0;
   const completedVideos = parseInt(enrollment.completed_videos) || 0;
   const totalQuizzes = parseInt(enrollment.total_quizzes) || 0;
@@ -290,30 +360,31 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
   const totalItems = totalVideos + totalQuizzes;
   const completedItems = completedVideos + passedQuizzes;
   
-  // Calculate progress percentage from actual completion data
-  // Don't trust the API's progress_percentage as it may be stale
-  const calculatedPercentage = totalItems > 0 
-    ? Math.round((completedItems / totalItems) * 100) 
+  // Determine which data to use
+  const hasSectionData = totalSections > 0;
+  const progressTotal = hasSectionData ? totalSections : totalItems;
+  const progressCompleted = hasSectionData ? completedSections : completedItems;
+  
+  // Calculate progress percentage
+  const calculatedPercentage = progressTotal > 0 
+    ? Math.round((progressCompleted / progressTotal) * 100) 
     : 0;
   
-  // For display counts, use section counts if available, otherwise use item counts
-  const progressTotal = totalSections > 0 ? totalSections : totalItems;
-  const progressCompleted = totalSections > 0 ? completedSections : completedItems;
+  console.log(`[courseService] Converting enrollment for "${enrollment.title}":`, {
+    hasSectionData,
+    totalSections,
+    completedSections,
+    totalItems,
+    completedItems,
+    progressTotal,
+    progressCompleted,
+    calculatedPercentage,
+  });
   
   // Generate avatar from instructor name
   const generateAvatar = (name: string): string => {
-    if (!name) return 'https://via.placeholder.com/50x50';
+    if (!name) return 'https://ui-avatars.com/api/?name=Unknown&size=50&background=3B82F6&color=fff';
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=50&background=3B82F6&color=fff`;
-  };
-
-  // Map level to lowercase format
-  const mapLevel = (level: string): 'beginner' | 'intermediate' | 'advanced' => {
-    const levelLower = level?.toLowerCase();
-    switch (levelLower) {
-      case 'intermediate': return 'intermediate';
-      case 'advanced': return 'advanced';
-      default: return 'beginner';
-    }
   };
 
   return {
@@ -328,35 +399,31 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
       rating: parseFloat(enrollment.instructor_rating),
       bio: `Expert ${enrollment.category_name} instructor`,
     },
-    progress: {
-      completed: progressCompleted,
-      total: progressTotal,
-      percentage: calculatedPercentage,
-      lastAccessed: enrollment.last_accessed,
-    },
+    progress_percentage: enrollment.progress_percentage,
     duration: `${enrollment.duration_hours}h`,
     rating: parseFloat(enrollment.rating),
     image: enrollment.thumbnail_url,
     category: enrollment.category_name,
-    level: mapLevel(enrollment.level),
+    categoryColor: enrollment.category_color || Colors.categoryDefault,
     modules: progressTotal,
     tags: enrollment.tags || [],
     prerequisites: [],
     outcomes: [],
     createdAt: enrollment.enrollment_date,
-    updatedAt: enrollment.last_accessed,
+    updatedAt: enrollment.last_activity_at || enrollment.last_accessed || enrollment.enrollment_date,
     isWishlisted: Boolean(enrollment.is_in_wishlist),
   };
 };
 
 class CourseService {
   /**
-   * Get all courses from AWS API Gateway
+   * Get all courses
    */
   async getCourses(params?: CourseListParams): Promise<Course[]> {
     try {
       // Check cache first
-      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_${JSON.stringify(params || {})}`;
+      const paramString = params ? JSON.stringify(params) : 'default';
+      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_${paramString}`;
       const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
       if (cachedCourses) {
         return cachedCourses;
@@ -366,7 +433,6 @@ class CourseService {
       const queryParams: Record<string, string> = {};
       if (params?.limit) queryParams.limit = params.limit.toString();
       if (params?.category) queryParams.category = params.category;
-      if (params?.level) queryParams.level = params.level;
       if (params?.sortBy) queryParams.sortBy = params.sortBy;
       if (params?.sortOrder) queryParams.sortOrder = params.sortOrder;
 
@@ -374,7 +440,6 @@ class CourseService {
         ENDPOINTS.COURSES,
         queryParams
       );
-
       // Safety check: ensure response exists
       if (!response) {
         throw new Error('No response received from API');
@@ -399,7 +464,7 @@ class CourseService {
         console.error('Invalid API response structure:', JSON.stringify(response).slice(0, 500));
         throw new Error('Invalid API response: courses array not found');
       }
-
+      
       // Convert AWS course format to our app format
       const courses = coursesArray.map(convertAWSCourseToAppCourse);
 
@@ -420,15 +485,9 @@ class CourseService {
     try {
       userId = userId || DEFAULT_USER_ID;
       
-      // For testing, skip cache and always fetch fresh data
+      // Always clear cache to ensure fresh data
       const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_enrollments_${userId}`;
       await CacheManager.clear(cacheKey);
-      
-      // Check cache first
-      const cachedEnrollments = await CacheManager.get<Course[]>(cacheKey);
-      if (cachedEnrollments) {
-        return cachedEnrollments;
-      }
       
       const response = await apiService.get<any>(ENDPOINTS.USER_ENROLLMENTS(userId));
       const payload = unwrap<EnrollmentResponse | { enrollments: EnrollmentCourse[] }>(response);
@@ -445,6 +504,7 @@ class CourseService {
       }
 
       // Convert enrollment format to our app Course format
+      // Courses are already sorted by last_activity_at (descending) from the API
       const courses = enrollmentsData.map(convertEnrollmentToAppCourse);
 
       // Cache the response
@@ -458,38 +518,24 @@ class CourseService {
   }
 
   /**
-   * Get user's enrolled courses (filter courses with progress > 0)
-   * For now, returns first 2 courses as demo enrolled courses
+   * Get user's enrolled courses (uses getUserEnrollments for real data)
+   * Returns properly sorted courses by last activity
    */
   async getMyCourses(): Promise<Course[]> {
     try {
-      // Check cache first
       const cachedCourses = await CacheManager.get<Course[]>(`${CACHE_CONFIG.COURSES_KEY}_my`);
       if (cachedCourses) {
         return cachedCourses;
       }
 
-      // Get all courses and return first 2 as "my courses" for demo
-      const allCourses = await this.getCourses();
-      if (!allCourses || allCourses.length === 0) {
-        return [];
-      }
+      // Use the real enrolled courses from getUserEnrollments
+      const uid = DEFAULT_USER_ID;
+      const enrolledCourses = await this.getUserEnrollments(uid);
 
-      // For demo: take first 2 courses as enrolled courses and add progress
-      const myCourses = allCourses.slice(0, 2).map((course, index) => ({
-        ...course,
-        progress: {
-          completed: index === 0 ? 3 : 7, // Different progress for variety
-          total: course.modules || 10,
-          percentage: index === 0 ? 30 : 70, // 30% and 70% progress
-          lastAccessed: new Date().toISOString(),
-        }
-      }));
+      // Cache the result
+      await CacheManager.set(`${CACHE_CONFIG.COURSES_KEY}_my`, enrolledCourses);
 
-      // Cache the filtered courses
-      await CacheManager.set(`${CACHE_CONFIG.COURSES_KEY}_my`, myCourses);
-
-      return myCourses;
+      return enrolledCourses;
     } catch (error) {
       console.error('Error fetching my courses:', error);
       throw error;
@@ -565,10 +611,9 @@ class CourseService {
 
 async getWishlist(userId: string): Promise<Course[]> {
   if (!userId) userId = DEFAULT_USER_ID;
-  const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`;
+  const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_wishlist_v2_${userId}`;
   const cached = await CacheManager.get<Course[]>(cacheKey);
   if (cached) return cached;
-  // remove later - temporary override for testing
 
   const resp = await apiService.get<any>(WISHLIST.BASE(userId), { userId });
   const array = resp?.courses ?? resp?.data?.courses ?? [];
@@ -581,14 +626,14 @@ async addToWishlist(userId: string, courseId: string): Promise<void> {
   if (!userId) userId = DEFAULT_USER_ID;
   if (!courseId) throw new Error('Missing courseId');
   await apiService.post(WISHLIST.ITEM(userId , courseId), { userId, courseId });
-  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
+  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_v2_${userId}`);
 }
 
 async removeFromWishlist(userId: string, courseId: string): Promise<void> {
   if (!userId) userId = DEFAULT_USER_ID;
   if (!courseId) throw new Error('Missing courseId');
   await apiService.delete(WISHLIST.ITEM(userId, courseId));
-  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_${userId}`);
+  await CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_wishlist_v2_${userId}`);
 }
 
   /**

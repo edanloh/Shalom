@@ -17,8 +17,8 @@ export const useContentManagement = () => {
     const newModuleId = `m${Date.now()}`;
     const newModule: Module = {
       id: newModuleId,
-      title: `Module ${moduleNumber}: New Module`,
-      description: "Add a description for this module...",
+      title: `Module ${moduleNumber}: `,
+      description: "",
       status: "published",
       expanded: true,
       lessons: [],
@@ -31,6 +31,23 @@ export const useContentManagement = () => {
   };
 
   const deleteModule = (moduleId: string) => {
+    // Clear selection if deleting the currently selected module or its children
+    setSelectedItem((current: any) => {
+      if (!current) return current;
+      if (current.type === "module" && current.id === moduleId) {
+        return null;
+      }
+      if (current.type === "lesson" || current.type === "quiz") {
+        const module = modules.find((m) => m.id === moduleId);
+        if (!module) return current;
+        const isChild =
+          module.lessons.some((l) => l.id === current.id) ||
+          module.quizzes.some((q) => q.id === current.id);
+        return isChild ? null : current;
+      }
+      return current;
+    });
+
     let updatedModules = modules.filter((m) => m.id !== moduleId);
     updatedModules = modules.filter(m => m.id !== moduleId).map((module, index) => ({
       ...module,
@@ -48,7 +65,7 @@ export const useContentManagement = () => {
   };
 
   // Lesson functions
-  const addLesson = (moduleId: string, lessonType: 'video' | 'pdf' = 'video') => {
+  const addLesson = (moduleId: string, lessonType: 'video' | 'pdf' | 'document' | 'slides' = 'video') => {
     const newLessonId = `l${Date.now()}`;
     let updatedModules = modules.map((m) => {
       if (m.id === moduleId) {
@@ -60,16 +77,22 @@ export const useContentManagement = () => {
         const maxOrder = allOrders.length > 0 ? Math.max(...allOrders) : -1;
         const nextOrder = maxOrder + 1;
         
+        // Normalize type: pdf/slides/document all become 'document' type
+        const normalizedType = lessonType === 'video' ? 'video' : 'document';
+        // Store the specific subtype in resourceType
+        const resourceSubType = lessonType === 'video' ? undefined : (lessonType === 'pdf' ? 'pdf' : lessonType);
+        
         const newLesson: Lesson = {
           id: newLessonId,
-          title: `New Lesson`, // Will be updated by numbering
-          baseTitle: "New Lesson",
-          type: lessonType,
+          title: "",
+          baseTitle: "",
+          type: normalizedType,
           status: "draft",
           content: "",
           videoUrl: lessonType === 'video' ? "" : undefined,
-          resourceUrl: lessonType === 'pdf' ? "" : undefined,
-          isDownloadable: lessonType === 'pdf' ? true : undefined,
+          resourceUrl: lessonType !== 'video' ? "" : undefined,
+          resourceType: resourceSubType,
+          isDownloadable: lessonType !== 'video' ? true : undefined,
           order: nextOrder,
         } as Lesson;
         
@@ -148,18 +171,19 @@ export const useContentManagement = () => {
             ...m.quizzes,
             {
               id: newQuizId,
-              title: `New Quiz`, // Will be updated by numbering
-              baseTitle: "New Quiz",
+              title: "",
+              baseTitle: "",
               status: "draft",
               passingScore: 70,
+              maxAttempts: 1,
               order: nextOrder,
               questions: [
                 {
                   id: `qq${Date.now()}`,
-                  text: "New question",
+                  text: "",
                   type: "multiple-choice",
-                  options: ["Option 1", "Option 2"],
-                  correctAnswer: 0,
+                  options: ["", ""],
+                  correctAnswer: null,
                   imageUrl: null,
                   points: 1,
                 },
@@ -232,12 +256,13 @@ export const useContentManagement = () => {
                     ...q.questions,
                     {
                       id: `qq${Date.now()}`,
-                      text: "New question",
+                      text: "",
                       type: "multiple-choice",
-                      options: ["Option 1", "Option 2"],
-                      correctAnswer: 0,
+                      options: ["", ""],
+                      correctAnswer: null,
                       imageUrl: null,
                       points: 1,
+                      matchingPairs: [],
                     },
                   ],
                 };
@@ -307,7 +332,65 @@ export const useContentManagement = () => {
   const removeOption = (moduleId: string, quizId: string, questionId: string, index: number) => {
     const question = modules.find(m => m.id === moduleId)?.quizzes.find(q => q.id === quizId)?.questions.find(qu => qu.id === questionId);
     if (question) {
-      updateQuestion(moduleId, quizId, questionId, "options", question.options.filter((_, i) => i !== index));
+      // Remove the option at the specified index
+      const newOptions = question.options.filter((_, i) => i !== index);
+      
+      // Adjust correctAnswer index if needed
+      let newCorrectAnswer = question.correctAnswer;
+      
+      if (question.type === "multiple-choice" || question.type === "true-false") {
+        // Single answer - adjust if removed option was before the correct answer
+        if (typeof newCorrectAnswer === "number") {
+          if (index < newCorrectAnswer) {
+            // Removed option was before correct answer, shift index down
+            newCorrectAnswer = newCorrectAnswer - 1;
+          } else if (index === newCorrectAnswer) {
+            // Removed the correct answer option, reset to null
+            newCorrectAnswer = null;
+          }
+        }
+      } else if (question.type === "multiple-correct") {
+        // Multiple answers - adjust all indices
+        if (Array.isArray(newCorrectAnswer)) {
+          newCorrectAnswer = newCorrectAnswer
+            .map((ansIdx: number) => {
+              if (index < ansIdx) {
+                // Removed option was before this answer, shift index down
+                return ansIdx - 1;
+              } else if (index === ansIdx) {
+                // Removed this answer option, mark for removal
+                return -1;
+              }
+              return ansIdx;
+            })
+            .filter((idx: number) => idx >= 0); // Remove marked indices
+        }
+      }
+      
+      // Update both options and correctAnswer
+      setModules(
+        modules.map((m) => {
+          if (m.id === moduleId) {
+            return {
+              ...m,
+              quizzes: m.quizzes.map((q) => {
+                if (q.id === quizId) {
+                  return {
+                    ...q,
+                    questions: q.questions.map((qu) =>
+                      qu.id === questionId
+                        ? { ...qu, options: newOptions, correctAnswer: newCorrectAnswer }
+                        : qu
+                    ),
+                  };
+                }
+                return q;
+              }),
+            };
+          }
+          return m;
+        })
+      );
     }
   };
 

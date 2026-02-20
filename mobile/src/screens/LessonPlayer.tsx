@@ -46,23 +46,6 @@ const getYouTubeVideoId = (url: string): string | null => {
   return match && match[7].length === 11 ? match[7] : null;
 };
 
-// Helper function to convert YouTube URL to direct video URL (if possible)
-const getPlayableVideoUrl = (url: string): string => {
-  // For YouTube URLs, we need to note this won't work with expo-av
-  // You'd need to use a WebView or react-native-youtube-iframe
-  if (isYouTubeUrl(url)) {
-    const videoId = getYouTubeVideoId(url);
-    if (videoId) {
-      // Return a placeholder message for now
-      console.warn(
-        "YouTube videos require a WebView or YouTube player component"
-      );
-      // You could return an embed URL, but expo-av won't play it
-      return url;
-    }
-  }
-  return url;
-};
 
 const LessonPlayer = () => {
   const route = useRoute();
@@ -473,12 +456,13 @@ const LessonPlayer = () => {
           sectionId: nextItemInModule.sectionId,
           userId,
         });
-      } else if (nextItemInModule.item.type === 'pdf') {
-        navigation.replace("PDFView", {
-          pdfId: nextItemInModule.item.id,
+      } else if (['pdf', 'document', 'ppt'].includes(nextItemInModule.item.type)) {
+        navigation.replace("DocumentView", {
+          documentId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          documentType: nextItemInModule.item.type,
         });
       }
     }
@@ -502,12 +486,13 @@ const LessonPlayer = () => {
           sectionId: prevItemInModule.sectionId,
           userId,
         });
-      } else if (prevItemInModule.item.type === 'pdf') {
-        navigation.replace("PDFView", {
-          pdfId: prevItemInModule.item.id,
+      } else if (['pdf', 'document', 'ppt'].includes(prevItemInModule.item.type)) {
+        navigation.replace("DocumentView", {
+          documentId: prevItemInModule.item.id,
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          documentType: prevItemInModule.item.type,
         });
       }
     }
@@ -935,8 +920,8 @@ const LessonPlayer = () => {
             >
               {prevItemInModule?.item.type === 'quiz' 
                 ? 'PREVIOUS QUIZ' 
-                : prevItemInModule?.item.type === 'pdf'
-                ? 'PREVIOUS PDF'
+                : ['pdf', 'document', 'ppt'].includes(prevItemInModule?.item.type || '')
+                ? 'PREVIOUS DOCUMENT'
                 : 'PREVIOUS LESSON'}
             </Text>
             {prevItemInModule ? (
@@ -971,8 +956,8 @@ const LessonPlayer = () => {
             >
               {nextItemInModule?.item.type === 'quiz' 
                 ? 'NEXT QUIZ' 
-                : nextItemInModule?.item.type === 'pdf'
-                ? 'NEXT PDF'
+                : ['pdf', 'document', 'ppt'].includes(nextItemInModule?.item.type || '')
+                ? 'NEXT DOCUMENT'
                 : 'NEXT LESSON'}
             </Text>
             {nextItemInModule ? (
@@ -1092,7 +1077,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   video: {
-    width: "100%",
+    width: "90%",
     height: "100%",
   },
   touchableOverlay: {

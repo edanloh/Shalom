@@ -17,15 +17,15 @@ export interface NavigationItem {
  * 
  * @param courseId - The course ID
  * @param userId - The user ID
- * @param currentItemId - The current item ID (video/quiz/pdf)
- * @param currentItemType - The type of current item ('video' | 'quiz' | 'pdf')
+ * @param currentItemId - The current item ID (video/quiz/document)
+ * @param currentItemType - The type of current item ('video' | 'quiz' | 'pdf' | 'document' | 'ppt')
  * @param currentSectionId - The current section/module ID
  */
 export const useCourseNavigation = (
   courseId: string,
   userId: string,
   currentItemId: string,
-  currentItemType: "video" | "quiz" | "pdf",
+  currentItemType: "video" | "quiz" | "pdf" | "document" | "ppt",
   currentSectionId: string
 ) => {
   const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
@@ -42,26 +42,11 @@ export const useCourseNavigation = (
     }
   }, [courseId, userId]);
 
-  useEffect(() => {
-    console.log('🎣 Hook useEffect triggered:', {
-      hasCourseSections: courseSections.length > 0,
-      currentSectionId,
-      currentItemId,
-      currentItemType,
-      sectionsLength: courseSections.length,
-    });
-
+  useEffect(() => {   
     if (courseSections.length > 0 && currentSectionId && currentItemId) {
       const next = findNextItemAcrossModules();
       const prev = findPreviousItemAcrossModules();
-      
-      console.log('🎣 Navigation calculated:', {
-        hasNext: !!next,
-        hasPrev: !!prev,
-        willBeLastItem: !next,
-        willBeFirstItem: !prev,
-      });
-      
+               
       setNextItem(next);
       setPreviousItem(prev);
       setIsLastItem(!next);
@@ -81,12 +66,7 @@ export const useCourseNavigation = (
   const fetchCourseSections = async () => {
     try {
       setLoading(true);
-      console.log('📡 Fetching course sections...', { courseId, userId });
       const moduleDetail = await moduleService.getModuleDetail(courseId, userId);
-      console.log('✅ Course sections fetched:', {
-        sections: moduleDetail.sections.length,
-        sectionTitles: moduleDetail.sections.map(s => s.title),
-      });
       setCourseSections(moduleDetail.sections);
     } catch (err) {
       console.error("❌ Error fetching course sections:", err);

@@ -141,6 +141,22 @@ export const useVideoUpload = (updateLesson: any, moduleId: string, lessonId: st
   const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file size (50MB max)
+      const MAX_FILE_SIZE_MB = 50;
+      const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+      
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        // Return error info instead of showing alert
+        const errorInfo = {
+          title: "File Too Large",
+          description: `The selected thumbnail image is ${(file.size / (1024 * 1024)).toFixed(2)} MB, which exceeds the maximum allowed size of ${MAX_FILE_SIZE_MB} MB. Please choose a smaller file or compress the image before uploading.`,
+        };
+        e.target.value = ""; // Reset file input
+        // Store error to be retrieved by component
+        (window as any).__thumbnailUploadError = errorInfo;
+        return;
+      }
+      
       setSelectedThumbnailFile(file);
       
       // Store file in cache for persistence across lesson switches
@@ -159,6 +175,23 @@ export const useVideoUpload = (updateLesson: any, moduleId: string, lessonId: st
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file size (50MB max)
+      const MAX_FILE_SIZE_MB = 50;
+      const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+      
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        // Return error info instead of showing alert
+        // The component will handle showing the modal
+        const errorInfo = {
+          title: "File Too Large",
+          description: `The selected video is ${(file.size / (1024 * 1024)).toFixed(2)} MB, which exceeds the maximum allowed size of ${MAX_FILE_SIZE_MB} MB. Please choose a smaller file or compress the video before uploading.`,
+        };
+        e.target.value = ""; // Reset file input
+        // Store error to be retrieved by component
+        (window as any).__videoUploadError = errorInfo;
+        return;
+      }
+      
       setSelectedVideoFile(file);
       
       // Store file in cache for persistence across lesson switches
