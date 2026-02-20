@@ -221,7 +221,7 @@ serve(async (req) => {
           review,
           created_at,
           is_anonymous,
-          users (
+          reviewer:users!course_ratings_user_id_fkey (
             name,
             avatar_url
           )
@@ -236,8 +236,8 @@ serve(async (req) => {
         rating: Number(reviewDetails.rating),
         review: reviewDetails.review,
         createdAt: reviewDetails.created_at,
-        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.users?.name || "Anonymous"),
-        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.users?.avatar_url ?? null),
+        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.reviewer?.name || "Anonymous"),
+        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.reviewer?.avatar_url ?? null),
       };
 
       return new Response(
@@ -301,7 +301,7 @@ serve(async (req) => {
           review,
           created_at,
           is_anonymous,
-          users (
+          reviewer:users!course_ratings_user_id_fkey (
             name,
             avatar_url
           )
@@ -316,8 +316,8 @@ serve(async (req) => {
         rating: Number(reviewDetails.rating),
         review: reviewDetails.review,
         createdAt: reviewDetails.created_at,
-        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.users?.name || "Anonymous"),
-        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.users?.avatar_url ?? null),
+        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.reviewer?.name || "Anonymous"),
+        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.reviewer?.avatar_url ?? null),
       };
 
       return new Response(

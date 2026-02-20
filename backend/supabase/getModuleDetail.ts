@@ -153,7 +153,7 @@ serve(async (req) => {
         .from('course_ratings')
         .select(`
           id, rating, review, created_at, review_status,
-          users (
+          reviewer:users!course_ratings_user_id_fkey (
             id, name, avatar_url
           )
         `)
@@ -420,9 +420,9 @@ serve(async (req) => {
       rating: review.rating,
       review: review.review,
       createdAt: review.created_at,
-      reviewerName: review.users?.name || 'Anonymous',
-      reviewerAvatar: review.users?.avatar_url || null,
-      reviewerId: review.users?.id || null
+      reviewerName: review.reviewer?.name || 'Anonymous',
+      reviewerAvatar: review.reviewer?.avatar_url || null,
+      reviewerId: review.reviewer?.id || null
     }));
 
     // Calculate average rating and rating breakdown
