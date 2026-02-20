@@ -15,7 +15,6 @@ import {
   Star,
   DollarSign,
   BookOpen,
-  Clock,
   ArrowRight,
   UserPlus,
   Loader2,
@@ -386,11 +385,11 @@ const Index = () => {
             {stats &&
             stats.recent_activity &&
             stats.recent_activity.length > 0 ? (
-              <div className="gradient-card border-border rounded-xl p-6">
+              <div className="gradient-card border-border rounded-xl p-6 h-[450px] flex flex-col">
                 <h3 className="text-lg font-semibold mb-4 text-foreground">
                   Recent Activity
                 </h3>
-                <div className="space-y-3 max-h-[450px] overflow-y-auto pr-2">
+                <div className="space-y-3 overflow-y-auto pr-2 flex-1">
                   {stats.recent_activity
                     .slice(0, 8)
                     .map((activity: any, index: number) => (
@@ -412,46 +411,18 @@ const Index = () => {
                 </div>
               </div>
             ) : (
-              <ActivityFeed />
+              <div className="h-[450px]">
+                <ActivityFeed />
+              </div>
             )}
           </div>
 
           <div className="space-y-6">
-            {/* Upcoming Sessions */}
-            <div className="gradient-card border-border rounded-xl p-6">
-              <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                Upcoming Sessions
-              </h3>
-              {stats?.upcoming_sessions?.length > 0 ? (
-                <div className="space-y-3">
-                  {stats.upcoming_sessions.map((session: any) => (
-                    <div
-                      key={session.id}
-                      className="p-3 rounded-lg bg-background/50"
-                    >
-                      <p className="text-sm font-medium text-foreground">
-                        {session.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {session.formatted_date}{" "}
-                        {session.formatted_time ? `, ${session.formatted_time}` : ""}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-3 rounded-lg bg-background/50 text-sm text-muted-foreground">
-                  No upcoming sessions
-                </div>
-              )}
-            </div>
-
             {/* Pending Tasks */}
-            <div className="gradient-card border-border rounded-xl p-6">
+            <div className="gradient-card border-border rounded-xl p-6 h-[450px] flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-accent" />
+                  <BookOpen className="h-5 w-5 text-primary" />
                   Pending Tasks
                 </h3>
                 <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
@@ -501,178 +472,190 @@ const Index = () => {
                   </DialogContent>
                 </Dialog>
               </div>
-              {stats?.pending_tasks?.length > 0 ? (
-                <div className="space-y-4">
-                  {(() => {
-                    const derivedTaskIds = new Set([
-                      "assignment_grading",
-                      "unread_messages",
-                    ]);
-                    const derivedTasks = stats.pending_tasks.filter((task: any) =>
-                      derivedTaskIds.has(task.id)
-                    );
-                    const customTasks = stats.pending_tasks.filter(
-                      (task: any) => !derivedTaskIds.has(task.id)
-                    );
+              <div className="flex-1 min-h-0">
+                {stats?.pending_tasks?.length > 0 ? (
+                  <div className="flex h-full min-h-0 flex-col gap-4">
+                    {(() => {
+                      const derivedTaskIds = new Set([
+                        "assignment_grading",
+                        "unread_messages",
+                      ]);
+                      const derivedTasks = stats.pending_tasks.filter((task: any) =>
+                        derivedTaskIds.has(task.id)
+                      );
+                      const customTasks = stats.pending_tasks.filter(
+                        (task: any) => !derivedTaskIds.has(task.id)
+                      );
 
-                    return (
-                      <>
-                        {customTasks.length > 0 && (
-                          <div className="space-y-2">
+                      return (
+                        <>
+                          <div className="min-h-0 flex-1 flex flex-col gap-2">
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">
                               Custom Tasks
                             </p>
-                            <div className="space-y-3">
-                              {customTasks.map((task: any) => (
-                                <div
-                                  key={task.id}
-                                  className="flex items-center justify-between p-3 rounded-lg bg-background/50"
-                                >
-                                  <span className="text-sm text-foreground">
-                                    {task.title}
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => handleCompleteTask(task.id)}
-                                      disabled={
-                                        taskActionId === task.id &&
-                                        taskActionType === "complete"
-                                      }
-                                      aria-label="Mark task complete"
-                                    >
-                                      {taskActionId === task.id &&
-                                      taskActionType === "complete" ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Check className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => handleDeleteTask(task.id)}
-                                      disabled={
-                                        taskActionId === task.id &&
-                                        taskActionType === "delete"
-                                      }
-                                      aria-label="Delete task"
-                                    >
-                                      {taskActionId === task.id &&
-                                      taskActionType === "delete" ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Trash2 className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {derivedTasks.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                              System Tasks
-                            </p>
-                            <div className="space-y-3">
-                              {derivedTasks.map((task: any) => {
-                                const systemTaskRoutes: Record<string, string> = {
-                                  assignment_grading: "/assessments",
-                                  unread_messages: "/messages",
-                                };
-                                const route = systemTaskRoutes[task.id];
-
-                                return (
+                            <div
+                              className={`min-h-0 flex-1 ${
+                                customTasks.length > 0
+                                  ? "space-y-3 overflow-y-auto pr-2"
+                                  : "flex items-center justify-center"
+                              }`}
+                            >
+                              {customTasks.length > 0 ? (
+                                customTasks.map((task: any) => (
                                   <div
                                     key={task.id}
-                                    role={route ? "button" : undefined}
-                                    tabIndex={route ? 0 : undefined}
-                                    onClick={() => route && navigate(route)}
-                                    onKeyDown={(event) => {
-                                      if (!route) return;
-                                      if (event.key === "Enter" || event.key === " ") {
-                                        event.preventDefault();
-                                        navigate(route);
-                                      }
-                                    }}
-                                    className={`flex items-center justify-between p-3 rounded-lg bg-background/50 ${
-                                      route ? "cursor-pointer hover:bg-background/70" : ""
-                                    }`}
+                                    className="flex items-center justify-between p-3 rounded-lg bg-background/50"
                                   >
                                     <span className="text-sm text-foreground">
                                       {task.title}
                                     </span>
-                                    <span className="font-bold text-accent">
-                                      {task.count}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => handleCompleteTask(task.id)}
+                                        disabled={
+                                          taskActionId === task.id &&
+                                          taskActionType === "complete"
+                                        }
+                                        aria-label="Mark task complete"
+                                      >
+                                        {taskActionId === task.id &&
+                                        taskActionType === "complete" ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Check className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => handleDeleteTask(task.id)}
+                                        disabled={
+                                          taskActionId === task.id &&
+                                          taskActionType === "delete"
+                                        }
+                                        aria-label="Delete task"
+                                      >
+                                        {taskActionId === task.id &&
+                                        taskActionType === "delete" ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </div>
                                   </div>
-                                );
-                              })}
+                                ))
+                              ) : (
+                                <div className="text-sm text-muted-foreground">
+                                  No custom tasks yet
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
-                        {stats?.completed_tasks?.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
+                          {derivedTasks.length > 0 && (
+                            <div className="space-y-2 shrink-0">
                               <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                Completed Tasks
+                                System Tasks
                               </p>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setShowCompletedTasks((prev) => !prev)}
-                              >
-                                {showCompletedTasks ? "Hide" : "Show"}
-                              </Button>
-                            </div>
-                            {showCompletedTasks && (
                               <div className="space-y-3">
-                                {stats.completed_tasks.map((task: any) => (
-                                  <div
-                                    key={task.id}
-                                    className="flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/20"
-                                  >
-                                    <span className="text-sm text-muted-foreground">
-                                      {task.title}
-                                    </span>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => handleDeleteTask(task.id)}
-                                      disabled={
-                                        taskActionId === task.id &&
-                                        taskActionType === "delete"
-                                      }
-                                      aria-label="Delete task"
+                                {derivedTasks.map((task: any) => {
+                                  const systemTaskRoutes: Record<string, string> = {
+                                    assignment_grading: "/assessments",
+                                    unread_messages: "/messages",
+                                  };
+                                  const route = systemTaskRoutes[task.id];
+
+                                  return (
+                                    <div
+                                      key={task.id}
+                                      role={route ? "button" : undefined}
+                                      tabIndex={route ? 0 : undefined}
+                                      onClick={() => route && navigate(route)}
+                                      onKeyDown={(event) => {
+                                        if (!route) return;
+                                        if (event.key === "Enter" || event.key === " ") {
+                                          event.preventDefault();
+                                          navigate(route);
+                                        }
+                                      }}
+                                      className={`flex items-center justify-between p-3 rounded-lg bg-background/50 ${
+                                        route ? "cursor-pointer hover:bg-background/70" : ""
+                                      }`}
                                     >
-                                      {taskActionId === task.id &&
-                                      taskActionType === "delete" ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Trash2 className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </div>
-                                ))}
+                                      <span className="text-sm text-foreground">
+                                        {task.title}
+                                      </span>
+                                      <span className="font-bold text-primary">
+                                        {task.count}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              ) : (
-                <div className="p-3 rounded-lg bg-background/50 text-sm text-muted-foreground">
-                  No pending tasks
-                </div>
-              )}
+                            </div>
+                          )}
+                          {stats?.completed_tasks?.length > 0 && (
+                            <div className="space-y-2 shrink-0">
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                  Completed Tasks
+                                </p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowCompletedTasks((prev) => !prev)}
+                                >
+                                  {showCompletedTasks ? "Hide" : "Show"}
+                                </Button>
+                              </div>
+                              {showCompletedTasks && (
+                                <div className="space-y-3">
+                                  {stats.completed_tasks.map((task: any) => (
+                                    <div
+                                      key={task.id}
+                                      className="flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/20"
+                                    >
+                                      <span className="text-sm text-muted-foreground">
+                                        {task.title}
+                                      </span>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => handleDeleteTask(task.id)}
+                                        disabled={
+                                          taskActionId === task.id &&
+                                          taskActionType === "delete"
+                                        }
+                                        aria-label="Delete task"
+                                      >
+                                        {taskActionId === task.id &&
+                                        taskActionType === "delete" ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg bg-background/50 text-sm text-muted-foreground">
+                    No pending tasks
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>
