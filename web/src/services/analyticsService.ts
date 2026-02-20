@@ -50,6 +50,22 @@ export type InstructorAnalytics = {
       average_watch_hours: number;
     } | null;
   };
+  insights: Array<{
+    id: string;
+    severity: "high" | "medium" | "low";
+    type:
+      | "low_completion"
+      | "low_engagement"
+      | "low_rating"
+      | "negative_trend"
+      | "high_drop_off"
+      | "rating_decline";
+    target: { course_id?: string; module_id?: string; name: string };
+    message: string;
+    recommended_action: string;
+    supporting_metrics: Record<string, unknown>;
+    created_at: string;
+  }>;
 };
 
 const ENDPOINTS = {

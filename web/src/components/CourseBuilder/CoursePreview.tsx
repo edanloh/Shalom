@@ -14,7 +14,7 @@ import {
   Eye,
   UserPlus,
 } from "lucide-react";
-import { useCourseBuilder } from "./CourseBuilderContext";
+import { useCourseBuilder } from "./useCourseBuilder";
 import { Badge } from "../ui/badge";
 import { DEFAULT_COURSE_THUMBNAIL } from "@/constants/images";
 import { Progress } from "../ui/progress";

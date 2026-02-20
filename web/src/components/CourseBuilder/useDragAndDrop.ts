@@ -1,4 +1,5 @@
-import { useCourseBuilder, DraggedItem, Module } from './CourseBuilderContext';
+import { type DraggedItem, type Module } from './CourseBuilderContext';
+import { useCourseBuilder } from './useCourseBuilder';
 
 export const useDragAndDrop = () => {
   const {

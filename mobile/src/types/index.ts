@@ -177,7 +177,9 @@ export interface Course {
   createdAt: string;
   updatedAt: string;
   isWishlisted?: boolean;
-  recommendationReason?: string;
+  recommendationPrimaryTag?: string;
+  recommendationModelVersion?: string;
+  recommendationRequestId?: string;
   recommendationScore?: number;
   recommendationRank?: number;
 }

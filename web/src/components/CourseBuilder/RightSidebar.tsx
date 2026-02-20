@@ -18,7 +18,7 @@ import {
   Trash2,
   ChevronDown,
 } from "lucide-react";
-import { useCourseBuilder } from "./CourseBuilderContext";
+import { useCourseBuilder } from "./useCourseBuilder";
 import { useCategories } from "../../hooks/useCategories";
 import { Colors } from "../../constants/Colors";
 import categoryService from "@/services/categoryService";

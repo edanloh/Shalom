@@ -561,6 +561,11 @@ class CourseService {
         resp?.data?.recommendations ??
         resp?.recommendations ??
         [];
+      const meta =
+        resp?.data?.data?.meta ??
+        resp?.data?.meta ??
+        resp?.meta ??
+        {};
 
       const sorted = Array.isArray(recs)
         ? [...recs].sort((a, b) => {
@@ -590,7 +595,18 @@ class CourseService {
             const course = convertAWSCourseToAppCourse(coursePayload);
             return {
               ...course,
-              recommendationReason: item.reason || coursePayload.recommendation_reason,
+              recommendationPrimaryTag:
+                item.primary_reason_tag ||
+                coursePayload.recommendation_primary_tag ||
+                undefined,
+              recommendationModelVersion:
+                meta?.model_version ||
+                item.model_version ||
+                coursePayload.recommendation_model_version,
+              recommendationRequestId:
+                meta?.request_id ||
+                item.request_id ||
+                coursePayload.recommendation_request_id,
               recommendationScore: item.score || coursePayload.recommendation_score,
               recommendationRank: item.rank ?? item.recommendation_rank ?? idx + 1,
             };

@@ -129,6 +129,9 @@ serve(async (req) => {
     const rating = Number(body.rating);
     const review = (body.review ?? "").toString().trim();
     const isAnonymous = !!body.isAnonymous;
+    const contextSectionId = (body.contextSectionId ?? body.sectionId ?? "")
+      .toString()
+      .trim();
 
     if (!userId) return badRequest("userId is required");
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
@@ -177,11 +180,25 @@ serve(async (req) => {
       }
 
       // Insert new review
+      let normalizedContextSectionId: string | null = null;
+      if (contextSectionId) {
+        const { data: section, error: sectionError } = await supabaseClient
+          .from("course_sections")
+          .select("id,course_id")
+          .eq("id", contextSectionId)
+          .eq("course_id", courseId)
+          .single();
+        if (!sectionError && section?.id) {
+          normalizedContextSectionId = String(section.id);
+        }
+      }
+
       const { data: newReview, error: insertError } = await supabaseClient
         .from('course_ratings')
         .insert({
           user_id: userId,
           course_id: courseId,
+          context_section_id: normalizedContextSectionId,
           rating: rating,
           review: review,
           is_anonymous: isAnonymous,

@@ -23,7 +23,6 @@ Multiple Correct - At least one answer must be selected
 
 import {
   createContext,
-  useContext,
   useState,
   useEffect,
   ReactNode,
@@ -121,7 +120,7 @@ export interface ModalState {
 }
 
 // Context Interface
-interface CourseBuilderContextType {
+export interface CourseBuilderContextType {
   // Course state
   courseName: string;
   setCourseName: (name: string) => void;
@@ -205,7 +204,7 @@ interface CourseBuilderContextType {
 }
 
 // Create Context
-const CourseBuilderContext = createContext<
+export const CourseBuilderContext = createContext<
   CourseBuilderContextType | undefined
 >(undefined);
 
@@ -1399,14 +1398,4 @@ export const CourseBuilderProvider = ({
       {children}
     </CourseBuilderContext.Provider>
   );
-};
-
-export const useCourseBuilder = () => {
-  const context = useContext(CourseBuilderContext);
-  if (!context) {
-    throw new Error(
-      "useCourseBuilder must be used within CourseBuilderProvider",
-    );
-  }
-  return context;
 };

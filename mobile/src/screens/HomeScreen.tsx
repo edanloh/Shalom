@@ -370,8 +370,29 @@ export default function HomeScreen({ navigation, route }: any) {
         userId: user.id,
         courseId: course.id,
         eventType: 'click',
-        context: { placement: 'home_recommended' },
+        requestId: course.recommendationRequestId,
+        context: {
+          placement: 'home_recommended',
+          isRecommendationSurface: true,
+          modelVersion: course.recommendationModelVersion,
+          requestId: course.recommendationRequestId,
+        },
       }).catch((err) => console.warn('Failed to record rec click', err));
+    }
+    navigation.navigate('CourseDetail', { courseId: course.id });
+  };
+
+  const handleWishlistCourseClick = async (course: Course) => {
+    if (user?.id) {
+      courseService.recordRecommendationEvent({
+        userId: user.id,
+        courseId: course.id,
+        eventType: 'click',
+        context: {
+          placement: 'wishlist',
+          isRecommendationSurface: false,
+        },
+      }).catch((err) => console.warn('Failed to record wishlist click', err));
     }
     navigation.navigate('CourseDetail', { courseId: course.id });
   };
@@ -387,12 +408,17 @@ export default function HomeScreen({ navigation, route }: any) {
 
   useEffect(() => {
     if (user?.id && recommendedList.length > 0) {
+      const firstRecommendation = recommendedList[0];
       courseService.recordRecommendationEvent({
         userId: user.id,
         eventType: 'impression',
+        requestId: firstRecommendation?.recommendationRequestId,
         context: {
           placement: 'home_recommended',
+          isRecommendationSurface: true,
           courseIds: recommendedList.map((c) => c.id),
+          modelVersion: firstRecommendation?.recommendationModelVersion,
+          requestId: firstRecommendation?.recommendationRequestId,
         },
       }).catch((err) => console.warn('Failed to record rec impression', err));
     }
@@ -529,7 +555,8 @@ export default function HomeScreen({ navigation, route }: any) {
                     course={course}
                     variant="compact"
                     showInstructor={false}
-                    onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
+                    showRecommendationReason={false}
+                    onPress={(c) => handleWishlistCourseClick(c)}
                   />
                 ))}
               </ScrollView>

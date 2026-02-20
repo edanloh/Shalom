@@ -11,6 +11,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 
 import { useCourses } from "../contexts/CourseContext";
+import { useAuth } from "../contexts/AuthContext";
+import courseService from "../services/courseService";
 import type { MainStackParamList } from "@/types/navigation";
 import { Colors, Typography, Spacing, TextStyles } from "../constants";
 import { ImageWithFallback } from "../components/common";
@@ -29,6 +31,7 @@ const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
 
 export default function WishlistScreen() {
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
+  const { user } = useAuth();
   const {
     wishlist,
     wishlistLoading,
@@ -40,19 +43,36 @@ export default function WishlistScreen() {
   const renderItem = ({ item }: any) => (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
+      onPress={() => {
+        if (user?.id) {
+          courseService
+            .recordRecommendationEvent({
+              userId: user.id,
+              courseId: item.id,
+              eventType: "click",
+              context: {
+                placement: "wishlist",
+                isRecommendationSurface: false,
+              },
+            })
+            .catch((err) =>
+              console.warn("Failed to record wishlist course click", err)
+            );
+        }
+        navigation.navigate("CourseDetail", { courseId: item.id });
+      }}
       style={styles.card}
     >
       {/* Left: text */}
       <View style={styles.cardLeft}>
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <MetaRow rating={item.rating} modules={item.modules} />
         {/* Category badge */}
         <View  style={[styles.categoryBadge, { backgroundColor: item.categoryColor }]}>
           <Text style={styles.categoryText}>{item.category}</Text>
         </View>
+        <Text style={styles.title} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <MetaRow rating={item.rating} modules={item.modules} />
       </View>
 
       {/* Right: image + heart */}

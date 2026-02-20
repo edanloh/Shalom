@@ -10,6 +10,42 @@ const corsHeaders = {
 const dayMs = 24 * 60 * 60 * 1000;
 
 const toPercent = (value: number) => Math.round(Number.isFinite(value) ? value : 0);
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const LOW_COMPLETION_THRESHOLD = Number(
+  Deno.env.get("INSTRUCTOR_LOW_COMPLETION_THRESHOLD") ?? "60"
+);
+const LOW_ENGAGEMENT_THRESHOLD = Number(
+  Deno.env.get("INSTRUCTOR_LOW_ENGAGEMENT_THRESHOLD") ?? "40"
+);
+const LOW_RATING_THRESHOLD = Number(Deno.env.get("INSTRUCTOR_LOW_RATING_THRESHOLD") ?? "3.8");
+const MIN_RATING_SAMPLE = Number(Deno.env.get("INSTRUCTOR_MIN_RATING_SAMPLE") ?? "10");
+const NEGATIVE_TREND_DELTA = Number(Deno.env.get("INSTRUCTOR_NEGATIVE_TREND_DELTA") ?? "15");
+const MODULE_DROPOFF_THRESHOLD = Number(
+  Deno.env.get("INSTRUCTOR_MODULE_DROPOFF_THRESHOLD") ?? "20"
+);
+const RATING_TREND_DELTA = Number(Deno.env.get("INSTRUCTOR_RATING_TREND_DELTA") ?? "0.3");
+const RATING_TREND_MIN_SAMPLE = Number(
+  Deno.env.get("INSTRUCTOR_RATING_TREND_MIN_SAMPLE") ?? "3"
+);
+
+type InstructorInsight = {
+  id: string;
+  severity: "high" | "medium" | "low";
+  type:
+    | "low_completion"
+    | "low_engagement"
+    | "low_rating"
+    | "negative_trend"
+    | "high_drop_off"
+    | "rating_decline";
+  target: { course_id?: string; module_id?: string; name: string };
+  message: string;
+  recommended_action: string;
+  supporting_metrics: Record<string, unknown>;
+  created_at: string;
+};
 
 const formatDayLabel = (date: Date) =>
   date.toLocaleDateString("en-US", { weekday: "short" });
@@ -18,6 +54,46 @@ const formatMonthLabel = (date: Date) =>
   date.toLocaleDateString("en-US", { month: "short" });
 const formatMonthYearLabel = (date: Date) =>
   date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+
+const severityRank: Record<InstructorInsight["severity"], number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+const insightMagnitude = (insight: InstructorInsight) => {
+  const metrics = insight.supporting_metrics || {};
+  if (insight.type === "high_drop_off") {
+    return Number(metrics.dropoff_percent || 0);
+  }
+  if (insight.type === "low_completion") {
+    return Number(metrics.threshold_percent || 0) - Number(metrics.module_completion_percent || metrics.completion_percent || 0);
+  }
+  if (insight.type === "low_engagement") {
+    return Number(metrics.threshold_percent || 0) - Number(metrics.module_engagement_percent || metrics.engagement_percent || 0);
+  }
+  if (insight.type === "rating_decline") {
+    return Math.abs(Number(metrics.rating_delta || 0));
+  }
+  if (insight.type === "low_rating") {
+    return Number(metrics.threshold || 0) - Number(metrics.rating || 0);
+  }
+  if (insight.type === "negative_trend") {
+    return Math.abs(Number(metrics.trend_delta || 0));
+  }
+  return 0;
+};
+
+const insightPriorityComparator = (a: InstructorInsight, b: InstructorInsight) => {
+  const severityDiff = severityRank[b.severity] - severityRank[a.severity];
+  if (severityDiff !== 0) return severityDiff;
+  const magnitudeDiff = insightMagnitude(b) - insightMagnitude(a);
+  if (magnitudeDiff !== 0) return magnitudeDiff;
+  const timeDiff =
+    new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  if (timeDiff !== 0) return timeDiff;
+  return String(a.id).localeCompare(String(b.id));
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -75,6 +151,9 @@ serve(async (req) => {
 
     const courseIds = courses.map((c) => c.id);
     const courseIdFilter = courseId && courseIds.includes(courseId) ? [courseId] : courseIds;
+    const scopedCourses = (courses || []).filter((course) =>
+      courseIdFilter.includes(course.id)
+    );
 
     const { data: enrollments, error: enrollmentsError } =
       courseIdFilter.length > 0
@@ -92,7 +171,7 @@ serve(async (req) => {
       courseIdFilter.length > 0
         ? await supabase
             .from("course_ratings")
-            .select("course_id,rating")
+            .select("course_id,rating,created_at")
             .in("course_id", courseIdFilter)
         : { data: [], error: null };
 
@@ -240,7 +319,20 @@ serve(async (req) => {
       })
     );
 
-    const coursePerformance = courses.map((course) => {
+    const ratingSampleCountByCourse = new Map<string, number>();
+    for (const rating of ratings || []) {
+      const key = String(rating.course_id || "");
+      if (!key) continue;
+      ratingSampleCountByCourse.set(key, (ratingSampleCountByCourse.get(key) || 0) + 1);
+    }
+
+    const courseTrendDeltaById = new Map<string, number>();
+    const courseRatingTrendById = new Map<
+      string,
+      { prevAvg: number; recentAvg: number; delta: number; prevCount: number; recentCount: number }
+    >();
+
+    const coursePerformance = scopedCourses.map((course) => {
       const courseEnrollments = (enrollments || []).filter((e) => e.course_id === course.id);
       const courseWindowEnrollments = courseEnrollments.filter((e) => {
         const updated = new Date(
@@ -268,6 +360,59 @@ serve(async (req) => {
               courseWindowEnrollments.length) *
             100
           : 0;
+
+      const midpoint = new Date(now.getTime() - (days / 2) * dayMs);
+      const prevWindow = courseWindowEnrollments.filter((e) => {
+        const updated = new Date(
+          e.last_activity_at || e.updated_at || e.enrollment_date || 0
+        );
+        return updated >= start && updated < midpoint;
+      });
+      const recentWindow = courseWindowEnrollments.filter((e) => {
+        const updated = new Date(
+          e.last_activity_at || e.updated_at || e.enrollment_date || 0
+        );
+        return updated >= midpoint;
+      });
+      const prevAvg =
+        prevWindow.length > 0
+          ? prevWindow.reduce((sum, e) => sum + Number(e.progress_percentage || 0), 0) /
+            prevWindow.length
+          : 0;
+      const recentAvg =
+        recentWindow.length > 0
+          ? recentWindow.reduce((sum, e) => sum + Number(e.progress_percentage || 0), 0) /
+            recentWindow.length
+          : 0;
+      courseTrendDeltaById.set(String(course.id), Number((recentAvg - prevAvg).toFixed(2)));
+
+      const courseRatings = (ratings || [])
+        .filter((r) => r.course_id === course.id)
+        .map((r: any) => ({
+          rating: Number(r.rating || 0),
+          created_at: r.created_at ? new Date(r.created_at) : null,
+        }))
+        .filter((r) => Number.isFinite(r.rating) && r.created_at instanceof Date && !Number.isNaN(r.created_at.getTime()));
+      const prevRatingWindow = courseRatings.filter(
+        (r) => r.created_at! >= start && r.created_at! < midpoint
+      );
+      const recentRatingWindow = courseRatings.filter((r) => r.created_at! >= midpoint);
+      const prevRatingAvg =
+        prevRatingWindow.length > 0
+          ? prevRatingWindow.reduce((sum, r) => sum + r.rating, 0) / prevRatingWindow.length
+          : 0;
+      const recentRatingAvg =
+        recentRatingWindow.length > 0
+          ? recentRatingWindow.reduce((sum, r) => sum + r.rating, 0) / recentRatingWindow.length
+          : 0;
+      courseRatingTrendById.set(String(course.id), {
+        prevAvg: Number(prevRatingAvg.toFixed(2)),
+        recentAvg: Number(recentRatingAvg.toFixed(2)),
+        delta: Number((recentRatingAvg - prevRatingAvg).toFixed(2)),
+        prevCount: prevRatingWindow.length,
+        recentCount: recentRatingWindow.length,
+      });
+
       return {
         id: course.id,
         name: course.title,
@@ -278,7 +423,7 @@ serve(async (req) => {
       };
     });
 
-    const cohortCourseIds = courses.map((course) => course.id).filter(Boolean);
+    const cohortCourseIds = scopedCourses.map((course) => course.id).filter(Boolean);
     const quizStatsByCourse = new Map<
       string,
       { total: number; pass: number; scoreSum: number }
@@ -311,7 +456,7 @@ serve(async (req) => {
       });
     }
 
-    const cohort_analytics = courses.map((course) => {
+    const cohort_analytics = scopedCourses.map((course) => {
       const courseEnrollments = (enrollments || []).filter((e) => e.course_id === course.id);
       const courseWindowEnrollments = courseEnrollments.filter((e) => {
         const updated = new Date(
@@ -372,7 +517,14 @@ serve(async (req) => {
     }));
 
     let module_performance: Array<{ module: string; completion: number; avgScore: number }> = [];
+    let moduleInsightContext: Array<{
+      moduleId: string;
+      moduleName: string;
+      completion: number;
+      engagement: number;
+    }> = [];
     let weekly_study_time: Array<{ week: string; hours: number }> = [];
+    let insights: InstructorInsight[] = [];
     let cohort_metrics: {
       enrolled: number;
       active_learners: number;
@@ -395,9 +547,19 @@ serve(async (req) => {
 
       const { data: courseQuizScores } = await supabase
         .from("quiz_attempts")
-        .select("score,is_passed,completed_at,course_quizzes(course_id)")
+        .select("user_id,quiz_id,score,is_passed,attempt_number,completed_at,course_quizzes(course_id,section_id)")
         .eq("course_quizzes.course_id", activeCourseId)
         .gte("completed_at", start.toISOString());
+
+      const sectionIds = (sections || []).map((s: any) => String(s.id));
+      const { data: moduleProgressRows } =
+        sectionIds.length > 0
+          ? await supabase
+              .from("user_module_progress")
+              .select("section_id,user_id,is_completed,completed_at")
+              .eq("course_id", activeCourseId)
+              .in("section_id", sectionIds)
+          : { data: [] };
 
       const quizScores =
         (courseQuizScores || [])
@@ -452,32 +614,96 @@ serve(async (req) => {
       const averageWatchHours =
         courseEnrollments.length > 0 ? totalWatchMinutes / 60 / courseEnrollments.length : 0;
 
-      module_performance = (sections || []).map((section: any, index: number) => ({
-        module: section.title || `Module ${index + 1}`,
-        completion: toPercent(courseAvgProgress),
-        avgScore: avgScore,
-      }));
+      const enrolledUsers = new Set(courseEnrollments.map((e) => String(e.user_id)));
+      const enrolledCountForModule = Math.max(1, enrolledUsers.size);
+      const moduleProgressBySection = new Map<
+        string,
+        Array<{ user_id: string; is_completed: boolean }>
+      >();
+      for (const row of moduleProgressRows || []) {
+        const sectionId = String((row as any).section_id || "");
+        if (!sectionId) continue;
+        if (!moduleProgressBySection.has(sectionId)) moduleProgressBySection.set(sectionId, []);
+        moduleProgressBySection.get(sectionId)!.push({
+          user_id: String((row as any).user_id || ""),
+          is_completed: Boolean((row as any).is_completed),
+        });
+      }
 
-      const weeklyBuckets = Array.from({ length: 4 }).map((_, index) => ({
+      const latestAttemptByUserQuiz = new Map<string, any>();
+      for (const attempt of courseQuizScores || []) {
+        const userId = String((attempt as any).user_id || "");
+        const quizId = String((attempt as any).quiz_id || "");
+        if (!userId || !quizId) continue;
+        const key = `${userId}:${quizId}`;
+        const prev = latestAttemptByUserQuiz.get(key);
+        const nextAttemptNum = Number((attempt as any).attempt_number || 0);
+        const prevAttemptNum = Number((prev as any)?.attempt_number || 0);
+        const nextTime = new Date((attempt as any).completed_at || 0).getTime();
+        const prevTime = new Date((prev as any)?.completed_at || 0).getTime();
+        if (!prev || nextAttemptNum > prevAttemptNum || nextTime > prevTime) {
+          latestAttemptByUserQuiz.set(key, attempt);
+        }
+      }
+
+      const sectionQuizScores = new Map<string, number[]>();
+      for (const attempt of latestAttemptByUserQuiz.values()) {
+        const sectionId = String((attempt as any)?.course_quizzes?.section_id || "");
+        if (!sectionId) continue;
+        if (!sectionQuizScores.has(sectionId)) sectionQuizScores.set(sectionId, []);
+        const score = Number((attempt as any).score || 0);
+        if (Number.isFinite(score)) sectionQuizScores.get(sectionId)!.push(score);
+      }
+
+      module_performance = (sections || []).map((section: any, index: number) => {
+        const sectionId = String(section.id);
+        const rows = moduleProgressBySection.get(sectionId) || [];
+        const engagedUsers = new Set(rows.filter((r) => r.user_id).map((r) => r.user_id));
+        const completedUsers = new Set(
+          rows.filter((r) => r.is_completed && r.user_id).map((r) => r.user_id)
+        );
+        const completionPct = (completedUsers.size / enrolledCountForModule) * 100;
+        const engagementPct = (engagedUsers.size / enrolledCountForModule) * 100;
+        const scores = sectionQuizScores.get(sectionId) || [];
+        const avgSectionScore =
+          scores.length > 0
+            ? scores.reduce((sum, value) => sum + value, 0) / scores.length
+            : avgScore;
+        moduleInsightContext.push({
+          moduleId: sectionId,
+          moduleName: section.title || `Module ${index + 1}`,
+          completion: toPercent(completionPct),
+          engagement: toPercent(engagementPct),
+        });
+        return {
+          module: section.title || `Module ${index + 1}`,
+          completion: toPercent(completionPct),
+          avgScore: toPercent(avgSectionScore),
+        };
+      });
+
+      const weeklyBucketCount = Math.max(1, Math.ceil(days / 7));
+      const weeklyBuckets = Array.from({ length: weeklyBucketCount }).map((_, index) => ({
         week: `Week ${index + 1}`,
         hours: 0,
       }));
-
-      const fourWeeksAgo = new Date(now.getTime() - 28 * dayMs);
-      const recentEnrollments = courseEnrollments.filter((e) => {
-        const updated = new Date(e.updated_at || e.enrollment_date || 0);
-        return updated >= fourWeeksAgo;
-      });
-
-      const totalRecentMinutes = recentEnrollments.reduce(
-        (sum, e) => sum + Number(e.total_watch_time_minutes || 0),
-        0
-      );
-      const perWeekHours = totalRecentMinutes / 60 / 4;
-
+      for (const enrollment of courseEnrollments) {
+        const lastActivity = new Date(
+          enrollment.last_activity_at || enrollment.updated_at || enrollment.enrollment_date || 0
+        );
+        if (Number.isNaN(lastActivity.getTime()) || lastActivity < start || lastActivity > now) {
+          continue;
+        }
+        const weekIndex = clamp(
+          Math.floor((lastActivity.getTime() - start.getTime()) / (7 * dayMs)),
+          0,
+          weeklyBucketCount - 1
+        );
+        weeklyBuckets[weekIndex].hours += Number(enrollment.total_watch_time_minutes || 0) / 60;
+      }
       weekly_study_time = weeklyBuckets.map((bucket) => ({
         ...bucket,
-        hours: Math.round(perWeekHours),
+        hours: Math.round(bucket.hours * 10) / 10,
       }));
 
       cohort_metrics = {
@@ -497,6 +723,222 @@ serve(async (req) => {
       };
     }
 
+    const nowIso = new Date().toISOString();
+    for (const course of coursePerformance) {
+      if (course.completion < LOW_COMPLETION_THRESHOLD) {
+        const gap = Number((LOW_COMPLETION_THRESHOLD - course.completion).toFixed(1));
+        insights.push({
+          id: `low_completion_${course.id}`,
+          severity: gap >= 15 ? "high" : "medium",
+          type: "low_completion",
+          target: { course_id: course.id, name: course.name },
+          message: `${course.name} completion is ${course.completion}% (below ${LOW_COMPLETION_THRESHOLD}%).`,
+          recommended_action:
+            "Audit module difficulty and add checkpoints or reminders in weaker modules.",
+          supporting_metrics: {
+            completion_percent: course.completion,
+            threshold_percent: LOW_COMPLETION_THRESHOLD,
+          },
+          created_at: nowIso,
+        });
+      }
+
+      if (course.engagement < LOW_ENGAGEMENT_THRESHOLD) {
+        const gap = Number((LOW_ENGAGEMENT_THRESHOLD - course.engagement).toFixed(1));
+        insights.push({
+          id: `low_engagement_${course.id}`,
+          severity: gap >= 15 ? "high" : "medium",
+          type: "low_engagement",
+          target: { course_id: course.id, name: course.name },
+          message: `${course.name} engagement is ${course.engagement}% (below ${LOW_ENGAGEMENT_THRESHOLD}%).`,
+          recommended_action:
+            "Refresh early modules, reduce long content blocks, and add more interactive checks.",
+          supporting_metrics: {
+            engagement_percent: course.engagement,
+            threshold_percent: LOW_ENGAGEMENT_THRESHOLD,
+          },
+          created_at: nowIso,
+        });
+      }
+
+      const ratingSample = ratingSampleCountByCourse.get(String(course.id)) || 0;
+      if (ratingSample >= MIN_RATING_SAMPLE && course.rating < LOW_RATING_THRESHOLD) {
+        insights.push({
+          id: `low_rating_${course.id}`,
+          severity: "medium",
+          type: "low_rating",
+          target: { course_id: course.id, name: course.name },
+          message: `${course.name} rating is ${course.rating.toFixed(2)} from ${ratingSample} reviews.`,
+          recommended_action:
+            "Review low-rated modules and update pacing, clarity, and examples based on feedback.",
+          supporting_metrics: {
+            rating: Number(course.rating.toFixed(2)),
+            threshold: LOW_RATING_THRESHOLD,
+            rating_sample_count: ratingSample,
+            min_rating_sample: MIN_RATING_SAMPLE,
+          },
+          created_at: nowIso,
+        });
+      }
+
+      const trendDelta = courseTrendDeltaById.get(String(course.id)) || 0;
+      if (trendDelta <= -Math.abs(NEGATIVE_TREND_DELTA)) {
+        insights.push({
+          id: `negative_trend_${course.id}`,
+          severity: "high",
+          type: "negative_trend",
+          target: { course_id: course.id, name: course.name },
+          message: `${course.name} engagement trend dropped by ${Math.abs(trendDelta).toFixed(1)} points.`,
+          recommended_action:
+            "Check recent content changes and add intervention messages for at-risk learners.",
+          supporting_metrics: {
+            trend_delta: Number(trendDelta.toFixed(2)),
+            threshold_delta: -Math.abs(NEGATIVE_TREND_DELTA),
+            window_days: days,
+          },
+          created_at: nowIso,
+        });
+      }
+
+      const ratingTrend = courseRatingTrendById.get(String(course.id));
+      if (
+        ratingTrend &&
+        ratingTrend.prevCount >= RATING_TREND_MIN_SAMPLE &&
+        ratingTrend.recentCount >= RATING_TREND_MIN_SAMPLE &&
+        ratingTrend.delta <= -Math.abs(RATING_TREND_DELTA)
+      ) {
+        insights.push({
+          id: `rating_decline_${course.id}`,
+          severity: Math.abs(ratingTrend.delta) >= Math.abs(RATING_TREND_DELTA) * 2 ? "high" : "medium",
+          type: "rating_decline",
+          target: { course_id: course.id, name: course.name },
+          message: `${course.name} rating trend declined from ${ratingTrend.prevAvg.toFixed(2)} to ${ratingTrend.recentAvg.toFixed(2)}.`,
+          recommended_action:
+            "Review recent low-rated feedback and improve module pacing, clarity, or examples in updated sections.",
+          supporting_metrics: {
+            previous_period_rating: ratingTrend.prevAvg,
+            recent_period_rating: ratingTrend.recentAvg,
+            rating_delta: ratingTrend.delta,
+            threshold_delta: -Math.abs(RATING_TREND_DELTA),
+            previous_period_count: ratingTrend.prevCount,
+            recent_period_count: ratingTrend.recentCount,
+            min_sample_per_period: RATING_TREND_MIN_SAMPLE,
+            window_days: days,
+          },
+          created_at: nowIso,
+        });
+      }
+    }
+
+    if (courseIdFilter.length === 1) {
+      const activeCourse = scopedCourses.find((course) => String(course.id) === String(courseIdFilter[0]));
+      for (let index = 0; index < moduleInsightContext.length; index += 1) {
+        const module = moduleInsightContext[index];
+        if (module.completion < LOW_COMPLETION_THRESHOLD) {
+          const severity: InstructorInsight["severity"] =
+            module.completion < LOW_COMPLETION_THRESHOLD - 15 ? "high" : "medium";
+          insights.push({
+            id: `module_low_completion_${index + 1}`,
+            severity,
+            type: "low_completion",
+            target: {
+              course_id: activeCourse?.id,
+              module_id: module.moduleId,
+              name: `${activeCourse?.title || "Course"} • ${module.moduleName}`,
+            },
+            message: `${module.moduleName} completion is ${module.completion}% (below ${LOW_COMPLETION_THRESHOLD}%).`,
+            recommended_action:
+              "Shorten this module or split into smaller lessons with clearer outcomes.",
+            supporting_metrics: {
+              module_completion_percent: module.completion,
+              threshold_percent: LOW_COMPLETION_THRESHOLD,
+            },
+            created_at: nowIso,
+          });
+        }
+
+        if (module.engagement < LOW_ENGAGEMENT_THRESHOLD) {
+          const severity: InstructorInsight["severity"] =
+            module.engagement < LOW_ENGAGEMENT_THRESHOLD - 15 ? "high" : "medium";
+          insights.push({
+            id: `module_low_engagement_${index + 1}`,
+            severity,
+            type: "low_engagement",
+            target: {
+              course_id: activeCourse?.id,
+              module_id: module.moduleId,
+              name: `${activeCourse?.title || "Course"} • ${module.moduleName}`,
+            },
+            message: `${module.moduleName} engagement is ${module.engagement}% (below ${LOW_ENGAGEMENT_THRESHOLD}%).`,
+            recommended_action:
+              "Add a stronger intro hook, shorter lesson chunks, and an early checkpoint activity.",
+            supporting_metrics: {
+              module_engagement_percent: module.engagement,
+              threshold_percent: LOW_ENGAGEMENT_THRESHOLD,
+            },
+            created_at: nowIso,
+          });
+        }
+
+        if (index > 0) {
+          const previousModule = moduleInsightContext[index - 1];
+          const completionDrop = Number((previousModule.completion - module.completion).toFixed(1));
+          if (completionDrop >= MODULE_DROPOFF_THRESHOLD) {
+            const severity: InstructorInsight["severity"] =
+              completionDrop >= MODULE_DROPOFF_THRESHOLD + 15 ? "high" : "medium";
+            insights.push({
+              id: `module_dropoff_${index + 1}`,
+              severity,
+              type: "high_drop_off",
+              target: {
+                course_id: activeCourse?.id,
+                module_id: module.moduleId,
+                name: `${activeCourse?.title || "Course"} • ${module.moduleName}`,
+              },
+              message: `Completion drops by ${completionDrop}% from ${previousModule.moduleName} to ${module.moduleName}.`,
+              recommended_action:
+                "Investigate transition friction between these modules and add bridging recap or prerequisite checkpoints.",
+              supporting_metrics: {
+                previous_module: previousModule.moduleName,
+                previous_completion_percent: previousModule.completion,
+                current_module: module.moduleName,
+                current_completion_percent: module.completion,
+                dropoff_percent: completionDrop,
+                threshold_percent: MODULE_DROPOFF_THRESHOLD,
+              },
+              created_at: nowIso,
+            });
+          }
+        }
+      }
+    }
+
+    const dedupedByKey = new Map<string, InstructorInsight>();
+    for (const insight of insights) {
+      const target = insight.target || { course_id: "", module_id: "", name: "" };
+      const signature = `${insight.type}:${target.course_id || ""}:${target.module_id || ""}`;
+      const existing = dedupedByKey.get(signature);
+      if (!existing || insightPriorityComparator(insight, existing) < 0) {
+        dedupedByKey.set(signature, insight);
+      }
+    }
+
+    const perCourseCap = 4;
+    const byCourse = new Map<string, InstructorInsight[]>();
+    for (const insight of dedupedByKey.values()) {
+      const courseKey = String(insight.target?.course_id || "__global__");
+      if (!byCourse.has(courseKey)) byCourse.set(courseKey, []);
+      byCourse.get(courseKey)!.push(insight);
+    }
+
+    const prioritized: InstructorInsight[] = [];
+    for (const courseInsights of byCourse.values()) {
+      courseInsights.sort(insightPriorityComparator);
+      prioritized.push(...courseInsights.slice(0, perCourseCap));
+    }
+
+    insights = prioritized.sort(insightPriorityComparator).slice(0, 12);
+
     const responseData = {
       summary: {
         total_enrolled: totalStudents,
@@ -513,6 +955,7 @@ serve(async (req) => {
       category_performance,
       course_performance,
       cohort_analytics,
+      insights,
       course_details: {
         module_performance,
         weekly_study_time,

@@ -510,6 +510,11 @@ const Index = () => {
                                       {task.title}
                                     </span>
                                     <div className="flex items-center gap-2">
+                                      {task.formatted_due && (
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                          Due {task.formatted_due}
+                                        </span>
+                                      )}
                                       <Button
                                         variant="ghost"
                                         size="icon"

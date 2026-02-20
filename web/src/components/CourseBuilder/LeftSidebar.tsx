@@ -9,7 +9,7 @@ import {
   Video,
   ClipboardCheck
 } from "lucide-react";
-import { useCourseBuilder } from "./CourseBuilderContext";
+import { useCourseBuilder } from "./useCourseBuilder";
 import { useDragAndDrop } from "./useDragAndDrop";
 import { useContentManagement } from "./useContentManagement";
 import { Button } from "../ui/button";

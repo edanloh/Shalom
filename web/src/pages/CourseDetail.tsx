@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Edit,
   Users,
@@ -37,6 +44,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { courseService, Course, Module, Review, Student } from "@/services";
 
+const DEMO_INSTRUCTOR_ID = "550e8400-e29b-41d4-a716-446655440201";
+const REVIEW_PAGE_SIZE = 20;
+
 const CourseDetail = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
@@ -52,6 +62,31 @@ const CourseDetail = () => {
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [isEnrolling, setIsEnrolling] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<"all" | "visible" | "hidden" | "flagged" | "resolved">("all");
+  const [reviewSort, setReviewSort] = useState<"latest" | "lowest" | "highest">("latest");
+  const [reviewSearchQuery, setReviewSearchQuery] = useState("");
+  const [debouncedReviewSearchQuery, setDebouncedReviewSearchQuery] = useState("");
+  const [reviewOffset, setReviewOffset] = useState(0);
+  const [reviewTotal, setReviewTotal] = useState(0);
+  const [reviewHasMore, setReviewHasMore] = useState(false);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewActionId, setReviewActionId] = useState<string | null>(null);
+  const [isReviewActionDialogOpen, setIsReviewActionDialogOpen] = useState(false);
+  const [pendingReviewAction, setPendingReviewAction] = useState<{
+    review: Review;
+    action:
+      | "hide"
+      | "unhide"
+      | "flag"
+      | "resolve"
+      | "acknowledge"
+      | "reply"
+      | "pin"
+      | "unpin";
+  } | null>(null);
+  const [reviewActionNote, setReviewActionNote] = useState("");
+  const [reviewActionFlagReason, setReviewActionFlagReason] = useState("");
+  const [reviewActionReply, setReviewActionReply] = useState("");
 
   // API state
   const [course, setCourse] = useState<Course | null>(null);
@@ -77,6 +112,22 @@ const CourseDetail = () => {
     }
   }, [courseId]);
 
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedReviewSearchQuery(reviewSearchQuery.trim());
+    }, 400);
+    return () => window.clearTimeout(handle);
+  }, [reviewSearchQuery]);
+
+  useEffect(() => {
+    if (!courseId) return;
+    fetchReviews();
+  }, [courseId, reviewFilter, reviewSort, debouncedReviewSearchQuery, reviewOffset]);
+
+  useEffect(() => {
+    setReviewOffset(0);
+  }, [reviewFilter, reviewSort, debouncedReviewSearchQuery]);
+
   // Refresh data when returning from quiz
   useEffect(() => {
     if (locationState?.quizCompleted && courseId) {
@@ -97,16 +148,15 @@ const CourseDetail = () => {
 
       // Get actual admin ID from auth context
       // TODO: Replace with actual auth context
-      const adminId = "550e8400-e29b-41d4-a716-446655440101";
+      const adminId = DEMO_INSTRUCTOR_ID;
 
-      // Fetch all course data using the service
-      const { course, modules, reviews, enrolledStudents, availableStudents } =
-        await courseService.getCourseDetailData(courseId, adminId);
+      // Fetch course details.
+      const courseData = await courseService.getCourseDetailData(courseId, adminId);
+      const { course, modules, enrolledStudents, availableStudents } = courseData;
 
       // Set all state from the service response
       setCourse(course);
       setModules(modules);
-      setReviews(reviews);
       setEnrolledStudents(enrolledStudents);
       setAvailableStudents(availableStudents);
     } catch (err) {
@@ -121,6 +171,130 @@ const CourseDetail = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReviews = async () => {
+    if (!courseId) return;
+    try {
+      setReviewsLoading(true);
+      const backendSort =
+        reviewSort === "lowest"
+          ? "lowest_rating"
+          : reviewSort === "highest"
+            ? "highest_rating"
+            : "latest";
+      const response = await courseService.getInstructorReviews({
+        instructorId: DEMO_INSTRUCTOR_ID,
+        courseId,
+        sort: backendSort,
+        status: reviewFilter,
+        q: debouncedReviewSearchQuery,
+        limit: REVIEW_PAGE_SIZE,
+        offset: reviewOffset,
+      });
+      setReviews(response.reviews);
+      setReviewTotal(response.pagination.total);
+      setReviewHasMore(response.pagination.has_more);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to fetch reviews";
+      toast({
+        title: "Review data unavailable",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const reviewCounts = useMemo(
+    () =>
+      reviews.reduce(
+        (acc, review) => {
+          const status = review.reviewStatus || "visible";
+          acc[status] = (acc[status] || 0) + 1;
+          return acc;
+        },
+        { visible: 0, hidden: 0, flagged: 0, resolved: 0 } as Record<string, number>
+      ),
+    [reviews]
+  );
+  const hasActiveReviewFilters =
+    reviewFilter !== "all" || reviewSearchQuery.trim().length > 0;
+
+  const openReviewActionDialog = (
+    review: Review,
+    action:
+      | "hide"
+      | "unhide"
+      | "flag"
+      | "resolve"
+      | "acknowledge"
+      | "reply"
+      | "pin"
+      | "unpin"
+  ) => {
+    setPendingReviewAction({ review, action });
+    setReviewActionNote("");
+    setReviewActionFlagReason(
+      action === "flag" ? review.flagReason || "Needs instructor follow-up" : ""
+    );
+    setReviewActionReply(action === "reply" ? review.instructorReply || "" : "");
+    setIsReviewActionDialogOpen(true);
+  };
+
+  const handleReviewAction = async () => {
+    if (!courseId || !pendingReviewAction) return;
+    const { review, action } = pendingReviewAction;
+    const reviewId = String(review.id);
+    const instructorId = DEMO_INSTRUCTOR_ID;
+
+    try {
+      setReviewActionId(reviewId);
+      await courseService.applyInstructorReviewAction({
+        instructorId,
+        reviewId,
+        action,
+        moderationNote: reviewActionNote.trim() || undefined,
+        flagReason:
+          action === "flag" ? reviewActionFlagReason.trim() || undefined : undefined,
+        instructorReply:
+          action === "reply" ? reviewActionReply.trim() || undefined : undefined,
+      });
+      toast({
+        title: "Review updated",
+        description:
+          action === "acknowledge"
+            ? "Review acknowledged."
+            : action === "reply"
+              ? "Instructor reply saved."
+              : action === "pin"
+                ? "Review pinned."
+                : action === "unpin"
+                  ? "Review unpinned."
+              : `Review marked as ${
+                  action === "hide"
+                    ? "hidden"
+                    : action === "unhide"
+                    ? "visible"
+                    : action === "flag"
+                    ? "flagged"
+                    : "resolved"
+                }.`,
+      });
+      setIsReviewActionDialogOpen(false);
+      setPendingReviewAction(null);
+      await fetchReviews();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update review";
+      toast({
+        title: "Action failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setReviewActionId(null);
     }
   };
 
@@ -662,17 +836,7 @@ const CourseDetail = () => {
                 <h2 className="text-2xl font-bold">Course Review</h2>
               </div>
 
-              {reviews.length === 0 ? (
-                <div className="text-center py-12">
-                  <MessageSquare className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground mb-4">No reviews yet</p>
-                  <p className="text-sm text-muted-foreground">
-                    Students will be able to leave reviews once they complete
-                    the course.
-                  </p>
-                </div>
-              ) : (
-                <>
+              <>
                   {/* Rating Summary */}
                   <div className="grid md:grid-cols-2 gap-8 mb-4 pb-2 pr-10">
                     {/* Average Rating */}
@@ -738,7 +902,66 @@ const CourseDetail = () => {
 
                   {/* Individual Reviews */}
                   <div className="space-y-4">
-                    <h3 className="font-semibold text-lg">Recent Reviews</h3>
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <h3 className="font-semibold text-lg">Recent Reviews</h3>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <Badge variant="outline">Visible {reviewCounts.visible || 0}</Badge>
+                        <Badge variant="outline">Hidden {reviewCounts.hidden || 0}</Badge>
+                        <Badge variant="outline">Flagged {reviewCounts.flagged || 0}</Badge>
+                        <Badge variant="outline">Resolved {reviewCounts.resolved || 0}</Badge>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="space-y-1 md:col-span-3">
+                        <Label className="text-xs text-muted-foreground">Search</Label>
+                        <Input
+                          value={reviewSearchQuery}
+                          onChange={(event) => setReviewSearchQuery(event.target.value)}
+                          placeholder="Search reviewer, comment, or date..."
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Filter</Label>
+                        <Select
+                          value={reviewFilter}
+                          onValueChange={(value) => setReviewFilter(value as any)}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="visible">Visible</SelectItem>
+                            <SelectItem value="hidden">Hidden</SelectItem>
+                            <SelectItem value="flagged">Flagged</SelectItem>
+                            <SelectItem value="resolved">Resolved</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Sort</Label>
+                        <Select
+                          value={reviewSort}
+                          onValueChange={(value) => setReviewSort(value as any)}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="latest">Latest</SelectItem>
+                            <SelectItem value="lowest">Lowest Rating</SelectItem>
+                            <SelectItem value="highest">Highest Rating</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {reviewsLoading && (
+                      <div className="flex items-center justify-center py-8 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Loading reviews...
+                      </div>
+                    )}
                     {reviews.map((review) => (
                       <div
                         key={review.id}
@@ -763,27 +986,234 @@ const CourseDetail = () => {
                               </p>
                             </div>
                           </div>
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`h-4 w-4 ${
-                                  star <= review.rating
-                                    ? "text-warning fill-warning"
-                                    : "text-muted-foreground"
-                                }`}
-                              />
-                            ))}
+                          <div className="flex items-center gap-3">
+                            <Badge variant="secondary" className="capitalize">
+                              {review.reviewStatus || "visible"}
+                            </Badge>
+                            {review.isPinned ? (
+                              <Badge variant="outline" className="uppercase text-[10px]">
+                                Pinned
+                              </Badge>
+                            ) : null}
+                            <div className="flex gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-4 w-4 ${
+                                    star <= review.rating
+                                      ? "text-warning fill-warning"
+                                      : "text-muted-foreground"
+                                  }`}
+                                />
+                              ))}
+                            </div>
                           </div>
                         </div>
-                        <p className="text-muted-foreground">
+                        <p className="text-muted-foreground mb-3">
                           {review.comment}
                         </p>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Context: {review.contextSectionTitle || "Course-level review"}
+                        </p>
+                        {(review.flagReason || review.moderationNote) && (
+                          <div className="rounded border border-border/60 bg-background/40 p-2 mb-3 text-xs text-muted-foreground space-y-1">
+                            {review.flagReason ? (
+                              <p>
+                                <span className="font-semibold text-foreground">Flag:</span>{" "}
+                                {review.flagReason}
+                              </p>
+                            ) : null}
+                            {review.moderationNote ? (
+                              <p>
+                                <span className="font-semibold text-foreground">Note:</span>{" "}
+                                {review.moderationNote}
+                              </p>
+                            ) : null}
+                          </div>
+                        )}
+                        {(review.instructorReply || review.acknowledgedAt) && (
+                          <div className="rounded border border-border/60 bg-background/40 p-2 mb-3 text-xs text-muted-foreground space-y-1">
+                            {review.acknowledgedAt ? (
+                              <p>
+                                <span className="font-semibold text-foreground">Acknowledged:</span>{" "}
+                                {new Date(review.acknowledgedAt).toLocaleString()}
+                              </p>
+                            ) : null}
+                            {review.instructorReply ? (
+                              <p>
+                                <span className="font-semibold text-foreground">Instructor reply:</span>{" "}
+                                {review.instructorReply}
+                              </p>
+                            ) : null}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {review.reviewStatus !== "hidden" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReviewActionDialog(review, "hide")}
+                              disabled={reviewActionId === String(review.id)}
+                            >
+                              {reviewActionId === String(review.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Hide"
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReviewActionDialog(review, "unhide")}
+                              disabled={reviewActionId === String(review.id)}
+                            >
+                              {reviewActionId === String(review.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Unhide"
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openReviewActionDialog(review, "flag")}
+                            disabled={reviewActionId === String(review.id)}
+                          >
+                            {reviewActionId === String(review.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Flag"
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openReviewActionDialog(review, "resolve")}
+                            disabled={reviewActionId === String(review.id)}
+                          >
+                            {reviewActionId === String(review.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Resolve"
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openReviewActionDialog(review, "acknowledge")}
+                            disabled={reviewActionId === String(review.id)}
+                          >
+                            {reviewActionId === String(review.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Acknowledge"
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openReviewActionDialog(review, "reply")}
+                            disabled={reviewActionId === String(review.id)}
+                          >
+                            {reviewActionId === String(review.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Reply"
+                            )}
+                          </Button>
+                          {review.isPinned ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReviewActionDialog(review, "unpin")}
+                              disabled={reviewActionId === String(review.id)}
+                            >
+                              {reviewActionId === String(review.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Unpin"
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openReviewActionDialog(review, "pin")}
+                              disabled={reviewActionId === String(review.id)}
+                            >
+                              {reviewActionId === String(review.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Pin"
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ))}
+                    {!reviewsLoading && reviews.length === 0 && (
+                      <div className="py-6 text-center space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          {hasActiveReviewFilters
+                            ? "No reviews matched the current filters."
+                            : "No reviews yet"}
+                        </p>
+                        {hasActiveReviewFilters ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setReviewSearchQuery("");
+                              setReviewFilter("all");
+                              setReviewSort("latest");
+                              setReviewOffset(0);
+                            }}
+                          >
+                            Clear search and filters
+                          </Button>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Students will be able to leave reviews once they complete the course.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {!reviewsLoading && reviewTotal > 0 && (
+                      <div className="flex items-center justify-between pt-2">
+                        <p className="text-xs text-muted-foreground">
+                          Showing {Math.min(reviewOffset + 1, reviewTotal)}-
+                          {Math.min(reviewOffset + REVIEW_PAGE_SIZE, reviewTotal)} of {reviewTotal}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setReviewOffset((prev) => Math.max(0, prev - REVIEW_PAGE_SIZE))
+                            }
+                            disabled={reviewOffset === 0}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setReviewOffset((prev) =>
+                                reviewHasMore ? prev + REVIEW_PAGE_SIZE : prev
+                              )
+                            }
+                            disabled={!reviewHasMore}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
-              )}
             </div>
           </div>
 
@@ -973,6 +1403,104 @@ const CourseDetail = () => {
           </div>
         </div>
       </main>
+      <Dialog
+        open={isReviewActionDialogOpen}
+        onOpenChange={(open) => {
+          setIsReviewActionDialogOpen(open);
+          if (!open) {
+            setPendingReviewAction(null);
+            setReviewActionNote("");
+            setReviewActionFlagReason("");
+            setReviewActionReply("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Review</DialogTitle>
+            <DialogDescription>
+              {pendingReviewAction
+                ? `You are about to mark this review as ${
+                    pendingReviewAction.action === "hide"
+                      ? "hidden"
+                      : pendingReviewAction.action === "unhide"
+                        ? "visible"
+                      : pendingReviewAction.action === "flag"
+                          ? "flagged"
+                          : pendingReviewAction.action === "resolve"
+                            ? "resolved"
+                            : pendingReviewAction.action === "acknowledge"
+                              ? "acknowledged"
+                              : pendingReviewAction.action === "reply"
+                                ? "replied"
+                                : pendingReviewAction.action === "pin"
+                                  ? "pinned"
+                                  : "unpinned"
+                  }.`
+                : "Confirm review action."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {pendingReviewAction?.action === "flag" ? (
+              <div className="space-y-2">
+                <Label htmlFor="review-flag-reason">Flag reason (optional)</Label>
+                <Input
+                  id="review-flag-reason"
+                  value={reviewActionFlagReason}
+                  onChange={(event) => setReviewActionFlagReason(event.target.value)}
+                  placeholder="Needs instructor follow-up"
+                />
+              </div>
+            ) : null}
+            {pendingReviewAction?.action === "reply" ? (
+              <div className="space-y-2">
+                <Label htmlFor="review-reply">Instructor reply</Label>
+                <Textarea
+                  id="review-reply"
+                  value={reviewActionReply}
+                  onChange={(event) => setReviewActionReply(event.target.value)}
+                  placeholder="Write a response to the learner..."
+                  rows={3}
+                />
+              </div>
+            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="review-note">Internal note (optional)</Label>
+              <Textarea
+                id="review-note"
+                value={reviewActionNote}
+                onChange={(event) => setReviewActionNote(event.target.value)}
+                placeholder="Add moderation context for your team."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsReviewActionDialogOpen(false);
+                setPendingReviewAction(null);
+                setReviewActionNote("");
+                setReviewActionFlagReason("");
+                setReviewActionReply("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReviewAction}
+              disabled={!pendingReviewAction || reviewActionId === String(pendingReviewAction.review.id)}
+            >
+              {pendingReviewAction && reviewActionId === String(pendingReviewAction.review.id) ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Confirm"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

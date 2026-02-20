@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { X, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import mammoth from "mammoth";
 import JSZip from "jszip";
-import { useCourseBuilder } from "./CourseBuilderContext";
+import { useCourseBuilder } from "./useCourseBuilder";
 import { useContentManagement } from "./useContentManagement";
 import { useVideoUpload } from "./useVideoUpload";
 import { Button } from "../ui/button";

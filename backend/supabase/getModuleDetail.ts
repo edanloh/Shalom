@@ -152,12 +152,13 @@ serve(async (req) => {
       supabaseClient
         .from('course_ratings')
         .select(`
-          id, rating, review, created_at,
+          id, rating, review, created_at, review_status,
           users (
             id, name, avatar_url
           )
         `)
         .eq('course_id', courseId)
+        .in('review_status', ['visible', 'resolved'])
         .order('created_at', { ascending: false })
     ]);
 
