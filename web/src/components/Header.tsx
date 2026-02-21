@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   Settings,
   LogOut,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -70,7 +71,7 @@ export const Header = () => {
     { icon: BarChart3, label: "Analytics", path: "/analytics" },
     { icon: Users, label: "Students", path: "/students" },
     { icon: ClipboardCheck, label: "Assessments", path: "/assessments" },
-    // { icon: MessageSquare, label: "Messages", path: "/messages" },
+    { icon: MessageSquare, label: "Messages", path: "/messages" },
     { icon: Star, label: "Badges", path: "/badges" },
   ];
 

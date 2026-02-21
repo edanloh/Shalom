@@ -30,7 +30,7 @@ const TAB_BAR_HIDE_TRANSLATE = tabBarBottomOffset + TAB_BAR_HEIGHT + 20;
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // Tab routes mapping to indices
-const TAB_ROUTES = ["Home", "Courses", "Notifications", "Profile"];
+const TAB_ROUTES = ["Home", "Courses", "Notifications", "Messages", "Profile"];
 
 function TabNavigator() {
   const { user } = useAuth();
@@ -64,7 +64,7 @@ function TabNavigator() {
   }, []);
 
   // Calculate the position for the sliding white circle
-  const tabWidth = (SCREEN_WIDTH - 20) / 4 - 0.3; // 4 tabs, minus margins
+  const tabWidth = (SCREEN_WIDTH - 20) / 5 - 0.3; // 4 tabs, minus margins
 
   const animatedCircleStyle = useAnimatedStyle(() => {
     return {
@@ -101,6 +101,9 @@ function TabNavigator() {
               break;
             case "Notifications":
               iconName = focused ? "notifications" : "notifications-outline";
+              break;
+            case "Messages":
+              iconName = focused ? "chatbubble" : "chatbubble-outline";
               break;
             case "Profile":
               iconName = focused ? "person" : "person-outline";
@@ -187,6 +190,7 @@ function TabNavigator() {
       <BottomTabNav.Screen name="Home" component={Screens.HomeScreen} />
       <BottomTabNav.Screen name="Courses" component={Screens.CoursesScreen} />
       <BottomTabNav.Screen name="Notifications" component={Screens.Notification} />
+      <BottomTabNav.Screen name="Messages" component={Screens.MessagesScreen} />
       <BottomTabNav.Screen name="Profile" component={Screens.UserProfile} />
     </BottomTabNav.Navigator>
   );
@@ -307,6 +311,11 @@ export default function MainNavigator() {
       <Stack.Screen
         name="ResetPassword"
         component={Screens.ResetPassword}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Conversation"
+        component={Screens.ConversationScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

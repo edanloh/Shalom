@@ -12,6 +12,19 @@ export async function fetchUserProfile(
   return resp?.data ?? resp ?? [];
 }
 
+export async function fetchAllUsers(): Promise<User[]> {
+  const resp = await apiService.get<any>('/getAllUsers');
+  return resp?.data ?? resp ?? [];
+}
+
+export async function fetchUserProfileById(
+  id: string,
+): Promise<User> {
+  if (!id) throw new Error('id is required');
+  const resp = await apiService.get<any>('/getUserInfoById', {id});
+  return resp?.data ?? resp ?? [];
+}
+
 export async function updateUserProfile(
   id: string,
   payload: Partial<User>

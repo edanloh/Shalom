@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { API_BASE_URL } from 'react-native-dotenv';
 import { supabase } from '@/lib/supabase';

@@ -12,6 +12,11 @@ export async function fetchUserProfile(email: string): Promise<User> {
   return resp?.data ?? resp ?? [];
 }
 
+export async function fetchAllUsers(): Promise<User[]> {
+  const resp = await apiService.get<any>('/getAllUsers');
+  return resp?.data ?? resp ?? [];
+}
+
 export async function updateUserProfile(
   id: string,
   payload: Partial<User>,

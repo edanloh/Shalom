@@ -270,7 +270,7 @@ const CourseStudents = () => {
             >
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Message {selectedStudent?.name}</DialogTitle>
+                  <DialogTitle>Notify {selectedStudent?.name}</DialogTitle>
                   <DialogDescription>
                     Send a notification to {selectedStudent?.name}.
                   </DialogDescription>
@@ -288,7 +288,7 @@ const CourseStudents = () => {
                         toast({
                           title: 'Error',
                           description: !messageStudent.trim()
-                            ? 'Message cannot be empty.'
+                            ? 'Notification message cannot be empty.'
                             : 'No student selected.',
                           variant: 'destructive',
                         });
@@ -303,8 +303,8 @@ const CourseStudents = () => {
                         type: `course_announcement-${courseId}-${notificationId}`,
                       });
                       toast({
-                        title: 'Message Sent',
-                        description: `Your message has been sent to ${selectedStudent.name}.`,
+                        title: 'Notification Sent',
+                        description: `Your notification has been sent to ${selectedStudent.name}.`,
                       });
                       setIsMessageStudentDialogOpen(false);
                       setMessageStudent('');
@@ -312,7 +312,7 @@ const CourseStudents = () => {
                     className="w-full gap-2"
                   >
                     <Mail className="h-4 w-4" />
-                    Send Message
+                    Send Notification
                   </Button>
                 </div>
               </DialogContent>
@@ -578,7 +578,7 @@ const CourseStudents = () => {
                                       setIsMessageStudentDialogOpen(true);
                                     }}>
                                     <Mail className="h-4 w-4" />
-                                    Send Message
+                                    Send Notification
                                   </Button>
                                 </div>
                               </div>

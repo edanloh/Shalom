@@ -32,6 +32,7 @@ export type MainStackParamList = {
   LearningGoalScreen: undefined;
   ChangePassword: undefined;
   ResetPassword: undefined;
+  Conversation: { conversationId: string };
 };
 
 export type BottomTabNavParamList = {
@@ -39,6 +40,7 @@ export type BottomTabNavParamList = {
   Courses: undefined;
   Notifications: undefined;
   Profile: undefined;
+  Messages: undefined;
   Admin?: undefined;
 };
 
