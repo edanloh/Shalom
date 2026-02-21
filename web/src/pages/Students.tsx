@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2, UserCheck, X, HelpCircle } from "lucide-react";
+import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2, UserCheck, X, HelpCircle, MessageSquare } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
 import { courseService, studentService } from "@/services";
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useNavigate } from "react-router-dom";
 
 const Students = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,6 +44,7 @@ const Students = () => {
   const [error, setError] = useState("");
 
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [isMessageAllDialogOpen, setIsMessageAllDialogOpen] = useState(false);
   const [messageToAll, setMessageToAll] = useState(["",""]);
@@ -489,12 +491,12 @@ const Students = () => {
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Mail className="h-4 w-4" />
-                  Message All
+                  Notify All Students
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Message All Students</DialogTitle>
+                  <DialogTitle>Notify All Students</DialogTitle>
                   <DialogDescription>
                     Send a notification to all students.
                   </DialogDescription>
@@ -523,7 +525,7 @@ const Students = () => {
                     className="w-full gap-2"
                   >
                     <Mail className="h-4 w-4" />
-                      Message All
+                      Notify All Students
                   </Button>
                 </div>
               </DialogContent>
@@ -532,7 +534,7 @@ const Students = () => {
             <Dialog open={isMessageStudentDialogOpen} onOpenChange={setIsMessageStudentDialogOpen}>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Message {selectedStudent?.name}</DialogTitle>
+                  <DialogTitle>Notify {selectedStudent?.name}</DialogTitle>
                   <DialogDescription>
                     Send a notification to {selectedStudent?.name}.
                   </DialogDescription>
@@ -561,7 +563,7 @@ const Students = () => {
                     className="w-full gap-2"
                   >
                     <Mail className="h-4 w-4" />
-                      Message {selectedStudent?.name}
+                      Notify {selectedStudent?.name}
                   </Button>
                 </div>
               </DialogContent>
@@ -1091,10 +1093,16 @@ const Students = () => {
                           {activeProfile && (
                           <div className="mt-auto border-t border-border bg-background/95 backdrop-blur">
                             <div className="flex flex-col gap-2 p-4">
-                              <Button className="w-full gap-2" onClick={() => {
-                              setIsMessageStudentDialogOpen(true);
-                            }}>
+                                <Button className="w-full gap-2" onClick={() => {
+                                  setIsMessageStudentDialogOpen(true);
+                                }}>
                                 <Mail className="h-4 w-4" />
+                                Send Notification
+                              </Button>
+                              <Button className="w-full gap-2" onClick={() => {
+                                  navigate("/messages");
+                                }}>
+                                <MessageSquare className="h-4 w-4" />
                                 Send Message
                               </Button>
                               
