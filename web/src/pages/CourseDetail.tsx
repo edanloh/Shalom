@@ -43,9 +43,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { courseService, Course, Module, Review, Student } from "@/services";
-
-const DEMO_INSTRUCTOR_ID = "550e8400-e29b-41d4-a716-446655440201";
-const REVIEW_PAGE_SIZE = 20;
+import moduleService from "@/services/moduleService";
+import { useUser } from "@/contexts/UserContext";
+import { getCourseNotifications, postNotification } from "@/services/notificationService";
+import { Megaphone } from "lucide-react";
 
 const CourseDetail = () => {
   const { courseId } = useParams();
@@ -104,11 +105,23 @@ const CourseDetail = () => {
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useUser();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isMessageAllDialogOpen, setIsMessageAllDialogOpen] = useState(false);
+  const [messageToAll, setMessageToAll] = useState("");
 
   // Fetch course data
   useEffect(() => {
     if (courseId) {
       fetchCourseData();
+      // Fetch notifications for this course
+      getCourseNotifications(courseId).then(data => {
+        // Group by notification ID to avoid duplicates
+        const uniqueNotifications = Array.from(new Map(data.map(item => [item.type, item])).values());
+        setNotifications(uniqueNotifications);
+      }).catch(err => {
+        console.error('Error fetching notifications:', err);
+      });
     }
   }, [courseId]);
 
@@ -148,7 +161,7 @@ const CourseDetail = () => {
 
       // Get actual admin ID from auth context
       // TODO: Replace with actual auth context
-      const adminId = DEMO_INSTRUCTOR_ID;
+      const adminId = user.uuid || "550e8400-e29b-41d4-a716-446655440101";
 
       // Fetch course details.
       const courseData = await courseService.getCourseDetailData(courseId, adminId);
@@ -572,6 +585,42 @@ const CourseDetail = () => {
     }
   };
 
+  const sendMessageToAll = async () => {
+    // Ensure message is not empty
+    if (!messageToAll.trim()) {
+      toast({
+        title: "Error",
+        description: "Message cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+    console.log("Sending message to all students:", messageToAll);
+    console.log(enrolledStudents);
+    // Generate random uuid
+    const notificationId = crypto.randomUUID();
+    await postNotification({
+      userIds: enrolledStudents.map(student => student.id.toString()),
+      title: `${course.title}`,
+      message: messageToAll,
+      type: `course_announcement-${courseId}-${notificationId}`,
+    });
+    toast({
+      title: "Message Sent",
+      description: "Your message has been sent to all students.",
+    });
+    // Fetch notifications for this course
+    getCourseNotifications(courseId).then(data => {
+      // Group by notification ID to avoid duplicates
+      const uniqueNotifications = Array.from(new Map(data.map(item => [item.type, item])).values());
+      setNotifications(uniqueNotifications);
+    }).catch(err => {
+      console.error('Error fetching notifications:', err);
+    });
+    setIsMessageAllDialogOpen(false);
+    setMessageToAll("");
+  }
+
   // Filter available students based on search query
   const filteredAvailableStudents = availableStudents.filter(
     (student) =>
@@ -585,8 +634,10 @@ const CourseDetail = () => {
       <div className="min-h-screen bg-background">
         <Header />
         <main className="container mx-auto px-6 py-8">
-          <div className="flex justify-center items-center py-12">
+          <div className="flex justify-center items-center py-12 flex-col">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <br />
+            <p className="ml-4 text-lg">Loading course details...</p>
           </div>
         </main>
       </div>
@@ -830,13 +881,61 @@ const CourseDetail = () => {
               </div>
             </div>
 
-            {/* Course Reviews Section */}
+            {/* Course Announcements Section */}
             <div className="gradient-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Course Review</h2>
+                <h2 className="text-2xl font-bold">Course Announcements</h2>
               </div>
 
-              <>
+              {notifications.length === 0 ? (
+                <div className="text-center py-12">
+                  <MessageSquare className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground mb-4">No announcements yet</p>
+                </div>
+              ) : (
+                <>
+                  {/* Individual Announcements */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Recent Announcements</h3>
+                    <div className="max-h-80 overflow-y-auto space-y-4 pr-2">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className="p-4 rounded-lg bg-background/50"
+                        >
+                          <p>
+                            {notification.message}
+                          </p>
+                          <p className="text-muted-foreground">
+                              {notification.createdAt
+                              ? new Date(notification.createdAt).toLocaleString()
+                              : 'N/A'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Course Announcements Section */}
+            <div className="gradient-card border border-border rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold">Course Announcements</h2>
+              </div>
+
+              {reviews.length === 0 ? (
+                <div className="text-center py-12">
+                  <MessageSquare className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground mb-4">No reviews yet</p>
+                  <p className="text-sm text-muted-foreground">
+                    Students will be able to leave reviews once they complete
+                    the course.
+                  </p>
+                </div>
+              ) : (
+                <>
                   {/* Rating Summary */}
                   <div className="grid md:grid-cols-2 gap-8 mb-4 pb-2 pr-10">
                     {/* Average Rating */}
@@ -1347,6 +1446,41 @@ const CourseDetail = () => {
                   View Enrolled Students{" "}
                   {course.enrolledCount > 0 ? `(${course.enrolledCount})` : ""}
                 </Button>
+                <Dialog open={isMessageAllDialogOpen} onOpenChange={setIsMessageAllDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline"  className="w-full gap-2">
+                      <Megaphone className="h-4 w-4" />
+                      Create Announcement
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Create Announcement</DialogTitle>
+                      <DialogDescription>
+                        Send a notification to all students enrolled in this course.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <textarea
+                        value={messageToAll || ""}
+                        onChange={(e) =>
+                          setMessageToAll(e.target.value)
+                        }
+                        rows={3}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+                      />
+                      <Button
+                        onClick={() => {
+                          sendMessageToAll();
+                        }}
+                        className="w-full gap-2"
+                      >
+                        <Megaphone className="h-4 w-4" />
+                          Create Announcement
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
 

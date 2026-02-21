@@ -333,7 +333,65 @@ export const useContentManagement = () => {
   const removeOption = (moduleId: string, quizId: string, questionId: string, index: number) => {
     const question = modules.find(m => m.id === moduleId)?.quizzes.find(q => q.id === quizId)?.questions.find(qu => qu.id === questionId);
     if (question) {
-      updateQuestion(moduleId, quizId, questionId, "options", question.options.filter((_, i) => i !== index));
+      // Remove the option at the specified index
+      const newOptions = question.options.filter((_, i) => i !== index);
+      
+      // Adjust correctAnswer index if needed
+      let newCorrectAnswer = question.correctAnswer;
+      
+      if (question.type === "multiple-choice" || question.type === "true-false") {
+        // Single answer - adjust if removed option was before the correct answer
+        if (typeof newCorrectAnswer === "number") {
+          if (index < newCorrectAnswer) {
+            // Removed option was before correct answer, shift index down
+            newCorrectAnswer = newCorrectAnswer - 1;
+          } else if (index === newCorrectAnswer) {
+            // Removed the correct answer option, reset to null
+            newCorrectAnswer = null;
+          }
+        }
+      } else if (question.type === "multiple-correct") {
+        // Multiple answers - adjust all indices
+        if (Array.isArray(newCorrectAnswer)) {
+          newCorrectAnswer = newCorrectAnswer
+            .map((ansIdx: number) => {
+              if (index < ansIdx) {
+                // Removed option was before this answer, shift index down
+                return ansIdx - 1;
+              } else if (index === ansIdx) {
+                // Removed this answer option, mark for removal
+                return -1;
+              }
+              return ansIdx;
+            })
+            .filter((idx: number) => idx >= 0); // Remove marked indices
+        }
+      }
+      
+      // Update both options and correctAnswer
+      setModules(
+        modules.map((m) => {
+          if (m.id === moduleId) {
+            return {
+              ...m,
+              quizzes: m.quizzes.map((q) => {
+                if (q.id === quizId) {
+                  return {
+                    ...q,
+                    questions: q.questions.map((qu) =>
+                      qu.id === questionId
+                        ? { ...qu, options: newOptions, correctAnswer: newCorrectAnswer }
+                        : qu
+                    ),
+                  };
+                }
+                return q;
+              }),
+            };
+          }
+          return m;
+        })
+      );
     }
   };
 

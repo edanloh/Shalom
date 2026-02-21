@@ -23,13 +23,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { courseService, instructorTaskService } from "@/services";
-import { useAuth } from "@/contexts/AuthContext";
+import { useUser } from "@/contexts/UserContext";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const defaultUserId = user?.id || "550e8400-e29b-41d4-a716-446655440201";
+  const { user } = useUser();
+  const defaultUserId = user?.uuid || '550e8400-e29b-41d4-a716-446655440201';
   const { toast } = useToast();
 
   // State for API data
@@ -193,7 +193,7 @@ const Index = () => {
   const draftCourses = courses.filter((course) => course.status === "draft");
 
   // Show loading state
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -215,7 +215,7 @@ const Index = () => {
         <section className="space-y-2">
           <h1 className="text-4xl font-bold text-foreground">
             Welcome Back,{" "}
-            <span className="bg-gradient-primary bg-clip-text text-transparent">
+            <span className="bg-gradient-primary bg-clip-text">
               {user?.name || "Instructor"}
             </span>
           </h1>

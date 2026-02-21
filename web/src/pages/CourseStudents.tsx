@@ -13,10 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, ArrowLeft, UserPlus } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
-import { disableStudent } from "@/lib/disableStudent";
 import { Colors } from "@/constants";
 import { courseService, studentService } from "@/services";
 import { useToast } from "@/hooks/use-toast";
+import { postNotification } from "@/services/notificationService";
 
 interface Student {
   id: string;
@@ -50,6 +50,9 @@ const CourseStudents = () => {
   const [itemsPerPage] = useState(10);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isEnrollDialogOpen, setIsEnrollDialogOpen] = useState(false);
+
+  const [isMessageStudentDialogOpen, setIsMessageStudentDialogOpen] = useState(false);
+  const [messageStudent, setMessageStudent] = useState("");
   const [profileCache, setProfileCache] = useState<Record<string, any>>({});
   const [profileLoadingId, setProfileLoadingId] = useState<string | null>(null);
 
@@ -260,11 +263,60 @@ const CourseStudents = () => {
                 </div>
               </DialogContent>
             </Dialog>
-            
-            <Button variant="outline" className="gap-2">
-              <Mail className="h-4 w-4" />
-              Message All
-            </Button>
+
+            <Dialog
+              open={isMessageStudentDialogOpen}
+              onOpenChange={setIsMessageStudentDialogOpen}
+            >
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Message {selectedStudent?.name}</DialogTitle>
+                  <DialogDescription>
+                    Send a notification to {selectedStudent?.name}.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <textarea
+                    value={messageStudent || ''}
+                    onChange={(e) => setMessageStudent(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                  <Button
+                    onClick={async () => {
+                      if (!messageStudent.trim() || !selectedStudent) {
+                        toast({
+                          title: 'Error',
+                          description: !messageStudent.trim()
+                            ? 'Message cannot be empty.'
+                            : 'No student selected.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      // Generate random uuid
+                      const notificationId = crypto.randomUUID();
+                      await postNotification({
+                        userIds: [selectedStudent.id],
+                        title: courseName,
+                        message: messageStudent,
+                        type: `course_announcement-${courseId}-${notificationId}`,
+                      });
+                      toast({
+                        title: 'Message Sent',
+                        description: `Your message has been sent to ${selectedStudent.name}.`,
+                      });
+                      setIsMessageStudentDialogOpen(false);
+                      setMessageStudent('');
+                    }}
+                    className="w-full gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Send Message
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -520,7 +572,11 @@ const CourseStudents = () => {
                               </div>
                               <div className="mt-auto border-t border-border bg-background/95 backdrop-blur">
                                 <div className="flex flex-col gap-2 p-4">
-                                  <Button className="w-full gap-2">
+                                  <Button className="w-full gap-2"
+                                    onClick={() => {
+                                      setSelectedStudent(selectedStudent);
+                                      setIsMessageStudentDialogOpen(true);
+                                    }}>
                                     <Mail className="h-4 w-4" />
                                     Send Message
                                   </Button>

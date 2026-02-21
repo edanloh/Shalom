@@ -455,8 +455,7 @@ export default function HomeScreen({ navigation, route }: any) {
       onRefresh={handleRefresh}
     >
       {/* Combined Header with Profile, Welcome, and Notifications */}
-      <ProfileHeader 
-        user={user}
+      <ProfileHeader
         hasNotifications={true}
         onNotificationPress={handleNotificationPress}
       />

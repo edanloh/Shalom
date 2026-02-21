@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { lessonService } from "@/services";
+import { useUser } from "@/contexts/UserContext";
 import UniversalDocumentViewer from "@/components/document/UniversalDocumentViewer";
 import OfficeOnlinePreview from "@/components/document/OfficeOnlinePreview";
 
@@ -90,6 +91,7 @@ const LessonDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const { user } = useUser();
 
   useEffect(() => {
     if (courseId && lessonId) {
@@ -106,7 +108,7 @@ const LessonDetail = () => {
       setError(null);
 
       // TODO: Get actual userId from auth context
-      const userId = "550e8400-e29b-41d4-a716-446655440101";
+      const userId = user.uuid;
 
       // Call lesson service to get lesson details
       const lessonData = await lessonService.getLessonDetail(lessonId!, userId);

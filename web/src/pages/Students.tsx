@@ -9,11 +9,14 @@ import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2, X, HelpCircle } from "lucide-react";
+import { Search, Filter, Mail, MoreVertical, TrendingUp, BookOpen, Clock, Award, Target, CheckCircle, Star, UserX, Loader2, UserCheck, X, HelpCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/Pagination";
-import { disableStudent } from "@/lib/disableStudent";
 import { courseService, studentService } from "@/services";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { postNotification } from "@/services/notificationService";
+import { disableUser } from "@/services/userService";
+import { supabase } from '@/lib/supabase';
 import { useToast } from "@/hooks/use-toast";
 import {
   Select,
@@ -38,7 +41,14 @@ const Students = () => {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const { toast } = useToast();
+
+  const [isMessageAllDialogOpen, setIsMessageAllDialogOpen] = useState(false);
+  const [messageToAll, setMessageToAll] = useState(["",""]);
+
+  const [isMessageStudentDialogOpen, setIsMessageStudentDialogOpen] = useState(false);
+  const [messageStudent, setMessageStudent] = useState(["",""]);
 
   const [filterEnrolledFrom, setFilterEnrolledFrom] = useState("");
   const [filterEnrolledTo, setFilterEnrolledTo] = useState("");
@@ -356,6 +366,77 @@ const Students = () => {
     return "destructive";
   };
 
+  const sendMessageToAll = async () => {
+    // Ensure message is not empty
+    if (!messageToAll || !messageToAll[0].trim() || !messageToAll[1].trim()) {
+      toast({
+        title: "Error",
+        description: "Title or message cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+    await postNotification({
+      userIds: students.map(student => student.id),
+      title: messageToAll[0],
+      message: messageToAll[1],
+      type: "general",
+    });
+    toast({
+      title: "Message Sent",
+      description: "Your message has been sent to all students.",
+    });
+    setIsMessageAllDialogOpen(false);
+    setMessageToAll(["",""]);
+  }
+
+  const sendMessageToStudent = async () => {
+    // Ensure message is not empty
+    if (!messageStudent || !messageStudent[0].trim() || !messageStudent[1].trim()) {
+      toast({
+        title: "Error",
+        description: "Title or message cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+    await postNotification({
+      userIds: [selectedStudent?.id],
+      title: messageStudent[0],
+      message: messageStudent[1],
+      type: "general",
+    });
+    toast({
+      title: "Message Sent",
+      description: `Your message has been sent to ${selectedStudent?.name}.`,
+    });
+    setIsMessageStudentDialogOpen(false);
+    setMessageStudent(["",""]);
+  }
+
+  const handleDisableUser = async (email: string, enable: boolean) => {
+    console.log(selectedStudent)
+    const sessionResponse = await supabase.auth.getSession();
+    const accessToken = sessionResponse.data.session?.access_token;
+    try {
+      const response = await disableUser(email, accessToken, enable);
+      toast({
+        title: "Success",
+        description: "User status has been updated successfully.",
+        variant: "default",
+      });
+      return response;
+    } catch (error) {
+      console.error('Error disabling/enabling user:', error);
+      toast({
+        title: "Error",
+        description: "There was an error updating the user status.",
+        variant: "destructive",
+      });
+      return;
+    }
+  };
+
   useEffect(() => {
     setCurrentPage(1);
   }, [
@@ -404,10 +485,87 @@ const Students = () => {
             <p className="text-muted-foreground">Monitor and support your students</p>
           </div>
           
-          <Button className="gap-2">
-            <Mail className="h-4 w-4" />
-            Message All
-          </Button>
+            <Dialog open={isMessageAllDialogOpen} onOpenChange={setIsMessageAllDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Mail className="h-4 w-4" />
+                  Message All
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Message All Students</DialogTitle>
+                  <DialogDescription>
+                    Send a notification to all students.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Title"
+                    value={messageToAll ? messageToAll[0] : ""}
+                    onChange={(e) => setMessageToAll([e.target.value, messageToAll[1]])}
+                  />
+                  <textarea
+                    value={messageToAll ? messageToAll[1] : ""}
+                    placeholder="Message"
+                    onChange={(e) =>
+                      setMessageToAll([messageToAll[0], e.target.value])
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                  <Button
+                    onClick={() => {
+                      sendMessageToAll();
+                    }}
+                    className="w-full gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                      Message All
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isMessageStudentDialogOpen} onOpenChange={setIsMessageStudentDialogOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Message {selectedStudent?.name}</DialogTitle>
+                  <DialogDescription>
+                    Send a notification to {selectedStudent?.name}.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Title"
+                    value={messageStudent ? messageStudent[0] : ""}
+                    onChange={(e) => setMessageStudent([e.target.value, messageStudent[1]])}
+                  />
+                  <textarea
+                    value={messageStudent ? messageStudent[1] : ""}
+                    placeholder="Message"
+                    onChange={(e) =>
+                      setMessageStudent([messageStudent[0], e.target.value])
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                  <Button
+                    onClick={() => {
+                      sendMessageToStudent();
+                    }}
+                    className="w-full gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                      Message {selectedStudent?.name}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
         </div>
 
         <Card className="p-6 gradient-card border-border">
@@ -933,7 +1091,9 @@ const Students = () => {
                           {activeProfile && (
                           <div className="mt-auto border-t border-border bg-background/95 backdrop-blur">
                             <div className="flex flex-col gap-2 p-4">
-                              <Button className="w-full gap-2">
+                              <Button className="w-full gap-2" onClick={() => {
+                              setIsMessageStudentDialogOpen(true);
+                            }}>
                                 <Mail className="h-4 w-4" />
                                 Send Message
                               </Button>
@@ -953,10 +1113,7 @@ const Students = () => {
                                         </span>
                                       ),
                                     });
-                                    const result = await disableStudent({
-                                      studentId: activeProfile.email,
-                                      status: false,
-                                    });
+                                    const result = await handleDisableUser(activeProfile.email, false);
                                     if (result) {
                                         // Update local state immediately
                                         setSelectedStudent({ ...activeProfile, enabled: false });
@@ -1017,10 +1174,7 @@ const Students = () => {
                                         </span>
                                       ),
                                     });
-                                    const result = await disableStudent({
-                                      studentId: activeProfile.email,
-                                      status: true,
-                                    });
+                                    const result = handleDisableUser(activeProfile.email, true);
                                     if (result) {
                                         // Update local state immediately
                                         setSelectedStudent({ ...activeProfile, enabled: true });
@@ -1063,8 +1217,8 @@ const Students = () => {
                                 }
                               }}
                               >
-                              <UserX className="h-4 w-4" />
-                              Enable User
+                                <UserCheck className="h-4 w-4" />
+                                Enable User
                               </Button>
                             )}
                             </div>

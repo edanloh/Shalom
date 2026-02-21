@@ -108,27 +108,37 @@ class ApiService {
   // Authentication interceptor - adds JWT token to requests
   private authInterceptor: RequestInterceptor = async (config) => {
     try {
-      // const authData = localStorage.getItem('shalom_auth');
-      // let token = null;
-      
-      // if (authData) {
-      //   const parsed = JSON.parse(authData);
-      //   token = parsed.IdToken || parsed.AccessToken;
-      // }
-      
+      // Only set Authorization if not already present
       if (SUPABASE_ANON_KEY) {
+        if (!config.headers || !('Authorization' in config.headers)) {
+          config.headers = {
+            ...config.headers,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          };
+        }
+        // Always set apikey for Supabase
         config.headers = {
           ...config.headers,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          // supabase specific
-          'apikey': SUPABASE_ANON_KEY,
+          apikey: SUPABASE_ANON_KEY,
         };
       }
-      
-      config.headers = {
-        ...config.headers,
-        'Content-Type': 'application/json',
-      };
+
+      // Only set Content-Type: application/json if not sending File, Blob, or ArrayBuffer
+      if (
+        !(config.body instanceof File) &&
+        !(config.body instanceof Blob) &&
+        !(config.body instanceof ArrayBuffer)
+      ) {
+        config.headers = {
+          ...config.headers,
+          'Content-Type': 'application/json',
+        };
+      } else {
+        // Use whatever Content-Type is set in config.headers (from caller)
+        config.headers = {
+          ...config.headers,
+        };
+      }
     } catch (error) {
       console.warn('Failed to retrieve auth token:', error);
       config.headers = {
@@ -195,17 +205,34 @@ class ApiService {
       }
     }
 
+    // Only set Content-Type: application/json if not sending File, Blob, or ArrayBuffer
+    const computedHeaders: Record<string, string> = {
+      Accept: 'application/json',
+      ...headers,
+    };
+    if (
+      !(body instanceof File) &&
+      !(body instanceof Blob) &&
+      !(body instanceof ArrayBuffer)
+    ) {
+      computedHeaders['Content-Type'] =
+        computedHeaders['Content-Type'] || 'application/json';
+    }
+
     const requestOptions: RequestInit = {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...headers,
-      },
+      headers: computedHeaders,
     };
 
-    if (body && method !== 'GET') {
-      requestOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
+    if (
+      body instanceof File ||
+      body instanceof Blob ||
+      body instanceof ArrayBuffer
+    ) {
+      requestOptions.body = body as BodyInit;
+    } else {
+      requestOptions.body =
+        typeof body === 'string' ? body : JSON.stringify(body);
     }
 
     for (let attempt = 0; attempt <= retries; attempt++) {

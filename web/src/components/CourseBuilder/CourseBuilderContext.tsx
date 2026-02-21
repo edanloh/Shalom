@@ -33,6 +33,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import { StorageService } from "../../services/storageService";
 import { useCategories } from "../../hooks/useCategories";
 import { Colors } from "@/constants";
+import { useUser } from '@/contexts/UserContext';
+import { postNotification } from "@/services/notificationService";
+import { Student } from "@/services";
 
 // Types
 export interface Question {
@@ -218,7 +221,7 @@ export const CourseBuilderProvider = ({
   children,
   courseId,
 }: CourseBuilderProviderProps) => {
-  const { user } = useAuth(); // Get authenticated user for admin ID
+  const { user } = useUser(); // Get authenticated user for admin ID
   const { categories } = useCategories();
 
   // Course state - Start with empty data (will be loaded from API or kept empty for new course)
@@ -272,7 +275,7 @@ export const CourseBuilderProvider = ({
       setIsLoadingCourse(true);
 
       try {
-        const adminId = user?.id || "550e8400-e29b-41d4-a716-446655440101";
+        const adminId = user?.uuid || "550e8400-e29b-41d4-a716-446655440101";
 
         // Fetch all course data using the service
         const courseBuilderData = await courseService.getCourseBuilderData(
@@ -382,8 +385,16 @@ export const CourseBuilderProvider = ({
         setModules(updatedModules);
       }
     };
-
+    const getStudents = async () => {
+      const studentsData = await courseService.getCourseStudents(currentCourseId);
+      console.log('Enrolled students fetched for notifications:', studentsData);
+      setEnrolledStudents(studentsData);
+      const data = await courseService.getAllStudents();
+      setAllStudents(data.students);
+      console.log('All students fetched for notifications:', data.students);
+    };
     initializeOrderValues();
+    getStudents();
   }, []); // Run only once on mount
 
   // UI state
@@ -404,6 +415,10 @@ export const CourseBuilderProvider = ({
   const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
   const [draggedOver, setDraggedOver] = useState<DraggedItem | null>(null);
 
+  // Students
+  const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  
   // Utility functions
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
@@ -659,64 +674,12 @@ export const CourseBuilderProvider = ({
               }
             }
           }
-          // Handle external URL (download and upload)
-          else {
-            try {
-              // Fetch the image
-              const response = await fetch(imageUrl);
-              if (!response.ok) {
-                console.error(
-                  `Failed to fetch image from ${imageUrl}:`,
-                  response.statusText,
-                );
-                hasErrors = true;
-                continue;
-              }
-
-              // Check if it's actually an image
-              const contentType = response.headers.get("content-type");
-              if (!contentType || !contentType.startsWith("image/")) {
-                console.error(
-                  `URL does not point to an image: ${imageUrl} (type: ${contentType})`,
-                );
-                hasErrors = true;
-                continue;
-              }
-
-              // Convert to blob
-              const blob = await response.blob();
-
-              // Get filename from URL or use default
-              const urlPath = new URL(imageUrl).pathname;
-              const filename = urlPath.split("/").pop() || "image.jpg";
-
-              // Convert blob to File
-              const file = new File([blob], filename, { type: blob.type });
-
-              // Upload to Supabase
-              const { url, error } = await StorageService.uploadQuestionImage(
-                file,
-                courseIdForUpload,
-              );
-
-              if (error) {
-                console.error(
-                  `Question image upload failed from URL ${imageUrl}:`,
-                  error,
-                );
-                hasErrors = true;
-              } else {
-                uploadedModules[moduleIndex].quizzes[quizIndex].questions[
-                  questionIndex
-                ].imageUrl = url;
-              }
-            } catch (err) {
-              console.error(
-                `Error processing image URL ${imageUrl}:`,
-                err,
-              );
-              hasErrors = true;
-            }
+          // Skip external URLs - they should already be uploaded to bucket
+          // (handled immediately when URL is pasted in QuestionImageUpload component)
+          else if (!imageUrl.includes("supabase.co/storage")) {
+            console.warn(
+              `Question image URL is not a Supabase storage URL: ${imageUrl}. This should have been uploaded when the URL was entered.`,
+            );
           }
         }
       }
@@ -1185,26 +1148,26 @@ export const CourseBuilderProvider = ({
           maxAttempts: quiz.maxAttempts === null ? null : quiz.maxAttempts ?? 1,
           order: quiz.order ?? quizIndex, // Use existing order or index
           questions: quiz.questions.map((q, qIndex) => {
-            // Convert correctAnswer index back to actual answer text for database
-            let correctAnswerForDb: string | string[];
+            // Prepare correctAnswer for database storage
+            // Save actual option values (not indices) so options can be scrambled on mobile
+            let correctAnswerForDb: string | string[] | number[];
 
             if (q.type === "multiple-choice" || q.type === "multiple_choice") {
-              // Single answer: convert index to text
-              correctAnswerForDb =
-                typeof q.correctAnswer === "number"
-                  ? q.options[q.correctAnswer] || ""
-                  : String(q.correctAnswer);
+              // Single answer: store the actual option text
+              const answerIndex = typeof q.correctAnswer === "number" ? q.correctAnswer : 0;
+              correctAnswerForDb = q.options[answerIndex] || "";
             } else if (q.type === "true-false") {
-              // True/False: convert index to text
-              correctAnswerForDb = q.correctAnswer === 0 ? "True" : "False";
+              // True/False: store the actual option text ("True" or "False")
+              const answerIndex = q.correctAnswer === 0 ? 0 : 1;
+              correctAnswerForDb = q.options[answerIndex] || "True";
             } else if (q.type === "multiple-correct") {
-              // Multiple answers: convert array of indices to array of texts
+              // Multiple answers: store array of actual option texts
               if (Array.isArray(q.correctAnswer)) {
-                correctAnswerForDb = q.correctAnswer.map((idx: number) =>
-                  typeof idx === "number" ? q.options[idx] || "" : String(idx),
-                );
+                correctAnswerForDb = q.correctAnswer
+                  .filter((idx: any) => typeof idx === "number" && idx >= 0 && idx < q.options.length)
+                  .map((idx: number) => q.options[idx]);
               } else {
-                correctAnswerForDb = [String(q.correctAnswer)];
+                correctAnswerForDb = [];
               }
             } else {
               // For other types (short-answer, matching), store as-is
@@ -1238,8 +1201,9 @@ export const CourseBuilderProvider = ({
           category: finalCategoryId || "",
           description: courseDescription || "Course description",
           thumbnailUrl: uploadedCourseThumbnailUrl || null,
-          instructorId: user?.id || "550e8400-e29b-41d4-a716-446655440101", // Get from auth context
-          instructorName: user?.name || "Shalom Instructor", // Get from auth context
+          level: 'Beginner', // TODO: Add level selector in UI
+          instructorId: user?.uuid, // Get from auth context
+          instructorName: user?.name || 'Instructor', // Get from auth context
           modules: transformedModules,
           outcomes: courseOutcomes.map((outcome) => outcome.trim()).filter(Boolean),
           requirements: [], // TODO: Add requirements in UI
@@ -1298,6 +1262,30 @@ export const CourseBuilderProvider = ({
         showCancel: false,
       });
 
+      try {
+        if (currentCourseId && currentCourseId !== 'new' ) {
+          // Generate random uuid
+          const notificationId = crypto.randomUUID();
+          await postNotification({
+            userIds: enrolledStudents.map(student => student.id.toString()),
+            title: `${courseName}`,
+            message: `${courseName} has been updated! Check out the latest content.`,
+            type: `course_announcement-${currentCourseId}-${notificationId}`,
+          });
+        } else {
+          // Generate random uuid
+          const notificationId = crypto.randomUUID();
+          await postNotification({
+            userIds: allStudents.map(student => student.id.toString()),
+            title: `${courseName}`,
+            message: `New course ${courseName} has been created! Check it out now.`,
+            type: `course_announcement-${currentCourseId}-${notificationId}`,
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error sending notifications to students:', notificationError);
+      }
+      
       setHasUnsavedChanges(false); // Reset after successful save
       return { success: true, courseId: finalCourseId };
     } catch (error) {

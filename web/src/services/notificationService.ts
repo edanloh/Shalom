@@ -1,4 +1,15 @@
-import apiService from "./apiService";
+import apiService from './apiService';
+
+const ENDPOINTS = {
+  POST: '/postNotification',
+  GET: '/getCourseNotifications',
+  LIST: "/getNotifications",
+  CREATE: "/postNotification",
+  MARK_READ: "/markNotificationRead",
+  MARK_ALL_READ: "/markAllNotificationsRead",
+  DELETE: "/deleteNotification",
+  CLEAR: "/clearNotifications",
+} as const;
 
 export interface Notification {
   id: string;
@@ -36,14 +47,33 @@ const toNotification = (record: NotificationRecord): Notification => ({
   iconUrl: record.icon_url ?? undefined,
 });
 
-const ENDPOINTS = {
-  LIST: "/getNotifications",
-  CREATE: "/postNotification",
-  MARK_READ: "/markNotificationRead",
-  MARK_ALL_READ: "/markAllNotificationsRead",
-  DELETE: "/deleteNotification",
-  CLEAR: "/clearNotifications",
-} as const;
+export async function postNotification(payload: {
+  userIds: string[];
+  title: string;
+  message: string;
+  type: string;
+}) {
+  console.log('Posting notifications to userIds:', payload.userIds);
+  const resp = await apiService.post<any>(ENDPOINTS.POST, payload);
+  return resp?.data ?? resp;
+}
+
+export async function getCourseNotifications(
+  courseId: string,
+  limitOrOptions: number | { limit?: number; offset?: number } = 50
+): Promise<any[]> {
+  const resolved =
+    typeof limitOrOptions === "number"
+      ? { limit: limitOrOptions, offset: 0 }
+      : { limit: limitOrOptions.limit ?? 50, offset: limitOrOptions.offset ?? 0 };
+  const resp = await apiService.get<any>(ENDPOINTS.GET, {
+    courseId,
+    limit: String(resolved.limit),
+    offset: String(resolved.offset),
+  });
+  const raw = resp?.data ?? resp ?? [];
+  return Array.isArray(raw) ? raw.map(toNotification) : [];
+}
 
 export const notificationService = {
   async getNotifications(

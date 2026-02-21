@@ -7,17 +7,39 @@ import { Progress } from "@/components/ui/progress";
 import { ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { moduleService } from "@/services/moduleService";
+import apiService from "@/services/apiService";
+import { useUser } from "@/contexts/UserContext";
 import courseService, {
   CourseSection,
   Quiz,
   CourseSectionItem,
 } from "@/services/courseService";
 
+interface CourseSection {
+  id: string;
+  title: string;
+  description?: string;
+  order_index: number;
+  items: ModuleItem[];
+}
+
+interface ModuleItem {
+  id: string;
+  type: 'video' | 'quiz' | 'pdf';
+  title: string;
+  description?: string;
+  order_index: number;
+  duration_seconds?: number;
+  video_url?: string;
+  thumbnail_url?: string;
+}
+
 const QuizTaking = () => {
   const { courseId, moduleId, quizId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useUser();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [timeRemaining, setTimeRemaining] = useState(1800);
@@ -47,7 +69,7 @@ const QuizTaking = () => {
       }
 
       const adminId =
-        user?.id ||
+        user?.uuid ||
         (user as any)?.sub ||
         (user as any)?.["cognito:username"] ||
         "550e8400-e29b-41d4-a716-446655440101";
@@ -166,6 +188,101 @@ const QuizTaking = () => {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1);
     }
+  };
+
+  const handleSubmit = async () => {
+    if (!user?.uuid || !quizId) {
+      toast({
+        title: "Error",
+        description: "User information or quiz ID is missing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Transform answers from { [index]: value } to [{ questionId, answer }]
+      const answersArray = Object.entries(answers).map(([index, answer]) => ({
+        questionId: quiz.questions[parseInt(index)].id.toString(),
+        answer: answer
+      }));
+
+      // Calculate time taken in minutes
+      const timeTakenMinutes = Math.floor((1800 - timeRemaining) / 60);
+
+      const result = await moduleService.submitQuiz(
+        quizId,
+        user.sub,
+        answersArray,
+        timeTakenMinutes
+      );
+
+      toast({
+        title: "Quiz Submitted Successfully",
+        description: `You scored ${result.data.score}% (${result.data.correctAnswers}/${result.data.totalQuestions} correct)`,
+        variant: result.data.isPassed ? "default" : "destructive",
+      });
+
+      // Only navigate to next item if user passed the quiz
+      if (result.data.isPassed) {
+        // Find next item to navigate to
+        const nextItem = findNextItemAcrossModules();
+        
+        console.log('🎯 Quiz passed! Finding next item...', {
+          currentQuizId: quizId,
+          currentModuleId: moduleId,
+          nextItem: nextItem ? {
+            id: nextItem.item.id,
+            type: nextItem.item.type,
+            title: nextItem.item.title
+          } : null
+        });
+        
+        if (nextItem) {
+          // Navigate to next item (video or quiz)
+          if (nextItem.item.type === 'video') {
+            navigate(`/course/${courseId}/module/${nextItem.sectionId}/lesson/${nextItem.item.id}`);
+          } else if (nextItem.item.type === 'quiz') {
+            navigate(`/course/${courseId}/module/${nextItem.sectionId}/quiz/${nextItem.item.id}`);
+          }
+        } else {
+          // No next item, navigate back to course with state to trigger refresh
+          navigate(`/course/${courseId}`, { 
+            state: { 
+              quizCompleted: true, 
+              quizId,
+              isPassed: true 
+            } 
+          });
+        }
+      } else {
+        // Quiz failed, navigate back to course detail
+        navigate(`/course/${courseId}`, { 
+          state: { 
+            quizCompleted: true, 
+            quizId,
+            isPassed: false 
+          } 
+        });
+      }
+    } catch (error: any) {
+      console.error('Error submitting quiz:', error);
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Failed to submit quiz. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (

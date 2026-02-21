@@ -378,8 +378,8 @@ export default function LearningGoalScreen({ navigation }: any) {
             <View style={{ paddingVertical: Spacing.lg, alignItems: "center" }}>
               <ActivityIndicator size="large" color={Colors.secondary} />
             </View>
-          ) : null}
-
+          ) : (
+            <>
           <View style={styles.streakCard}>
             <Ionicons name="flame" size={48} color="#FF6B35" />
             <Text style={styles.streakNumber}>{streakDays}</Text>
@@ -432,6 +432,8 @@ export default function LearningGoalScreen({ navigation }: any) {
               <StatTile key={i} stat={stat} />
             ))}
           </View>
+          </>
+          )}
         </View>
       </ScrollView>
 
