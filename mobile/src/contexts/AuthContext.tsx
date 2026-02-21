@@ -27,9 +27,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const bypassAuth = true;
+  const bypassAuth = process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true';
   const bypassUserId =
-    process.env.EXPO_PUBLIC_BYPASS_USER_ID || '550e8400-e29b-41d4-a716-446655440101';
+    process.env.EXPO_PUBLIC_BYPASS_USER_ID || '';
   const bypassEmail =
     process.env.EXPO_PUBLIC_BYPASS_USER_EMAIL || 'shalomfyp@gmail.com';
 
@@ -101,6 +101,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // }, [session, user]);
   useEffect(() => {
     if (!bypassAuth) return;
+    if (!bypassUserId) {
+      console.warn("EXPO_PUBLIC_BYPASS_AUTH is enabled but EXPO_PUBLIC_BYPASS_USER_ID is missing.");
+      return;
+    }
     setUser({
       id: bypassUserId,
       email: bypassEmail,

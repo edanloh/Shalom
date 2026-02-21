@@ -59,9 +59,7 @@ export default function CourseDetailScreen({
   const [error, setError] = useState<string | null>(null);
   const { user } = useUser();
   const userId = user?.uuid;
-  const fallbackUserId =
-    process.env.EXPO_PUBLIC_DEFAULT_USER_ID ||
-    "550e8400-e29b-41d4-a716-446655440101";
+  const fallbackUserId = process.env.EXPO_PUBLIC_DEFAULT_USER_ID;
   const effectiveUserId = userId || fallbackUserId;
 
   const [isEnrolling, setIsEnrolling] = useState(false);

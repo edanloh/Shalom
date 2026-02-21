@@ -49,8 +49,11 @@ class ModuleService {
    */
   async getCourseModules(courseId: string, adminId?: string): Promise<ModuleDetail[]> {
     try {
+      if (!adminId) {
+        throw new Error('Missing instructor/admin ID');
+      }
       // Use instructor endpoint to get full details including quiz questions
-      const instructorId = adminId || '550e8400-e29b-41d4-a716-446655440201';
+      const instructorId = adminId;
       // const response = await apiService.get<any>(`/admin/${instructorId}/${courseId}`);
       const response = await apiService.get<any>(`/getModuleDetailInstructor/${instructorId}/${courseId}`);
       if (!response || !response.data || !response.data.sections) {

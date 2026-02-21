@@ -20,11 +20,15 @@ const Notifications = () => {
   const userId =
     user?.id ||
     (user as any)?.sub ||
-    (user as any)?.["cognito:username"] ||
-    "550e8400-e29b-41d4-a716-446655440201";
+    (user as any)?.["cognito:username"];
 
   useEffect(() => {
     const loadNotifications = async () => {
+      if (!userId) {
+        setNotifications([]);
+        setIsLoading(false);
+        return;
+      }
       try {
         setIsLoading(true);
         setError(null);

@@ -148,11 +148,6 @@ export const useMyCourses = (): UseMyCoursesReturn => {
   }, []);
 
   const fetchMyCourses = useCallback(async () => {
-    // REMOVE LATER - Temporary override for testing
-    if (user) {
-      user.id = '550e8400-e29b-41d4-a716-446655440101'; // Temporary override for testing
-    }
-    
     if (!user?.id) {
       console.log('useMyCourses - No user ID available, skipping enrollment fetch');
       return;

@@ -71,8 +71,15 @@ const QuizTaking = () => {
       const adminId =
         user?.uuid ||
         (user as any)?.sub ||
-        (user as any)?.["cognito:username"] ||
-        "550e8400-e29b-41d4-a716-446655440101";
+        (user as any)?.["cognito:username"];
+      if (!adminId) {
+        toast({
+          title: "Error",
+          description: "User not authenticated",
+          variant: "destructive",
+        });
+        return;
+      }
 
       try {
         setIsLoading(true);

@@ -33,6 +33,7 @@ export interface CourseListParams {
   category?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  instructorId?: string;
 }
 
 export interface Course {
@@ -416,6 +417,7 @@ class CourseService {
       if (params?.category) queryParams.append('filterValue', params.category);
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+      if (params?.instructorId) queryParams.append('instructorId', params.instructorId);
       
       const response = await apiService.get<any>(ENDPOINTS.COURSES + `?${queryParams.toString()}`);    
 
@@ -438,6 +440,10 @@ class CourseService {
       return convertedCourses;
     } catch (error) {
       console.error('Error fetching courses:', error);
+      // Instructor-scoped empty state should not hard-fail page rendering.
+      if (params?.instructorId) {
+        return [];
+      }
       throw error;
     }
   }
@@ -597,7 +603,7 @@ class CourseService {
   /**
    * Get all students in the system with enrollment statistics
    */
-  async getAllStudents(): Promise<{
+  async getAllStudents(instructorId?: string): Promise<{
     students: Array<{
       id: string;
       name: string;
@@ -621,7 +627,10 @@ class CourseService {
     };
   }> {
     try {
-      const response = await apiService.get<any>(ENDPOINTS.ALL_STUDENTS);
+      const response = await apiService.get<any>(
+        ENDPOINTS.ALL_STUDENTS,
+        instructorId ? { instructorId } : undefined
+      );
 
       const payload = response?.data ?? response;
       const students = Array.isArray(payload?.students) ? payload.students : [];
@@ -1341,7 +1350,10 @@ class CourseService {
    * Get personalized recommendations
    */
   async getRecommendations(userId: string, limit = 6): Promise<Course[]> {
-    const uid = userId || '550e8400-e29b-41d4-a716-446655440201';
+    if (!userId) {
+      throw new Error("Missing userId for recommendations");
+    }
+    const uid = userId;
     const response = await apiService.get<any>(ENDPOINTS.RECOMMENDATIONS, {
       userId: uid,
       limit: String(limit),
@@ -1379,8 +1391,11 @@ class CourseService {
     context?: Record<string, any>;
     requestId?: string;
   }): Promise<void> {
+    if (!payload.userId) {
+      throw new Error("Missing userId for recommendation event");
+    }
     const body = {
-      userId: payload.userId || '550e8400-e29b-41d4-a716-446655440201',
+      userId: payload.userId,
       courseId: payload.courseId ?? null,
       eventType: payload.eventType,
       context: payload.context || {},

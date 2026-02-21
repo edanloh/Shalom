@@ -36,13 +36,23 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    const { id } = body ?? {};
+    const { id, createdBy } = body ?? {};
 
     if (!id) {
       return new Response(JSON.stringify({ success: false, message: "id is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (!createdBy) {
+      return new Response(
+        JSON.stringify({ success: false, message: "createdBy is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const update: Record<string, unknown> = {};
@@ -76,6 +86,7 @@ serve(async (req) => {
       .from("achievements")
       .update(update)
       .eq("id", id)
+      .eq("created_by", createdBy)
       .select()
       .single();
 

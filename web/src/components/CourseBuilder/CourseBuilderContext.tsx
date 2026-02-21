@@ -275,7 +275,10 @@ export const CourseBuilderProvider = ({
       setIsLoadingCourse(true);
 
       try {
-        const adminId = user?.uuid || "550e8400-e29b-41d4-a716-446655440101";
+        if (!user?.uuid) {
+          throw new Error("User not authenticated");
+        }
+        const adminId = user.uuid;
 
         // Fetch all course data using the service
         const courseBuilderData = await courseService.getCourseBuilderData(
@@ -324,7 +327,7 @@ export const CourseBuilderProvider = ({
     };
 
     fetchCourseData();
-  }, [courseId]);
+  }, [courseId, user?.uuid]);
 
   useEffect(() => {
     if (categories.length > 0 && localCategories.length === 0) {

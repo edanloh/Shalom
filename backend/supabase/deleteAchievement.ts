@@ -34,7 +34,7 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    const { id } = body ?? {};
+    const { id, createdBy } = body ?? {};
 
     if (!id) {
       return new Response(JSON.stringify({ success: false, message: "id is required" }), {
@@ -43,10 +43,21 @@ serve(async (req) => {
       });
     }
 
+    if (!createdBy) {
+      return new Response(
+        JSON.stringify({ success: false, message: "createdBy is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { data: existing, error: fetchError } = await supabase
       .from("achievements")
       .select("id, icon")
       .eq("id", id)
+      .eq("created_by", createdBy)
       .single();
 
     if (fetchError) {
@@ -67,6 +78,7 @@ serve(async (req) => {
       .from("achievements")
       .delete()
       .eq("id", id)
+      .eq("created_by", createdBy)
       .select("id")
       .single();
 

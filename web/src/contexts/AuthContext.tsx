@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setAuthUser(null);
         } else if (data?.user) {
           setAuthUser({
-            id: '550e8400-e29b-41d4-a716-446655440105',
+            id: data.user.id,
             email: data.user.email,
             name: data.user.user_metadata.full_name || '',
             auth_provider: data.user.app_metadata.provider,
@@ -64,8 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       (_event, session) => {
         if (session?.user) {
           setAuthUser({
-            id: '550e8400-e29b-41d4-a716-446655440105',
-            // id: session.user.id,
+            id: session.user.id,
             email: session.user.email,
             name: session.user.user_metadata.full_name || '',
             auth_provider: session.user.app_metadata.provider,
@@ -92,7 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
       if (data?.user) {
         const auth_user = {
-          id: '550e8400-e29b-41d4-a716-446655440105',
+          id: data.user.id,
           email: data.user.email,
           name: data.user.user_metadata.full_name || '',
           auth_provider: data.user.app_metadata.provider,
@@ -164,7 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
     if (data?.user) {
       const auth_user = {
-        id: '550e8400-e29b-41d4-a716-446655440105',
+        id: data.user.id,
         email: data.user.email,
         name: data.user.user_metadata.name || '',
         auth_provider: data.user.app_metadata.provider,

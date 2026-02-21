@@ -38,8 +38,7 @@ export const Header = () => {
     setAvatarUrl(getAvatarUri(user?.avatar_url));
   }, [user]);
 
-  const userId =
-    user?.uuid || "550e8400-e29b-41d4-a716-446655440201";
+  const userId = user?.uuid;
 
   useEffect(() => {
     let isActive = true;
@@ -56,6 +55,8 @@ export const Header = () => {
 
     if (userId) {
       loadUnreadCount();
+    } else if (isActive) {
+      setUnreadCount(0);
     }
 
     return () => {

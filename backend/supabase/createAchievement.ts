@@ -37,6 +37,7 @@ serve(async (req) => {
 
     const body = await req.json();
     const {
+      createdBy = null,
       name,
       description = null,
       icon = null,
@@ -54,6 +55,16 @@ serve(async (req) => {
       });
     }
 
+    if (!createdBy) {
+      return new Response(
+        JSON.stringify({ success: false, message: "createdBy is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     if (!allowedTypes.has(type)) {
       return new Response(JSON.stringify({ success: false, message: "invalid type" }), {
         status: 400,
@@ -64,6 +75,7 @@ serve(async (req) => {
     const { data, error } = await supabase
       .from("achievements")
       .insert({
+        created_by: createdBy,
         name,
         description,
         icon,

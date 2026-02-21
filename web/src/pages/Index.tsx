@@ -13,7 +13,6 @@ import {
   Users,
   TrendingUp,
   Star,
-  DollarSign,
   BookOpen,
   ArrowRight,
   UserPlus,
@@ -29,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useUser();
-  const defaultUserId = user?.uuid || '550e8400-e29b-41d4-a716-446655440201';
+  const defaultUserId = user?.uuid;
   const { toast } = useToast();
 
   // State for API data
@@ -63,10 +62,19 @@ const Index = () => {
 
       // Get admin ID from user (fallback to mock for now)
       const adminId = defaultUserId;
+      if (!adminId) {
+        setCourses([]);
+        setStats(null);
+        return;
+      }
 
       // Fetch courses and admin stats in parallel using courseService
       const [coursesData, statsData] = await Promise.all([
-        courseService.getCourses({ sortBy: "updated_at", sortOrder: "desc" }),
+        courseService.getCourses({
+          sortBy: "updated_at",
+          sortOrder: "desc",
+          instructorId: adminId,
+        }),
         courseService.getInstructorStats(adminId),
       ]);
 
@@ -115,6 +123,9 @@ const Index = () => {
 
     try {
       setTaskSaving(true);
+      if (!defaultUserId) {
+        throw new Error("User not authenticated");
+      }
       await instructorTaskService.createTask({
         instructorId: defaultUserId,
         title: taskTitle.trim(),
@@ -275,7 +286,7 @@ const Index = () => {
             <StatsCard
               title="Enrollments (All Courses)"
               value={String(totalEnrollments)}
-              icon={DollarSign}
+              icon={UserPlus}
               trend="Last 30 days"
               variant="warning"
               className="flex-1 w-full min-w-[180px] max-w-[250px]"

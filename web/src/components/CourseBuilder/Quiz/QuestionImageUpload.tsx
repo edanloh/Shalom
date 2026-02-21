@@ -2,7 +2,7 @@ import { X, Loader2 } from "lucide-react";
 import { Colors } from "../../../constants/Colors";
 import { useState } from "react";
 import { StorageService } from "../../../services/storageService";
-import { useCourseBuilder } from "../CourseBuilderContext";
+import { useCourseBuilder } from "../useCourseBuilder";
 
 interface QuestionImageUploadProps {
   currentQuestion: any;

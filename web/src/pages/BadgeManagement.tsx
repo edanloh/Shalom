@@ -36,6 +36,7 @@ import {
   updateAchievement,
   uploadAchievementIcon,
 } from "@/services/achievementService";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface BadgeItem {
   id: string;
@@ -52,6 +53,8 @@ interface BadgeItem {
 
 const BadgeManagement = () => {
   const { toast } = useToast();
+  const { authUser } = useAuth();
+  const instructorId = authUser?.id ?? "";
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newBadgeName, setNewBadgeName] = useState("");
@@ -129,9 +132,14 @@ const BadgeManagement = () => {
   });
 
   const loadBadges = async () => {
+    if (!instructorId) {
+      setBadges([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
-      const response = await listAchievements({ type: "badge" });
+      const response = await listAchievements(instructorId, { type: "badge" });
       const items = response.items.map(mapBadge);
       setBadges(items);
     } catch (error) {
@@ -148,7 +156,7 @@ const BadgeManagement = () => {
 
   useEffect(() => {
     loadBadges();
-  }, []);
+  }, [instructorId]);
 
   const resetCreateForm = () => {
     setNewBadgeName("");
@@ -163,6 +171,14 @@ const BadgeManagement = () => {
   };
 
   const handleCreateBadge = async () => {
+    if (!instructorId) {
+      toast({
+        title: "Missing account context",
+        description: "Please sign in again and retry.",
+        variant: "destructive",
+      });
+      return;
+    }
     const criteriaCount = parseInt(newBadgeCriteriaCount, 10);
     const pointsValue = parseInt(newBadgePoints, 10);
     if (!newBadgeName.trim() || !newBadgeDescription.trim()) {
@@ -201,7 +217,7 @@ const BadgeManagement = () => {
         iconValue = upload?.url || upload?.publicUrl || upload?.path || "award";
       }
 
-      const created = await createAchievement({
+      const created = await createAchievement(instructorId, {
         name: newBadgeName,
         description: newBadgeDescription,
         icon: iconValue,
@@ -252,12 +268,13 @@ const BadgeManagement = () => {
   };
 
   const toggleBadgeStatus = async (badgeId: string) => {
+    if (!instructorId) return;
     const badge = badges.find((item) => item.id === badgeId);
     if (!badge) return;
     const nextActive = !badge.active;
     setBadges(badges.map(b => (b.id === badgeId ? { ...b, active: nextActive } : b)));
     try {
-      await updateAchievement({ id: badgeId, isActive: nextActive });
+      await updateAchievement(instructorId, { id: badgeId, isActive: nextActive });
       toast({
         title: "Badge Status Updated",
         description: "Badge status has been changed",
@@ -274,10 +291,11 @@ const BadgeManagement = () => {
   };
 
   const deleteBadge = async (badgeId: string) => {
+    if (!instructorId) return;
     const prev = badges;
     setBadges(badges.filter(badge => badge.id !== badgeId));
     try {
-      await deleteAchievement(badgeId);
+      await deleteAchievement(instructorId, badgeId);
       toast({
         title: "Badge Deleted",
         description: "Badge has been removed successfully",

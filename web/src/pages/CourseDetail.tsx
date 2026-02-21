@@ -48,6 +48,8 @@ import { useUser } from "@/contexts/UserContext";
 import { getCourseNotifications, postNotification } from "@/services/notificationService";
 import { Megaphone } from "lucide-react";
 
+const REVIEW_PAGE_SIZE = 20;
+
 const CourseDetail = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
@@ -123,7 +125,7 @@ const CourseDetail = () => {
         console.error('Error fetching notifications:', err);
       });
     }
-  }, [courseId]);
+  }, [courseId, user?.uuid]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -133,9 +135,9 @@ const CourseDetail = () => {
   }, [reviewSearchQuery]);
 
   useEffect(() => {
-    if (!courseId) return;
+    if (!courseId || !user?.uuid) return;
     fetchReviews();
-  }, [courseId, reviewFilter, reviewSort, debouncedReviewSearchQuery, reviewOffset]);
+  }, [courseId, user?.uuid, reviewFilter, reviewSort, debouncedReviewSearchQuery, reviewOffset]);
 
   useEffect(() => {
     setReviewOffset(0);
@@ -154,14 +156,13 @@ const CourseDetail = () => {
 
   const fetchCourseData = async () => {
     if (!courseId) return;
+    if (!user?.uuid) return;
 
     try {
       setLoading(true);
       setError(null);
 
-      // Get actual admin ID from auth context
-      // TODO: Replace with actual auth context
-      const adminId = user.uuid || "550e8400-e29b-41d4-a716-446655440101";
+      const adminId = user.uuid;
 
       // Fetch course details.
       const courseData = await courseService.getCourseDetailData(courseId, adminId);
@@ -188,7 +189,7 @@ const CourseDetail = () => {
   };
 
   const fetchReviews = async () => {
-    if (!courseId) return;
+    if (!courseId || !user?.uuid) return;
     try {
       setReviewsLoading(true);
       const backendSort =
@@ -198,7 +199,7 @@ const CourseDetail = () => {
             ? "highest_rating"
             : "latest";
       const response = await courseService.getInstructorReviews({
-        instructorId: DEMO_INSTRUCTOR_ID,
+        instructorId: user.uuid,
         courseId,
         sort: backendSort,
         status: reviewFilter,
@@ -258,10 +259,10 @@ const CourseDetail = () => {
   };
 
   const handleReviewAction = async () => {
-    if (!courseId || !pendingReviewAction) return;
+    if (!courseId || !pendingReviewAction || !user?.uuid) return;
     const { review, action } = pendingReviewAction;
     const reviewId = String(review.id);
-    const instructorId = DEMO_INSTRUCTOR_ID;
+    const instructorId = user.uuid;
 
     try {
       setReviewActionId(reviewId);
@@ -1313,6 +1314,7 @@ const CourseDetail = () => {
                     )}
                   </div>
                 </>
+              )}
             </div>
           </div>
 
