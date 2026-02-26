@@ -556,7 +556,7 @@ export const RightSidebar = () => {
             </label>
             <button
               onClick={handleAddOutcome}
-              style={{ color: Colors.accent }}
+              style={{ color: Colors.secondary }}
               className="flex items-center gap-1 text-xs hover:opacity-80 transition-opacity"
               title="Add outcome"
             >
@@ -631,7 +631,7 @@ export const RightSidebar = () => {
             </label>
             <button
               onClick={() => setShowAddCategoryModal(true)}
-              style={{ color: Colors.accent }}
+              style={{ color: Colors.secondary }}
               className="flex items-center gap-1 text-xs hover:opacity-80 transition-opacity"
               title="Add new category"
             >
@@ -770,8 +770,8 @@ export const RightSidebar = () => {
                       onClick={openEditModal}
                       style={{
                         backgroundColor: Colors.gray800,
-                        color: Colors.accent,
-                        borderColor: Colors.accent,
+                        color: Colors.secondary,
+                        borderColor: Colors.secondary,
                       }}
                       className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border rounded text-sm font-medium hover:opacity-80 transition-opacity"
                     >
@@ -884,7 +884,7 @@ export const RightSidebar = () => {
               }
               style={{
                 backgroundColor:
-                  thumbnailInputType === "url" ? Colors.accent : Colors.gray800,
+                  thumbnailInputType === "url" ? Colors.secondary : Colors.gray800,
                 color: Colors.textPrimary,
                 opacity:
                   thumbnailInputType === "upload" &&
@@ -913,7 +913,7 @@ export const RightSidebar = () => {
               style={{
                 backgroundColor:
                   thumbnailInputType === "upload"
-                    ? Colors.accent
+                    ? Colors.secondary
                     : Colors.gray800,
                 color: Colors.textPrimary,
                 opacity:
@@ -1571,7 +1571,7 @@ export const RightSidebar = () => {
                   onClick={handleEditCategory}
                   disabled={!editCategoryName.trim()}
                   style={{
-                    backgroundColor: Colors.accent,
+                    backgroundColor: Colors.secondary,
                     opacity: !editCategoryName.trim() ? 0.5 : 1,
                   }}
                   className="flex-1 px-4 py-2 rounded text-white font-medium hover:opacity-90 transition-opacity disabled:cursor-not-allowed"
@@ -1613,7 +1613,7 @@ export const RightSidebar = () => {
                 style={{ color: Colors.textPrimary }}
                 className="text-lg font-semibold flex items-center gap-2"
               >
-                <Plus className="h-5 w-5" style={{ color: Colors.accent }} />
+                <Plus className="h-5 w-5" style={{ color: Colors.secondary }} />
                 New Category
               </h2>
               <button
@@ -1666,7 +1666,7 @@ export const RightSidebar = () => {
                         backgroundColor: color,
                         border:
                           newCategoryColor === color
-                            ? `3px solid ${Colors.accent}`
+                            ? `3px solid ${Colors.secondary}`
                             : `2px solid ${Colors.gray600}`,
                       }}
                       className="h-10 rounded transition-all hover:scale-110"
@@ -1681,7 +1681,7 @@ export const RightSidebar = () => {
                   onClick={handleAddCategory}
                   disabled={!newCategoryName.trim()}
                   style={{
-                    backgroundColor: Colors.accent,
+                    backgroundColor: Colors.secondary,
                     opacity: !newCategoryName.trim() ? 0.5 : 1,
                   }}
                   className="flex-1 px-4 py-2 rounded text-white font-medium hover:opacity-90 transition-opacity disabled:cursor-not-allowed"
