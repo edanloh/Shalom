@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 import { useNavigate } from "react-router-dom";
 
 const Students = () => {

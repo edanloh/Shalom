@@ -20,6 +20,7 @@ import { Spacing, Colors, Typography, TextStyles } from "../../constants";
 import { Course } from "../../types";
 import type { MainStackParamList } from "../../types/navigation";
 import { ImageWithFallback } from "../common";
+import AnimatedHeartButton from "../common/AnimatedHeartButton";
 import { Images } from "../../../assets";
 import { Ionicons } from "@expo/vector-icons";
 import { useCourses } from "../../contexts/CourseContext";
@@ -251,21 +252,15 @@ function CourseCardItem({
       </Pressable>
 
       {/* Wishlist Heart - Positioned outside parent Pressable */}
-      <Pressable
+      <AnimatedHeartButton
         onPress={() => onToggleWishlist?.(course)}
         hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
         style={styles.heartBtn}
-        accessibilityRole="button"
         accessibilityLabel={
           wishlisted ? "Remove from wishlist" : "Add to wishlist"
         }
-      >
-        <Ionicons
-          name={wishlisted ? "heart" : "heart-outline"}
-          size={20}
-          color="#fff"
-        />
-      </Pressable>
+        filled={wishlisted}
+      />
     </Animated.View>
   );
 }

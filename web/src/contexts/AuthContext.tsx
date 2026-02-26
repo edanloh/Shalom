@@ -1,10 +1,9 @@
 import {
-  createContext,
-  useContext,
   useState,
   useEffect,
   ReactNode,
 } from 'react';
+import { AuthContext } from './AuthContextStore';
 
 import { supabase } from '@/lib/supabase';
 import { registerCheck, fetchUserProfile, approveInstructor as ApproveInstructor } from '@/services/userService';
@@ -17,7 +16,7 @@ interface SupabaseUser {
   auth_provider: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   authUser: SupabaseUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -27,8 +26,6 @@ interface AuthContextType {
   register: ( email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
   approveInstructor: (uuid: string) => Promise<any>;
 }
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authUser, setAuthUser] = useState<SupabaseUser | null>(null);
@@ -201,10 +198,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
 };

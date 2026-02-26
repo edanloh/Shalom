@@ -6,10 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from '@/contexts/useAuth';
 import { moduleService } from "@/services/moduleService";
 import apiService from "@/services/apiService";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 import courseService, {
   CourseSection,
   Quiz,

@@ -55,12 +55,11 @@ serve(async (req) => {
 
     const { data: existing, error: fetchError } = await supabase
       .from("achievements")
-      .select("id, icon")
+      .select("id, icon, created_by, scope_type")
       .eq("id", id)
-      .eq("created_by", createdBy)
       .single();
 
-    if (fetchError) {
+    if (fetchError && (fetchError as any).code !== "PGRST116") {
       return new Response(JSON.stringify({ success: false, message: fetchError.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -68,6 +67,27 @@ serve(async (req) => {
     }
 
     if (!existing) {
+      return new Response(JSON.stringify({ success: false, message: "achievement not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // System/platform achievements (typically global + no creator) are not deletable via instructor endpoint.
+    if (!existing.created_by || existing.scope_type === "global") {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "system achievements cannot be deleted from instructor badge management",
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (existing.created_by !== createdBy) {
       return new Response(JSON.stringify({ success: false, message: "achievement not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

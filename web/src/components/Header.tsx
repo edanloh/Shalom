@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 import { notificationService } from "@/services";
 import {
   DropdownMenu,

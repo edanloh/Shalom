@@ -22,7 +22,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { courseService, instructorTaskService } from "@/services";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {

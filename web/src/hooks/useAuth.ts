@@ -1,6 +1,6 @@
 import { AUTH_STORAGE_KEY } from "@/env";
 
-export { useAuth } from "@/contexts/AuthContext";
+export { useAuth } from "@/contexts/useAuth";
 
 // Utility function to sign out locally (no Cognito redirect needed for custom auth)
 export const signOut = () => {

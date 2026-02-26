@@ -79,7 +79,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   const loadCredits = React.useCallback(async () => {
     try {
-      const uid = user?.id;
+      const uid = user?.uuid;
       if (!uid) {
         setBalance(0);
         setAchievementsData([]);
@@ -121,7 +121,7 @@ export default function ProfileScreen({ navigation }: any) {
         type: "error",
       });
     }
-  }, [user?.id]);
+  }, [user?.uuid]);
 
   const handleRefresh = async () => {
     try {

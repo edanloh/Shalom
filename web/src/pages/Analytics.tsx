@@ -27,7 +27,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { analyticsService, type InstructorAnalytics } from "@/services";
-import { useAuth } from "@/contexts/AuthContext";
+import { useUser } from "@/contexts/useUser";
 import {
   LineChart,
   Line,
@@ -69,8 +69,8 @@ const Analytics = () => {
   const [error, setError] = useState<string | null>(null);
   const tooltipWrapperStyle = { pointerEvents: "none" } as const;
   const { toast } = useToast();
-  const { user } = useAuth();
-  const defaultUserId = user?.id;
+  const { user: profileUser } = useUser();
+  const defaultUserId = profileUser?.uuid;
   const SectionHelp = ({
     title,
     items,

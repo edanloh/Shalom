@@ -44,7 +44,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { courseService, Course, Module, Review, Student } from "@/services";
 import moduleService from "@/services/moduleService";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 import { getCourseNotifications, postNotification } from "@/services/notificationService";
 import { Megaphone } from "lucide-react";
 
@@ -263,6 +263,16 @@ const CourseDetail = () => {
     const { review, action } = pendingReviewAction;
     const reviewId = String(review.id);
     const instructorId = user.uuid;
+    const trimmedReply = reviewActionReply.trim();
+
+    if (action === "reply" && !trimmedReply) {
+      toast({
+        title: "Reply required",
+        description: "Please enter an instructor reply before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setReviewActionId(reviewId);
@@ -273,8 +283,7 @@ const CourseDetail = () => {
         moderationNote: reviewActionNote.trim() || undefined,
         flagReason:
           action === "flag" ? reviewActionFlagReason.trim() || undefined : undefined,
-        instructorReply:
-          action === "reply" ? reviewActionReply.trim() || undefined : undefined,
+        instructorReply: action === "reply" ? trimmedReply : undefined,
       });
       toast({
         title: "Review updated",
@@ -920,10 +929,10 @@ const CourseDetail = () => {
               )}
             </div>
 
-            {/* Course Announcements Section */}
+            {/* Course Reviews Section */}
             <div className="gradient-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Course Announcements</h2>
+                <h2 className="text-2xl font-bold">Course Reviews</h2>
               </div>
 
               {reviews.length === 0 ? (
@@ -1598,6 +1607,9 @@ const CourseDetail = () => {
                   placeholder="Write a response to the learner..."
                   rows={3}
                 />
+                <p className="text-xs text-muted-foreground">
+                  A reply is required for this action.
+                </p>
               </div>
             ) : null}
             <div className="space-y-2">
@@ -1626,7 +1638,11 @@ const CourseDetail = () => {
             </Button>
             <Button
               onClick={handleReviewAction}
-              disabled={!pendingReviewAction || reviewActionId === String(pendingReviewAction.review.id)}
+              disabled={
+                !pendingReviewAction ||
+                reviewActionId === String(pendingReviewAction.review.id) ||
+                (pendingReviewAction.action === "reply" && reviewActionReply.trim().length === 0)
+              }
             >
               {pendingReviewAction && reviewActionId === String(pendingReviewAction.review.id) ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

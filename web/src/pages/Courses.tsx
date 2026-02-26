@@ -14,7 +14,7 @@ import { Plus, Search, Grid3x3, List, Filter, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { courseService, Course } from "@/services";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 
 const Courses = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");

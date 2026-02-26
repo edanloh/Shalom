@@ -11,10 +11,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { User, Bell, Shield, Palette, Settings as SettingsIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from '@/contexts/UserContext';
+import { useUser } from '@/contexts/useUser';
 import { uploadProfilePic } from '@/services/userService';
 import { getAvatarUri } from '@/utils/avatar';
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from '@/contexts/useAuth';
 import { validatePassword } from "@/utils/authUtils";
 import courseService from "@/services/courseService";
 

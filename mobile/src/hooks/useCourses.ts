@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Course } from '../types';
 import courseService, { CourseListParams } from '../services/courseService';
 import { ApiError, NetworkError, TimeoutError } from '../services/apiService';
-import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
 
 // Hook return types
 export interface UseCoursesReturn {
@@ -137,7 +137,8 @@ export const useMyCourses = (): UseMyCoursesReturn => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user: profileUser } = useUser();
+  const dbUserId = profileUser?.uuid;
   
   const isMountedRef = useRef(true);
 
@@ -148,7 +149,7 @@ export const useMyCourses = (): UseMyCoursesReturn => {
   }, []);
 
   const fetchMyCourses = useCallback(async () => {
-    if (!user?.id) {
+    if (!dbUserId) {
       console.log('useMyCourses - No user ID available, skipping enrollment fetch');
       return;
     }
@@ -156,7 +157,7 @@ export const useMyCourses = (): UseMyCoursesReturn => {
 
     try {
       // Use the new enrollment endpoint with user ID
-      const coursesData = await courseService.getUserEnrollments(user.id);
+      const coursesData = await courseService.getUserEnrollments(dbUserId);
       
       if (!isMountedRef.current) return;
 
@@ -168,7 +169,7 @@ export const useMyCourses = (): UseMyCoursesReturn => {
       console.error('useMyCourses - Error fetching courses:', err);
       setError(errorMessage);
     }
-  }, [user?.id]);
+  }, [dbUserId]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -204,7 +205,8 @@ export const useRecommendedCourses = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user: profileUser } = useUser();
+  const dbUserId = profileUser?.uuid;
   
   const isMountedRef = useRef(true);
 
@@ -217,7 +219,7 @@ export const useRecommendedCourses = () => {
   const fetchRecommendedCourses = useCallback(async () => {
     try {
       console.log('Fetching recommended courses...');
-      const coursesData = await courseService.getRecommendedCourses(user?.id);
+      const coursesData = await courseService.getRecommendedCourses(dbUserId);
       
       if (!isMountedRef.current) return;
       
@@ -230,7 +232,7 @@ export const useRecommendedCourses = () => {
       setError(errorMessage);
       console.error('Error fetching recommended courses:', err);
     }
-  }, [user?.id]);
+  }, [dbUserId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);

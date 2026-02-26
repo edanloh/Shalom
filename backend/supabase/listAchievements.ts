@@ -47,7 +47,7 @@ serve(async (req) => {
 
     let query = supabase
       .from("achievements")
-      .select("id, name, description, icon, type, criteria, points, color, is_active, created_at", {
+      .select("id, name, description, icon, type, criteria, points, color, is_active, created_at, scope_type, scope_id", {
         count: "exact",
       })
       .order("created_at", { ascending: false })

@@ -12,7 +12,7 @@ import { Colors, Spacing, TextStyles } from "../constants";
 import Screen from "../components/common/Screen";
 import creditService from "../services/creditService";
 import { CreditEvent } from "../types";
-import { useAuth } from "../contexts/AuthContext";
+import { useUser } from "../contexts/UserContext";
 import { Ionicons } from "@expo/vector-icons";
 
 type AppPointHistory = {
@@ -44,7 +44,8 @@ const formatTime = (iso: string) => {
 };
 
 export default function PointsHistoryScreen({ navigation }: any) {
-  const { user } = useAuth();
+  const { user } = useUser();
+  const dbUserId = user?.uuid;
   const [history, setHistory] = useState<AppPointHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -96,7 +97,7 @@ export default function PointsHistoryScreen({ navigation }: any) {
   }, []);
 
   const loadHistory = useCallback(async () => {
-    if (!user?.id) {
+    if (!dbUserId) {
       setHistory([]);
       setNextOffset(0);
       setHasMore(false);
@@ -104,7 +105,7 @@ export default function PointsHistoryScreen({ navigation }: any) {
     }
     setLoading(true);
     try {
-      const events: CreditEvent[] = await creditService.getCreditHistory(user.id, {
+      const events: CreditEvent[] = await creditService.getCreditHistory(dbUserId, {
         limit: PAGE_SIZE,
         offset: 0,
       });
@@ -120,14 +121,14 @@ export default function PointsHistoryScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [mapEvents, user?.id]);
+  }, [mapEvents, dbUserId]);
 
   const loadMoreHistory = useCallback(async () => {
-    if (!user?.id || loadingMore || !hasMore || loading) return;
+    if (!dbUserId || loadingMore || !hasMore || loading) return;
     setLoadingMore(true);
     try {
       const startOffset = nextOffset;
-      const events: CreditEvent[] = await creditService.getCreditHistory(user.id, {
+      const events: CreditEvent[] = await creditService.getCreditHistory(dbUserId, {
         limit: PAGE_SIZE,
         offset: startOffset,
       });
@@ -143,7 +144,7 @@ export default function PointsHistoryScreen({ navigation }: any) {
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loading, loadingMore, mapEvents, nextOffset, user?.id]);
+  }, [hasMore, loading, loadingMore, mapEvents, nextOffset, dbUserId]);
 
   useEffect(() => {
     loadHistory();
@@ -151,7 +152,7 @@ export default function PointsHistoryScreen({ navigation }: any) {
     return () => {
       if (unsub) unsub();
     };
-  }, [loadHistory, user?.id]);
+  }, [loadHistory, dbUserId]);
 
   const onRefresh = useCallback(async () => {
     try {

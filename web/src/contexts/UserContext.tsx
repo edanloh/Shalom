@@ -1,14 +1,13 @@
 import {
-  createContext,
-  useContext,
   useState,
   useEffect,
   useCallback,
   ReactNode,
 } from 'react';
+import { UserContext } from './UserContextStore';
 
 import { User } from '@/types';
-import { useAuth } from './AuthContext';
+import { useAuth } from './useAuth';
 import {
   fetchUserProfile,
   updateUserProfile,
@@ -16,15 +15,13 @@ import {
   registerCheck,
 } from '@/services/userService';
 
-interface UserContextType {
+export interface UserContextType {
   user: User | null;
   isLoading: boolean;
   fetchUser: (email: string) => Promise<User>;
   updateUser: (id: string, payload: Partial<User>) => Promise<User>;
   uploadUserPic: (name: string, avatar: Blob) => Promise<void>;
 }
-
-const UserContext = createContext<UserContextType | null>(null);
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -102,10 +99,4 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </UserContext.Provider>
   );
-};
-
-export const useUser = () => {
-  const ctx = useContext(UserContext);
-  if (!ctx) throw new Error('useUser must be used within UserProvider');
-  return ctx;
 };

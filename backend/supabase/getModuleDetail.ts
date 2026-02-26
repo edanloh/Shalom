@@ -153,12 +153,14 @@ serve(async (req) => {
         .from('course_ratings')
         .select(`
           id, rating, review, created_at, review_status,
+          instructor_reply, instructor_replied_at, acknowledged_at, is_pinned,
           reviewer:users!course_ratings_user_id_fkey (
             id, name, avatar_url
           )
         `)
         .eq('course_id', courseId)
         .in('review_status', ['visible', 'resolved'])
+        .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false })
     ]);
 
@@ -422,7 +424,11 @@ serve(async (req) => {
       createdAt: review.created_at,
       reviewerName: review.reviewer?.name || 'Anonymous',
       reviewerAvatar: review.reviewer?.avatar_url || null,
-      reviewerId: review.reviewer?.id || null
+      reviewerId: review.reviewer?.id || null,
+      instructorReply: review.instructor_reply || null,
+      instructorRepliedAt: review.instructor_replied_at || null,
+      acknowledgedAt: review.acknowledged_at || null,
+      isPinned: Boolean(review.is_pinned)
     }));
 
     // Calculate average rating and rating breakdown

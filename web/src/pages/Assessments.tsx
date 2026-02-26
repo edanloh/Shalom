@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/Pagination";
 import { courseService, Course } from "@/services";
 import moduleService from "@/services/moduleService";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 import { useNavigate } from "react-router-dom";
 
 const Assessments = () => {

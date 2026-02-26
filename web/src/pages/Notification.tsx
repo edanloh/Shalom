@@ -6,21 +6,18 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bell, CheckCircle, AlertCircle, Info, Award, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { useUser } from '@/contexts/useUser';
 import { notificationService, type Notification } from "@/services/notificationService";
 
 const Notifications = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useUser();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const userId =
-    user?.id ||
-    (user as any)?.sub ||
-    (user as any)?.["cognito:username"];
+  const userId = user?.uuid;
 
   useEffect(() => {
     const loadNotifications = async () => {

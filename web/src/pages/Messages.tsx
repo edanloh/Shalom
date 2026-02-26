@@ -27,7 +27,7 @@ import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { useToast } from '@/hooks/use-toast';
 import { courseService } from '@/services';
 import { supabase } from '@/lib/supabase';
-import { useUser } from '@/contexts/UserContext';
+import { useUser } from '@/contexts/useUser';
 import { getAvatarUri } from '@/utils/avatar';
 import { fetchUserProfile } from '@/services/userService';
 import { fetchAllUsers } from '@/services/userService';

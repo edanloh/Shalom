@@ -16,6 +16,7 @@ const corsHeaders = {
 };
 
 const allowedTypes = new Set(["streak", "certificate", "badge", "level"]);
+const allowedScopeTypes = new Set(["instructor", "course"]);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -46,6 +47,8 @@ serve(async (req) => {
       points = 0,
       color = null,
       isActive = true,
+      scopeType = "instructor",
+      scopeId = null,
     } = body ?? {};
 
     if (!name) {
@@ -72,6 +75,19 @@ serve(async (req) => {
       });
     }
 
+    if (!allowedScopeTypes.has(scopeType)) {
+      return new Response(JSON.stringify({ success: false, message: "invalid scopeType" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!scopeId) {
+      return new Response(JSON.stringify({ success: false, message: "scopeId is required for scoped achievements" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data, error } = await supabase
       .from("achievements")
       .insert({
@@ -84,6 +100,8 @@ serve(async (req) => {
         points,
         color,
         is_active: isActive,
+        scope_type: scopeType,
+        scope_id: scopeId,
       })
       .select()
       .single();

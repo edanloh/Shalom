@@ -21,7 +21,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST,PUT,OPTIONS',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
 };
 
 function badRequest(msg: string) {
@@ -115,6 +115,57 @@ serve(async (req) => {
 
     if (!courseId || courseId === 'courseReviewHandler') {
       return badRequest("courseId is required in path");
+    }
+
+    if (!["GET", "POST", "PUT"].includes(req.method)) {
+      return new Response(
+        JSON.stringify({ success: false, message: "Method not allowed" }),
+        { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (req.method === "GET") {
+      const userId = (url.searchParams.get("userId") ?? "").toString().trim();
+      if (!userId) return badRequest("userId is required");
+
+      const { data: reviewDetails, error: reviewError } = await supabaseClient
+        .from('course_ratings')
+        .select(`
+          id,
+          rating,
+          review,
+          created_at,
+          is_anonymous,
+          reviewer:users!course_ratings_user_id_fkey (
+            name,
+            avatar_url
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (reviewError) throw reviewError;
+      if (!reviewDetails) {
+        return new Response(
+          JSON.stringify({ success: true, data: null }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const payload = {
+        id: reviewDetails.id,
+        rating: Number(reviewDetails.rating),
+        review: reviewDetails.review,
+        createdAt: reviewDetails.created_at,
+        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.reviewer?.name || "Anonymous"),
+        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.reviewer?.avatar_url ?? null),
+      };
+
+      return new Response(
+        JSON.stringify({ success: true, data: payload }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Parse body

@@ -15,7 +15,6 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useCourses } from "../contexts/CourseContext";
 import { useUser } from "../contexts/UserContext";
-import { useAuth } from "../contexts/AuthContext";
 import courseService from "../services/courseService";
 import { Colors, Spacing, TextStyles, Typography } from "../constants";
 import type { Course } from "../types";
@@ -74,8 +73,8 @@ export default function CoursesScreen({ navigation }: any) {
 
   const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
   const isWishlisted = (c: Course) => wishIds.has(c.id);
-  const { enrolledCourses = [] } = useUser();
-  const { user } = useAuth();
+  const { enrolledCourses = [], user: profileUser } = useUser();
+  const recommendationUserId = profileUser?.uuid;
 
   // UI state
   const [query, setQuery] = useState("");
@@ -176,10 +175,10 @@ export default function CoursesScreen({ navigation }: any) {
 
   const handleRecommendedCourseClick = useCallback(
     (course: Course) => {
-      if (user?.id) {
+      if (recommendationUserId) {
         courseService
           .recordRecommendationEvent({
-            userId: user.id,
+            userId: recommendationUserId,
             courseId: course.id,
             eventType: "click",
             requestId: course.recommendationRequestId,
@@ -196,7 +195,7 @@ export default function CoursesScreen({ navigation }: any) {
       }
       navigation.navigate("CourseDetail", { courseId: course.id });
     },
-    [navigation, user?.id]
+    [navigation, recommendationUserId]
   );
 
   const onRefresh = useCallback(async () => {
@@ -262,10 +261,10 @@ export default function CoursesScreen({ navigation }: any) {
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => {
-          if (trackRecommendation && user?.id) {
+          if (trackRecommendation && recommendationUserId) {
             courseService
               .recordRecommendationEvent({
-                userId: user.id,
+                userId: recommendationUserId,
                 courseId: item.id,
                 eventType: "click",
                 requestId: item.recommendationRequestId,
@@ -322,10 +321,10 @@ export default function CoursesScreen({ navigation }: any) {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => {
-        if (user?.id) {
+        if (recommendationUserId) {
           courseService
             .recordRecommendationEvent({
-              userId: user.id,
+              userId: recommendationUserId,
               courseId: item.id,
               eventType: "click",
               context: {
@@ -383,11 +382,11 @@ export default function CoursesScreen({ navigation }: any) {
 
   useEffect(() => {
     if (query) return;
-    if (!user?.id || recommended.length === 0) return;
+    if (!recommendationUserId || recommended.length === 0) return;
     const firstRecommendation = recommended[0];
 
     const impressionKey = [
-      user.id,
+      recommendationUserId,
       firstRecommendation?.recommendationRequestId || "no_request_id",
       ...recommended.map((c) => c.id),
     ].join("|");
@@ -396,7 +395,7 @@ export default function CoursesScreen({ navigation }: any) {
 
     courseService
       .recordRecommendationEvent({
-        userId: user.id,
+        userId: recommendationUserId,
         eventType: "impression",
         requestId: firstRecommendation.recommendationRequestId,
         context: {
@@ -410,7 +409,7 @@ export default function CoursesScreen({ navigation }: any) {
       .catch((err) =>
         console.warn("Failed to record courses rec impression", err)
       );
-  }, [query, recommended, user?.id]);
+  }, [query, recommended, recommendationUserId]);
 
   return (
     <Screen

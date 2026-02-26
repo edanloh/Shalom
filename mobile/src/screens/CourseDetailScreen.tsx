@@ -22,6 +22,7 @@ import {
 } from "../services/courseDetailService";
 import type { MainStackParamList } from "../types/navigation";
 import { ImageWithFallback } from "../components/common";
+import AnimatedHeartButton from "../components/common/AnimatedHeartButton";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "../contexts/AuthContext";
 import { useUser } from '../contexts/UserContext';
@@ -329,7 +330,15 @@ export default function CourseDetailScreen({
           style={styles.reviewerAvatar}
         />
         <View style={styles.reviewerInfo}>
-          <Text style={styles.reviewerName}>{review.reviewerName}</Text>
+          <View style={styles.reviewNameRow}>
+            <Text style={styles.reviewerName}>{review.reviewerName}</Text>
+            {review.isPinned ? (
+              <View style={styles.reviewPinnedBadge}>
+                <Ionicons name="pin-outline" size={10} color={Colors.purple400} />
+                <Text style={styles.reviewPinnedText}>Pinned</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.reviewDate}>
             {new Date(review.createdAt).toLocaleDateString()}
           </Text>
@@ -337,6 +346,23 @@ export default function CourseDetailScreen({
       </View>
       <View style={styles.reviewRating}>{renderStarRating(review.rating)}</View>
       <Text style={styles.reviewText}>{review.review}</Text>
+      {review.instructorReply ? (
+        <View style={styles.instructorReplyBox}>
+          <View style={styles.instructorReplyHeader}>
+            <Ionicons name="chatbubble-ellipses-outline" size={14} color={Colors.purple400} />
+            <Text style={styles.instructorReplyTitle}>Instructor reply</Text>
+            {review.acknowledgedAt && !review.instructorRepliedAt ? (
+              <Text style={styles.instructorReplyMeta}>Acknowledged</Text>
+            ) : null}
+          </View>
+          <Text style={styles.instructorReplyText}>{review.instructorReply}</Text>
+          {review.instructorRepliedAt ? (
+            <Text style={styles.instructorReplyMeta}>
+              {new Date(review.instructorRepliedAt).toLocaleDateString()}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 
@@ -506,7 +532,7 @@ export default function CourseDetailScreen({
 
         {/* Wishlist Button */}
         {courseDetail && (
-          <Pressable
+          <AnimatedHeartButton
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               toggleWishlist({
@@ -521,13 +547,10 @@ export default function CourseDetailScreen({
               } as any);
             }}
             style={styles.wishlistButton}
-          >
-            <Ionicons
-              name={wishlisted ? "heart" : "heart-outline"}
-              size={20}
-              color={Colors.white}
-            />
-          </Pressable>
+            filled={wishlisted}
+            color={Colors.white}
+            size={20}
+          />
         )}
       </View>
 
@@ -1230,10 +1253,30 @@ const styles = StyleSheet.create({
   reviewerInfo: {
     flex: 1,
   },
+  reviewNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    flexWrap: "wrap",
+  },
   reviewerName: {
     fontSize: TextStyles.body.fontSize,
     fontWeight: "600",
     color: Colors.textPrimary,
+  },
+  reviewPinnedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.purple400 + "14",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  reviewPinnedText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: Colors.purple400,
   },
   reviewDate: {
     fontSize: TextStyles.caption.fontSize,
@@ -1247,6 +1290,35 @@ const styles = StyleSheet.create({
     fontSize: TextStyles.body.fontSize,
     color: Colors.textSecondary,
     lineHeight: 20,
+  },
+  instructorReplyBox: {
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.textInputBg,
+    borderRadius: 10,
+    padding: Spacing.sm,
+    borderLeftWidth: 2,
+    borderLeftColor: Colors.purple400,
+  },
+  instructorReplyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+    flexWrap: "wrap",
+  },
+  instructorReplyTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+  },
+  instructorReplyText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: Colors.textSecondary,
+  },
+  instructorReplyMeta: {
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
   noModulesContainer: {
     backgroundColor: Colors.textInputBg,

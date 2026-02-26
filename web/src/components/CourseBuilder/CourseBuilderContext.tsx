@@ -22,20 +22,20 @@ Multiple Correct - At least one answer must be selected
 */
 
 import {
-  createContext,
   useState,
   useEffect,
   ReactNode,
 } from "react";
 import courseService from "../../services/courseService";
 import categoryService from "@/services/categoryService";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from '../../contexts/useAuth';
 import { StorageService } from "../../services/storageService";
 import { useCategories } from "../../hooks/useCategories";
 import { Colors } from "@/constants";
-import { useUser } from '@/contexts/UserContext';
+import { useUser } from '@/contexts/useUser';
 import { postNotification } from "@/services/notificationService";
 import { Student } from "@/services";
+import { CourseBuilderContext } from "./CourseBuilderContextStore";
 
 // Types
 export interface Question {
@@ -205,11 +205,6 @@ export interface CourseBuilderContextType {
   setCurrentCourseId: (id: string | undefined) => void;
   isSaving: boolean;
 }
-
-// Create Context
-export const CourseBuilderContext = createContext<
-  CourseBuilderContextType | undefined
->(undefined);
 
 // Provider Component
 interface CourseBuilderProviderProps {

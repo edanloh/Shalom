@@ -82,6 +82,16 @@ export interface AchievementItem {
   createdAt?: string;
   earned?: boolean;
   earnedAt?: string | null;
+  scopeType?: "global" | "instructor" | "course" | string;
+  scopeId?: string | null;
+  sourceEventType?: string | null;
+  sourceCourseId?: string | null;
+  sourceCourseTitle?: string | null;
+  sourceInstructorId?: string | null;
+  sourceInstructorName?: string | null;
+  sourceReferenceKey?: string | null;
+  sourceAwardedAt?: string | null;
+  achievementValue?: number | null;
 }
 
 export interface LearningGoal {

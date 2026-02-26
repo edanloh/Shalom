@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { CourseBuilderContext } from "./CourseBuilderContext";
+import { CourseBuilderContext } from "./CourseBuilderContextStore";
 
 export const useCourseBuilder = () => {
   const context = useContext(CourseBuilderContext);

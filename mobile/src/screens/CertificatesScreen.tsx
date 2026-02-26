@@ -18,7 +18,7 @@ import { ActionButton, CustomTextInput } from "@/components";
 import CustomModal from "../components/common/CustomModal";
 import creditService from "../services/creditService";
 import { CertificateProgress } from "../types";
-import { useAuth } from "../contexts/AuthContext";
+import { useUser } from "../contexts/UserContext";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 
@@ -85,7 +85,8 @@ const buildCertificateHtml = (cert: Certificate) => `
 `;
 
 export default function CertificatesScreen({ navigation }: any) {
-  const { user } = useAuth();
+  const { user } = useUser();
+  const dbUserId = user?.uuid;
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
   const [query, setQuery] = useState("");
@@ -110,7 +111,7 @@ export default function CertificatesScreen({ navigation }: any) {
   );
 
   const loadCerts = useCallback(async () => {
-    if (!user?.id) {
+    if (!dbUserId) {
       setCertificates([]);
       setNextOffset(0);
       setHasMore(false);
@@ -118,7 +119,7 @@ export default function CertificatesScreen({ navigation }: any) {
     }
     setLoading(true);
     try {
-      const remote = await creditService.getCertificates(user.id, {
+      const remote = await creditService.getCertificates(dbUserId, {
         limit: PAGE_SIZE,
         offset: 0,
       }).catch((err: any) => {
@@ -143,11 +144,11 @@ export default function CertificatesScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [mapFromProgress, user?.id]);
+  }, [mapFromProgress, dbUserId]);
 
   useEffect(() => {
     loadCerts();
-  }, [loadCerts, user?.id]);
+  }, [loadCerts, dbUserId]);
 
   const filteredCertificates = useMemo(() => {
     const base = certificates.length ? certificates : [];
@@ -180,11 +181,11 @@ export default function CertificatesScreen({ navigation }: any) {
   }, [loadCerts]);
 
   const loadMoreCerts = useCallback(async () => {
-    if (!user?.id || loadingMore || !hasMore || loading) return;
+    if (!dbUserId || loadingMore || !hasMore || loading) return;
     setLoadingMore(true);
     try {
       const startOffset = nextOffset;
-      const remote = await creditService.getCertificates(user.id, {
+      const remote = await creditService.getCertificates(dbUserId, {
         limit: PAGE_SIZE,
         offset: startOffset,
       }).catch((err: any) => {
@@ -207,7 +208,7 @@ export default function CertificatesScreen({ navigation }: any) {
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loading, loadingMore, mapFromProgress, nextOffset, user?.id]);
+  }, [hasMore, loading, loadingMore, mapFromProgress, nextOffset, dbUserId]);
 
   const generateCertificatePdf = useCallback(async (cert: Certificate) => {
     if (Platform.OS === "web") {

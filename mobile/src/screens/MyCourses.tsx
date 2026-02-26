@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMyCourses } from "../hooks";
 import { useAuth } from "../contexts/AuthContext";
 import { ImageWithFallback } from "../components/common";
+import AnimatedHeartButton from "../components/common/AnimatedHeartButton";
 import { Images } from "../../assets";
 import {
   Colors,
@@ -197,6 +198,21 @@ export default function MyCourses({ navigation }: any) {
                   style={styles.ipCard}
                 >
                   <View style={styles.ipLeft}>
+                    <View
+                      style={[
+                        styles.categoryBadge,
+                        {
+                          backgroundColor:
+                            item.categoryColor || Colors.purple400,
+                        },
+                        styles.categoryBadgeTop,
+                      ]}
+                    >
+                      <Text style={styles.categoryText} numberOfLines={1}>
+                        {item.category}
+                      </Text>
+                    </View>
+
                     <Text style={styles.ipTitle} numberOfLines={2}>
                       {item.title}
                     </Text>
@@ -213,18 +229,7 @@ export default function MyCourses({ navigation }: any) {
                     </View>
 
                     <View style={styles.ipPercentRow}>
-                      <View
-                        style={[
-                          styles.categoryBadge,
-                          {
-                            backgroundColor:
-                              item.categoryColor || Colors.purple400,
-                          },
-                        ]}
-                      >
-                        <Text style={styles.categoryText}>{item.category}</Text>
-                      </View>
-                      <Text style={styles.ipMetaText}>{pct}% complete</Text>
+                      <Text style={styles.ipPercentText}>{pct}% complete</Text>
                     </View>
 
                     <ProgressBar percent={pct} />
@@ -237,28 +242,20 @@ export default function MyCourses({ navigation }: any) {
                       style={styles.ipImage}
                     />
                     <View style={styles.badgeRow}>
-                      <TouchableOpacity
+                      <AnimatedHeartButton
                         onPress={(e) => {
                           e.stopPropagation();
                           toggleWishlist?.(item);
                         }}
                         hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
                         style={styles.heartBtn}
-                        accessibilityRole="button"
                         accessibilityLabel={
                           wishIds.has(item.id)
                             ? "Remove from wishlist"
                             : "Add to wishlist"
                         }
-                      >
-                        <Ionicons
-                          name={
-                            wishIds.has(item.id) ? "heart" : "heart-outline"
-                          }
-                          size={20}
-                          color="#fff"
-                        />
-                      </TouchableOpacity>
+                        filled={wishIds.has(item.id)}
+                      />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -321,7 +318,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: 6,
-    marginRight: Spacing.sm,
+    flexShrink: 1,
+    maxWidth: "72%",
+  },
+  categoryBadgeTop: {
+    alignSelf: "flex-start",
+    marginBottom: Spacing.sm,
   },
   categoryText: {
     color: Colors.white,
@@ -393,10 +395,17 @@ const styles = StyleSheet.create({
   },
   ipPercentRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "center",
+    flexWrap: "wrap",
     marginVertical: Spacing.sm,
-    // gap: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  ipPercentText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "500",
+    flexShrink: 1,
   },
 
   // progress bar

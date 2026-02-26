@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ImageWithFallback } from "../common"; // adjust path if needed
@@ -43,6 +44,7 @@ export default function CourseCard({
 }: Props) {
   const { wishlist = [], toggleWishlist } = useCourses();
   const isWishlisted = !!wishlist?.some((c) => c.id === course.id);
+  const heartScale = useRef(new Animated.Value(1)).current;
   const rankLabel =
     course.recommendationRank || course.recommendationScore
       ? `#${course.recommendationRank ?? "?"} • ${Number(course.recommendationScore ?? 0).toFixed(1)}`
@@ -50,6 +52,25 @@ export default function CourseCard({
   const reasonText = formatPrimaryRecommendationReason(
     course.recommendationPrimaryTag
   );
+
+  const handleToggleWishlist = () => {
+    heartScale.stopAnimation();
+    heartScale.setValue(0.88);
+    Animated.sequence([
+      Animated.timing(heartScale, {
+        toValue: 1.18,
+        duration: 110,
+        useNativeDriver: true,
+      }),
+      Animated.spring(heartScale, {
+        toValue: 1,
+        friction: 4,
+        tension: 140,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    toggleWishlist(course);
+  };
 
   return (
     <TouchableOpacity
@@ -74,7 +95,7 @@ export default function CourseCard({
           <TouchableOpacity
             onPress={(e) => {
               e.stopPropagation();
-              toggleWishlist(course);
+              handleToggleWishlist();
             }}
             accessibilityRole="button"
             accessibilityLabel={
@@ -84,11 +105,13 @@ export default function CourseCard({
             style={styles.heartBtn}
             activeOpacity={0.7}
           >
-            <Ionicons
-              name={isWishlisted ? "heart" : "heart-outline"}
-              size={18}
-              color="#fff"
-            />
+            <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+              <Ionicons
+                name={isWishlisted ? "heart" : "heart-outline"}
+                size={18}
+                color="#fff"
+              />
+            </Animated.View>
           </TouchableOpacity>
         </View>
         {rankLabel ? (

@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Spacing, TextStyles } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
 import { courseService } from '../services/courseService';
 import creditService from '../services/creditService';
 import type { MainStackParamList } from '../types/navigation';
@@ -24,15 +25,17 @@ export default function LeaveReviewScreen() {
   const route = useRoute<R>();
   const navigation = useNavigation();
   const { user } = useAuth();
-  const userId = user?.id!;
+  const { user: profileUser } = useUser();
+  const userId = profileUser?.uuid ?? user?.id!;
   const { courseId } = route.params;
 
   const [rating, setRating] = useState<number>(0);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const reviewText = typeof text === "string" ? text : "";
 
-  const canSubmit = rating > 0 && text.trim().length >= 10;
+  const canSubmit = rating > 0 && reviewText.trim().length >= 10;
 
   useEffect(() => {
     let mounted = true;
@@ -40,7 +43,7 @@ export default function LeaveReviewScreen() {
       const existing = await courseService.getUserReview(courseId, userId);
       if (mounted && existing) {
         setRating(existing.rating);
-        setText(existing.review);
+        setText(typeof existing.review === "string" ? existing.review : "");
         setIsEditing(true);
       }
     })();
@@ -55,7 +58,7 @@ export default function LeaveReviewScreen() {
 
   const onSubmit = async () => {
     if (!rating) return Alert.alert('Rating required', 'Please select a star rating.');
-    if (text.trim().length < 10) {
+    if (reviewText.trim().length < 10) {
       return Alert.alert('Tell us a bit more', 'Please write at least 10 characters.');
     }
     if (submitting) return;
@@ -63,7 +66,7 @@ export default function LeaveReviewScreen() {
     setSubmitting(true);
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const payload = { userId, rating, review: text.trim(), isAnonymous: false };
+    const payload = { userId, rating, review: reviewText.trim(), isAnonymous: false };
 
     const doSuccess = (msg = 'Thanks for your feedback.') => {
       Alert.alert(isEditing ? '✅ Review updated!' : '✅ Review submitted!', msg);
@@ -175,7 +178,7 @@ export default function LeaveReviewScreen() {
 
       <CustomTextInput
         placeholder="Share your experience (min 10 chars)"
-        value={text}
+        value={reviewText}
         onChangeText={setText}
         autoCapitalize={"none"}
         multiline
