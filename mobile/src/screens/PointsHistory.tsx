@@ -177,7 +177,12 @@ export default function PointsHistoryScreen({ navigation }: any) {
     >
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) =>
+          String(
+            item.id ??
+              `points-${index}-${item.pointsTitle ?? item.subtitle ?? "row"}`
+          )
+        }
         renderItem={({ item, index, section }) => (
           <View>
             <TouchableOpacity activeOpacity={0.8} style={styles.row}>

@@ -120,7 +120,9 @@ export default function MyCourses({ navigation }: any) {
 
             <FlatList
               data={continueWatching}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item, index) =>
+                String(item.id ?? `continue-${index}-${item.title ?? "course"}`)
+              }
               horizontal
               showsHorizontalScrollIndicator={false}
               ItemSeparatorComponent={() => (
@@ -186,11 +188,11 @@ export default function MyCourses({ navigation }: any) {
           </View>
         ) : (
           <View>
-            {courses.map((item) => {
+            {courses.map((item, index) => {
               const pct = Math.round(item.progress_percentage ?? 0);
               return (
                 <TouchableOpacity
-                  key={item.id}
+                  key={String(item.id ?? `my-course-${index}-${item.title ?? "course"}`)}
                   activeOpacity={0.9}
                   onPress={() =>
                     navigation.navigate("CourseDetail", { courseId: item.id })

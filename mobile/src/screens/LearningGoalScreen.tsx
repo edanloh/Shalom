@@ -478,12 +478,14 @@ export default function LearningGoalScreen({ navigation }: any) {
                 contentContainerStyle={styles.templateList}
                 showsVerticalScrollIndicator={false}
               >
-                {goalTemplates.map((template) => {
+                {goalTemplates.map((template, index) => {
                   const isActive = activeTemplateIds.has(template.id);
                   const selected = selectedTemplateIds.includes(template.id);
                   return (
                     <Pressable
-                      key={template.id}
+                      key={String(
+                        template.id ?? `goal-template-${index}-${template.label ?? "template"}`
+                      )}
                       style={[
                         styles.templateRow,
                         selected && styles.templateRowSelected,

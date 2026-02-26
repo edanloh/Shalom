@@ -255,7 +255,12 @@ export default function CertificatesScreen({ navigation }: any) {
     >
       <FlatList
         data={filteredCertificates}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) =>
+          String(
+            item.id ??
+              `certificate-${index}-${item.courseName ?? item.credentialId ?? "row"}`
+          )
+        }
         renderItem={({ item: cert }) => (
           <TouchableOpacity
             activeOpacity={0.7}

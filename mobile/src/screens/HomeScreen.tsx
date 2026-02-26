@@ -565,9 +565,9 @@ export default function HomeScreen({ navigation, route }: any) {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
                 >
-                  {wishlist.map((course) => (
+                  {wishlist.map((course, index) => (
                     <CourseCard
-                      key={course.id}
+                      key={String(course.id ?? `wishlist-${index}-${course.title ?? "course"}`)}
                       course={course}
                       variant="compact"
                       showInstructor={false}
@@ -607,9 +607,9 @@ export default function HomeScreen({ navigation, route }: any) {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
                 >
-                  {recommendedList.map((course) => (
+                  {recommendedList.map((course, index) => (
                     <CourseCard
-                      key={course.id}
+                      key={String(course.id ?? `recommended-${index}-${course.title ?? "course"}`)}
                       course={course}
                       variant="compact"
                       showInstructor={false}

@@ -251,7 +251,7 @@ export default function CourseDetailScreen({
 
     return (
       <Pressable
-        key={section.id}
+        key={String(section.id ?? `section-${index}-${section.title ?? "module"}`)}
         style={[styles.moduleItem, isLocked && styles.moduleItemLocked]}
         onPress={isLocked ? undefined : onOpen}
         disabled={isLocked}

@@ -142,7 +142,13 @@ export default function WishlistScreen() {
     >
       <FlatList
         data={wishlist}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => {
+          const rawId = item?.id;
+          if (rawId !== undefined && rawId !== null && String(rawId).length > 0) {
+            return String(rawId);
+          }
+          return `wishlist-${index}-${item?.title ?? "unknown"}`;
+        }}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}

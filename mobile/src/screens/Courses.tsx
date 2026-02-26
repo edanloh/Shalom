@@ -497,7 +497,9 @@ export default function CoursesScreen({ navigation }: any) {
               </Text>
               <FlatList<Course>
                 data={jumpBackIn}
-                keyExtractor={(i) => i.id}
+                keyExtractor={(i, index) =>
+                  String(i.id ?? `jump-back-${index}-${i.title ?? "course"}`)
+                }
                 renderItem={({ item }) => <HCard item={item} withProgress />}
                 horizontal
                 showsVerticalScrollIndicator={false}
@@ -522,7 +524,9 @@ export default function CoursesScreen({ navigation }: any) {
               ) : recommended.length ? (
                 <FlatList<Course>
                   data={recommended}
-                  keyExtractor={(i) => i.id}
+                  keyExtractor={(i, index) =>
+                    String(i.id ?? `recommended-${index}-${i.title ?? "course"}`)
+                  }
                   renderItem={({ item }) => (
                     <CourseCard
                       course={item}
@@ -559,7 +563,9 @@ export default function CoursesScreen({ navigation }: any) {
           ) : popular.length ? (
             <FlatList<Course>
               data={popular}
-              keyExtractor={(i) => i.id}
+              keyExtractor={(i, index) =>
+                String(i.id ?? `popular-${index}-${i.title ?? "course"}`)
+              }
               renderItem={({ item }) => <GCard item={item} />}
               numColumns={2}
               columnWrapperStyle={{ justifyContent: "space-between" }}

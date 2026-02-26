@@ -243,7 +243,12 @@ export default function AchievementsScreen({ navigation }: any) {
     >
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) =>
+          String(
+            item.id ??
+              `achievement-${index}-${item.label ?? item.subtitle ?? "row"}`
+          )
+        }
         renderItem={({ item, index, section }) => (
           <View>
             <TouchableOpacity

@@ -1110,7 +1110,10 @@ const QuizScreen = () => {
 
             return (
               <TouchableOpacity
-                key={option.id}
+                key={String(
+                  option.id ??
+                    `option-${index}-${option.option_text ?? "choice"}`
+                )}
                 style={[
                   styles.modernOptionCard,
                   { borderColor, backgroundColor },

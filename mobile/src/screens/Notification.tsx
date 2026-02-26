@@ -350,7 +350,12 @@ export default function NotificationsScreen({ navigation }: any) {
       </Modal>
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) =>
+          String(
+            item.id ??
+              `notification-${index}-${item.createdAt ?? item.title ?? item.message ?? "row"}`
+          )
+        }
         renderItem={({ item }) => renderRow(item)}
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>

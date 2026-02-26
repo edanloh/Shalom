@@ -187,7 +187,17 @@ export default function CourseProvider({ children }: { children: React.ReactNode
 
   const toggleWishlist = async (course: Course) => {
     if (!dbUserId) return;
-    const id = course.id;
+    const id = course?.id;
+    if (!id) {
+      setWishlistError('Course ID is missing');
+      showToast({
+        type: 'error',
+        title: 'Wishlist update failed',
+        message: 'This course is missing an ID.',
+        durationMs: 2200,
+      });
+      return;
+    }
     const currently = isWishlisted(id);
 
     // optimistic UI

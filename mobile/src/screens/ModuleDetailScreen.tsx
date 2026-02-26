@@ -325,7 +325,7 @@ const ModuleDetailScreen = () => {
 
     return (
       <TouchableOpacity
-        key={item.id}
+        key={String(item.id ?? `module-item-${index}-${item.title ?? item.type ?? "item"}`)}
         style={[styles.itemCard, isLocked && styles.itemCardLocked]}
         onPress={() => handleItemPress(item)}
         activeOpacity={isLocked ? 1 : 0.7}

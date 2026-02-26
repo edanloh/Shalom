@@ -82,7 +82,7 @@ export default function CourseCarousel({
 
           return (
             <CourseCardItem
-              key={course.id}
+              key={String(course.id ?? `carousel-${index}-${course.title ?? "course"}`)}
               course={course}
               index={index}
               scrollX={scrollX}
