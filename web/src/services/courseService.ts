@@ -1112,7 +1112,7 @@ class CourseService {
   }): Promise<Course> {
     try {
       // Get instructor ID from context or use default
-      const instructorId = courseData.instructorId || '550e8400-e29b-41d4-a716-446655440101';
+      const instructorId = courseData.instructorId
 
       const response = await apiService.post<any>(ENDPOINTS.CREATE_COURSE, {
         title: courseData.title,

@@ -52,6 +52,7 @@ const ENDPOINTS = {
   MARK_ALL_READ: "/markAllNotificationsRead",
   DELETE: "/deleteNotification",
   CLEAR: "/clearNotifications",
+  LIST_COURSES: '/getCourseNotifications',
 } as const;
 
 export const notificationService = {
@@ -61,6 +62,7 @@ export const notificationService = {
    * Maps to pushNotificationHandler.mjs Lambda function
    */
   async registerPushToken(userId: string, pushToken: string) {
+    console.log("Registering push token for user:", userId, pushToken);
     try {
       const response = await apiService.post("/pushNotificationHandler/register", {
         userId,
@@ -164,6 +166,23 @@ export const notificationService = {
     const resp = await apiService.post<any>(ENDPOINTS.DELETE, { userId, notificationId });
     return Number(resp?.data?.deleted ?? resp?.deleted ?? 0);
   },
+
+  async getCourseNotifications(
+    courseId: string,
+    limitOrOptions: number | { limit?: number; offset?: number } = 50
+  ): Promise<any[]> {
+    const resolved =
+      typeof limitOrOptions === "number"
+        ? { limit: limitOrOptions, offset: 0 }
+        : { limit: limitOrOptions.limit ?? 50, offset: limitOrOptions.offset ?? 0 };
+    const resp = await apiService.get<any>(ENDPOINTS.LIST_COURSES, {
+      courseId,
+      limit: String(resolved.limit),
+      offset: String(resolved.offset),
+    });
+    const raw = resp?.data ?? resp ?? [];
+    return raw
+  }
 };
 
 export default notificationService;

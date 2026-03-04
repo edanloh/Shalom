@@ -318,6 +318,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2A2A35",
     borderRadius: 5,
     overflow: "hidden",
+    marginBottom: Spacing.xs,
   },
   compactProgressFill: {
     height: "100%",

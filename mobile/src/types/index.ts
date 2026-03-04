@@ -17,14 +17,19 @@ export interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   changePassword: ( currentPassword: string, newPassword: string ) => Promise<{ success: boolean; error?: string }>;
   fetchEmail: (email: string) => Promise<any>;
-  loginWithToken: (credentials: Tokens, path: string) => Promise<void>;
+  loginWithToken: (credentials: Tokens, type?: string) => Promise<void>;
   setIsResettingPassword: (value: boolean) => void;
 }
 
 export interface User {
   id: string;
+  uuid?: string; // db users table id
   email: string;
   name: string;
+  bio?: string;
+  location?: string;
+  phone?: string;
+  role?: string;
   avatar_url?: string;
   points?: number; // For gamification features
   joined_at?: string; // ISO date string

@@ -34,6 +34,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import { StorageService } from "../../services/storageService";
 import { useCategories } from "../../hooks/useCategories";
 import { Colors } from "@/constants";
+import { useUser } from '@/contexts/UserContext';
+import { postNotification } from "@/services/notificationService";
+import { Student } from "@/services";
 
 // Types
 export interface Question {
@@ -219,7 +222,7 @@ export const CourseBuilderProvider = ({
   children,
   courseId,
 }: CourseBuilderProviderProps) => {
-  const { user } = useAuth(); // Get authenticated user for admin ID
+  const { user } = useUser(); // Get authenticated user for admin ID
   const { categories } = useCategories();
 
   // Course state - Start with empty data (will be loaded from API or kept empty for new course)
@@ -273,7 +276,7 @@ export const CourseBuilderProvider = ({
       setIsLoadingCourse(true);
 
       try {
-        const adminId = user?.id || "550e8400-e29b-41d4-a716-446655440101";
+        const adminId = user?.uuid || "550e8400-e29b-41d4-a716-446655440101";
 
         // Fetch all course data using the service
         const courseBuilderData = await courseService.getCourseBuilderData(
@@ -383,8 +386,16 @@ export const CourseBuilderProvider = ({
         setModules(updatedModules);
       }
     };
-
+    const getStudents = async () => {
+      const studentsData = await courseService.getCourseStudents(currentCourseId);
+      console.log('Enrolled students fetched for notifications:', studentsData);
+      setEnrolledStudents(studentsData);
+      const data = await courseService.getAllStudents();
+      setAllStudents(data.students);
+      console.log('All students fetched for notifications:', data.students);
+    };
     initializeOrderValues();
+    getStudents();
   }, []); // Run only once on mount
 
   // UI state
@@ -405,6 +416,10 @@ export const CourseBuilderProvider = ({
   const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
   const [draggedOver, setDraggedOver] = useState<DraggedItem | null>(null);
 
+  // Students
+  const [enrolledStudents, setEnrolledStudents] = useState<Student[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  
   // Utility functions
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
@@ -1187,8 +1202,9 @@ export const CourseBuilderProvider = ({
           category: finalCategoryId || "",
           description: courseDescription || "Course description",
           thumbnailUrl: uploadedCourseThumbnailUrl || null,
-          instructorId: user?.id || "550e8400-e29b-41d4-a716-446655440101", // Get from auth context
-          instructorName: user?.name || "Shalom Instructor", // Get from auth context
+          level: 'Beginner', // TODO: Add level selector in UI
+          instructorId: user?.uuid, // Get from auth context
+          instructorName: user?.name || 'Instructor', // Get from auth context
           modules: transformedModules,
           outcomes: courseOutcomes.map((outcome) => outcome.trim()).filter(Boolean),
           requirements: [], // TODO: Add requirements in UI
@@ -1247,6 +1263,30 @@ export const CourseBuilderProvider = ({
         showCancel: false,
       });
 
+      try {
+        if (currentCourseId && currentCourseId !== 'new' ) {
+          // Generate random uuid
+          const notificationId = crypto.randomUUID();
+          await postNotification({
+            userIds: enrolledStudents.map(student => student.id.toString()),
+            title: `${courseName}`,
+            message: `${courseName} has been updated! Check out the latest content.`,
+            type: `course_announcement-${currentCourseId}-${notificationId}`,
+          });
+        } else {
+          // Generate random uuid
+          const notificationId = crypto.randomUUID();
+          await postNotification({
+            userIds: allStudents.map(student => student.id.toString()),
+            title: `${courseName}`,
+            message: `New course ${courseName} has been created! Check it out now.`,
+            type: `course_announcement-${currentCourseId}-${notificationId}`,
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error sending notifications to students:', notificationError);
+      }
+      
       setHasUnsavedChanges(false); // Reset after successful save
       return { success: true, courseId: finalCourseId };
     } catch (error) {
