@@ -168,6 +168,15 @@ class ModuleService {
    * Check if item is completed
    */
   isItemCompleted(item: ModuleItem, userProgress?: UserProgress): boolean {
+    // Use the is_completed property from the backend which already handles:
+    // - Videos: watched to completion
+    // - Quizzes: passed OR exhausted all attempts
+    // - Documents: viewed/completed
+    if (item.is_completed !== undefined) {
+      return item.is_completed;
+    }
+
+    // Fallback to manual checking if is_completed not set (legacy)
     if (!userProgress) return false;
 
     if (item.type === 'video') {
@@ -178,7 +187,7 @@ class ModuleService {
       return attempt?.is_passed || false;
     }
     else if (item.type === 'pdf' || item.type === 'document' || item.type === 'ppt') {
-      return item.is_completed || false;
+      return false;
     }
     return false;
   }
@@ -187,11 +196,28 @@ class ModuleService {
    * Calculate section completion percentage
    */
   getSectionCompletionPercentage(section: CourseSection, userProgress?: UserProgress): number {
-    if (!userProgress || section.items.length === 0) return 0;
+    if (section.items.length === 0) return 0;
+    
+    // Use is_completed directly from items first (already calculated by backend)
     const completedItems = section.items.filter(item => 
       this.isItemCompleted(item, userProgress)
     ).length;
-    return Math.round((completedItems / section.items.length) * 100);
+    
+    const percentage = Math.round((completedItems / section.items.length) * 100);
+    
+    console.log(`📊 Calculating section completion for ${section.title}:`, {
+      completedItems,
+      totalItems: section.items.length,
+      percentage,
+      items: section.items.map(item => ({
+        title: item.title,
+        type: item.type,
+        is_completed: item.is_completed,
+        calculated: this.isItemCompleted(item, userProgress)
+      }))
+    });
+    
+    return percentage;
   }
 
   /**
