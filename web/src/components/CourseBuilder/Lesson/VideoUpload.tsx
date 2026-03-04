@@ -120,7 +120,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
           }
           style={{
             backgroundColor: videoInputType === "url"
-              ? Colors.accent
+              ? Colors.secondary
               : Colors.gray800,
             color: Colors.textPrimary,
             opacity:
@@ -165,7 +165,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
           }
           style={{
             backgroundColor: videoInputType === "upload"
-              ? Colors.accent
+              ? Colors.secondary
               : Colors.gray800,
             color: Colors.textPrimary,
             opacity:

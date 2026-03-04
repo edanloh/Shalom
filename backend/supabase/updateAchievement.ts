@@ -16,6 +16,7 @@ const corsHeaders = {
 };
 
 const allowedTypes = new Set(["streak", "certificate", "badge", "level"]);
+const allowedScopeTypes = new Set(["instructor", "course"]);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -36,13 +37,23 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    const { id } = body ?? {};
+    const { id, createdBy } = body ?? {};
 
     if (!id) {
       return new Response(JSON.stringify({ success: false, message: "id is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (!createdBy) {
+      return new Response(
+        JSON.stringify({ success: false, message: "createdBy is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const update: Record<string, unknown> = {};
@@ -54,6 +65,24 @@ serve(async (req) => {
     if ("points" in body) update.points = body.points;
     if ("color" in body) update.color = body.color;
     if ("isActive" in body) update.is_active = body.isActive;
+    if ("scopeType" in body) {
+      if (!allowedScopeTypes.has(body.scopeType)) {
+        return new Response(JSON.stringify({ success: false, message: "invalid scopeType (instructors can only use instructor or course)" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      update.scope_type = body.scopeType;
+      update.scope_id = body.scopeId ?? null;
+      if (!body.scopeId) {
+        return new Response(JSON.stringify({ success: false, message: "scopeId is required for scoped achievements" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else if ("scopeId" in body) {
+      update.scope_id = body.scopeId;
+    }
 
     if ("type" in body) {
       if (!allowedTypes.has(body.type)) {
@@ -76,6 +105,7 @@ serve(async (req) => {
       .from("achievements")
       .update(update)
       .eq("id", id)
+      .eq("created_by", createdBy)
       .select()
       .single();
 

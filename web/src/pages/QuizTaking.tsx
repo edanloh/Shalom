@@ -6,10 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from '@/contexts/useAuth';
 import { moduleService } from "@/services/moduleService";
 import apiService from "@/services/apiService";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 import courseService, {
   CourseSection,
   Quiz,
@@ -71,8 +71,15 @@ const QuizTaking = () => {
       const adminId =
         user?.uuid ||
         (user as any)?.sub ||
-        (user as any)?.["cognito:username"] ||
-        "550e8400-e29b-41d4-a716-446655440101";
+        (user as any)?.["cognito:username"];
+      if (!adminId) {
+        toast({
+          title: "Error",
+          description: "User not authenticated",
+          variant: "destructive",
+        });
+        return;
+      }
 
       try {
         setIsLoading(true);

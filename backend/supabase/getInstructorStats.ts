@@ -71,10 +71,11 @@ serve(async (req) => {
       );
     }
 
-    // Get all PUBLISHED courses only
+    // Get this instructor's published courses only
     const { data: courses, error: coursesError } = await supabaseClient
       .from("courses")
       .select("id, title, rating, is_published")
+      .eq("instructor_id", adminId)
       .eq("is_published", true);
 
     if (coursesError) throw coursesError;
@@ -83,12 +84,14 @@ serve(async (req) => {
 
     // Get enrollments for PUBLISHED courses only
     const { data: enrollments, error: enrollmentsError } =
-      await supabaseClient
-        .from("course_enrollments")
-        .select(
-          "id, user_id, course_id, enrollment_date, progress_percentage, is_completed"
-        )
-        .in("course_id", publishedCourseIds);
+      publishedCourseIds.length > 0
+        ? await supabaseClient
+            .from("course_enrollments")
+            .select(
+              "id, user_id, course_id, enrollment_date, progress_percentage, is_completed"
+            )
+            .in("course_id", publishedCourseIds)
+        : { data: [], error: null };
 
     if (enrollmentsError) throw enrollmentsError;
 
@@ -101,10 +104,12 @@ serve(async (req) => {
     // 🔧 FIX: Fetch ACTUAL rating values
     // =========================
     const { data: courseRatings, error: ratingsError } =
-      await supabaseClient
-        .from("course_ratings")
-        .select("course_id, rating")
-        .in("course_id", publishedCourseIds);
+      publishedCourseIds.length > 0
+        ? await supabaseClient
+            .from("course_ratings")
+            .select("course_id, rating")
+            .in("course_id", publishedCourseIds)
+        : { data: [], error: null };
 
     if (ratingsError) throw ratingsError;
 
@@ -218,24 +223,26 @@ serve(async (req) => {
 
     // Get recent activity for PUBLISHED courses only
     const { data: recentEnrollments, error: recentError } =
-      await supabaseClient
-        .from("course_enrollments")
-        .select(
+      publishedCourseIds.length > 0
+        ? await supabaseClient
+            .from("course_enrollments")
+            .select(
+              `
+            enrollment_date,
+            users (
+              name,
+              email
+            ),
+            courses (
+              title,
+              is_published
+            )
           `
-        enrollment_date,
-        users (
-          name,
-          email
-        ),
-        courses (
-          title,
-          is_published
-        )
-      `
-        )
-        .eq("courses.is_published", true)
-        .order("enrollment_date", { ascending: false })
-        .limit(10);
+            )
+            .in("course_id", publishedCourseIds)
+            .order("enrollment_date", { ascending: false })
+            .limit(10)
+        : { data: [], error: null };
 
     if (recentError) throw recentError;
 

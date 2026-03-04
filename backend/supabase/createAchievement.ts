@@ -16,6 +16,7 @@ const corsHeaders = {
 };
 
 const allowedTypes = new Set(["streak", "certificate", "badge", "level"]);
+const allowedScopeTypes = new Set(["instructor", "course"]);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -37,6 +38,7 @@ serve(async (req) => {
 
     const body = await req.json();
     const {
+      createdBy = null,
       name,
       description = null,
       icon = null,
@@ -45,6 +47,8 @@ serve(async (req) => {
       points = 0,
       color = null,
       isActive = true,
+      scopeType = "instructor",
+      scopeId = null,
     } = body ?? {};
 
     if (!name) {
@@ -54,8 +58,31 @@ serve(async (req) => {
       });
     }
 
+    if (!createdBy) {
+      return new Response(
+        JSON.stringify({ success: false, message: "createdBy is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     if (!allowedTypes.has(type)) {
       return new Response(JSON.stringify({ success: false, message: "invalid type" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!allowedScopeTypes.has(scopeType)) {
+      return new Response(JSON.stringify({ success: false, message: "invalid scopeType" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!scopeId) {
+      return new Response(JSON.stringify({ success: false, message: "scopeId is required for scoped achievements" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -64,6 +91,7 @@ serve(async (req) => {
     const { data, error } = await supabase
       .from("achievements")
       .insert({
+        created_by: createdBy,
         name,
         description,
         icon,
@@ -72,6 +100,8 @@ serve(async (req) => {
         points,
         color,
         is_active: isActive,
+        scope_type: scopeType,
+        scope_id: scopeId,
       })
       .select()
       .single();

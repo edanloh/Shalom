@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { lessonService } from "@/services";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 import UniversalDocumentViewer from "@/components/document/UniversalDocumentViewer";
 import OfficeOnlinePreview from "@/components/document/OfficeOnlinePreview";
 

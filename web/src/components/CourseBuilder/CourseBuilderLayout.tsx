@@ -1,5 +1,5 @@
 import React from "react";
-import { useCourseBuilder } from './CourseBuilderContext';
+import { useCourseBuilder } from './useCourseBuilder';
 
 export const CourseBuilderLayout = ({ children }: { children: React.ReactNode }) => {
   const {

@@ -11,9 +11,12 @@ import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 
 import { useCourses } from "../contexts/CourseContext";
+import { useUser } from "../contexts/UserContext";
+import courseService from "../services/courseService";
 import type { MainStackParamList } from "@/types/navigation";
 import { Colors, Typography, Spacing, TextStyles } from "../constants";
 import { ImageWithFallback } from "../components/common";
+import AnimatedHeartButton from "../components/common/AnimatedHeartButton";
 import { Images } from "../../assets";
 import Screen from "../components/common/Screen";
 import { ActionButton } from "@/components";
@@ -29,6 +32,8 @@ const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
 
 export default function WishlistScreen() {
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
+  const { user: profileUser } = useUser();
+  const recommendationUserId = profileUser?.uuid;
   const {
     wishlist,
     wishlistLoading,
@@ -40,19 +45,36 @@ export default function WishlistScreen() {
   const renderItem = ({ item }: any) => (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
+      onPress={() => {
+        if (recommendationUserId) {
+          courseService
+            .recordRecommendationEvent({
+              userId: recommendationUserId,
+              courseId: item.id,
+              eventType: "click",
+              context: {
+                placement: "wishlist",
+                isRecommendationSurface: false,
+              },
+            })
+            .catch((err) =>
+              console.warn("Failed to record wishlist course click", err)
+            );
+        }
+        navigation.navigate("CourseDetail", { courseId: item.id });
+      }}
       style={styles.card}
     >
       {/* Left: text */}
       <View style={styles.cardLeft}>
+        {/* Category badge */}
+        <View style={[styles.categoryBadge, { backgroundColor: item.categoryColor || Colors.purple400 }]}>
+          <Text style={styles.categoryText} numberOfLines={1}>{item.category}</Text>
+        </View>
         <Text style={styles.title} numberOfLines={2}>
           {item.title}
         </Text>
         <MetaRow rating={item.rating} modules={item.modules} />
-        {/* Category badge */}
-        <View  style={[styles.categoryBadge, { backgroundColor: item.categoryColor }]}>
-          <Text style={styles.categoryText}>{item.category}</Text>
-        </View>
       </View>
 
       {/* Right: image + heart */}
@@ -63,15 +85,13 @@ export default function WishlistScreen() {
           style={styles.cardImage}
         />
         <View style={styles.badgeRow}>
-          <TouchableOpacity
+          <AnimatedHeartButton
             onPress={() => toggleWishlist(item)}
             hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
             style={styles.heartBtn}
-            accessibilityRole="button"
             accessibilityLabel="Remove from wishlist"
-          >
-            <Ionicons name="heart" size={20} color="#fff" />
-          </TouchableOpacity>
+            filled
+          />
         </View>
       </View>
     </TouchableOpacity>
@@ -122,22 +142,34 @@ export default function WishlistScreen() {
     >
       <FlatList
         data={wishlist}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => {
+          const rawId = item?.id;
+          if (rawId !== undefined && rawId !== null && String(rawId).length > 0) {
+            return String(rawId);
+          }
+          return `wishlist-${index}-${item?.title ?? "unknown"}`;
+        }}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
         refreshing={!!wishlistLoading}
         onRefresh={refreshWishlist}
         scrollEnabled={false}
+        contentContainerStyle={wishlist.length === 0 ? styles.emptyListContent : undefined}
         ListEmptyComponent={
-          <View style={{ gap: Spacing.base, alignItems: "center" }}>
+          <View style={styles.emptyState}>
+            <Ionicons
+              name="heart-outline"
+              size={48}
+              color={Colors.textMuted ?? Colors.textSecondary}
+            />
             <Text style={TextStyles.body}>Your wishlist is empty</Text>
             <Text style={TextStyles.caption}>
               Tap the heart on any course to save it here.
             </Text>
             <ActionButton
               text="Browse courses"
-              onPress={() => navigation.navigate("MyCourses")}
+              onPress={() => navigation.goBack()}
             />
           </View>
         }
@@ -162,11 +194,20 @@ const styles = StyleSheet.create({
 
   card: {
     flexDirection: "row",
-    backgroundColor: Colors.cardDark,
+    backgroundColor: Colors.gray600,
     borderRadius: 16,
     overflow: "hidden",
+    minHeight: 110,
+    maxHeight: 160,
   },
-  cardLeft: { flex: 1, padding: Spacing.md },
+  cardLeft: {
+    flex: 1,
+    padding: Spacing.lg,
+    justifyContent: "center",
+    paddingRight: Spacing.md,
+    flexShrink: 1,
+    minWidth: 0,
+  },
   leftTitle: {
     fontFamily: TextStyles.h4.fontFamily,
     fontSize: 16,
@@ -185,16 +226,18 @@ const styles = StyleSheet.create({
   title: {
     color: Colors.textPrimary,
     fontWeight: "700",
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: Typography?.fontFamily?.semiBold ?? TextStyles.body.fontFamily,
-    marginBottom: 4,
+    marginBottom: 8,
+    lineHeight: 20,
   },
 
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingTop: 6,
+    gap: 4,
+    paddingTop: 2,
+    flexWrap: "wrap",
   },
 
   metaText: {
@@ -207,15 +250,12 @@ const styles = StyleSheet.create({
   metaDot: { color: Colors.textSecondary, marginHorizontal: 4 },
 
   cardRight: {
-    width: 150,
-    height: 100,
-    backgroundColor: "#E7F0EC",
-    alignItems: "center",
-    justifyContent: "center",
+    width: 140,
+    alignSelf: "stretch",
     position: "relative",
-    alignSelf: "center",
+    overflow: "hidden",
   },
-  cardImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  cardImage: { flex: 1, width: 150, resizeMode: "cover" },
   badgeRow: {
     position: "absolute",
     top: Spacing.sm,
@@ -224,13 +264,13 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   categoryBadge: {
-    width: "auto",
-    alignSelf: "flex-start",    
+    alignSelf: "flex-start",
     paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: 8,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.xs,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: Spacing.sm,
+    maxWidth: "72%",
+    flexShrink: 1,
   },
   categoryText: {
     color: Colors.white,
@@ -241,5 +281,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 14,
     padding: 6,
+  },
+  emptyListContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  emptyState: {
+    gap: Spacing.base,
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    paddingHorizontal: Spacing.lg,
   },
 });

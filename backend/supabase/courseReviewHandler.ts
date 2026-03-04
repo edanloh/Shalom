@@ -21,7 +21,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST,PUT,OPTIONS',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
 };
 
 function badRequest(msg: string) {
@@ -117,6 +117,57 @@ serve(async (req) => {
       return badRequest("courseId is required in path");
     }
 
+    if (!["GET", "POST", "PUT"].includes(req.method)) {
+      return new Response(
+        JSON.stringify({ success: false, message: "Method not allowed" }),
+        { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (req.method === "GET") {
+      const userId = (url.searchParams.get("userId") ?? "").toString().trim();
+      if (!userId) return badRequest("userId is required");
+
+      const { data: reviewDetails, error: reviewError } = await supabaseClient
+        .from('course_ratings')
+        .select(`
+          id,
+          rating,
+          review,
+          created_at,
+          is_anonymous,
+          reviewer:users!course_ratings_user_id_fkey (
+            name,
+            avatar_url
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (reviewError) throw reviewError;
+      if (!reviewDetails) {
+        return new Response(
+          JSON.stringify({ success: true, data: null }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const payload = {
+        id: reviewDetails.id,
+        rating: Number(reviewDetails.rating),
+        review: reviewDetails.review,
+        createdAt: reviewDetails.created_at,
+        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.reviewer?.name || "Anonymous"),
+        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.reviewer?.avatar_url ?? null),
+      };
+
+      return new Response(
+        JSON.stringify({ success: true, data: payload }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Parse body
     let body;
     try {
@@ -129,6 +180,9 @@ serve(async (req) => {
     const rating = Number(body.rating);
     const review = (body.review ?? "").toString().trim();
     const isAnonymous = !!body.isAnonymous;
+    const contextSectionId = (body.contextSectionId ?? body.sectionId ?? "")
+      .toString()
+      .trim();
 
     if (!userId) return badRequest("userId is required");
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
@@ -177,11 +231,25 @@ serve(async (req) => {
       }
 
       // Insert new review
+      let normalizedContextSectionId: string | null = null;
+      if (contextSectionId) {
+        const { data: section, error: sectionError } = await supabaseClient
+          .from("course_sections")
+          .select("id,course_id")
+          .eq("id", contextSectionId)
+          .eq("course_id", courseId)
+          .single();
+        if (!sectionError && section?.id) {
+          normalizedContextSectionId = String(section.id);
+        }
+      }
+
       const { data: newReview, error: insertError } = await supabaseClient
         .from('course_ratings')
         .insert({
           user_id: userId,
           course_id: courseId,
+          context_section_id: normalizedContextSectionId,
           rating: rating,
           review: review,
           is_anonymous: isAnonymous,
@@ -204,7 +272,7 @@ serve(async (req) => {
           review,
           created_at,
           is_anonymous,
-          users (
+          reviewer:users!course_ratings_user_id_fkey (
             name,
             avatar_url
           )
@@ -219,8 +287,8 @@ serve(async (req) => {
         rating: Number(reviewDetails.rating),
         review: reviewDetails.review,
         createdAt: reviewDetails.created_at,
-        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.users?.name || "Anonymous"),
-        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.users?.avatar_url ?? null),
+        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.reviewer?.name || "Anonymous"),
+        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.reviewer?.avatar_url ?? null),
       };
 
       return new Response(
@@ -284,7 +352,7 @@ serve(async (req) => {
           review,
           created_at,
           is_anonymous,
-          users (
+          reviewer:users!course_ratings_user_id_fkey (
             name,
             avatar_url
           )
@@ -299,8 +367,8 @@ serve(async (req) => {
         rating: Number(reviewDetails.rating),
         review: reviewDetails.review,
         createdAt: reviewDetails.created_at,
-        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.users?.name || "Anonymous"),
-        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.users?.avatar_url ?? null),
+        reviewerName: reviewDetails.is_anonymous ? "Anonymous" : (reviewDetails.reviewer?.name || "Anonymous"),
+        reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.reviewer?.avatar_url ?? null),
       };
 
       return new Response(

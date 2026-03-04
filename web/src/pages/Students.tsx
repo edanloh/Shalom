@@ -26,9 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useUser } from '@/contexts/useUser';
 import { useNavigate } from "react-router-dom";
 
 const Students = () => {
+  const { user } = useUser();
+  const instructorId = user?.uuid;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -110,7 +113,11 @@ const Students = () => {
 		setLoading(true);
 		setError("");
 		try {
-			const result = await courseService.getAllStudents();
+			if (!instructorId) {
+        setStudents([]);
+        return;
+      }
+			const result = await courseService.getAllStudents(instructorId);
 			
 			// Transform API data to match the expected structure
 			const transformedStudents = result.students.map((student: any) => ({
@@ -137,7 +144,7 @@ const Students = () => {
 
   useEffect(() => {
     fetchStudents();
-  }, []);
+  }, [instructorId]);
 
   const activeProfileBase = selectedStudent
     ? profileCache[selectedStudent.id] || selectedStudent
@@ -768,7 +775,7 @@ const Students = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedStudents.map((student) => (
+                {paginatedStudents.length > 0 ? paginatedStudents.map((student) => (
                   <TableRow key={student.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -1238,20 +1245,30 @@ const Students = () => {
                     </Sheet>
                   </TableCell>
                 </TableRow>
-              ))}
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                      {searchQuery.trim().length > 0
+                        ? "No students match your search and filters."
+                        : "No students found for your courses yet."}
+                    </TableCell>
+                  </TableRow>
+                )}
             </TableBody>
           </Table>
 
-            <Pagination
-              currentPage={currentPage}
-              totalPages={Math.ceil(filteredStudents.length / itemsPerPage)}
-              onPageChange={(page) => {
-                setCurrentPage(page);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              itemsPerPage={itemsPerPage}
-              totalItems={filteredStudents.length}
-            />
+            {filteredStudents.length > 0 ? (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(filteredStudents.length / itemsPerPage)}
+                onPageChange={(page) => {
+                  setCurrentPage(page);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                itemsPerPage={itemsPerPage}
+                totalItems={filteredStudents.length}
+              />
+            ) : null}
             </>
           </Card>
         )}

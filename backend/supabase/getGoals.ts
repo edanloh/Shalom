@@ -79,7 +79,7 @@ serve(async (req) => {
         .maybeSingle(),
       supabase
         .from("user_analytics")
-        .select("total_time_minutes")
+        .select("total_time_minutes, streak_days")
         .eq("user_id", userId)
         .maybeSingle(),
     ]);
@@ -170,6 +170,7 @@ serve(async (req) => {
         data: payload,
         completedCourses: completedCount ?? 0,
         totalTimeMinutes: Number(analyticsRow?.total_time_minutes ?? 0),
+        streakDays: Number(analyticsRow?.streak_days ?? 0),
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

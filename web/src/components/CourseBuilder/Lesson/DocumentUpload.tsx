@@ -596,7 +596,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                   style={{
                     padding: "6px 12px",
                     backgroundColor:
-                      currentSlideIndex === 0 ? Colors.gray800 : Colors.accent,
+                      currentSlideIndex === 0 ? Colors.gray800 : Colors.secondary,
                     color: Colors.textPrimary,
                     border: "none",
                     borderRadius: "4px",
@@ -628,7 +628,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     backgroundColor:
                       currentSlideIndex === pptxSlides.length - 1
                         ? Colors.gray800
-                        : Colors.accent,
+                        : Colors.secondary,
                     color: Colors.textPrimary,
                     border: "none",
                     borderRadius: "4px",
@@ -709,7 +709,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           }
           style={{
             backgroundColor: !lesson?.resourceUrl?.startsWith("[LOCAL_FILE:")
-              ? Colors.accent
+              ? Colors.secondary
               : Colors.gray800,
             color: Colors.textPrimary,
             opacity:
@@ -735,7 +735,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           }
           style={{
             backgroundColor: lesson?.resourceUrl?.startsWith("[LOCAL_FILE:")
-              ? Colors.accent
+              ? Colors.secondary
               : Colors.gray800,
             color: Colors.textPrimary,
             opacity:

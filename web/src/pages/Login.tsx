@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useUser } from '@/contexts/UserContext';
+import { useAuth } from '@/contexts/useAuth';
+import { useUser } from '@/contexts/useUser';
 
 const Login = () => {
   const [email, setEmail] = useState('');

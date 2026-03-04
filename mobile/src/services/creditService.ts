@@ -92,8 +92,9 @@ export async function getGoalsWithProgress(userId?: string): Promise<{
   goals: LearningGoal[];
   completedCourses: number;
   totalTimeMinutes: number;
+  streakDays: number;
 }> {
-  if (!userId) return { goals: [], completedCourses: 0, totalTimeMinutes: 0 };
+  if (!userId) return { goals: [], completedCourses: 0, totalTimeMinutes: 0, streakDays: 0 };
   const resp = await apiService.get<any>(ENDPOINTS.GOALS, { userId });
   const data = resp?.data ?? resp;
   if (Array.isArray(data)) {
@@ -101,12 +102,14 @@ export async function getGoalsWithProgress(userId?: string): Promise<{
       goals: data,
       completedCourses: Number(resp?.completedCourses ?? 0),
       totalTimeMinutes: Number(resp?.totalTimeMinutes ?? 0),
+      streakDays: Number(resp?.streakDays ?? 0),
     };
   }
   return {
     goals: Array.isArray(data?.data) ? data.data : [],
     completedCourses: Number(data?.completedCourses ?? resp?.completedCourses ?? 0),
     totalTimeMinutes: Number(data?.totalTimeMinutes ?? resp?.totalTimeMinutes ?? 0),
+    streakDays: Number(data?.streakDays ?? resp?.streakDays ?? 0),
   };
 }
 

@@ -27,7 +27,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { analyticsService, type InstructorAnalytics } from "@/services";
-import { useAuth } from "@/contexts/AuthContext";
+import { useUser } from "@/contexts/useUser";
 import {
   LineChart,
   Line,
@@ -69,8 +69,8 @@ const Analytics = () => {
   const [error, setError] = useState<string | null>(null);
   const tooltipWrapperStyle = { pointerEvents: "none" } as const;
   const { toast } = useToast();
-  const { user } = useAuth();
-  const defaultUserId = user?.id || "550e8400-e29b-41d4-a716-446655440201";
+  const { user: profileUser } = useUser();
+  const defaultUserId = profileUser?.uuid;
   const SectionHelp = ({
     title,
     items,
@@ -110,6 +110,10 @@ const Analytics = () => {
       try {
         setLoading(true);
         setError(null);
+        if (!defaultUserId) {
+          setAnalytics(null);
+          return;
+        }
         const data = await analyticsService.getInstructorAnalytics(defaultUserId, {
           days: Number(dateFilter),
         });
@@ -137,6 +141,10 @@ const Analytics = () => {
         return;
       }
       try {
+        if (!defaultUserId) {
+          setCourseAnalytics(null);
+          return;
+        }
         const data = await analyticsService.getInstructorAnalytics(defaultUserId, {
           days: Number(dateFilter),
           courseId: selectedCourseId,
@@ -194,17 +202,21 @@ const Analytics = () => {
     course.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const enrollmentData = useMemo(() => {
-    const data = analytics?.enrollment_trend ?? [];
-    return [...data].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
-  }, [analytics]);
+  const enrollmentData = useMemo(() => analytics?.enrollment_trend ?? [], [analytics]);
   const courseEnrollmentData = useMemo(() => {
     if (selectedCourseId) {
-      const data = courseAnalytics?.enrollment_trend ?? [];
-      return [...data].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
+      return courseAnalytics?.enrollment_trend ?? [];
     }
     return enrollmentData;
   }, [selectedCourseId, courseAnalytics, enrollmentData]);
+  const hasEnrollmentData = useMemo(
+    () => enrollmentData.some((point) => Number(point.students || 0) > 0),
+    [enrollmentData]
+  );
+  const hasCourseEnrollmentData = useMemo(
+    () => courseEnrollmentData.some((point) => Number(point.students || 0) > 0),
+    [courseEnrollmentData]
+  );
 
   const completionData =
     analytics?.completion_breakdown?.map((entry) => {
@@ -215,10 +227,23 @@ const Analytics = () => {
       };
       return { ...entry, color: colorMap[entry.name] || "hsl(var(--muted))" };
     }) ?? [];
+  const hasCompletionDistributionData = useMemo(
+    () => completionData.some((entry) => Number(entry.value || 0) > 0),
+    [completionData]
+  );
 
   const studentActivityData = analytics?.activity_by_day ?? [];
+  const hasStudentActivityData = useMemo(
+    () => studentActivityData.some((entry) => Number(entry.active || 0) > 0),
+    [studentActivityData]
+  );
 
   const categoryPerformance = analytics?.category_performance ?? [];
+  const hasCategoryPerformanceData = useMemo(
+    () => categoryPerformance.some((entry) => Number(entry.value || 0) > 0),
+    [categoryPerformance]
+  );
+  const useCategoryBarFallback = categoryPerformance.length > 0 && categoryPerformance.length < 3;
   const cohortAnalytics = analytics?.cohort_analytics ?? [];
 
   const coursePerformance =
@@ -228,6 +253,14 @@ const Analytics = () => {
       engagement: c.engagement,
       completion: c.completion,
     }));
+  const hasCoursePerformanceData = useMemo(
+    () =>
+      coursePerformance.some(
+        (entry) =>
+          Number(entry.engagement || 0) > 0 || Number(entry.completion || 0) > 0
+      ),
+    [coursePerformance]
+  );
 
   // Custom tick component with responsive width-based formatting
   const CustomXAxisTick = ({ x, y, payload, width }: any) => {
@@ -342,10 +375,103 @@ const Analytics = () => {
 
   const singleCourseModuleData =
     courseAnalytics?.course_details?.module_performance ?? [];
+  const hasSingleCourseModuleData = useMemo(
+    () =>
+      singleCourseModuleData.some(
+        (entry) =>
+          Number(entry.completion || 0) > 0 || Number(entry.avgScore || 0) > 0
+      ),
+    [singleCourseModuleData]
+  );
 
   const singleCourseTimeData =
     courseAnalytics?.course_details?.weekly_study_time ?? [];
+  const hasSingleCourseStudyTimeData = useMemo(
+    () => singleCourseTimeData.some((entry) => Number(entry.hours || 0) > 0),
+    [singleCourseTimeData]
+  );
   const courseCohortMetrics = courseAnalytics?.course_details?.cohort_metrics ?? null;
+  const visibleInsights = useMemo(() => {
+    if (viewMode === "course") {
+      if (!selectedCourseId) return [];
+      return courseAnalytics?.insights ?? [];
+    }
+    return analytics?.insights ?? [];
+  }, [viewMode, selectedCourseId, courseAnalytics, analytics]);
+
+  const insightsTitle = useMemo(() => {
+    if (viewMode === "course" && selectedCourse?.name) {
+      return `Optimization Insights · ${selectedCourse.name}`;
+    }
+    return "Optimization Insights";
+  }, [viewMode, selectedCourse?.name]);
+
+  const insightsEmptyMessage =
+    viewMode === "course" && !selectedCourseId
+      ? "Select a course to view scoped optimization insights."
+      : "No major optimization risks detected for the selected view.";
+
+  const getInsightSeverityTone = (severity: "high" | "medium" | "low") => {
+    if (severity === "high") {
+      return "bg-destructive/15 text-destructive border border-destructive/40";
+    }
+    if (severity === "medium") {
+      return "bg-warning/15 text-warning border border-warning/40";
+    }
+    return "bg-muted text-muted-foreground border border-border";
+  };
+
+  const getInsightTypeLabel = (type: InstructorAnalytics["insights"][number]["type"]) => {
+    switch (type) {
+      case "low_completion":
+        return "Low Completion";
+      case "low_engagement":
+        return "Low Engagement";
+      case "low_rating":
+        return "Low Rating";
+      case "negative_trend":
+        return "Negative Trend";
+      case "high_drop_off":
+        return "High Drop-off";
+      case "rating_decline":
+        return "Rating Decline";
+      default:
+        return "Insight";
+    }
+  };
+
+  const getInsightMetricSummary = (
+    insight: InstructorAnalytics["insights"][number]
+  ): string | null => {
+    const m = insight.supporting_metrics || {};
+    if (insight.type === "high_drop_off") {
+      return `Drop-off ${Number(m.dropoff_percent || 0).toFixed(1)}%`;
+    }
+    if (insight.type === "low_completion") {
+      const value = Number(m.module_completion_percent ?? m.completion_percent ?? 0);
+      const threshold = Number(m.threshold_percent || 0);
+      return `Completion ${value.toFixed(1)}% vs threshold ${threshold.toFixed(1)}%`;
+    }
+    if (insight.type === "low_engagement") {
+      const value = Number(m.module_engagement_percent ?? m.engagement_percent ?? 0);
+      const threshold = Number(m.threshold_percent || 0);
+      return `Engagement ${value.toFixed(1)}% vs threshold ${threshold.toFixed(1)}%`;
+    }
+    if (insight.type === "low_rating") {
+      const rating = Number(m.rating || 0);
+      const sample = Number(m.rating_sample_count || 0);
+      return `Rating ${rating.toFixed(2)} / 5 (${sample} reviews)`;
+    }
+    if (insight.type === "rating_decline") {
+      const delta = Number(m.rating_delta || 0);
+      return `Rating delta ${delta.toFixed(2)} (${Number(m.previous_period_rating || 0).toFixed(2)} -> ${Number(m.recent_period_rating || 0).toFixed(2)})`;
+    }
+    if (insight.type === "negative_trend") {
+      const delta = Number(m.trend_delta || 0);
+      return `Trend delta ${delta.toFixed(2)} points`;
+    }
+    return null;
+  };
 
   const handleExport = () => {
     const data = selectedCourseId ? courseAnalytics : analytics;
@@ -527,6 +653,52 @@ const Analytics = () => {
           </TabsList>
 
           <TabsContent value="all" className="space-y-6 mt-6">
+            <Card className="p-6 gradient-card border-border">
+              <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+                <Target className="h-5 w-5 text-warning" />
+                {insightsTitle}
+              </h3>
+              {visibleInsights.length > 0 ? (
+                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                  {visibleInsights.map((insight) => (
+                    <div
+                      key={insight.id}
+                      className="rounded-lg border border-border bg-background/40 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] uppercase tracking-wide px-2 py-0.5 rounded-full border border-border/60 bg-background/60 text-muted-foreground">
+                            {getInsightTypeLabel(insight.type)}
+                          </span>
+                          <span
+                            className={`text-[11px] uppercase tracking-wide px-2 py-0.5 rounded-full ${getInsightSeverityTone(
+                              insight.severity
+                            )}`}
+                          >
+                            {insight.severity}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold">
+                        {insight.target?.name || "Course"}
+                      </p>
+                      <p className="text-sm mt-1">{insight.message}</p>
+                      {getInsightMetricSummary(insight) ? (
+                        <p className="text-xs mt-2 text-muted-foreground">
+                          Trigger: {getInsightMetricSummary(insight)}
+                        </p>
+                      ) : null}
+                      <p className="text-xs mt-2 opacity-90">
+                        Action: {insight.recommended_action}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">{insightsEmptyMessage}</p>
+              )}
+            </Card>
+
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatsCard
                 title="Total Enrolled"
@@ -579,43 +751,49 @@ const Analytics = () => {
                     ]}
                   />
                 </h3>
-                <ResponsiveContainer width="100%" height={380}>
-                  <BarChart data={coursePerformance}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis
-                      dataKey="course"
-                      stroke="hsl(var(--muted-foreground))"
-                      height={60}
-                      interval={0}
-                      tick={<CustomXAxisTick />}
-                    />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <RechartsTooltip
-                      wrapperStyle={tooltipWrapperStyle}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Legend wrapperStyle={{ paddingTop: "0px" }} />
-                    <Bar
-                      dataKey="engagement"
-                      fill="hsl(var(--primary))"
-                      radius={[8, 8, 0, 0]}
-                      name="Engagement %"
-                    />
-                    <Bar
-                      dataKey="completion"
-                      fill="hsl(var(--success))"
-                      radius={[8, 8, 0, 0]}
-                      name="Completion %"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {hasCoursePerformanceData ? (
+                  <ResponsiveContainer width="100%" height={380}>
+                    <BarChart data={coursePerformance}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="hsl(var(--border))"
+                      />
+                      <XAxis
+                        dataKey="course"
+                        stroke="hsl(var(--muted-foreground))"
+                        height={60}
+                        interval={0}
+                        tick={<CustomXAxisTick />}
+                      />
+                      <YAxis stroke="hsl(var(--muted-foreground))" />
+                      <RechartsTooltip
+                        wrapperStyle={tooltipWrapperStyle}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: "0px" }} />
+                      <Bar
+                        dataKey="engagement"
+                        fill="hsl(var(--primary))"
+                        radius={[8, 8, 0, 0]}
+                        name="Engagement %"
+                      />
+                      <Bar
+                        dataKey="completion"
+                        fill="hsl(var(--success))"
+                        radius={[8, 8, 0, 0]}
+                        name="Completion %"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[380px] flex items-center justify-center text-sm text-muted-foreground">
+                    No course performance data for this date range.
+                  </div>
+                )}
               </Card>
             </div>
 
@@ -635,55 +813,61 @@ const Analytics = () => {
                     ]}
                   />
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={enrollmentData}>
-                    <defs>
-                      <linearGradient
-                        id="colorStudents"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="hsl(var(--primary))"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="hsl(var(--primary))"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis
-                      dataKey="month"
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <RechartsTooltip
-                      wrapperStyle={tooltipWrapperStyle}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="students"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={3}
-                      fillOpacity={1}
-                      fill="url(#colorStudents)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {hasEnrollmentData ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={enrollmentData}>
+                      <defs>
+                        <linearGradient
+                          id="colorStudents"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="hsl(var(--primary))"
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="hsl(var(--primary))"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="hsl(var(--border))"
+                      />
+                      <XAxis
+                        dataKey="month"
+                        stroke="hsl(var(--muted-foreground))"
+                      />
+                      <YAxis stroke="hsl(var(--muted-foreground))" />
+                      <RechartsTooltip
+                        wrapperStyle={tooltipWrapperStyle}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="students"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorStudents)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                    No enrollment activity for this date range.
+                  </div>
+                )}
               </Card>
 
               <Card className="p-6 gradient-card border-border">
@@ -711,34 +895,40 @@ const Analytics = () => {
                     ]}
                   />
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={completionData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({ name, percent }) =>
-                        `${name} ${(percent * 100).toFixed(0)}%`
-                      }
-                    >
-                      {completionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip
-                      wrapperStyle={tooltipWrapperStyle}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                {hasCompletionDistributionData ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={completionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, percent }) =>
+                          `${name} ${(percent * 100).toFixed(0)}%`
+                        }
+                      >
+                        {completionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        wrapperStyle={tooltipWrapperStyle}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                    No progress distribution data for this date range.
+                  </div>
+                )}
               </Card>
             </div>
 
@@ -835,42 +1025,48 @@ const Analytics = () => {
                     ]}
                   />
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={studentActivityData}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis
-                      dataKey="day"
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <RechartsTooltip
-                      wrapperStyle={tooltipWrapperStyle}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="active"
-                      stackId="a"
-                      fill="hsl(var(--success))"
-                      radius={[0, 0, 0, 0]}
-                      name="Active Students"
-                    />
-                    <Bar
-                      dataKey="inactive"
-                      stackId="a"
-                      fill="hsl(var(--muted))"
-                      radius={[8, 8, 0, 0]}
-                      name="Inactive Students"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {hasStudentActivityData ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={studentActivityData}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="hsl(var(--border))"
+                      />
+                      <XAxis
+                        dataKey="day"
+                        stroke="hsl(var(--muted-foreground))"
+                      />
+                      <YAxis stroke="hsl(var(--muted-foreground))" />
+                      <RechartsTooltip
+                        wrapperStyle={tooltipWrapperStyle}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Legend />
+                      <Bar
+                        dataKey="active"
+                        stackId="a"
+                        fill="hsl(var(--success))"
+                        radius={[0, 0, 0, 0]}
+                        name="Active Students"
+                      />
+                      <Bar
+                        dataKey="inactive"
+                        stackId="a"
+                        fill="hsl(var(--muted))"
+                        radius={[8, 8, 0, 0]}
+                        name="Inactive Students"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                    No student activity data for this date range.
+                  </div>
+                )}
               </Card>
 
               <Card className="p-6 gradient-card border-border">
@@ -888,56 +1084,139 @@ const Analytics = () => {
                     ]}
                   />
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RadarChart
-                    data={categoryPerformance}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius="89%"
-                  >
-                    <PolarGrid stroke="hsl(var(--border))" />
-                    <PolarAngleAxis
-                      dataKey="category"
-                      stroke="hsl(var(--muted-foreground))"
-                      tick={{
-                        fill: "hsl(var(--muted-foreground))",
-                        fontSize: 12,
-                      }}
-                      tickLine={false}
-                    />
-                    <PolarRadiusAxis
-                      angle={90}
-                      domain={[0, 100]}
-                      stroke="hsl(var(--muted-foreground))"
-                      tick={{
-                        fill: "hsl(var(--muted-foreground))",
-                        fontSize: 10,
-                      }}
-                      tickCount={6}
-                    />
-                    <Radar
-                      name="Score"
-                      dataKey="value"
-                      stroke="hsl(var(--primary))"
-                      fill="hsl(var(--primary))"
-                      fillOpacity={0.6}
-                      strokeWidth={2}
-                    />
-                    <RechartsTooltip
-                      wrapperStyle={tooltipWrapperStyle}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
+                {hasCategoryPerformanceData ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    {useCategoryBarFallback ? (
+                      <BarChart data={categoryPerformance}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="hsl(var(--border))"
+                        />
+                        <XAxis
+                          dataKey="category"
+                          stroke="hsl(var(--muted-foreground))"
+                        />
+                        <YAxis
+                          domain={[0, 100]}
+                          stroke="hsl(var(--muted-foreground))"
+                        />
+                        <RechartsTooltip
+                          wrapperStyle={tooltipWrapperStyle}
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "8px",
+                          }}
+                        />
+                        <Bar
+                          dataKey="value"
+                          fill="hsl(var(--primary))"
+                          radius={[8, 8, 0, 0]}
+                          name="Score %"
+                        />
+                      </BarChart>
+                    ) : (
+                      <RadarChart
+                        data={categoryPerformance}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius="89%"
+                      >
+                        <PolarGrid stroke="hsl(var(--border))" />
+                        <PolarAngleAxis
+                          dataKey="category"
+                          stroke="hsl(var(--muted-foreground))"
+                          tick={{
+                            fill: "hsl(var(--muted-foreground))",
+                            fontSize: 12,
+                          }}
+                          tickLine={false}
+                        />
+                        <PolarRadiusAxis
+                          angle={90}
+                          domain={[0, 100]}
+                          stroke="hsl(var(--muted-foreground))"
+                          tick={{
+                            fill: "hsl(var(--muted-foreground))",
+                            fontSize: 10,
+                          }}
+                          tickCount={6}
+                        />
+                        <Radar
+                          name="Score"
+                          dataKey="value"
+                          stroke="hsl(var(--primary))"
+                          fill="hsl(var(--primary))"
+                          fillOpacity={0.6}
+                          strokeWidth={2}
+                        />
+                        <RechartsTooltip
+                          wrapperStyle={tooltipWrapperStyle}
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "8px",
+                          }}
+                        />
+                      </RadarChart>
+                    )}
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                    No category performance data for this date range.
+                  </div>
+                )}
               </Card>
             </div>
           </TabsContent>
 
           <TabsContent value="course" className="space-y-6 mt-6">
+            <Card className="p-6 gradient-card border-border">
+              <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+                <Target className="h-5 w-5 text-warning" />
+                {insightsTitle}
+              </h3>
+              {visibleInsights.length > 0 ? (
+                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                  {visibleInsights.map((insight) => (
+                    <div
+                      key={insight.id}
+                      className="rounded-lg border border-border bg-background/40 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] uppercase tracking-wide px-2 py-0.5 rounded-full border border-border/60 bg-background/60 text-muted-foreground">
+                            {getInsightTypeLabel(insight.type)}
+                          </span>
+                          <span
+                            className={`text-[11px] uppercase tracking-wide px-2 py-0.5 rounded-full ${getInsightSeverityTone(
+                              insight.severity
+                            )}`}
+                          >
+                            {insight.severity}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold">
+                        {insight.target?.name || "Course"}
+                      </p>
+                      <p className="text-sm mt-1">{insight.message}</p>
+                      {getInsightMetricSummary(insight) ? (
+                        <p className="text-xs mt-2 text-muted-foreground">
+                          Trigger: {getInsightMetricSummary(insight)}
+                        </p>
+                      ) : null}
+                      <p className="text-xs mt-2 opacity-90">
+                        Action: {insight.recommended_action}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">{insightsEmptyMessage}</p>
+              )}
+            </Card>
+
             {!selectedCourseId ? (
               <div className="space-y-4">
                 <Card className="p-6 gradient-card border-border">
@@ -1261,51 +1540,57 @@ const Analytics = () => {
                         items={[
                           {
                             label: "Completion %",
-                            formula: "course average progress",
+                            formula: "module completed learners ÷ course enrolled learners × 100",
                             className: "text-primary",
                           },
                           {
                             label: "Avg Score",
-                            formula: "course average quiz score",
+                            formula: "average of latest quiz attempt scores for quizzes in this module",
                             className: "text-success",
                           },
                         ]}
                       />
                     </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={singleCourseModuleData}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="hsl(var(--border))"
-                        />
-                        <XAxis
-                          dataKey="module"
-                          stroke="hsl(var(--muted-foreground))"
-                        />
-                        <YAxis stroke="hsl(var(--muted-foreground))" />
-                        <RechartsTooltip
-                          wrapperStyle={tooltipWrapperStyle}
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
-                        />
-                        <Legend />
-                        <Bar
-                          dataKey="completion"
-                          fill="hsl(var(--primary))"
-                          radius={[8, 8, 0, 0]}
-                          name="Completion %"
-                        />
-                        <Bar
-                          dataKey="avgScore"
-                          fill="hsl(var(--success))"
-                          radius={[8, 8, 0, 0]}
-                          name="Avg Score %"
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    {hasSingleCourseModuleData ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={singleCourseModuleData}>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="hsl(var(--border))"
+                          />
+                          <XAxis
+                            dataKey="module"
+                            stroke="hsl(var(--muted-foreground))"
+                          />
+                          <YAxis stroke="hsl(var(--muted-foreground))" />
+                          <RechartsTooltip
+                            wrapperStyle={tooltipWrapperStyle}
+                            contentStyle={{
+                              backgroundColor: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          <Legend />
+                          <Bar
+                            dataKey="completion"
+                            fill="hsl(var(--primary))"
+                            radius={[8, 8, 0, 0]}
+                            name="Completion %"
+                          />
+                          <Bar
+                            dataKey="avgScore"
+                            fill="hsl(var(--success))"
+                            radius={[8, 8, 0, 0]}
+                            name="Avg Score %"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                        No module performance data for this date range.
+                      </div>
+                    )}
                   </Card>
 
                   <Card className="p-6 gradient-card border-border">
@@ -1317,63 +1602,69 @@ const Analytics = () => {
                         items={[
                           {
                             label: "Hours",
-                            formula: "total watch time ÷ 4 weeks (approx)",
+                            formula: "watch time aggregated into week buckets across selected date range",
                             className: "text-accent",
                           },
                         ]}
                       />
                     </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={singleCourseTimeData}>
-                        <defs>
-                          <linearGradient
-                            id="colorHours"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="hsl(var(--accent))"
-                              stopOpacity={0.3}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="hsl(var(--accent))"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="hsl(var(--border))"
-                        />
-                        <XAxis
-                          dataKey="week"
-                          stroke="hsl(var(--muted-foreground))"
-                        />
-                        <YAxis stroke="hsl(var(--muted-foreground))" />
-                        <RechartsTooltip
-                          wrapperStyle={tooltipWrapperStyle}
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
-                          formatter={(value: number) => `${value} hours`}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="hours"
-                          stroke="hsl(var(--accent))"
-                          strokeWidth={3}
-                          fillOpacity={1}
-                          fill="url(#colorHours)"
-                          name="Study Hours"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                    {hasSingleCourseStudyTimeData ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <AreaChart data={singleCourseTimeData}>
+                          <defs>
+                            <linearGradient
+                              id="colorHours"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="hsl(var(--accent))"
+                                stopOpacity={0.3}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="hsl(var(--accent))"
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="hsl(var(--border))"
+                          />
+                          <XAxis
+                            dataKey="week"
+                            stroke="hsl(var(--muted-foreground))"
+                          />
+                          <YAxis stroke="hsl(var(--muted-foreground))" />
+                          <RechartsTooltip
+                            wrapperStyle={tooltipWrapperStyle}
+                            contentStyle={{
+                              backgroundColor: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                            formatter={(value: number) => `${value} hours`}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="hours"
+                            stroke="hsl(var(--accent))"
+                            strokeWidth={3}
+                            fillOpacity={1}
+                            fill="url(#colorHours)"
+                            name="Study Hours"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                        No weekly study-time data for this date range.
+                      </div>
+                    )}
                   </Card>
                 </div>
 
@@ -1392,35 +1683,41 @@ const Analytics = () => {
                       ]}
                     />
                   </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={courseEnrollmentData}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="hsl(var(--border))"
-                      />
-                      <XAxis
-                        dataKey="month"
-                        stroke="hsl(var(--muted-foreground))"
-                      />
-                      <YAxis stroke="hsl(var(--muted-foreground))" />
-                      <RechartsTooltip
-                        wrapperStyle={tooltipWrapperStyle}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="students"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={3}
-                        dot={{ fill: "hsl(var(--primary))", r: 5 }}
-                        name="Enrollments"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {hasCourseEnrollmentData ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={courseEnrollmentData}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="hsl(var(--border))"
+                        />
+                        <XAxis
+                          dataKey="month"
+                          stroke="hsl(var(--muted-foreground))"
+                        />
+                        <YAxis stroke="hsl(var(--muted-foreground))" />
+                        <RechartsTooltip
+                          wrapperStyle={tooltipWrapperStyle}
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "8px",
+                          }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="students"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={3}
+                          dot={{ fill: "hsl(var(--primary))", r: 5 }}
+                          name="Enrollments"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
+                      No enrollments recorded in this date range.
+                    </div>
+                  )}
                 </Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1439,9 +1736,14 @@ const Analytics = () => {
                     <div className="w-12 h-12 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-3">
                       <Clock className="h-6 w-6 text-warning" />
                     </div>
-                    <p className="text-3xl font-bold mb-1">42hrs</p>
+                    <p className="text-3xl font-bold mb-1">
+                      {courseCohortMetrics?.average_watch_hours !== null &&
+                      courseCohortMetrics?.average_watch_hours !== undefined
+                        ? `${courseCohortMetrics.average_watch_hours}h`
+                        : "-"}
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      Avg. Time to Complete
+                      Avg Watch Time
                     </p>
                   </Card>
                   <Card className="p-6 gradient-card border-border text-center">

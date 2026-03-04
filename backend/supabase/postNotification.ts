@@ -123,7 +123,13 @@ serve(async (req) => {
 
     console.log("📌 CRON BODY:", body);
 
-    const userIds: string[] = body.userIds || body.user_ids;
+    const userIds: string[] = Array.isArray(body.userIds)
+      ? body.userIds
+      : Array.isArray(body.user_ids)
+      ? body.user_ids
+      : body.userId || body.user_id
+      ? [body.userId || body.user_id]
+      : [];
     const title = body.title;
     const message = body.message;
     const type = body.type || "system";

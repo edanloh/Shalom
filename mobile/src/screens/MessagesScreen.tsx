@@ -342,14 +342,20 @@ export default function MessagesScreen() {
       }
     >
       {refreshing ? (
-        <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={styles.loadingState}>
           <ActivityIndicator size="large" color={Colors.secondary} />
           <Text style={[TextStyles.bodyMedium, { marginTop: 12 }]}>Loading conversations...</Text>
         </View>
       ) : (
         <FlatList
           data={conversations}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => {
+            const rawId = item?.id;
+            if (rawId !== undefined && rawId !== null && String(rawId).length > 0) {
+              return String(rawId);
+            }
+            return `conversation-${index}-${item?.name ?? "unknown"}`;
+          }}
           renderItem={renderConversation}
           horizontal={false}
           showsVerticalScrollIndicator={true}
@@ -373,6 +379,26 @@ export default function MessagesScreen() {
             }
             lastScrollY.current = y;
           }}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={48}
+                color={Colors.textMuted ?? Colors.textSecondary}
+              />
+              <Text style={[TextStyles.h4, { marginTop: Spacing.md }]}>
+                No conversations yet
+              </Text>
+              <Text
+                style={[
+                  TextStyles.caption,
+                  { marginTop: Spacing.xs, textAlign: "center" },
+                ]}
+              >
+                Start a new conversation to message an instructor or learner.
+              </Text>
+            </View>
+          }
           ListFooterComponent={<View style={{ height: 0 }} />}
         />
       )}
@@ -401,9 +427,9 @@ export default function MessagesScreen() {
                   u.email?.toLowerCase().includes(newConvoUser.toLowerCase()),
               )
               .slice(0, 3)
-              .map((u) => (
+              .map((u, index) => (
                 <TouchableOpacity
-                  key={u.id}
+                  key={String(u?.id ?? `${index}-${u?.email ?? u?.username ?? "unknown"}`)}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -511,6 +537,20 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 4,
   },
+  emptyState: {
+    flex: 1,
+    minHeight: 320,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  loadingState: {
+    flex: 1,
+    minHeight: 320,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
+  },
   messageBubble: {
     marginVertical: 6,
     marginHorizontal: 8,
@@ -569,12 +609,6 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     ...Shadows.small,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    paddingBottom: 40,
   },
   emptyText: {
     ...(TextStyles.bodyMedium || {}),

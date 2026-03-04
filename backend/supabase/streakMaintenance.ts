@@ -92,16 +92,46 @@ async function sendNotification(payload: {
 }) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!supabaseUrl || !serviceKey) return;
-  await fetch(`${supabaseUrl}/functions/v1/postNotification`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
-    },
-    body: JSON.stringify(payload),
-  });
+  const directInsert = async () => {
+    await supabase.from("notifications").insert({
+      user_id: payload.userId,
+      title: payload.title,
+      message: payload.message,
+      type: payload.type,
+      related_entity_type: payload.relatedEntityType ?? null,
+      related_entity_id: payload.relatedEntityId ?? null,
+      created_at: new Date().toISOString(),
+    });
+  };
+
+  if (!supabaseUrl || !serviceKey) {
+    await directInsert();
+    return;
+  }
+
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/postNotification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({
+        userIds: [payload.userId],
+        title: payload.title,
+        message: payload.message,
+        type: payload.type,
+        relatedEntityType: payload.relatedEntityType,
+        relatedEntityId: payload.relatedEntityId,
+      }),
+    });
+    if (!response.ok) {
+      await directInsert();
+    }
+  } catch {
+    await directInsert();
+  }
 }
 
 async function notifyExpiredGoals(nowIso: string) {
@@ -250,7 +280,12 @@ serve(async (req) => {
 
     return ok({
       success: true,
-      data: { processed: userIds.length, remindersSent, brokenSent, goalsExpiredSent },
+      data: {
+        processed: userIds.length,
+        remindersSent,
+        brokenSent,
+        goalsExpiredSent,
+      },
     });
   } catch (err: any) {
     console.error("streakMaintenance error", err);

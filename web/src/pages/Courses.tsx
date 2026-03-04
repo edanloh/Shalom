@@ -14,6 +14,7 @@ import { Plus, Search, Grid3x3, List, Filter, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { courseService, Course } from "@/services";
+import { useUser } from '@/contexts/useUser';
 
 const Courses = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -21,6 +22,7 @@ const Courses = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useUser();
 
   // API state
   const [courses, setCourses] = useState<Course[]>([]);
@@ -35,13 +37,18 @@ const Courses = () => {
   // Fetch courses from API
   useEffect(() => {
     fetchCourses();
-  }, []);
+  }, [user?.uuid]);
 
   const fetchCourses = async (newlyDuplicatedCourseId?: string) => {
+    if (!user?.uuid) {
+      setCourses([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const data = await courseService.getCourses();
+      const data = await courseService.getCourses({ instructorId: user.uuid });
       setCourses(data);
       
       // If we just duplicated a course, highlight it and scroll to it

@@ -75,7 +75,7 @@ export const OptionsEditor = ({
                   0,
                 );
               }}
-              className="w-4 h-4 accent-blue-500"
+              className="w-4 h-4 accent-primary"
             />
             <span className="text-white flex-1">True</span>
           </label>
@@ -93,7 +93,7 @@ export const OptionsEditor = ({
                   1,
                 );
               }}
-              className="w-4 h-4 accent-blue-500"
+              className="w-4 h-4 accent-primary"
             />
             <span className="text-white flex-1">False</span>
           </label>

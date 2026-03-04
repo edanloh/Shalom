@@ -2,7 +2,7 @@ import { X, Loader2 } from "lucide-react";
 import { Colors } from "../../../constants/Colors";
 import { useState } from "react";
 import { StorageService } from "../../../services/storageService";
-import { useCourseBuilder } from "../CourseBuilderContext";
+import { useCourseBuilder } from "../useCourseBuilder";
 
 interface QuestionImageUploadProps {
   currentQuestion: any;
@@ -149,7 +149,7 @@ export const QuestionImageUpload = ({
           style={{
             backgroundColor: (!currentQuestion.imageUrl || 
               (currentQuestion.imageUrl && !currentQuestion.imageUrl.startsWith("[LOCAL_FILE:")))
-              ? Colors.accent
+              ? Colors.secondary
               : Colors.gray800,
             color: Colors.textPrimary,
             opacity:
@@ -206,7 +206,7 @@ export const QuestionImageUpload = ({
           }
           style={{
             backgroundColor: (currentQuestion.imageUrl?.startsWith("[LOCAL_FILE:"))
-              ? Colors.accent
+              ? Colors.secondary
               : Colors.gray800,
             color: Colors.textPrimary,
             opacity:
@@ -248,7 +248,7 @@ export const QuestionImageUpload = ({
             />
             {isUploading && (
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <Loader2 className="h-5 w-5 animate-spin" style={{ color: Colors.accent }} />
+                <Loader2 className="h-5 w-5 animate-spin" style={{ color: Colors.secondary }} />
               </div>
             )}
           </div>

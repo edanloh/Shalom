@@ -11,10 +11,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { User, Bell, Shield, Palette, Settings as SettingsIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from '@/contexts/UserContext';
+import { useUser } from '@/contexts/useUser';
 import { uploadProfilePic } from '@/services/userService';
 import { getAvatarUri } from '@/utils/avatar';
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from '@/contexts/useAuth';
 import { validatePassword } from "@/utils/authUtils";
 import courseService from "@/services/courseService";
 
@@ -24,6 +24,7 @@ const Settings = () => {
   const { toast } = useToast();
 
   const { user, updateUser } = useUser();
+  const isAdmin = user?.role === "admin";
   const [name, setName] = useState(user?.name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
   const [location, setLocation] = useState(user?.location ?? '');
@@ -197,7 +198,7 @@ const Settings = () => {
 
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className={`grid w-full md:w-[800px] 
-            ${user.uuid === "550e8400-e29b-41d4-a716-446655440201" ? "grid-cols-4" : "grid-cols-3"}`
+            ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`
             }>
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
@@ -211,7 +212,7 @@ const Settings = () => {
               <Shield className="h-4 w-4" />
               Security
             </TabsTrigger>
-            {user.uuid === "550e8400-e29b-41d4-a716-446655440201" && (
+            {isAdmin && (
               <TabsTrigger value="approval" className="gap-2">
                 <Shield className="h-4 w-4" />
                 Instructor Approvals

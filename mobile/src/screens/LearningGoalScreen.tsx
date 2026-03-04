@@ -18,7 +18,7 @@ import externalStyles from "@styles/styles";
 import creditService from "../services/creditService";
 import { showToast } from "../components/common/Toast";
 import { GoalTemplate, LearningGoal } from "../types";
-import { useAuth } from "../contexts/AuthContext";
+import { useUser } from "../contexts/UserContext";
 
 const CARD_BG = "#3A3A45";
 const TILE_BG = "#5B38E3";
@@ -29,6 +29,13 @@ const formatProgressValue = (value: number, unit: "points" | "courses" | "hours"
   const rounded = Math.round(value * 100) / 100;
   const text = rounded.toFixed(2);
   return text.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+};
+
+const formatDeadlineLabel = (deadline?: string | null) => {
+  if (!deadline) return "";
+  const parsed = new Date(deadline);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return `Ends ${parsed.toLocaleDateString()}`;
 };
 
 const GoalCard = ({ goal, onClear, clearing }: any) => {
@@ -115,7 +122,8 @@ const StatTile = ({ stat }: any) => (
 );
 
 export default function LearningGoalScreen({ navigation }: any) {
-  const { user } = useAuth();
+  const { user: profileUser } = useUser();
+  const goalUserId = profileUser?.uuid;
   const [goals, setGoals] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -198,7 +206,7 @@ export default function LearningGoalScreen({ navigation }: any) {
         icon,
         color,
         title: g.label,
-        subtitle: g.deadline ? `Ends ${new Date(g.deadline).toLocaleDateString()}` : "",
+        subtitle: formatDeadlineLabel(g.deadline),
         current,
         target,
         unit: metric,
@@ -211,21 +219,28 @@ export default function LearningGoalScreen({ navigation }: any) {
     });
 
   const loadGoals = useCallback(async () => {
+    if (!goalUserId) {
+      setGoals([]);
+      setStreakDays(0);
+      setCompletedCourses(0);
+      setStudyHours(0);
+      return;
+    }
     setLoading(true);
     try {
-      const { goals: raw, completedCourses: completed, totalTimeMinutes } =
-        await creditService.getGoalsWithProgress(user?.id);
-      creditService.recordGoalMilestones(raw, user?.id);
+      const { goals: raw, completedCourses: completed, totalTimeMinutes, streakDays: analyticsStreakDays } =
+        await creditService.getGoalsWithProgress(goalUserId);
+      creditService.recordGoalMilestones(raw, goalUserId);
       const mapped = mapGoals(raw);
-      const maxStreak =
-        raw.reduce((max, g) => Math.max(max, g.streakDays || 0), 0);
+      const maxGoalStreak = raw.reduce((max, g) => Math.max(max, g.streakDays || 0), 0);
+      const resolvedStreak = Math.max(Number(analyticsStreakDays || 0), maxGoalStreak);
       const hasAnalyticsMinutes =
         typeof totalTimeMinutes === "number" && Number.isFinite(totalTimeMinutes);
       const totalStudy = hasAnalyticsMinutes
         ? totalTimeMinutes / 60
         : raw.reduce((sum, g) => sum + Number(g.currentHours || 0), 0);
       setGoals(mapped);
-      setStreakDays(maxStreak);
+      setStreakDays(resolvedStreak);
       setCompletedCourses(completed);
       setStudyHours(totalStudy);
     } catch (err) {
@@ -237,13 +252,14 @@ export default function LearningGoalScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [goalUserId]);
 
   const openGoalPicker = useCallback(async () => {
+    if (!goalUserId) return;
     setTemplatesLoading(true);
     setGoalPickerOpen(true);
     try {
-      const templates = await creditService.getGoalTemplates(user?.id);
+      const templates = await creditService.getGoalTemplates(goalUserId);
       setGoalTemplates(Array.isArray(templates) ? templates : []);
       setSelectedTemplateIds([]);
     } catch (err) {
@@ -251,7 +267,7 @@ export default function LearningGoalScreen({ navigation }: any) {
     } finally {
       setTemplatesLoading(false);
     }
-  }, []);
+  }, [goalUserId]);
 
   const activeGoals = goals.filter((g) => g.isActive || g.isExpired || g.isCompleted);
   const activeNonExpired = goals.filter(
@@ -272,10 +288,10 @@ export default function LearningGoalScreen({ navigation }: any) {
   };
 
   const applyTemplates = useCallback(async () => {
-    if (!selectedTemplateIds.length || applyingGoals) return;
+    if (!goalUserId || !selectedTemplateIds.length || applyingGoals) return;
     setApplyingGoals(true);
     try {
-      await creditService.createGoalsFromTemplates(selectedTemplateIds, user?.id);
+      await creditService.createGoalsFromTemplates(selectedTemplateIds, goalUserId);
       setGoalPickerOpen(false);
       setPendingGoalsToast(true);
       await loadGoals();
@@ -284,7 +300,7 @@ export default function LearningGoalScreen({ navigation }: any) {
     } finally {
       setApplyingGoals(false);
     }
-  }, [selectedTemplateIds, user?.id, loadGoals, applyingGoals]);
+  }, [selectedTemplateIds, goalUserId, loadGoals, applyingGoals]);
 
   const handleGoalPickerDismiss = useCallback(() => {
     if (!pendingGoalsToast) return;
@@ -303,7 +319,8 @@ export default function LearningGoalScreen({ navigation }: any) {
       if (clearingGoalIds.has(goalId)) return;
       setClearingGoalIds((prev) => new Set(prev).add(goalId));
       try {
-        await creditService.clearGoal(goalId, user?.id);
+        if (!goalUserId) return;
+        await creditService.clearGoal(goalId, goalUserId);
         await loadGoals();
       } catch (err) {
         console.warn("LearningGoal: failed to clear goal", err);
@@ -315,7 +332,7 @@ export default function LearningGoalScreen({ navigation }: any) {
         });
       }
     },
-    [user?.id, loadGoals, clearingGoalIds]
+    [goalUserId, loadGoals, clearingGoalIds]
   );
 
   const stats = useMemo(
@@ -461,12 +478,14 @@ export default function LearningGoalScreen({ navigation }: any) {
                 contentContainerStyle={styles.templateList}
                 showsVerticalScrollIndicator={false}
               >
-                {goalTemplates.map((template) => {
+                {goalTemplates.map((template, index) => {
                   const isActive = activeTemplateIds.has(template.id);
                   const selected = selectedTemplateIds.includes(template.id);
                   return (
                     <Pressable
-                      key={template.id}
+                      key={String(
+                        template.id ?? `goal-template-${index}-${template.label ?? "template"}`
+                      )}
                       style={[
                         styles.templateRow,
                         selected && styles.templateRowSelected,

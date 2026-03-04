@@ -53,6 +53,14 @@ export interface CourseDetailResponse {
         reviewer_avatar?: string | null;
         reviewerAvatar?: string | null;
         is_anonymous?: boolean;
+        instructor_reply?: string | null;
+        instructorReply?: string | null;
+        instructor_replied_at?: string | null;
+        instructorRepliedAt?: string | null;
+        acknowledged_at?: string | null;
+        acknowledgedAt?: string | null;
+        is_pinned?: boolean;
+        isPinned?: boolean;
       }>;
     };
     sections: any[];
@@ -117,6 +125,10 @@ export interface ProcessedCourseDetail {
     reviewerName: string;
     reviewerAvatar: string;
     createdAt: string;
+    instructorReply?: string | null;
+    instructorRepliedAt?: string | null;
+    acknowledgedAt?: string | null;
+    isPinned?: boolean;
   }>;
   ratingBreakdown: Record<number, number>;
   requirements: string[];
@@ -170,6 +182,11 @@ class CourseDetailService {
       reviewerName: review.reviewer_name ?? review.reviewerName ?? "Anonymous",
       reviewerAvatar: review.reviewer_avatar ?? review.reviewerAvatar ?? null,
       createdAt: review.created_at ?? review.createdAt ?? new Date().toISOString(),
+      instructorReply: review.instructor_reply ?? review.instructorReply ?? null,
+      instructorRepliedAt:
+        review.instructor_replied_at ?? review.instructorRepliedAt ?? null,
+      acknowledgedAt: review.acknowledged_at ?? review.acknowledgedAt ?? null,
+      isPinned: Boolean(review.is_pinned ?? review.isPinned),
     }));
 
     // Calculate actual rating breakdown from reviews

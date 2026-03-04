@@ -1,4 +1,5 @@
-export { CourseBuilderProvider, useCourseBuilder } from './CourseBuilderContext';
+export { CourseBuilderProvider } from './CourseBuilderContext';
+export { useCourseBuilder } from './useCourseBuilder';
 export { useDragAndDrop } from './useDragAndDrop';
 export { useContentManagement } from './useContentManagement';
 export { CourseBuilderHeader } from './CourseBuilderHeader';

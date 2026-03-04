@@ -7,7 +7,7 @@ import {
   BarChart3,
   ArrowLeft,
 } from "lucide-react";
-import { useCourseBuilder } from "./CourseBuilderContext";
+import { useCourseBuilder } from "./useCourseBuilder";
 import { useNavigate } from "react-router-dom";
 import { Colors } from "../../constants/Colors";
 

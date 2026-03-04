@@ -40,7 +40,7 @@ serve(async (req) => {
   const { data: earnedRows, error } = await supabase
     .from("user_achievements")
     .select(
-      "earned_at, achievements!inner(id, name, description, icon, type, points, created_at, is_active)"
+      "earned_at, value, source_event_type, source_course_id, source_instructor_id, source_reference_key, source_awarded_at, achievements!inner(id, name, description, icon, type, points, created_at, is_active, scope_type, scope_id)"
     )
     .eq("user_id", userId)
     .eq("achievements.is_active", true)
@@ -54,6 +54,39 @@ serve(async (req) => {
     });
   }
 
+  const courseIds = Array.from(
+    new Set(
+      (earnedRows ?? [])
+        .map((row: any) => row.source_course_id)
+        .filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+    )
+  );
+  const instructorIds = Array.from(
+    new Set(
+      (earnedRows ?? [])
+        .map((row: any) => row.source_instructor_id)
+        .filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+    )
+  );
+
+  let courseById = new Map<string, any>();
+  if (courseIds.length > 0) {
+    const { data: courses } = await supabase
+      .from("courses")
+      .select("id,title")
+      .in("id", courseIds);
+    courseById = new Map((courses ?? []).map((c: any) => [c.id, c]));
+  }
+
+  let instructorById = new Map<string, any>();
+  if (instructorIds.length > 0) {
+    const { data: users } = await supabase
+      .from("users")
+      .select("id,name,email")
+      .in("id", instructorIds);
+    instructorById = new Map((users ?? []).map((u: any) => [u.id, u]));
+  }
+
   const payload =
     earnedRows?.map((row: any) => ({
       id: row.achievements?.id,
@@ -65,6 +98,22 @@ serve(async (req) => {
       createdAt: row.achievements?.created_at,
       earned: true,
       earnedAt: row.earned_at ?? null,
+      achievementValue: row.value ?? null,
+      scopeType: row.achievements?.scope_type ?? "global",
+      scopeId: row.achievements?.scope_id ?? null,
+      sourceEventType: row.source_event_type ?? null,
+      sourceCourseId: row.source_course_id ?? null,
+      sourceCourseTitle: row.source_course_id
+        ? courseById.get(row.source_course_id)?.title ?? null
+        : null,
+      sourceInstructorId: row.source_instructor_id ?? null,
+      sourceInstructorName: row.source_instructor_id
+        ? instructorById.get(row.source_instructor_id)?.name ??
+          instructorById.get(row.source_instructor_id)?.email ??
+          null
+        : null,
+      sourceReferenceKey: row.source_reference_key ?? null,
+      sourceAwardedAt: row.source_awarded_at ?? null,
     })) ?? [];
 
   return new Response(JSON.stringify({ success: true, data: payload }), {

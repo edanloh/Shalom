@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ImageWithFallback } from "../common"; // adjust path if needed
@@ -12,6 +13,7 @@ import { Colors, Spacing, TextStyles, Typography } from "../../constants";
 import { Images } from "../../../assets";
 import type { Course } from "../../types";
 import { useCourses } from "../../contexts/CourseContext";
+import { formatPrimaryRecommendationReason } from "../../utils/recommendations";
 
 type Variant = "compact" | "progress";
 
@@ -21,6 +23,7 @@ interface Props {
   variant?: Variant;
   // Optional toggles for subparts
   showInstructor?: boolean;
+  showRecommendationReason?: boolean;
 }
 
 const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
@@ -37,13 +40,37 @@ export default function CourseCard({
   onPress,
   variant = "compact",
   showInstructor = false,
+  showRecommendationReason = true,
 }: Props) {
   const { wishlist = [], toggleWishlist } = useCourses();
   const isWishlisted = !!wishlist?.some((c) => c.id === course.id);
+  const heartScale = useRef(new Animated.Value(1)).current;
   const rankLabel =
     course.recommendationRank || course.recommendationScore
       ? `#${course.recommendationRank ?? "?"} • ${Number(course.recommendationScore ?? 0).toFixed(1)}`
       : null;
+  const reasonText = formatPrimaryRecommendationReason(
+    course.recommendationPrimaryTag
+  );
+
+  const handleToggleWishlist = () => {
+    heartScale.stopAnimation();
+    heartScale.setValue(0.88);
+    Animated.sequence([
+      Animated.timing(heartScale, {
+        toValue: 1.18,
+        duration: 110,
+        useNativeDriver: true,
+      }),
+      Animated.spring(heartScale, {
+        toValue: 1,
+        friction: 4,
+        tension: 140,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    toggleWishlist(course);
+  };
 
   return (
     <TouchableOpacity
@@ -68,7 +95,7 @@ export default function CourseCard({
           <TouchableOpacity
             onPress={(e) => {
               e.stopPropagation();
-              toggleWishlist(course);
+              handleToggleWishlist();
             }}
             accessibilityRole="button"
             accessibilityLabel={
@@ -78,11 +105,13 @@ export default function CourseCard({
             style={styles.heartBtn}
             activeOpacity={0.7}
           >
-            <Ionicons
-              name={isWishlisted ? "heart" : "heart-outline"}
-              size={18}
-              color="#fff"
-            />
+            <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+              <Ionicons
+                name={isWishlisted ? "heart" : "heart-outline"}
+                size={18}
+                color="#fff"
+              />
+            </Animated.View>
           </TouchableOpacity>
         </View>
         {rankLabel ? (
@@ -104,13 +133,15 @@ export default function CourseCard({
 
       {/* Text/content */}
       <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={2}>
-          {course.title}
-        </Text>
+        <View style={styles.titleWrap}>
+          <Text style={styles.title} numberOfLines={2}>
+            {course.title}
+          </Text>
+        </View>
         <MetaRow rating={course.rating} modules={course.modules} />
-        {course.recommendationReason ? (
+        {showRecommendationReason && reasonText ? (
           <Text style={styles.reason} numberOfLines={1}>
-            {course.recommendationReason}
+            {reasonText}
           </Text>
         ) : null}
 
@@ -217,11 +248,16 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: Spacing.xs,
   },
+  titleWrap: {
+    marginTop: 10,
+    minHeight: 42,
+    justifyContent: "flex-start",
+  },
   title: {
     color: Colors.textPrimary,
     fontWeight: "700",
     fontSize: 15,
-    marginTop: 10,
+    lineHeight: 20,
     paddingHorizontal: 2,
     fontFamily: Typography.fontFamily.semiBold,
   },

@@ -1,10 +1,9 @@
 import {
-  createContext,
-  useContext,
   useState,
   useEffect,
   ReactNode,
 } from 'react';
+import { AuthContext } from './AuthContextStore';
 
 import { supabase } from '@/lib/supabase';
 import { registerCheck, fetchUserProfile, approveInstructor as ApproveInstructor } from '@/services/userService';
@@ -17,7 +16,7 @@ interface SupabaseUser {
   auth_provider: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   authUser: SupabaseUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -27,8 +26,6 @@ interface AuthContextType {
   register: ( email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
   approveInstructor: (uuid: string) => Promise<any>;
 }
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authUser, setAuthUser] = useState<SupabaseUser | null>(null);
@@ -43,7 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setAuthUser(null);
         } else if (data?.user) {
           setAuthUser({
-            id: '550e8400-e29b-41d4-a716-446655440105',
+            id: data.user.id,
             email: data.user.email,
             name: data.user.user_metadata.full_name || '',
             auth_provider: data.user.app_metadata.provider,
@@ -64,8 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       (_event, session) => {
         if (session?.user) {
           setAuthUser({
-            id: '550e8400-e29b-41d4-a716-446655440105',
-            // id: session.user.id,
+            id: session.user.id,
             email: session.user.email,
             name: session.user.user_metadata.full_name || '',
             auth_provider: session.user.app_metadata.provider,
@@ -92,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
       if (data?.user) {
         const auth_user = {
-          id: '550e8400-e29b-41d4-a716-446655440105',
+          id: data.user.id,
           email: data.user.email,
           name: data.user.user_metadata.full_name || '',
           auth_provider: data.user.app_metadata.provider,
@@ -164,7 +160,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
     if (data?.user) {
       const auth_user = {
-        id: '550e8400-e29b-41d4-a716-446655440105',
+        id: data.user.id,
         email: data.user.email,
         name: data.user.user_metadata.name || '',
         auth_provider: data.user.app_metadata.provider,
@@ -202,10 +198,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
 };

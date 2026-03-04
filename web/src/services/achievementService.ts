@@ -12,6 +12,8 @@ export type AchievementRecord = {
   color: string | null;
   is_active: boolean;
   created_at: string;
+  scope_type?: "global" | "instructor" | "course" | null;
+  scope_id?: string | null;
   earnedBy?: number;
 };
 
@@ -31,8 +33,14 @@ const ENDPOINTS = {
   UPLOAD_ICON: "/uploadAchievementIcon",
 };
 
-export async function listAchievements(params?: Record<string, string>) {
-  const resp = await apiService.get<ListResponse>(ENDPOINTS.LIST, params);
+export async function listAchievements(
+  createdBy: string,
+  params?: Record<string, string>
+) {
+  const resp = await apiService.get<ListResponse>(ENDPOINTS.LIST, {
+    ...params,
+    createdBy,
+  });
   const items = Array.isArray(resp?.data) ? resp.data : Array.isArray(resp as any) ? (resp as any) : [];
   return {
     items,
@@ -42,18 +50,30 @@ export async function listAchievements(params?: Record<string, string>) {
   };
 }
 
-export async function createAchievement(payload: Record<string, unknown>) {
-  const resp = await apiService.post<any>(ENDPOINTS.CREATE, payload);
+export async function createAchievement(
+  createdBy: string,
+  payload: Record<string, unknown>
+) {
+  const resp = await apiService.post<any>(ENDPOINTS.CREATE, {
+    ...payload,
+    createdBy,
+  });
   return resp?.data ?? resp;
 }
 
-export async function updateAchievement(payload: Record<string, unknown>) {
-  const resp = await apiService.post<any>(ENDPOINTS.UPDATE, payload);
+export async function updateAchievement(
+  createdBy: string,
+  payload: Record<string, unknown>
+) {
+  const resp = await apiService.post<any>(ENDPOINTS.UPDATE, {
+    ...payload,
+    createdBy,
+  });
   return resp?.data ?? resp;
 }
 
-export async function deleteAchievement(id: string) {
-  const resp = await apiService.post<any>(ENDPOINTS.DELETE, { id });
+export async function deleteAchievement(createdBy: string, id: string) {
+  const resp = await apiService.post<any>(ENDPOINTS.DELETE, { id, createdBy });
   return resp?.data ?? resp;
 }
 

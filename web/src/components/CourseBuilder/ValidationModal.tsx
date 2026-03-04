@@ -39,7 +39,7 @@ export const ValidationModal: React.FC<ValidationModalProps> = ({
         <DialogFooter>
           <Button
             onClick={() => onOpenChange(false)}
-            style={{ backgroundColor: Colors.accent, color: Colors.textPrimary }}
+            style={{ backgroundColor: Colors.secondary, color: Colors.textPrimary }}
           >
             {confirmText}
           </Button>

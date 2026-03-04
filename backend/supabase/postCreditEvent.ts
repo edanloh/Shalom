@@ -39,6 +39,8 @@ type AchievementDef = {
   icon?: string | null;
   points?: number | null;
   color?: string | null;
+  scope_type?: string | null;
+  scope_id?: string | null;
 };
 
 type CreditEventRecord = {
@@ -231,6 +233,17 @@ async function countCreditEvents(userId: string, type: string) {
   return count ?? 0;
 }
 
+async function getCourseInstructorId(courseId?: string | null) {
+  if (!courseId) return null;
+  const { data, error } = await supabase
+    .from("courses")
+    .select("instructor_id")
+    .eq("id", courseId)
+    .maybeSingle();
+  if (error && error.code !== "PGRST116") throw error;
+  return (data?.instructor_id as string | null) ?? null;
+}
+
 async function awardAchievementsForCreditEvent(
   userId: string,
   event: CreditEventRecord,
@@ -238,7 +251,7 @@ async function awardAchievementsForCreditEvent(
 ) {
   const { data: defs, error } = await supabase
     .from("achievements")
-    .select("id, criteria, name, type, description, icon, points, color")
+    .select("id, criteria, name, type, description, icon, points, color, scope_type, scope_id")
     .eq("is_active", true);
   if (error) throw error;
   if (!defs?.length) return [];
@@ -280,9 +293,31 @@ async function awardAchievementsForCreditEvent(
     courseCompletionDays = await getCourseCompletionDays(userId, event.course_id ?? null);
   }
 
+  const scopedDefsExist = (defs as AchievementDef[]).some(
+    (d) => (d.scope_type ?? "global") !== "global"
+  );
+  const sourceCourseId = (event.course_id as string | null) ?? null;
+  const sourceInstructorId =
+    scopedDefsExist && sourceCourseId ? await getCourseInstructorId(sourceCourseId) : null;
+
   const toAward: Array<{ achievement_id: string; value?: number | null }> = [];
 
   for (const def of defs as AchievementDef[]) {
+    const scopeType = (def.scope_type ?? "global").toLowerCase();
+    const scopeId = def.scope_id ?? null;
+    if (scopeType === "course" && (!sourceCourseId || !scopeId || scopeId !== sourceCourseId)) {
+      continue;
+    }
+    if (
+      scopeType === "instructor" &&
+      (!sourceInstructorId || !scopeId || scopeId !== sourceInstructorId)
+    ) {
+      continue;
+    }
+    if (!["global", "course", "instructor"].includes(scopeType)) {
+      continue;
+    }
+
     const criteria = def.criteria ?? {};
     const criteriaType = criteria.type as string | undefined;
     if (!criteriaType) continue;
@@ -372,6 +407,11 @@ async function awardAchievementsForCreditEvent(
       user_id: userId,
       achievement_id: row.achievement_id,
       value: row.value ?? null,
+      source_event_type: event.type,
+      source_course_id: sourceCourseId,
+      source_instructor_id: sourceInstructorId,
+      source_reference_key: event.reference_key ?? null,
+      source_awarded_at: new Date().toISOString(),
     })),
     { onConflict: "user_id,achievement_id", ignoreDuplicates: true }
   );
@@ -380,7 +420,7 @@ async function awardAchievementsForCreditEvent(
   const ids = newAwards.map((row) => row.achievement_id);
   const { data: awarded, error: awardErr } = await supabase
     .from("achievements")
-    .select("id, name, description, icon, type, points, color")
+    .select("id, name, description, icon, type, points, color, scope_type, scope_id")
     .in("id", ids);
   if (awardErr) throw awardErr;
   return awarded ?? [];
