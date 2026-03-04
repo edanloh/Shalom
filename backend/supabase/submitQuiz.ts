@@ -359,11 +359,12 @@ async function checkAndUpdateModuleCompletion(supabaseClient: any, userId: strin
     if (completedError) throw completedError;
 
     const completed_videos = completed?.[0]?.completed_videos || 0;
-    const passed_quizzes = completed?.[0]?.passed_quizzes || 0;
+    const passed_quizzes = completed?.[0]?.passed_quizzes || 0; // Includes both passed AND exhausted attempts
 
-    console.log(`📊 Section ${sectionId} progress:`);
+    console.log(`📊 Section ${sectionId} progress (from get_section_completion RPC):`);
     console.log(`   Videos: ${completed_videos}/${total_videos}`);
-    console.log(`   Quizzes: ${passed_quizzes}/${total_quizzes}`);
+    console.log(`   Quizzes (passed or exhausted): ${passed_quizzes}/${total_quizzes}`);
+    console.log(`   ⚠️ NOTE: If passed_quizzes is 0 but you exhausted attempts, the migration hasn't been applied!`);
 
     // Check if module is completed
     const videosComplete = completed_videos === total_videos;
@@ -504,13 +505,57 @@ serve(async (req) => {
     let totalPoints = 0;
     const gradedAnswers = [];
 
+    console.log('\n🎯 Starting answer grading...');
+
     for (const answer of answers) {
       const { questionId, answer: userAnswer } = answer;
       const question = questionsMap.get(questionId);
       
-      if (!question) continue;
+      if (!question) {
+        console.log(`⚠️ Question ${questionId} not found in questionsMap`);
+        continue;
+      }
       
-      const isCorrect = question.correct_answer === userAnswer;
+      console.log(`\n📝 Grading question ${questionId}:`);
+      console.log(`   User answer:`, userAnswer);
+      console.log(`   User answer type:`, Array.isArray(userAnswer) ? 'array' : typeof userAnswer);
+      console.log(`   Correct answer:`, question.correct_answer);
+      console.log(`   Correct answer type:`, Array.isArray(question.correct_answer) ? 'array' : typeof question.correct_answer);
+      
+      // Compare answers properly based on type
+      let isCorrect = false;
+      
+      // Check if both answers are arrays (multiple-correct questions)
+      // Parse both user answer AND correct answer if they're JSON strings
+      const userAnswerArray = Array.isArray(userAnswer) 
+        ? userAnswer 
+        : (typeof userAnswer === 'string' && userAnswer.startsWith('[')
+            ? JSON.parse(userAnswer)
+            : null);
+      const correctAnswerArray = Array.isArray(question.correct_answer) 
+        ? question.correct_answer 
+        : (typeof question.correct_answer === 'string' && question.correct_answer.startsWith('[')
+            ? JSON.parse(question.correct_answer)
+            : null);
+      
+      console.log(`   User answer array:`, userAnswerArray);
+      console.log(`   Correct answer array:`, correctAnswerArray);
+      
+      if (userAnswerArray && correctAnswerArray) {
+        // Multiple-correct: Compare sorted arrays
+        const userSorted = JSON.stringify([...userAnswerArray].sort());
+        const correctSorted = JSON.stringify([...correctAnswerArray].sort());
+        console.log(`   Comparing (sorted):`);
+        console.log(`     User:    ${userSorted}`);
+        console.log(`     Correct: ${correctSorted}`);
+        isCorrect = userSorted === correctSorted;
+      } else {
+        // Single answer or other types: Direct comparison
+        isCorrect = question.correct_answer === userAnswer;
+        console.log(`   Direct comparison: ${question.correct_answer} === ${userAnswer} = ${isCorrect}`);
+      }
+      
+      console.log(`   Result: ${isCorrect ? '✅ CORRECT' : '❌ INCORRECT'}`);
       
       if (isCorrect) {
         correctCount++;
@@ -525,6 +570,8 @@ serve(async (req) => {
     }
 
     const totalQuestions = questions?.length || 0;
+    console.log(`\n📊 Final score: ${correctCount}/${totalQuestions} correct`);
+
     const score = totalQuestions > 0 
       ? Math.round((correctCount / totalQuestions) * 100) 
       : 0;

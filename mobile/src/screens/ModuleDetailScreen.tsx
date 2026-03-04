@@ -130,9 +130,30 @@ const ModuleDetailScreen = () => {
         courseId,
         userId,
         sectionId,
+        timestamp: new Date().toISOString()
       });
 
+      // Add timestamp to bust any potential caching
       const data = await moduleService.getModuleDetail(courseId, userId);
+      
+      console.log("📦 Course content fetched:", {
+        sectionsCount: data.sections.length,
+        currentSectionId: sectionId,
+        sections: data.sections.map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          itemsCount: s.items?.length || 0,
+          completedItems: s.items?.filter((i: any) => i.is_completed).length || 0,
+          items: s.items?.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            type: item.type,
+            is_completed: item.is_completed
+          })),
+          isCompleted: s.module_is_completed
+        }))
+      });
+      
       setCourseContent(data);
 
       // If we have a current section, try to maintain it, otherwise use sectionId or first section

@@ -358,13 +358,34 @@ serve(async (req) => {
       // Get quizzes for this section
       const sectionQuizzes = (quizzes || [])
         .filter((q: any) => q.section_id === section.id)
-        .map((q: any) => ({
-          ...q,
-          type: "quiz",
-          is_completed: userProgress?.quizAttempts?.some(
+        .map((q: any) => {
+          // Find the latest attempt for this quiz
+          const latestAttempt = userProgress?.quizAttempts?.find(
             (qa: any) => qa.quiz_id === q.id
-          ) || false
-        }));
+          );
+          
+          // Quiz is completed if:
+          // 1. User has passed, OR
+          // 2. User has exhausted all attempts (even if failed)
+          const isPassed = latestAttempt?.is_passed === true;
+          const hasExhaustedAttempts = latestAttempt && 
+                                       latestAttempt.attempt_number >= (q.max_attempts || 3);
+          const isCompleted = isPassed || hasExhaustedAttempts || false;
+          
+          console.log(`📝 Quiz ${q.title} (${q.id}):`, {
+            isPassed,
+            attemptNumber: latestAttempt?.attempt_number,
+            maxAttempts: q.max_attempts || 3,
+            hasExhaustedAttempts,
+            isCompleted
+          });
+          
+          return {
+            ...q,
+            type: "quiz",
+            is_completed: isCompleted
+          };
+        });
 
       // Combine and sort by order_index
       const items = [...sectionLessons, ...sectionPDFs, ...sectionQuizzes]
@@ -376,10 +397,23 @@ serve(async (req) => {
       let isModuleCompleted = false;
       let moduleCompletedAt = null;
       
+      console.log(`📊 Checking module completion for section ${section.id}:`, {
+        totalItems: items.length,
+        itemTypes: items.map((i: any) => `${i.type}(${i.is_completed ? '✅' : '❌'})`)
+      });
+      
       if (userId && items.length > 0) {
         // Check if ALL items in this section are completed
         const completedItems = items.filter((item: any) => item.is_completed);
+        const incompleteItems = items.filter((item: any) => !item.is_completed);
         isModuleCompleted = completedItems.length === items.length;
+        
+        console.log(`✅ Section ${section.id} (${section.title}): ${completedItems.length}/${items.length} items completed`);
+        if (!isModuleCompleted && incompleteItems.length > 0) {
+          console.log(`   ⏳ Incomplete items:`, incompleteItems.map((i: any) => `${i.title}(${i.type})`));
+        } else if (isModuleCompleted) {
+          console.log(`   🎉 MODULE COMPLETE!`);
+        }
         
         // If module is marked as completed in DB, use that timestamp
         // Otherwise use null (even if we calculated it's complete, we don't have the timestamp)
@@ -387,8 +421,6 @@ serve(async (req) => {
         if (isModuleCompleted && storedProgress?.completed_at) {
           moduleCompletedAt = storedProgress.completed_at;
         }
-        
-        console.log(`✅ Section ${section.id} (${section.title}): ${completedItems.length}/${items.length} items completed = ${isModuleCompleted ? 'MODULE COMPLETE' : 'INCOMPLETE'}`);
       }
 
       // Calculate total duration from videos in this section (in minutes)
