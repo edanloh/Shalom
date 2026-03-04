@@ -223,6 +223,30 @@ async function notifyAchievements(userId: string, awarded: AchievementDef[]) {
   }
 }
 
+async function creditAchievementRewards(userId: string, awarded: AchievementDef[]) {
+  if (!awarded.length) return;
+
+  const nowIso = new Date().toISOString();
+  for (const achievement of awarded) {
+    const rewardPoints = Math.round(Number(achievement.points ?? 0));
+    if (!Number.isFinite(rewardPoints) || rewardPoints <= 0) continue;
+
+    const rewardEvent = {
+      user_id: userId,
+      type: "achievement_reward",
+      title: `${achievement.name || "Achievement"} reward`,
+      points: rewardPoints,
+      course_id: null,
+      timestamp: nowIso,
+      reference_key: `achievement_reward:${achievement.id}`,
+    };
+
+    const { error } = await supabase.from("credits_events").insert(rewardEvent);
+    // Idempotent insert: ignore duplicate reward event for this user+achievement.
+    if (error && error.code !== "23505") throw error;
+  }
+}
+
 async function countCreditEvents(userId: string, type: string) {
   const { count, error } = await supabase
     .from("credits_events")
@@ -423,7 +447,9 @@ async function awardAchievementsForCreditEvent(
     .select("id, name, description, icon, type, points, color, scope_type, scope_id")
     .in("id", ids);
   if (awardErr) throw awardErr;
-  return awarded ?? [];
+  const unlocked = awarded ?? [];
+  await creditAchievementRewards(userId, unlocked);
+  return unlocked;
 }
 
 async function syncPointGoals(userId: string, balance: number) {
@@ -502,9 +528,14 @@ serve(async (req) => {
       if (existErr) throw existErr;
 
       if (existing) {
+        const balanceBefore = await computeBalance(event.user_id);
+        await syncPointGoals(event.user_id, balanceBefore);
+        const awardedAchievements = await awardAchievementsForCreditEvent(
+          event.user_id,
+          event,
+          balanceBefore
+        );
         const balance = await computeBalance(event.user_id);
-        await syncPointGoals(event.user_id, balance);
-        const awardedAchievements = await awardAchievementsForCreditEvent(event.user_id, event, balance);
         await notifyAchievements(event.user_id, awardedAchievements);
         return ok({
           success: true,
@@ -517,9 +548,14 @@ serve(async (req) => {
     const { error: insertErr } = await supabase.from("credits_events").insert(event);
     if (insertErr) throw insertErr;
 
+    const balanceBefore = await computeBalance(event.user_id);
+    await syncPointGoals(event.user_id, balanceBefore);
+    const awardedAchievements = await awardAchievementsForCreditEvent(
+      event.user_id,
+      event,
+      balanceBefore
+    );
     const balance = await computeBalance(event.user_id);
-    await syncPointGoals(event.user_id, balance);
-    const awardedAchievements = await awardAchievementsForCreditEvent(event.user_id, event, balance);
     await notifyAchievements(event.user_id, awardedAchievements);
     return ok({ success: true, data: { balance, event, awardedAchievements } });
   } catch (err: any) {
