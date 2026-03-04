@@ -100,7 +100,7 @@ serve(async (req) => {
     // Get all users with role='student'
     const { data: users, error: usersError } = await supabaseClient
       .from('users')
-      .select('id, name, email, is_active, created_at, role')
+      .select('id, name, email, is_active, created_at, role, avatar_url')
       .eq('role', 'student')
       .order('created_at', { ascending: false });
 
@@ -184,6 +184,7 @@ serve(async (req) => {
         coursesEnrolled: coursesEnrolled,
         completedCourses: completedCourses,
         totalHours: Math.round(totalStudyMinutes / 60), // Convert minutes to hours
+        avatarUrl: user.avatar_url
       };
     }).filter((student: any) => {
       if (scopedCourseIds === null) return true;
