@@ -33,6 +33,9 @@ const ENDPOINTS = {
   RECOMMENDATION_EVENT: '/postRecommendationEvent',
 };
 
+const getRecommendationCacheKey = (userId: string): string =>
+  `${CACHE_CONFIG.COURSES_KEY}_recommended_${userId}`;
+
 
 // Wishlist endpoints - Supabase Edge Functions
 const WISHLIST = {
@@ -265,6 +268,7 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   const modulesFromExplicit = Number(explicitModules);
   const lessonsFromExplicit = Number(explicitLessons);
   const durationHours = Number(awsCourse.duration_hours ?? 0);
+  const totalRatings = Number(awsCourse.total_ratings ?? awsCourse.totalRatings ?? 0);
 
   const resolvedModules = Number.isFinite(modulesFromExplicit) && modulesFromExplicit > 0
     ? modulesFromExplicit
@@ -272,6 +276,18 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   const resolvedLessons = Number.isFinite(lessonsFromExplicit) && lessonsFromExplicit > 0
     ? lessonsFromExplicit
     : 0;
+
+  const parseRating = (value: unknown): number => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 0;
+    if (parsed < 0) return 0;
+    if (parsed > 5) return 5;
+    return parsed;
+  };
+  const hasAnyReviewData =
+    Number.isFinite(totalRatings) && totalRatings > 0;
+  const parsedRating = parseRating(awsCourse.rating);
+  const rating = hasAnyReviewData ? parsedRating : 0;
 
   return {
     id: String(awsCourse.courseid || awsCourse.id || 'unknown'),
@@ -282,7 +298,7 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
       name: awsCourse.instructor_name || 'Unknown Instructor',
       avatar: generateAvatar(awsCourse.instructor_name || 'Unknown'),
       category: awsCourse.category_name || 'General',
-      rating: parseFloat(awsCourse.instructor_rating || '4.5'),
+      rating: parseRating(awsCourse.instructor_rating),
       bio: awsCourse.instructor_bio || 'No bio available',
     },
     progress_percentage: awsCourse.progress_percentage,
@@ -293,7 +309,7 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
     //   lastAccessed: new Date().toISOString(),
     // },
     duration: durationStr,
-    rating: parseFloat(awsCourse.rating || '4.0'),
+    rating,
     image:
       awsCourse.thumbnail_url ||
       awsCourse.image ||
@@ -396,12 +412,12 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
       name: enrollment.instructor_name,
       avatar: enrollment.instructor_avatar || generateAvatar(enrollment.instructor_name),
       category: enrollment.category_name,
-      rating: parseFloat(enrollment.instructor_rating),
+      rating: Number(enrollment.instructor_rating) || 0,
       bio: `Expert ${enrollment.category_name} instructor`,
     },
     progress_percentage: enrollment.progress_percentage,
     duration: `${enrollment.duration_hours}h`,
-    rating: parseFloat(enrollment.rating),
+    rating: Number(enrollment.rating) || 0,
     image: enrollment.thumbnail_url,
     category: enrollment.category_name,
     categoryColor: enrollment.category_color || Colors.categoryDefault,
@@ -548,10 +564,15 @@ class CourseService {
    * Get recommended courses (remaining courses after enrolled ones)
    */
   async getRecommendedCourses(userId?: string): Promise<Course[]> {
+    const uid = userId || DEFAULT_USER_ID;
+
     try {
-      const uid = userId || DEFAULT_USER_ID;
       if (!uid) return [];
-      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_recommended_${uid}`;
+      const cacheKey = getRecommendationCacheKey(uid);
+      const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
+      if (cachedCourses) {
+        return cachedCourses;
+      }
 
       const resp = await apiService.get<any>(ENDPOINTS.RECOMMENDATIONS, {
         userId: uid,
@@ -583,6 +604,14 @@ class CourseService {
 
       const courses = sorted
         .map((item: any, idx: number) => {
+          const recommendationScore = Number(
+            item?.score ??
+              item?.recommendation_score ??
+              item?.course?.recommendation_score ??
+              item?.course?.score ??
+              0
+          );
+
           let coursePayload: any = item.course || item;
           if (typeof coursePayload === 'string') {
             try {
@@ -610,7 +639,8 @@ class CourseService {
                 meta?.request_id ||
                 item.request_id ||
                 coursePayload.recommendation_request_id,
-              recommendationScore: item.score || coursePayload.recommendation_score,
+              recommendationScore:
+                Number.isFinite(recommendationScore) ? recommendationScore : 0,
               recommendationRank: item.rank ?? item.recommendation_rank ?? idx + 1,
             };
           } catch (err) {
@@ -624,7 +654,9 @@ class CourseService {
       return courses;
     } catch (error) {
       console.warn('Error fetching recommended courses, falling back to empty list:', error);
-      return [];
+      const cacheKey = getRecommendationCacheKey(uid);
+      const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
+      return cachedCourses ?? [];
     }
   }
 
@@ -707,10 +739,19 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    */
   async refreshCache(): Promise<void> {
     try {
+      const recommendationCacheKeys = [
+        CACHE_CONFIG.COURSES_KEY,
+        `${CACHE_CONFIG.COURSES_KEY}_my`,
+        `${CACHE_CONFIG.COURSES_KEY}_recommended`,
+      ];
+      if (DEFAULT_USER_ID) {
+        recommendationCacheKeys.push(
+          getRecommendationCacheKey(DEFAULT_USER_ID)
+        );
+      }
+
       await Promise.all([
-        CacheManager.clear(CACHE_CONFIG.COURSES_KEY),
-        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
-        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_recommended`),
+        ...recommendationCacheKeys.map((key) => CacheManager.clear(key)),
       ]);
       
       // Pre-load essential data
@@ -735,7 +776,9 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
     const [courses, myCourses, recommendedCourses] = await Promise.all([
       CacheManager.get(CACHE_CONFIG.COURSES_KEY),
       CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_my`),
-      CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_recommended`),
+      CacheManager.get(
+        getRecommendationCacheKey(DEFAULT_USER_ID || "")
+      ),
     ]);
 
     return {
@@ -882,6 +925,9 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
 
     try {
       await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
+      if (body.userId && body.userId !== 'anon') {
+        await CacheManager.clear(getRecommendationCacheKey(body.userId));
+      }
       console.info('rec_event_ok', {
         eventType: body.eventType,
         courseId: body.courseId,

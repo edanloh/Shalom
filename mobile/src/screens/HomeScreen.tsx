@@ -376,7 +376,8 @@ export default function HomeScreen({ navigation, route }: any) {
 
   const handleRecommendationClick = async (course: Course) => {
     if (recommendationUserId) {
-      courseService.recordRecommendationEvent({
+      courseService
+        .recordRecommendationEvent({
         userId: recommendationUserId,
         courseId: course.id,
         eventType: 'click',
@@ -387,7 +388,13 @@ export default function HomeScreen({ navigation, route }: any) {
           modelVersion: course.recommendationModelVersion,
           requestId: course.recommendationRequestId,
         },
-      }).catch((err) => console.warn('Failed to record rec click', err));
+      })
+        .then(() => {
+          refreshRecommended().catch((err) =>
+            console.warn("Failed to refresh recommendations after click", err)
+          );
+        })
+        .catch((err) => console.warn('Failed to record rec click', err));
     }
     navigation.navigate('CourseDetail', { courseId: course.id });
   };

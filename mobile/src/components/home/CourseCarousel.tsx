@@ -244,7 +244,9 @@ function CourseCardItem({
             </View>
 
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{course.rating || "4.5"}</Text>
+              <Text style={styles.statValue}>
+                {Number.isFinite(Number(course.rating)) ? course.rating : "0"}
+              </Text>
               <Text style={styles.statLabel}>Rating</Text>
             </View>
           </View>

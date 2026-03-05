@@ -26,6 +26,11 @@ const CANDIDATE_LONG_TAIL_POOL_LIMIT = Number(
 );
 const MAX_RESULTS = 6;
 const MIN_SCORE_FLOOR = Number(Deno.env.get("RECO_MIN_SCORE_FLOOR") ?? "1");
+const COLD_MIN_SCORE_FLOOR = (() => {
+  const parsed = Number(Deno.env.get("RECO_COLD_MIN_SCORE_FLOOR") ?? String(MIN_SCORE_FLOOR));
+  if (!Number.isFinite(parsed)) return MIN_SCORE_FLOOR;
+  return Math.max(parsed, MIN_SCORE_FLOOR);
+})();
 const PROFILE_DECAY_DAYS = Number(Deno.env.get("RECO_PROFILE_DECAY_DAYS") ?? "21");
 const NOVELTY_MIN_SLOTS = Number(Deno.env.get("RECO_NOVELTY_MIN_SLOTS") ?? "1");
 const RERANK_CATEGORY_PENALTY = Number(
@@ -70,7 +75,7 @@ const INSTRUCTOR_FATIGUE_PENALTY = Number(
   Deno.env.get("RECO_INSTRUCTOR_FATIGUE_PENALTY") ?? "1.2"
 );
 const MIN_USER_EVENTS_FOR_PERSONALIZATION = Number(
-  Deno.env.get("RECO_MIN_USER_EVENTS") ?? "3"
+  Deno.env.get("RECO_MIN_USER_EVENTS") ?? "1"
 );
 const MAX_PER_CATEGORY = Number(Deno.env.get("RECO_MAX_PER_CATEGORY") ?? "2");
 const MAX_PER_INSTRUCTOR = Number(Deno.env.get("RECO_MAX_PER_INSTRUCTOR") ?? "2");
@@ -108,6 +113,7 @@ type CourseCandidate = {
   title?: string | null;
   description?: string | null;
   rating?: number | string | null;
+  total_ratings?: number | string | null;
   duration_hours?: number | null;
   thumbnail_url?: string | null;
   tags?: string[] | null;
@@ -626,11 +632,12 @@ serve(async (req) => {
     const policy = experiment.policy;
     const requestId = crypto.randomUUID();
 
-    const courseSelect = `
+const courseSelect = `
       id,
       title,
       description,
       rating,
+      total_ratings,
       duration_hours,
       thumbnail_url,
       created_at,
@@ -1113,10 +1120,29 @@ serve(async (req) => {
       globalCtrNorm.set(cid, ctr);
     }
 
+    const positiveEventTypes = new Set([
+      "impression",
+      "view",
+      "click",
+      "save",
+      "start",
+      "complete",
+      "enroll",
+    ]);
+    const meaningfulUserEventCount = userEvents.reduce((count, ev) => {
+      const type = (ev.event_type ?? "").toLowerCase();
+      return count + (positiveEventTypes.has(type) ? 1 : 0);
+    }, 0);
+    const hasBehavioralSignal =
+      meaningfulUserEventCount >= Math.max(1, MIN_USER_EVENTS_FOR_PERSONALIZATION);
+
     const isColdStart =
       !userId ||
-      (userEvents.length < MIN_USER_EVENTS_FOR_PERSONALIZATION &&
-        userEnrolledCourseIds.length === 0);
+      (userEnrolledCourseIds.length === 0 && !hasBehavioralSignal);
+    const hasNoBehavioralProfile =
+      userEnrolledCourseIds.length === 0 &&
+      !hasBehavioralSignal;
+    const shouldApplyMinFloor = isColdStart || hasNoBehavioralProfile;
 
     const seenFilterMinImpressions = Math.max(1, SEEN_FILTER_MIN_IMPRESSIONS);
     const seenFilteredCandidates =
@@ -1151,6 +1177,7 @@ serve(async (req) => {
 
       const baseRating = Number(course.rating) || 0;
       const ratingNorm = clamp(baseRating / 5, 0, 1);
+      const totalRatings = Number(course.total_ratings ?? 0);
       const popularity = clamp(popularityNorm.get(course.id) ?? 0, 0, 1);
       const globalCtr = clamp(globalCtrNorm.get(course.id) ?? 0, 0, 1);
       const categoryKey =
@@ -1180,11 +1207,14 @@ serve(async (req) => {
               ? 1
               : 0.2;
       const freshness = getFreshnessScore(course, nowTs, FRESHNESS_HALF_LIFE_DAYS);
-      const qualityPenalty = getQualityPenalty(
-        ratingNorm,
-        QUALITY_MIN_RATING,
-        QUALITY_LOW_RATING_PENALTY
-      );
+      const qualityPenalty =
+        totalRatings > 0
+          ? getQualityPenalty(
+              ratingNorm,
+              QUALITY_MIN_RATING,
+              QUALITY_LOW_RATING_PENALTY
+            )
+          : 0;
       const sessionCategoryBoost =
         clamp(sessionCategoryNorm.get(categoryKey) ?? 0, 0, 1) *
         Math.max(0, SESSION_INTENT_BOOST) *
@@ -1244,7 +1274,9 @@ serve(async (req) => {
       score -= qualityPenalty;
 
       score = clamp(score, 0, 10);
-      if (!userBeh.hardSuppressed) {
+      if (shouldApplyMinFloor) {
+        score = Math.max(score, clamp(COLD_MIN_SCORE_FLOOR, 0, 10));
+      } else if (!userBeh.hardSuppressed) {
         score = Math.max(score, clamp(MIN_SCORE_FLOOR, 0, 10));
       }
       const primaryReasonTag = isColdStart
@@ -1422,13 +1454,15 @@ serve(async (req) => {
         session_window_hours: SESSION_WINDOW_HOURS,
         session_intent_boost: SESSION_INTENT_BOOST,
         instructor_fatigue_window_hours: INSTRUCTOR_FATIGUE_WINDOW_HOURS,
-        max_exposures_per_instructor_window: MAX_EXPOSURES_PER_INSTRUCTOR_WINDOW,
+        max_exposures_per_instructor_window:
+          MAX_EXPOSURES_PER_INSTRUCTOR_WINDOW,
         instructor_fatigue_penalty: INSTRUCTOR_FATIGUE_PENALTY,
         max_per_category: policy.maxPerCategory,
         max_per_instructor: policy.maxPerInstructor,
         exploration_slots: explorationSlots,
         max_exposures_per_course_7d: policy.maxExposuresPerCourse7d,
         suppression_cooldown_days: policy.suppressionCooldownDays,
+        cold_min_score_floor: COLD_MIN_SCORE_FLOOR,
       },
       filtering: {
         candidate_count_top_rated: topRatedCandidates.length,

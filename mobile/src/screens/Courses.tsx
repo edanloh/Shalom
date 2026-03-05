@@ -189,6 +189,11 @@ export default function CoursesScreen({ navigation }: any) {
               requestId: course.recommendationRequestId,
             },
           })
+          .then(() => {
+            refreshRecommended?.().catch((err) =>
+              console.warn("Failed to refresh recommendations after click", err)
+            );
+          })
           .catch((err) =>
             console.warn("Failed to record courses rec click", err)
           );
@@ -248,7 +253,7 @@ export default function CoursesScreen({ navigation }: any) {
     placement?: string;
   }) => {
     const rankLabel =
-      item.recommendationRank || item.recommendationScore
+      Number.isFinite(item.recommendationScore) || Number.isFinite(item.recommendationRank)
         ? `#${item.recommendationRank ?? "?"} • ${Number(
             item.recommendationScore ?? 0,
           ).toFixed(1)}`
