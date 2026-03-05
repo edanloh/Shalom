@@ -5,10 +5,10 @@
 
 import { apiService } from './apiService';
 
-// Module Item (Video or Quiz)
+// Module Item (Video, Document, or Quiz)
 export interface ModuleItem {
   id: string;
-  type: 'video' | 'quiz' | 'pdf';
+  type: 'video' | 'quiz' | 'pdf' | 'document' | 'ppt';
   title: string;
   description?: string;
   order_index: number;
@@ -18,10 +18,15 @@ export interface ModuleItem {
   duration_seconds?: number;
   thumbnail_url?: string;
   is_preview?: boolean;
+  // Document specific fields (PDF, DOCX, PPTX)
+  resource_url?: string;
+  resource_type?: string;
+  file_size_bytes?: number;
+  is_downloadable?: boolean;
   // Quiz specific fields
   passing_score?: number;
   time_limit_minutes?: number;
-  max_attempts?: number;
+  max_attempts?: number | null;
 }
 
 // Course Section with Items
@@ -72,10 +77,8 @@ export interface ModuleDetailResponse {
       title: string;
       description: string;
       instructor_name: string;
-      level: string;
       duration_hours: number;
       thumbnail_url?: string;
-      video_preview_url?: string;
       rating: string;
       total_ratings: number;
       student_count: number;
@@ -141,7 +144,7 @@ class ModuleService {
   }
 
   /**
-   * Get item progress (video or quiz)
+   * Get item progress (video, quiz, document)
    */
   getItemProgress(
     itemId: string,
@@ -154,8 +157,8 @@ class ModuleService {
       return userProgress.videoProgress?.find(vp => vp.video_id === itemId);
     } else if (itemType === 'quiz') {
       return userProgress.quizAttempts?.find(qa => qa.quiz_id === itemId);
-    } else if (itemType === 'pdf') {
-      return null; // No progress tracking for PDFs
+    } else if (itemType === 'pdf' || itemType === 'document' || itemType === 'ppt') {
+      return null; // No granular progress tracking for documents
     }
 
     return null;
@@ -165,6 +168,15 @@ class ModuleService {
    * Check if item is completed
    */
   isItemCompleted(item: ModuleItem, userProgress?: UserProgress): boolean {
+    // Use the is_completed property from the backend which already handles:
+    // - Videos: watched to completion
+    // - Quizzes: passed OR exhausted all attempts
+    // - Documents: viewed/completed
+    if (item.is_completed !== undefined) {
+      return item.is_completed;
+    }
+
+    // Fallback to manual checking if is_completed not set (legacy)
     if (!userProgress) return false;
 
     if (item.type === 'video') {
@@ -174,8 +186,8 @@ class ModuleService {
       const attempt = userProgress.quizAttempts?.find(qa => qa.quiz_id === item.id);
       return attempt?.is_passed || false;
     }
-    else if (item.type === 'pdf') {
-      return item.is_completed || false;
+    else if (item.type === 'pdf' || item.type === 'document' || item.type === 'ppt') {
+      return false;
     }
     return false;
   }
@@ -184,11 +196,28 @@ class ModuleService {
    * Calculate section completion percentage
    */
   getSectionCompletionPercentage(section: CourseSection, userProgress?: UserProgress): number {
-    if (!userProgress || section.items.length === 0) return 0;
+    if (section.items.length === 0) return 0;
+    
+    // Use is_completed directly from items first (already calculated by backend)
     const completedItems = section.items.filter(item => 
       this.isItemCompleted(item, userProgress)
     ).length;
-    return Math.round((completedItems / section.items.length) * 100);
+    
+    const percentage = Math.round((completedItems / section.items.length) * 100);
+    
+    console.log(`📊 Calculating section completion for ${section.title}:`, {
+      completedItems,
+      totalItems: section.items.length,
+      percentage,
+      items: section.items.map(item => ({
+        title: item.title,
+        type: item.type,
+        is_completed: item.is_completed,
+        calculated: this.isItemCompleted(item, userProgress)
+      }))
+    });
+    
+    return percentage;
   }
 
   /**

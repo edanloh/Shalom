@@ -33,7 +33,7 @@ serve(async (req) => {
     const to = offset + limit - 1;
     const { data, error } = await supabase
       .from("certificates")
-      .select("id, user_id, course_id, learning_path_id, certificate_type, certificate_number, issued_at, issuer_name, credential_url, metadata, courses(title,duration_hours,instructor_name)")
+      .select("id, user_id, course_id, certificate_type, certificate_number, issued_at, issuer_name, credential_url, metadata, courses(title,duration_hours,instructor_name)")
       .eq("user_id", userId)
       .order("issued_at", { ascending: false })
       .range(offset, to);
@@ -57,7 +57,6 @@ serve(async (req) => {
       issuer: c.issuer_name,
       credentialUrl: c.credential_url,
       courseId: c.course_id,
-      learningPathId: c.learning_path_id,
       durationHours:
         (c as any)?.courses?.duration_hours ??
         (c.metadata as any)?.duration_hours ??

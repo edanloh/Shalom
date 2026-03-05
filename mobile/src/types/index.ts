@@ -17,14 +17,19 @@ export interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   changePassword: ( currentPassword: string, newPassword: string ) => Promise<{ success: boolean; error?: string }>;
   fetchEmail: (email: string) => Promise<any>;
-  loginWithToken: (credentials: Tokens, path: string) => Promise<void>;
+  loginWithToken: (credentials: Tokens, type?: string) => Promise<void>;
   setIsResettingPassword: (value: boolean) => void;
 }
 
 export interface User {
   id: string;
+  uuid?: string; // db users table id
   email: string;
   name: string;
+  bio?: string;
+  location?: string;
+  phone?: string;
+  role?: string;
   avatar_url?: string;
   points?: number; // For gamification features
   joined_at?: string; // ISO date string
@@ -77,6 +82,16 @@ export interface AchievementItem {
   createdAt?: string;
   earned?: boolean;
   earnedAt?: string | null;
+  scopeType?: "global" | "instructor" | "course" | string;
+  scopeId?: string | null;
+  sourceEventType?: string | null;
+  sourceCourseId?: string | null;
+  sourceCourseTitle?: string | null;
+  sourceInstructorId?: string | null;
+  sourceInstructorName?: string | null;
+  sourceReferenceKey?: string | null;
+  sourceAwardedAt?: string | null;
+  achievementValue?: number | null;
 }
 
 export interface LearningGoal {
@@ -163,12 +178,13 @@ export interface Course {
   title: string;
   description: string;
   instructor: Instructor;
-  progress: CourseProgress;
+  progress_percentage?: number;
+  // progress: CourseProgress;
   duration: string;
   rating: number;
   image: string;
   category: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
+  categoryColor?: string;
   modules: number;
   tags?: string[];
   prerequisites?: string[];
@@ -176,7 +192,9 @@ export interface Course {
   createdAt: string;
   updatedAt: string;
   isWishlisted?: boolean;
-  recommendationReason?: string;
+  recommendationPrimaryTag?: string;
+  recommendationModelVersion?: string;
+  recommendationRequestId?: string;
   recommendationScore?: number;
   recommendationRank?: number;
 }
@@ -281,7 +299,6 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 //   rating: number;
 //   image: string;
 //   category: string;
-//   level: string;
 //   modules: number;
 // }
 
@@ -297,7 +314,6 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 // Filter and Search types
 export interface CourseFilters {
   category?: string[];
-  level?: ('beginner' | 'intermediate' | 'advanced')[];
   rating?: number;
   duration?: {
     min?: number;

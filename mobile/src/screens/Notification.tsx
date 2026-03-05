@@ -33,9 +33,16 @@ const isYesterday = (d: Date) => {
 };
 
 const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const UNKNOWN_DATE_LABEL = "Unknown date";
 
 const isIconUrl = (value?: string) =>
   !!value && (value.startsWith("http://") || value.startsWith("https://"));
+
+const parseValidDate = (value?: string | null) => {
+  if (!value) return null;
+  const dt = new Date(value);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+};
 
 export default function NotificationsScreen({ navigation }: any) {
   const {
@@ -61,11 +68,20 @@ export default function NotificationsScreen({ navigation }: any) {
     const yesterday: InAppNotification[] = [];
     const byDate: Record<string, InAppNotification[]> = {};
     const ordered = [...inAppNotifications].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a, b) => {
+        const bTime = parseValidDate(b.createdAt)?.getTime() ?? 0;
+        const aTime = parseValidDate(a.createdAt)?.getTime() ?? 0;
+        return bTime - aTime;
+      }
     );
 
     for (const n of ordered) {
-      const dt = new Date(n.createdAt);
+      const dt = parseValidDate(n.createdAt);
+      if (!dt) {
+        if (!byDate[UNKNOWN_DATE_LABEL]) byDate[UNKNOWN_DATE_LABEL] = [];
+        byDate[UNKNOWN_DATE_LABEL].push(n);
+        continue;
+      }
 
       if (isToday(dt)) {
         today.push(n);
@@ -84,7 +100,11 @@ export default function NotificationsScreen({ navigation }: any) {
 
     // Add older groups sorted by most-recent first
     const olderDates = Object.keys(byDate)
-      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+      .sort((a, b) => {
+        if (a === UNKNOWN_DATE_LABEL) return 1;
+        if (b === UNKNOWN_DATE_LABEL) return -1;
+        return new Date(b).getTime() - new Date(a).getTime();
+      });
 
     for (const key of olderDates) {
       result.push({ title: key, data: byDate[key] });
@@ -330,7 +350,12 @@ export default function NotificationsScreen({ navigation }: any) {
       </Modal>
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) =>
+          String(
+            item.id ??
+              `notification-${index}-${item.createdAt ?? item.title ?? item.message ?? "row"}`
+          )
+        }
         renderItem={({ item }) => renderRow(item)}
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>

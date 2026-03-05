@@ -15,29 +15,34 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET,OPTIONS',
 };
 
-serve(async (req) => {
+serve(async (req) => { 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
+    console.log('CORS preflight request - returning 200');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     // Create Supabase client with service role key
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      supabaseUrl ?? '',
+      supabaseKey ?? ''
     );
 
     const url = new URL(req.url);
     
     // Extract videoId from path: /getLessonDetail/{videoId}
-    const pathParts = url.pathname.split('/').filter(Boolean);
+    const pathParts = url.pathname.split('/').filter(Boolean);    
     const videoId = pathParts[pathParts.length - 1];
-    
+
     // Extract userId from query parameter
     const userId = url.searchParams.get('userId');
 
     if (!videoId || videoId === 'getLessonDetail') {
+      console.log('ERROR: Invalid videoId');
       return new Response(
         JSON.stringify({
           success: false,
@@ -49,8 +54,6 @@ serve(async (req) => {
         }
       );
     }
-
-    console.log('Fetching video details:', { videoId, userId });
 
     // ========================================
     // 1. Try to fetch from course_videos first
@@ -71,8 +74,7 @@ serve(async (req) => {
         courses (
           id,
           title,
-          instructor_name,
-          level
+          instructor_name
         ),
         course_sections (
           id,
@@ -83,7 +85,7 @@ serve(async (req) => {
       .single();
 
     // ========================================
-    // 2. If not found in videos, try course_resources (PDFs)
+    // 2. If not found in videos, try course_resources (Documents: PDF, PPTX, DOCX)
     // ========================================
     let lessonType = 'video';
     let pdfResource = null;
@@ -96,8 +98,8 @@ serve(async (req) => {
           title,
           description,
           resource_url,
+          resource_type,
           file_size_bytes,
-          thumbnail_url,
           is_preview,
           is_downloadable,
           order_index,
@@ -106,8 +108,7 @@ serve(async (req) => {
           courses (
             id,
             title,
-            instructor_name,
-            level
+            instructor_name
           ),
           course_sections (
             id,
@@ -115,14 +116,20 @@ serve(async (req) => {
           )
         `)
         .eq('id', videoId)
-        .eq('resource_type', 'pdf')
+        .in('resource_type', ['pdf', 'document', 'ppt'])
         .single();
+
 
       if (resourceError || !resource) {
         return new Response(
           JSON.stringify({
             success: false,
-            message: "Lesson not found"
+            message: "Lesson not found",
+            debug: {
+              videoId,
+              videoError: videoError?.message || null,
+              resourceError: resourceError?.message || null,
+            }
           }),
           {
             status: 404,
@@ -133,15 +140,15 @@ serve(async (req) => {
 
       // Convert resource to video-like structure for compatibility
       pdfResource = resource;
-      lessonType = 'pdf';
+      lessonType = resource.resource_type || 'pdf'; // Use actual resource type (pdf, document, slides)
       video = {
         id: resource.id,
         title: resource.title,
         description: resource.description,
         resource_url: resource.resource_url,
+        resource_type: resource.resource_type,
         file_size_bytes: resource.file_size_bytes,
         is_downloadable: resource.is_downloadable,
-        thumbnail_url: resource.thumbnail_url,
         is_preview: resource.is_preview,
         order_index: resource.order_index,
         course_id: resource.course_id,
@@ -152,9 +159,9 @@ serve(async (req) => {
     }
 
     // ========================================
-    // 3. Fetch navigation (all items in same section - videos, PDFs, and quizzes)
+    // 3. Fetch navigation (all items in same section)
     // ========================================
-    const { data: allVideos, error: videoNavError } = await supabaseClient
+      const { data: allVideos, error: videoNavError } = await supabaseClient
       .from('course_videos')
       .select('id, title, order_index')
       .eq('section_id', video.section_id)
@@ -163,11 +170,12 @@ serve(async (req) => {
 
     const { data: allResources, error: resourceNavError } = await supabaseClient
       .from('course_resources')
-      .select('id, title, order_index')
+      .select('id, title, order_index, resource_type')
       .eq('section_id', video.section_id)
       .eq('course_id', video.course_id)
-      .eq('resource_type', 'pdf')
+      .in('resource_type', ['pdf', 'document', 'ppt'])
       .order('order_index', { ascending: true });
+
 
     const { data: allQuizzes, error: quizNavError } = await supabaseClient
       .from('course_quizzes')
@@ -176,6 +184,7 @@ serve(async (req) => {
       .eq('course_id', video.course_id)
       .order('order_index', { ascending: true });
 
+
     if (videoNavError) throw videoNavError;
     if (resourceNavError) throw resourceNavError;
     if (quizNavError) throw quizNavError;
@@ -183,12 +192,14 @@ serve(async (req) => {
     // Combine and sort all items by order_index
     const allItems = [
       ...(allVideos || []).map((v: any) => ({ ...v, type: 'video' })),
-      ...(allResources || []).map((r: any) => ({ ...r, type: 'pdf' })),
+      ...(allResources || []).map((r: any) => ({ 
+        ...r, 
+        type: r.resource_type || 'pdf' // Use actual resource type
+      })),
       ...(allQuizzes || []).map((q: any) => ({ ...q, type: 'quiz' }))
     ].sort((a, b) => a.order_index - b.order_index);
 
-    const currentIndex = allItems.findIndex((item: any) => item.id === videoId);
-    
+    const currentIndex = allItems.findIndex((item: any) => item.id === videoId);    
     const previousVideo = currentIndex > 0 
       ? { 
           id: allItems[currentIndex - 1].id, 
@@ -213,7 +224,7 @@ serve(async (req) => {
     if (userId) {
       try {
         const { data: progress, error: progressError } = await supabaseClient
-          .from('video_progress')
+          .from('user_video_progress')
           .select(`
             watch_time_seconds,
             is_completed,
@@ -225,6 +236,12 @@ serve(async (req) => {
           .eq('video_id', videoId)
           .single();
 
+        console.log('Progress query result:', {
+          found: !!progress,
+          error: progressError,
+          data: progress
+        });
+
         if (!progressError && progress) {
           userProgress = progress;
         }
@@ -232,22 +249,25 @@ serve(async (req) => {
         console.error('Error fetching user progress:', progressError);
         // Continue without progress data
       }
+    } else {
+      console.log('Skipping progress fetch (no userId provided)');
     }
 
     // ========================================
-    // 4. Construct response
-    // ========================================
     // 5. Build response data
     // ========================================
+    const isDocumentType = ['pdf', 'document', 'ppt'].includes(lessonType);
+    
     const responseData = {
       id: video.id,
       title: video.title,
       description: video.description,
       type: lessonType,
       video_url: lessonType === 'video' ? video.video_url : undefined,
-      resource_url: lessonType === 'pdf' ? video.resource_url : undefined,
-      file_size_bytes: lessonType === 'pdf' ? video.file_size_bytes : undefined,
-      is_downloadable: lessonType === 'pdf' ? video.is_downloadable : undefined,
+      resource_url: isDocumentType ? video.resource_url : undefined,
+      resource_type: isDocumentType ? video.resource_type : undefined,
+      file_size_bytes: isDocumentType ? video.file_size_bytes : undefined,
+      is_downloadable: isDocumentType ? video.is_downloadable : undefined,
       duration_seconds: lessonType === 'video' ? video.duration_seconds : undefined,
       thumbnail_url: video.thumbnail_url,
       is_preview: video.is_preview,
@@ -256,7 +276,6 @@ serve(async (req) => {
         id: video.courses.id,
         title: video.courses.title,
         instructor_name: video.courses.instructor_name,
-        level: video.courses.level
       },
       section: {
         id: video.course_sections.id,
@@ -269,6 +288,9 @@ serve(async (req) => {
       },
       userProgress
     };
+
+    console.log('Response data prepared:', JSON.stringify(responseData, null, 2));
+    console.log('=== SUCCESS - Returning 200 ===');
 
     return new Response(
       JSON.stringify({
@@ -283,13 +305,19 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("Error retrieving video details:", error);
+    console.error("=== ERROR OCCURRED ===");
+    console.error("Error type:", error?.constructor?.name);
+    console.error("Error message:", error?.message);
+    console.error("Error stack:", error?.stack);
+    console.error("Full error:", error);
 
     return new Response(
       JSON.stringify({
         success: false,
         message: "An error occurred while retrieving video details",
-        error: error.message || "Unknown error"
+        error: error.message || "Unknown error",
+        errorType: error?.constructor?.name || "Unknown",
+        stack: error?.stack || null
       }),
       {
         status: 500,

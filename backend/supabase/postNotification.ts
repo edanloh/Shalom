@@ -1,3 +1,42 @@
+type NotificationType =
+  | "system"
+  | "assignment"
+  | "course"
+  | "marketing"
+  | "weekly";
+
+const allowsNotificationType = (
+  prefs: {
+    assignment_reminders?: boolean;
+    course_updates?: boolean;
+    marketing_emails?: boolean;
+    weekly_progress_summary?: boolean;
+  } | null,
+  type: string
+) => {
+  // No prefs row → allow all
+  if (!prefs) return true;
+
+  switch (type) {
+    case "assignment":
+      return prefs.assignment_reminders !== false;
+
+    case "course":
+      return prefs.course_updates !== false;
+
+    case "marketing":
+      return prefs.marketing_emails !== false;
+
+    case "weekly":
+      return prefs.weekly_progress_summary !== false;
+
+    case "system":
+    default:
+      // System notifications are always allowed
+      return true;
+  }
+};
+
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -37,8 +76,10 @@ const chunk = <T,>(items: T[], size: number) => {
 
 const sendExpoPush = async (payloads: Record<string, unknown>[]) => {
   if (!payloads.length) return { sent: 0, results: [] as unknown[] };
+
   const results: unknown[] = [];
   const batches = chunk(payloads, MAX_EXPO_TOKENS_PER_BATCH);
+
   for (const batch of batches) {
     const res = await fetch(EXPO_PUSH_URL, {
       method: "POST",
@@ -49,10 +90,23 @@ const sendExpoPush = async (payloads: Record<string, unknown>[]) => {
       },
       body: JSON.stringify(batch),
     });
+
     const body = await res.json().catch(() => ({}));
     results.push(body);
   }
+
   return { sent: payloads.length, results };
+};
+
+const allowsPush = (prefs: { push_notifications?: boolean } | null) => {
+  // No prefs row → allow
+  if (!prefs) return true;
+
+  // Explicit false → block
+  if (prefs.push_notifications === false) return false;
+
+  // true or null → allow
+  return true;
 };
 
 serve(async (req) => {
@@ -60,17 +114,57 @@ serve(async (req) => {
   if (req.method !== "POST") return fail("Method not allowed", 405);
 
   try {
-    const body = await req.json();
-    const userId = body.userId || body.user_id;
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return fail("Invalid JSON body", 400);
+    }
+
+    console.log("📌 CRON BODY:", body);
+
+    const userIds: string[] = Array.isArray(body.userIds)
+      ? body.userIds
+      : Array.isArray(body.user_ids)
+      ? body.user_ids
+      : body.userId || body.user_id
+      ? [body.userId || body.user_id]
+      : [];
     const title = body.title;
     const message = body.message;
     const type = body.type || "system";
 
-    if (!userId || !title || !message) {
-      return fail("userId, title, and message are required", 400);
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return fail("userIds must be a non-empty array", 400);
     }
 
-    const payload = {
+    if (!title || !message) {
+      return fail("title and message are required", 400);
+    }
+
+    const { data: prefRows, error: prefError } = await supabase
+      .from("user_preferences")
+      .select(`
+        user_id,
+        push_notifications,
+        assignment_reminders,
+        course_updates,
+        marketing_emails,
+        weekly_progress_summary
+      `)
+      .in("user_id", userIds);
+
+    if (prefError) throw prefError;
+
+    const prefsByUser = new Map<string, any>();
+    for (const row of prefRows ?? []) {
+      prefsByUser.set(row.user_id, row);
+    }
+
+    const createdAt = body.createdAt || body.created_at || new Date().toISOString();
+
+    // 1️⃣ Insert notifications (one per user)
+    const notificationsPayload = userIds.map((userId) => ({
       user_id: userId,
       title,
       message,
@@ -80,58 +174,88 @@ serve(async (req) => {
       related_entity_id: body.relatedEntityId || body.related_entity_id || null,
       priority: body.priority || "normal",
       expires_at: body.expiresAt || body.expires_at || null,
-      created_at: body.createdAt || body.created_at || new Date().toISOString(),
-    };
+      created_at: createdAt,
+    }));
 
-    const { data, error } = await supabase
+    const { data: notifications, error: insertError } = await supabase
       .from("notifications")
-      .insert(payload)
-      .select("id,user_id,title,message,type,is_read,created_at,action_url")
-      .single();
+      .insert(notificationsPayload)
+      .select("id,user_id,title,message,type,created_at");
 
-    if (error) throw error;
+    if (insertError) throw insertError;
 
-    // Fetch push tokens and send an Expo push for this notification.
+    // 2️⃣ Fetch all push tokens for these users
     let push = { sent: 0, results: [] as unknown[] };
+
     try {
-      const { data: tokenRow, error: tokenError } = await supabase
+      const { data: tokenRows, error: tokenError } = await supabase
         .from("push_notification_tokens")
-        .select("tokens")
-        .eq("user_id", userId)
-        .maybeSingle();
+        .select("user_id,tokens")
+        .in("user_id", userIds);
 
-      if (tokenError && tokenError.code !== "PGRST116") {
-        throw tokenError;
+      if (tokenError) throw tokenError;
+
+      const payloads: Record<string, unknown>[] = [];
+
+      for (const row of tokenRows ?? []) {
+        const userNotifications = notifications.filter(
+          (n) => n.user_id === row.user_id
+        );
+
+        const prefs = prefsByUser.get(row.user_id);
+
+        // 🚫 Push disabled
+        if (!allowsPush(prefs)) continue;
+
+        // 🚫 Notification type disabled
+        if (!allowsNotificationType(prefs, type)) continue;
+
+        const validTokens = (row.tokens ?? []).filter(
+          (t: string) => t && isExpoPushToken(t)
+        );
+
+        for (const token of validTokens) {
+          for (const notif of userNotifications) {
+            console.log(
+              "📨 PUSH SENT",
+              JSON.stringify({
+                notification_id: notif.id,
+                user_id: row.user_id,
+                token: token.slice(0, 20) + "...",
+                type,
+                title,
+                created_at: notif.created_at,
+              })
+            );
+
+            payloads.push({
+              to: token,
+              sound: "default",
+              title,
+              body: message,
+              priority: body.priority === "high" ? "high" : "default",
+              data: {
+                notificationId: notif.id,
+                type,
+                ...(typeof body.data === "object" ? body.data : {}),
+              },
+            });
+          }
+        }
       }
 
-      const tokens = (tokenRow?.tokens ?? []).filter(
-        (token: string) => token && isExpoPushToken(token)
-      );
-
-      if (tokens.length) {
-        const extraData =
-          body.data && typeof body.data === "object" ? body.data : {};
-        const payloads = tokens.map((token: string) => ({
-          to: token,
-          sound: "default",
-          title,
-          body: message,
-          data: {
-            notificationId: data.id,
-            type,
-            ...extraData,
-          },
-          priority: body.priority === "high" ? "high" : "default",
-        }));
-        push = await sendExpoPush(payloads);
-      }
-    } catch (pushError: any) {
-      console.error("Failed to send push notification:", pushError);
+      push = await sendExpoPush(payloads);
+    } catch (pushError) {
+      console.error("❌ Push notification failed:", pushError);
     }
 
-    return ok({ success: true, data, push });
+    return ok({
+      success: true,
+      notifications,
+      push,
+    });
   } catch (err: any) {
     console.error("postNotification error", err);
-    return fail("Failed to create notification", 500, { error: err.message });
+    return fail("Failed to create notifications", 500, { error: err.message });
   }
 });

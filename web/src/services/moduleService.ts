@@ -4,42 +4,42 @@
 
 import apiService from './apiService';
 
-export interface ModuleDetail {
-  id: number;
-  title: string;
-  description: string;
-  order_index: number;
-  lessons: Lesson[];
-  quizzes: Quiz[];
-}
+// export interface ModuleDetail {
+//   id: number;
+//   title: string;
+//   description: string;
+//   order_index: number;
+//   lessons: Lesson[];
+//   quizzes: Quiz[];
+// }
 
-export interface Lesson {
-  id: number;
-  title: string;
-  content: string;
-  video_url?: string;
-  thumbnail_url?: string;
-  duration: string;
-  duration_seconds?: number;
-  is_preview?: boolean;
-  order_index: number;
-}
+// export interface Lesson {
+//   id: number;
+//   title: string;
+//   content: string;
+//   video_url?: string;
+//   thumbnail_url?: string;
+//   duration: string;
+//   duration_seconds?: number;
+//   is_preview?: boolean;
+//   order_index: number;
+// }
 
-export interface Quiz {
-  id: number;
-  title: string;
-  description: string;
-  questions: Question[];
-}
+// export interface Quiz {
+//   id: number;
+//   title: string;
+//   description: string;
+//   questions: Question[];
+// }
 
-export interface Question {
-  id: number;
-  question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'short_answer';
-  options?: string[];
-  correct_answer: string;
-  explanation?: string;
-}
+// export interface Question {
+//   id: number;
+//   question_text: string;
+//   question_type: 'multiple_choice' | 'true_false' | 'short_answer';
+//   options?: string[];
+//   correct_answer: string;
+//   explanation?: string;
+// }
 
 class ModuleService {
   /**
@@ -49,8 +49,11 @@ class ModuleService {
    */
   async getCourseModules(courseId: string, adminId?: string): Promise<ModuleDetail[]> {
     try {
+      if (!adminId) {
+        throw new Error('Missing instructor/admin ID');
+      }
       // Use instructor endpoint to get full details including quiz questions
-      const instructorId = adminId || '550e8400-e29b-41d4-a716-446655440201';
+      const instructorId = adminId;
       // const response = await apiService.get<any>(`/admin/${instructorId}/${courseId}`);
       const response = await apiService.get<any>(`/getModuleDetailInstructor/${instructorId}/${courseId}`);
       if (!response || !response.data || !response.data.sections) {
@@ -230,6 +233,18 @@ class ModuleService {
       return response;
     } catch (error) {
       console.error(`Error submitting quiz ${quizId}:`, error);
+      throw error;
+    }
+  }
+
+  async getModuleDetailInstructor(
+    adminId: string, courseId: string
+  ): Promise<any> {
+    try {
+      const response = await apiService.get(`/getModuleDetailInstructor/${adminId}/${courseId}`)
+      return response;
+    } catch (error) {
+      console.error(`Error getting module details for instructor ${adminId} and course ${courseId}:`, error);
       throw error;
     }
   }

@@ -16,13 +16,14 @@ import CustomTextInput from "@/components/CustomTextInput";
 import CustomModal from "../components/common/CustomModal";
 import creditService from "../services/creditService";
 import { AchievementItem } from "../types";
-import { useAuth } from "../contexts/AuthContext";
+import { useUser } from "../contexts/UserContext";
 
 type Achievement = {
   id: string;
   icon: string;
   label: string;
   subtitle: string;
+  sourceLabel?: string;
   createdAt: string; // ISO date
   points?: number;
   earned?: boolean;
@@ -61,7 +62,8 @@ const isIconUrl = (value?: string) =>
 const PAGE_SIZE = 20;
 
 export default function AchievementsScreen({ navigation }: any) {
-  const { user } = useAuth();
+  const { user } = useUser();
+  const dbUserId = user?.uuid;
   const [query, setQuery] = useState("");
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
@@ -85,23 +87,38 @@ export default function AchievementsScreen({ navigation }: any) {
 
     return items
       .filter((a: any) => a.earned !== false)
-      .map((a: AchievementItem) => ({
-        id: a.id,
-        icon: iconFor(a),
-        label: a.label || (a as any).name || "Achievement",
-        subtitle: (a as any).description || a.label || "",
-        createdAt:
-          (a as any).earnedAt ||
-          (a as any).earned_at ||
-          (a as any).createdAt ||
-          new Date().toISOString(),
-        points: (a as any).points ?? undefined,
-        earned: (a as any).earned ?? true,
-      }));
+      .map((a: AchievementItem) => {
+        const sourceCourseTitle = (a as any).sourceCourseTitle || (a as any).source_course_title;
+        const sourceInstructorName =
+          (a as any).sourceInstructorName || (a as any).source_instructor_name;
+        const scopeType = ((a as any).scopeType || (a as any).scope_type || "global") as string;
+        const sourceLabel = sourceCourseTitle
+          ? `From ${sourceCourseTitle}`
+          : sourceInstructorName
+            ? `Instructor: ${sourceInstructorName}`
+            : scopeType === "global"
+              ? "Platform achievement"
+              : undefined;
+
+        return {
+          id: a.id,
+          icon: iconFor(a),
+          label: a.label || (a as any).name || "Achievement",
+          subtitle: (a as any).description || a.label || "",
+          sourceLabel,
+          createdAt:
+            (a as any).earnedAt ||
+            (a as any).earned_at ||
+            (a as any).createdAt ||
+            new Date().toISOString(),
+          points: (a as any).points ?? undefined,
+          earned: (a as any).earned ?? true,
+        };
+      });
   }, []);
 
   const load = useCallback(async () => {
-    if (!user?.id) {
+    if (!dbUserId) {
       setAchievements([]);
       setNextOffset(0);
       setHasMore(false);
@@ -109,10 +126,12 @@ export default function AchievementsScreen({ navigation }: any) {
     }
     setLoading(true);
     try {
-      const remote = await creditService.getAchievements(user.id, {
+      const remote = await creditService
+        .getAchievements(dbUserId, {
         limit: PAGE_SIZE,
         offset: 0,
-      }).catch(() => []);
+      })
+        .catch(() => []);
       const normalized = mapAchievements(remote);
       setAchievements(normalized);
       setNextOffset(normalized.length);
@@ -125,11 +144,11 @@ export default function AchievementsScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [mapAchievements, user?.id]);
+  }, [mapAchievements, dbUserId]);
 
   useEffect(() => {
     load();
-  }, [load, user?.id]);
+  }, [load, dbUserId]);
 
   const sections = useMemo(() => {
     // Filter achievements based on search query
@@ -188,14 +207,16 @@ export default function AchievementsScreen({ navigation }: any) {
   }, [load]);
 
   const loadMore = useCallback(async () => {
-    if (!user?.id || loadingMore || !hasMore || loading) return;
+    if (!dbUserId || loadingMore || !hasMore || loading) return;
     setLoadingMore(true);
     try {
       const startOffset = nextOffset;
-      const remote = await creditService.getAchievements(user.id, {
+      const remote = await creditService
+        .getAchievements(dbUserId, {
         limit: PAGE_SIZE,
         offset: startOffset,
-      }).catch(() => []);
+      })
+        .catch(() => []);
       const normalized = mapAchievements(remote);
       setAchievements((prev) => {
         const existing = new Set(prev.map((item) => item.id));
@@ -208,7 +229,7 @@ export default function AchievementsScreen({ navigation }: any) {
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loading, loadingMore, mapAchievements, nextOffset, user?.id]);
+  }, [hasMore, loading, loadingMore, mapAchievements, nextOffset, dbUserId]);
 
   return (
     <Screen
@@ -222,7 +243,12 @@ export default function AchievementsScreen({ navigation }: any) {
     >
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) =>
+          String(
+            item.id ??
+              `achievement-${index}-${item.label ?? item.subtitle ?? "row"}`
+          )
+        }
         renderItem={({ item, index, section }) => (
           <View>
             <TouchableOpacity
@@ -242,6 +268,11 @@ export default function AchievementsScreen({ navigation }: any) {
                   {item.label}
                 </Text>
                 <Text style={TextStyles.captionSmall}>{item.subtitle}</Text>
+                {item.sourceLabel ? (
+                  <Text style={[TextStyles.captionSmall, { color: Colors.textMuted }]}>
+                    {item.sourceLabel}
+                  </Text>
+                ) : null}
               </View>
             </TouchableOpacity>
             {index < section.data.length - 1 ? (
@@ -357,6 +388,21 @@ export default function AchievementsScreen({ navigation }: any) {
         >
           {selectedAchievement?.subtitle}
         </Text>
+        {selectedAchievement?.sourceLabel ? (
+          <Text
+            style={[
+              TextStyles.caption,
+              {
+                textAlign: "center",
+                marginTop: -Spacing.sm,
+                marginBottom: Spacing.md,
+                color: Colors.textMuted,
+              },
+            ]}
+          >
+            {selectedAchievement.sourceLabel}
+          </Text>
+        ) : null}
 
         {/* Points Badge */}
         {selectedAchievement?.points && (

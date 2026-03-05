@@ -5,30 +5,35 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { StackNavigationProp } from "@react-navigation/stack";
 
-import { useCourses } from '../contexts/CourseContext';
-import type { MainStackParamList } from '@/types/navigation';
-import { Colors, Typography, Spacing, TextStyles } from '../constants';
-import { ImageWithFallback } from '../components/common';
-import { Images } from '../../assets';
-import Screen from '../components/common/Screen';
-import { ActionButton } from '@/components';
+import { useCourses } from "../contexts/CourseContext";
+import { useUser } from "../contexts/UserContext";
+import courseService from "../services/courseService";
+import type { MainStackParamList } from "@/types/navigation";
+import { Colors, Typography, Spacing, TextStyles } from "../constants";
+import { ImageWithFallback } from "../components/common";
+import AnimatedHeartButton from "../components/common/AnimatedHeartButton";
+import { Images } from "../../assets";
+import Screen from "../components/common/Screen";
+import { ActionButton } from "@/components";
 
 const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
   <View style={styles.metaRow}>
     <Ionicons name="star" size={12} color="#FACC15" />
     <Text style={styles.metaText}>{rating?.toFixed?.(1) ?? rating}</Text>
     <Text style={styles.metaDot}>•</Text>
-    <Text style={styles.metaText}>{modules ?? 12} modules</Text>
+    <Text style={styles.metaText}>{modules ?? 0} modules</Text>
   </View>
 );
 
 export default function WishlistScreen() {
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
+  const { user: profileUser } = useUser();
+  const recommendationUserId = profileUser?.uuid;
   const {
     wishlist,
     wishlistLoading,
@@ -40,11 +45,32 @@ export default function WishlistScreen() {
   const renderItem = ({ item }: any) => (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => navigation.navigate('CourseDetail', { courseId: item.id })}
+      onPress={() => {
+        if (recommendationUserId) {
+          courseService
+            .recordRecommendationEvent({
+              userId: recommendationUserId,
+              courseId: item.id,
+              eventType: "click",
+              context: {
+                placement: "wishlist",
+                isRecommendationSurface: false,
+              },
+            })
+            .catch((err) =>
+              console.warn("Failed to record wishlist course click", err)
+            );
+        }
+        navigation.navigate("CourseDetail", { courseId: item.id });
+      }}
       style={styles.card}
     >
       {/* Left: text */}
       <View style={styles.cardLeft}>
+        {/* Category badge */}
+        <View style={[styles.categoryBadge, { backgroundColor: item.categoryColor || Colors.purple400 }]}>
+          <Text style={styles.categoryText} numberOfLines={1}>{item.category}</Text>
+        </View>
         <Text style={styles.title} numberOfLines={2}>
           {item.title}
         </Text>
@@ -59,19 +85,13 @@ export default function WishlistScreen() {
           style={styles.cardImage}
         />
         <View style={styles.badgeRow}>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>{item.level}</Text>
-          </View>
-
-          <TouchableOpacity
+          <AnimatedHeartButton
             onPress={() => toggleWishlist(item)}
             hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
             style={styles.heartBtn}
-            accessibilityRole="button"
             accessibilityLabel="Remove from wishlist"
-          >
-            <Ionicons name="heart" size={20} color="#fff" />
-          </TouchableOpacity>
+            filled
+          />
         </View>
       </View>
     </TouchableOpacity>
@@ -88,7 +108,9 @@ export default function WishlistScreen() {
       >
         <View style={[styles.centerContainer, { flex: 1 }]}>
           <ActivityIndicator size="large" color={Colors.secondary} />
-          <Text style={[TextStyles.body, {paddingTop: Spacing.md}]}>Loading your favourites…</Text>
+          <Text style={[TextStyles.body, { paddingTop: Spacing.md }]}>
+            Loading your favourites…
+          </Text>
         </View>
       </Screen>
     );
@@ -105,10 +127,7 @@ export default function WishlistScreen() {
       >
         <View>
           <Text style={styles.errorMessage}>Error: {wishlistError}</Text>
-          <ActionButton
-            text="Retry"
-            onPress={refreshWishlist}
-          />
+          <ActionButton text="Retry" onPress={refreshWishlist} />
         </View>
       </Screen>
     );
@@ -123,20 +142,34 @@ export default function WishlistScreen() {
     >
       <FlatList
         data={wishlist}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => {
+          const rawId = item?.id;
+          if (rawId !== undefined && rawId !== null && String(rawId).length > 0) {
+            return String(rawId);
+          }
+          return `wishlist-${index}-${item?.title ?? "unknown"}`;
+        }}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
         refreshing={!!wishlistLoading}
         onRefresh={refreshWishlist}
         scrollEnabled={false}
+        contentContainerStyle={wishlist.length === 0 ? styles.emptyListContent : undefined}
         ListEmptyComponent={
-          <View style={{gap: Spacing.base, alignItems: 'center' }}>
+          <View style={styles.emptyState}>
+            <Ionicons
+              name="heart-outline"
+              size={48}
+              color={Colors.textMuted ?? Colors.textSecondary}
+            />
             <Text style={TextStyles.body}>Your wishlist is empty</Text>
-            <Text style={TextStyles.caption}>Tap the heart on any course to save it here.</Text>
+            <Text style={TextStyles.caption}>
+              Tap the heart on any course to save it here.
+            </Text>
             <ActionButton
               text="Browse courses"
-              onPress={() => navigation.navigate('MyCourses')}
+              onPress={() => navigation.goBack()}
             />
           </View>
         }
@@ -149,90 +182,115 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.primary },
 
   centerContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   errorMessage: {
     ...TextStyles.body,
     color: Colors.red,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Spacing.lg,
   },
 
   card: {
-    flexDirection: 'row',
-    backgroundColor: Colors.cardDark,
+    flexDirection: "row",
+    backgroundColor: Colors.gray600,
     borderRadius: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
+    minHeight: 110,
+    maxHeight: 160,
   },
-  cardLeft: { flex: 1, padding: Spacing.md },
-    leftTitle: {
+  cardLeft: {
+    flex: 1,
+    padding: Spacing.lg,
+    justifyContent: "center",
+    paddingRight: Spacing.md,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  leftTitle: {
     fontFamily: TextStyles.h4.fontFamily,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     lineHeight: 20,
     marginBottom: Spacing.xs,
     flex: 1,
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+    flexDirection: "column",
+    justifyContent: "space-between",
   },
-  cardSubtitle: { ...TextStyles.body, color: Colors.textSecondary, fontSize: 13 },
+  cardSubtitle: {
+    ...TextStyles.body,
+    color: Colors.textSecondary,
+    fontSize: 13,
+  },
   title: {
     color: Colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 15,
+    fontWeight: "700",
+    fontSize: 16,
     fontFamily: Typography?.fontFamily?.semiBold ?? TextStyles.body.fontFamily,
-    marginBottom: 4,
+    marginBottom: 8,
+    lineHeight: 20,
   },
 
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingTop: 2,
+    flexWrap: "wrap",
   },
 
   metaText: {
     color: Colors.textSecondary,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: Typography?.fontFamily?.regular ?? TextStyles.body.fontFamily,
   },
 
   metaDot: { color: Colors.textSecondary, marginHorizontal: 4 },
 
   cardRight: {
-    width: 150,
-    height: 100, 
-    backgroundColor: '#E7F0EC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    alignSelf: 'center',
+    width: 140,
+    alignSelf: "stretch",
+    position: "relative",
+    overflow: "hidden",
   },
-  cardImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  cardImage: { flex: 1, width: 150, resizeMode: "cover" },
   badgeRow: {
-    position: 'absolute',
+    position: "absolute",
     top: Spacing.sm,
     right: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
-  levelBadge: {
-    backgroundColor: Colors.purple400,
+  categoryBadge: {
+    alignSelf: "flex-start",
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginRight: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: Spacing.sm,
+    maxWidth: "72%",
+    flexShrink: 1,
   },
-  levelText: {
-    fontFamily: Typography.fontFamily.medium,
-    fontSize: Typography.fontSize.xs,
+  categoryText: {
     color: Colors.white,
+    fontSize: 11,
+    fontWeight: "700",
   },
   heartBtn: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 14,
     padding: 6,
+  },
+  emptyListContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  emptyState: {
+    gap: Spacing.base,
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    paddingHorizontal: Spacing.lg,
   },
 });

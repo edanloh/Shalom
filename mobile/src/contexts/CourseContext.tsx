@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Course } from '../types';
 import courseService from '../services/courseService';
-import { useAuth } from './AuthContext';
+import { useUser } from './UserContext';
+import { showToast } from '@/components/common/Toast';
 
 interface CourseContextType {
   // All courses
@@ -55,22 +56,23 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [wishlistError, setWishlistError] = useState<string | null>(null);
 
-  const { user } = useAuth();
+  const { user: profileUser } = useUser();
+  const dbUserId = profileUser?.uuid;
 
   useEffect(() => {
     loadCourses();
   }, []);
 
   useEffect(() => {
-    if (user?.id) {
+    if (dbUserId) {
       loadMyCourses();
       loadRecommendedCourses();
     }
-  }, [user?.id]);
+  }, [dbUserId]);
 
   useEffect(() => {
-    if (user?.id) refreshWishlist();
-  }, [user?.id]);
+    if (dbUserId) refreshWishlist();
+  }, [dbUserId]);
 
   const loadCourses = async () => {
     if (loading) return;
@@ -80,7 +82,6 @@ export default function CourseProvider({ children }: { children: React.ReactNode
     
     try {
       const coursesData = await courseService.getCourses();
-      console.log('CourseContext: Loaded', coursesData.length, 'courses');
       setCourses(coursesData);
     } catch (err) {
       console.error('CourseContext: Error loading courses:', err);
@@ -91,13 +92,13 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   };
 
   const loadMyCourses = async () => {
-    if (!user?.id || myCoursesLoading) return;
+    if (!dbUserId || myCoursesLoading) return;
     
     setMyCoursesLoading(true);
     setMyCoursesError(null);
     
     try {
-      const myCoursesData = await courseService.getUserEnrollments(user.id);
+      const myCoursesData = await courseService.getUserEnrollments(dbUserId);
       console.log('CourseContext: Loaded', myCoursesData.length, 'my courses');
       setMyCourses(myCoursesData);
     } catch (err) {
@@ -116,7 +117,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
     
     try {
       console.log('CourseContext: Loading recommended courses...');
-      const recommendedData = await courseService.getRecommendedCourses(user?.id);
+      const recommendedData = await courseService.getRecommendedCourses(dbUserId);
       setRecommendedCourses(recommendedData);
     } catch (err) {
       console.error('CourseContext: Error loading recommended courses:', err);
@@ -161,11 +162,11 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   };
   
   const refreshWishlist = async () => {
-    if (!user?.id) return;
+    if (!dbUserId) return;
     try {
       setWishlistLoading(true);
       setWishlistError(null);
-      const items = await courseService.getWishlist(user.id);
+      const items = await courseService.getWishlist(dbUserId);
       setWishlist(items);
     } catch (e: any) {
       setWishlistError(e?.message ?? 'Failed to load wishlist');
@@ -185,8 +186,18 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   };
 
   const toggleWishlist = async (course: Course) => {
-    if (!user?.id) return;
-    const id = course.id;
+    if (!dbUserId) return;
+    const id = course?.id;
+    if (!id) {
+      setWishlistError('Course ID is missing');
+      showToast({
+        type: 'error',
+        title: 'Wishlist update failed',
+        message: 'This course is missing an ID.',
+        durationMs: 2200,
+      });
+      return;
+    }
     const currently = isWishlisted(id);
 
     // optimistic UI
@@ -200,9 +211,21 @@ export default function CourseProvider({ children }: { children: React.ReactNode
 
     try {
       if (currently) {
-        await courseService.removeFromWishlist(user.id, id);
+        await courseService.removeFromWishlist(dbUserId, id);
+        showToast({
+          type: 'success',
+          title: 'Removed from wishlist',
+          message: course.title || 'Course removed',
+          durationMs: 1800,
+        });
       } else {
-        await courseService.addToWishlist(user.id, id);
+        await courseService.addToWishlist(dbUserId, id);
+        showToast({
+          type: 'success',
+          title: 'Added to wishlist',
+          message: course.title || 'Course saved',
+          durationMs: 1800,
+        });
       }
     } catch (e) {
       // rollback on failure
@@ -214,6 +237,12 @@ export default function CourseProvider({ children }: { children: React.ReactNode
         setFlagInLists(id, false);
       }
       setWishlistError((e as Error)?.message ?? 'Failed to update wishlist');
+      showToast({
+        type: 'error',
+        title: 'Wishlist update failed',
+        message: (e as Error)?.message ?? 'Please try again.',
+        durationMs: 2200,
+      });
     }
   };
 

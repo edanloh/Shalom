@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
 };
 
@@ -14,110 +15,1457 @@ const supabase = createClient(
 
 const EVENT_LOOKBACK_DAYS = 30;
 const MAX_CANDIDATES = 20;
+const MAX_CANDIDATE_POOL = Number(
+  Deno.env.get("RECO_MAX_CANDIDATE_POOL") ?? "60"
+);
+const CANDIDATE_CATEGORY_POOL_LIMIT = Number(
+  Deno.env.get("RECO_CANDIDATE_CATEGORY_POOL_LIMIT") ?? "20"
+);
+const CANDIDATE_LONG_TAIL_POOL_LIMIT = Number(
+  Deno.env.get("RECO_CANDIDATE_LONG_TAIL_POOL_LIMIT") ?? "20"
+);
 const MAX_RESULTS = 6;
+const MIN_SCORE_FLOOR = Number(Deno.env.get("RECO_MIN_SCORE_FLOOR") ?? "1");
+const PROFILE_DECAY_DAYS = Number(Deno.env.get("RECO_PROFILE_DECAY_DAYS") ?? "21");
+const NOVELTY_MIN_SLOTS = Number(Deno.env.get("RECO_NOVELTY_MIN_SLOTS") ?? "1");
+const RERANK_CATEGORY_PENALTY = Number(
+  Deno.env.get("RECO_RERANK_CATEGORY_PENALTY") ?? "0.5"
+);
+const RERANK_INSTRUCTOR_PENALTY = Number(
+  Deno.env.get("RECO_RERANK_INSTRUCTOR_PENALTY") ?? "0.6"
+);
+const RERANK_TAG_OVERLAP_PENALTY = Number(
+  Deno.env.get("RECO_RERANK_TAG_OVERLAP_PENALTY") ?? "0.2"
+);
+const RERANK_NOVELTY_BONUS = Number(
+  Deno.env.get("RECO_RERANK_NOVELTY_BONUS") ?? "0.35"
+);
+const SESSION_GAP_HOURS = Number(Deno.env.get("RECO_SESSION_GAP_HOURS") ?? "2");
+const FRESHNESS_HALF_LIFE_DAYS = Number(
+  Deno.env.get("RECO_FRESHNESS_HALF_LIFE_DAYS") ?? "45"
+);
+const QUALITY_MIN_RATING = Number(Deno.env.get("RECO_QUALITY_MIN_RATING") ?? "3.5");
+const QUALITY_LOW_RATING_PENALTY = Number(
+  Deno.env.get("RECO_QUALITY_LOW_RATING_PENALTY") ?? "0.9"
+);
+const SEEN_FILTER_WINDOW_HOURS = Number(
+  Deno.env.get("RECO_SEEN_FILTER_WINDOW_HOURS") ?? "24"
+);
+const SEEN_FILTER_MIN_IMPRESSIONS = Number(
+  Deno.env.get("RECO_SEEN_FILTER_MIN_IMPRESSIONS") ?? "2"
+);
+const SESSION_WINDOW_HOURS = Number(
+  Deno.env.get("RECO_SESSION_WINDOW_HOURS") ?? "6"
+);
+const SESSION_INTENT_BOOST = Number(
+  Deno.env.get("RECO_SESSION_INTENT_BOOST") ?? "0.8"
+);
+const INSTRUCTOR_FATIGUE_WINDOW_HOURS = Number(
+  Deno.env.get("RECO_INSTRUCTOR_FATIGUE_WINDOW_HOURS") ?? "168"
+);
+const MAX_EXPOSURES_PER_INSTRUCTOR_WINDOW = Number(
+  Deno.env.get("RECO_MAX_EXPOSURES_PER_INSTRUCTOR_WINDOW") ?? "8"
+);
+const INSTRUCTOR_FATIGUE_PENALTY = Number(
+  Deno.env.get("RECO_INSTRUCTOR_FATIGUE_PENALTY") ?? "1.2"
+);
+const MIN_USER_EVENTS_FOR_PERSONALIZATION = Number(
+  Deno.env.get("RECO_MIN_USER_EVENTS") ?? "3"
+);
+const MAX_PER_CATEGORY = Number(Deno.env.get("RECO_MAX_PER_CATEGORY") ?? "2");
+const MAX_PER_INSTRUCTOR = Number(Deno.env.get("RECO_MAX_PER_INSTRUCTOR") ?? "2");
+const EXPLORATION_SLOTS = Number(Deno.env.get("RECO_EXPLORATION_SLOTS") ?? "1");
+const MAX_EXPOSURES_PER_COURSE_7D = Number(
+  Deno.env.get("RECO_MAX_EXPOSURES_PER_COURSE_7D") ?? "4"
+);
+const SUPPRESSION_COOLDOWN_DAYS = Number(
+  Deno.env.get("RECO_SUPPRESSION_COOLDOWN_DAYS") ?? "3"
+);
+const HARD_SUPPRESS_DISMISSALS = Number(
+  Deno.env.get("RECO_HARD_SUPPRESS_DISMISSALS") ?? "3"
+);
+const HARD_SUPPRESS_IGNORED_IMPRESSIONS = Number(
+  Deno.env.get("RECO_HARD_SUPPRESS_IGNORED_IMPRESSIONS") ?? "6"
+);
+const DEFAULT_ALGO = (Deno.env.get("RECO_ALGO_DEFAULT") ?? "rules_v2").toLowerCase();
+const SPLIT_V2 = Number(Deno.env.get("RECO_SPLIT_V2") ?? "100");
+const SPLIT_V2A = Number(Deno.env.get("RECO_SPLIT_V2A") ?? "0");
+const SPLIT_V2B = Number(Deno.env.get("RECO_SPLIT_V2B") ?? "0");
+
+type RecommendationEvent = {
+  course_id: string | null;
+  event_type: string | null;
+  timestamp: string | null;
+};
+
+type CourseCategory = {
+  name?: string | null;
+  color?: string | null;
+};
+
+type CourseCandidate = {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  rating?: number | string | null;
+  duration_hours?: number | null;
+  thumbnail_url?: string | null;
+  tags?: string[] | null;
+  instructor_id?: string | null;
+  category_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  category?: CourseCategory | null;
+};
+
+type ContextFactors = {
+  rating: number;
+  category: number;
+  popularity: number;
+  session: number;
+  noveltyBonus: number;
+  explorationBias: number;
+};
+
+type DifficultyLevel = "beginner" | "intermediate" | "advanced" | "mixed" | "unknown";
+
+type BehaviorAggregate = {
+  impressions: number;
+  recentImpressions7d: number;
+  positive: number;
+  recency: number;
+  dismissals: number;
+  lastEventTs: number;
+  lastImpressionTs: number;
+  lastPositiveTs: number;
+};
+
+const readWeight = (key: string, fallback: number): number => {
+  const raw = Deno.env.get(key);
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const clamp = (value: number, min: number, max: number): number => {
+  return Math.max(min, Math.min(max, value));
+};
+
+const clampInt = (value: number, min: number, max: number): number => {
+  return Math.floor(clamp(value, min, max));
+};
+
+const normalizeTag = (value: string): string => value.trim().toLowerCase();
+
+const getCourseTags = (course: CourseCandidate): string[] => {
+  const tags = Array.isArray(course.tags) ? course.tags : [];
+  return tags
+    .filter((tag): tag is string => typeof tag === "string")
+    .map(normalizeTag)
+    .filter((tag) => tag.length > 0);
+};
+
+const inferDifficultyLevel = (course: CourseCandidate): DifficultyLevel => {
+  const haystack = [
+    ...(getCourseTags(course) ?? []),
+    course.title?.toLowerCase() ?? "",
+    course.description?.toLowerCase() ?? "",
+  ].join(" ");
+
+  const hasBeginner =
+    haystack.includes("beginner") ||
+    haystack.includes("intro") ||
+    haystack.includes("foundation") ||
+    haystack.includes("basic");
+  const hasIntermediate =
+    haystack.includes("intermediate") ||
+    haystack.includes("mid-level") ||
+    haystack.includes("practical");
+  const hasAdvanced =
+    haystack.includes("advanced") ||
+    haystack.includes("expert") ||
+    haystack.includes("masterclass") ||
+    haystack.includes("professional");
+  const hasMixed =
+    haystack.includes("all levels") ||
+    haystack.includes("all-level") ||
+    haystack.includes("mixed level");
+
+  if (hasMixed) return "mixed";
+  if (hasBeginner && !hasIntermediate && !hasAdvanced) return "beginner";
+  if (!hasBeginner && hasIntermediate && !hasAdvanced) return "intermediate";
+  if (!hasBeginner && !hasIntermediate && hasAdvanced) return "advanced";
+  if (hasBeginner || hasIntermediate || hasAdvanced) return "mixed";
+  return "unknown";
+};
+
+const getFreshnessScore = (
+  course: CourseCandidate,
+  nowTs: number,
+  halfLifeDays: number
+): number => {
+  const ref = course.updated_at ?? course.created_at;
+  if (!ref) return 0.5;
+  const ts = new Date(ref).getTime();
+  if (!Number.isFinite(ts) || ts <= 0) return 0.5;
+  const ageMs = Math.max(0, nowTs - ts);
+  const halfLifeMs = Math.max(1, halfLifeDays) * 24 * 60 * 60 * 1000;
+  return clamp(Math.exp((-Math.LN2 * ageMs) / halfLifeMs), 0, 1);
+};
+
+const getQualityPenalty = (
+  ratingNorm: number,
+  qualityMinRating: number,
+  lowRatingPenalty: number
+): number => {
+  const rating = ratingNorm * 5;
+  if (rating >= qualityMinRating) return 0;
+  const gap = qualityMinRating - rating;
+  return clamp(gap * Math.max(0, lowRatingPenalty), 0, 3);
+};
+
+const getContextFactors = (
+  learningGoalRaw: string | null,
+  localHour: number,
+  dayOfWeek: number
+): ContextFactors => {
+  const goal = (learningGoalRaw ?? "").toLowerCase();
+  const factors: ContextFactors = {
+    rating: 1,
+    category: 1,
+    popularity: 1,
+    session: 1,
+    noveltyBonus: 0,
+    explorationBias: 0,
+  };
+
+  if (goal === "career" || goal === "certification") {
+    factors.rating += 0.12;
+    factors.popularity += 0.08;
+  } else if (goal === "exam" || goal === "assessment") {
+    factors.category += 0.15;
+    factors.session += 0.08;
+  } else if (goal === "hobby" || goal === "explore") {
+    factors.noveltyBonus += 0.25;
+    factors.explorationBias += 0.2;
+  }
+
+  if (localHour >= 18 && localHour <= 23) {
+    factors.session += 0.12;
+  } else if (localHour >= 0 && localHour <= 5) {
+    factors.popularity -= 0.05;
+  }
+
+  // 0 = Sunday, 6 = Saturday
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    factors.explorationBias += 0.15;
+    factors.noveltyBonus += 0.1;
+  }
+
+  return factors;
+};
+
+const SCORING = {
+  // Personalized path
+  rating: readWeight("RECO_WEIGHT_RATING", 0.55),
+  userCtr: readWeight("RECO_WEIGHT_USER_CTR", 0.15),
+  userRecency: readWeight("RECO_WEIGHT_USER_RECENCY", 0.1),
+  categoryAffinity: readWeight("RECO_WEIGHT_CATEGORY_AFFINITY", 0.15),
+  instructorAffinity: readWeight("RECO_WEIGHT_INSTRUCTOR_AFFINITY", 0.08),
+  tagAffinity: readWeight("RECO_WEIGHT_TAG_AFFINITY", 0.07),
+  difficultyMatch: readWeight("RECO_WEIGHT_DIFFICULTY_MATCH", 0.08),
+  freshness: readWeight("RECO_WEIGHT_FRESHNESS", 0.06),
+  globalPopularity: readWeight("RECO_WEIGHT_GLOBAL_POPULARITY", 0.08),
+  ignorePenalty: readWeight("RECO_WEIGHT_IGNORE_PENALTY", 0.5),
+  dismissPenalty: readWeight("RECO_WEIGHT_DISMISS_PENALTY", 0.7),
+  // Cold-start path
+  coldRating: readWeight("RECO_COLD_WEIGHT_RATING", 0.55),
+  coldPopularity: readWeight("RECO_COLD_WEIGHT_POPULARITY", 0.3),
+  coldCtr: readWeight("RECO_COLD_WEIGHT_GLOBAL_CTR", 0.15),
+};
+
+type ScoringConfig = typeof SCORING;
+
+type RankingPolicyConfig = {
+  maxPerCategory: number;
+  maxPerInstructor: number;
+  explorationSlots: number;
+  maxExposuresPerCourse7d: number;
+  suppressionCooldownDays: number;
+  hardSuppressDismissals: number;
+  hardSuppressIgnoredImpressions: number;
+};
+
+type ExperimentConfig = {
+  modelVersion: string;
+  scoring: ScoringConfig;
+  policy: RankingPolicyConfig;
+};
+
+type SplitConfig = {
+  rules_v2: number;
+  rules_v2a: number;
+  rules_v2b: number;
+};
+
+const BASE_POLICY: RankingPolicyConfig = {
+  maxPerCategory: MAX_PER_CATEGORY,
+  maxPerInstructor: MAX_PER_INSTRUCTOR,
+  explorationSlots: EXPLORATION_SLOTS,
+  maxExposuresPerCourse7d: MAX_EXPOSURES_PER_COURSE_7D,
+  suppressionCooldownDays: SUPPRESSION_COOLDOWN_DAYS,
+  hardSuppressDismissals: HARD_SUPPRESS_DISMISSALS,
+  hardSuppressIgnoredImpressions: HARD_SUPPRESS_IGNORED_IMPRESSIONS,
+};
+
+const normalizeSplitConfig = (split: SplitConfig): SplitConfig => {
+  const raw = {
+    rules_v2: Math.max(0, split.rules_v2),
+    rules_v2a: Math.max(0, split.rules_v2a),
+    rules_v2b: Math.max(0, split.rules_v2b),
+  };
+  const total = raw.rules_v2 + raw.rules_v2a + raw.rules_v2b;
+  if (total <= 0) {
+    return { rules_v2: 100, rules_v2a: 0, rules_v2b: 0 };
+  }
+  return {
+    rules_v2: (raw.rules_v2 / total) * 100,
+    rules_v2a: (raw.rules_v2a / total) * 100,
+    rules_v2b: (raw.rules_v2b / total) * 100,
+  };
+};
+
+const TRAFFIC_SPLIT = normalizeSplitConfig({
+  rules_v2: SPLIT_V2,
+  rules_v2a: SPLIT_V2A,
+  rules_v2b: SPLIT_V2B,
+});
+
+const hashToBucket100 = (value: string): number => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0) % 100;
+};
+
+const assignAlgoByTrafficSplit = (userId: string | null): { algo: string; bucket: number | null } => {
+  if (!userId) {
+    return { algo: DEFAULT_ALGO, bucket: null };
+  }
+
+  const bucket = hashToBucket100(userId);
+  const thresholdV2 = TRAFFIC_SPLIT.rules_v2;
+  const thresholdV2A = thresholdV2 + TRAFFIC_SPLIT.rules_v2a;
+
+  if (bucket < thresholdV2) return { algo: "rules_v2", bucket };
+  if (bucket < thresholdV2A) return { algo: "rules_v2a", bucket };
+  return { algo: "rules_v2b", bucket };
+};
+
+const getExperimentConfig = (algoParam: string | null): ExperimentConfig => {
+  const requested = (algoParam ?? DEFAULT_ALGO).toLowerCase();
+  const scoring: ScoringConfig = { ...SCORING };
+  const policy: RankingPolicyConfig = { ...BASE_POLICY };
+  let modelVersion = "rules_v2";
+
+  switch (requested) {
+    case "rules_v2a":
+      modelVersion = "rules_v2a";
+      policy.explorationSlots = Math.max(BASE_POLICY.explorationSlots, 2);
+      policy.maxPerCategory = Math.max(1, BASE_POLICY.maxPerCategory - 1);
+      scoring.globalPopularity = scoring.globalPopularity + 0.03;
+      scoring.categoryAffinity = Math.max(0, scoring.categoryAffinity - 0.03);
+      break;
+    case "rules_v2b":
+      modelVersion = "rules_v2b";
+      policy.suppressionCooldownDays = BASE_POLICY.suppressionCooldownDays + 2;
+      policy.hardSuppressDismissals = Math.max(2, BASE_POLICY.hardSuppressDismissals - 1);
+      scoring.dismissPenalty = scoring.dismissPenalty + 0.2;
+      scoring.ignorePenalty = scoring.ignorePenalty + 0.15;
+      break;
+    default:
+      modelVersion = "rules_v2";
+      break;
+  }
+
+  return { modelVersion, scoring, policy };
+};
+
+const aggregateBehavior = (
+  events: RecommendationEvent[] | null | undefined
+): Map<string, BehaviorAggregate> => {
+  const map = new Map<string, BehaviorAggregate>();
+  const now = Date.now();
+
+  for (const ev of events ?? []) {
+    if (!ev.course_id) continue;
+
+    const rec = map.get(ev.course_id) ?? {
+      impressions: 0,
+      recentImpressions7d: 0,
+      positive: 0,
+      recency: 0,
+      dismissals: 0,
+      lastEventTs: 0,
+      lastImpressionTs: 0,
+      lastPositiveTs: 0,
+    };
+
+    const type = (ev.event_type ?? "").toLowerCase();
+    if (type === "impression" || type === "view") {
+      rec.impressions += 1;
+    }
+    if (
+      type === "click" ||
+      type === "start" ||
+      type === "save" ||
+      type === "complete"
+    ) {
+      rec.positive += 1;
+    }
+    if (type === "dismiss") rec.dismissals += 1;
+
+    if (ev.timestamp) {
+      const ts = new Date(ev.timestamp).getTime();
+      const ageMs = now - ts;
+      rec.recency += Math.exp(-ageMs / (1000 * 60 * 60 * 24 * 7));
+      if (
+        ageMs <= 7 * 24 * 60 * 60 * 1000 &&
+        (type === "impression" || type === "view")
+      ) {
+        rec.recentImpressions7d += 1;
+      }
+      rec.lastEventTs = Math.max(rec.lastEventTs, ts);
+      if (type === "impression" || type === "view") {
+        rec.lastImpressionTs = Math.max(rec.lastImpressionTs, ts);
+      }
+      if (
+        type === "click" ||
+        type === "start" ||
+        type === "save" ||
+        type === "complete"
+      ) {
+        rec.lastPositiveTs = Math.max(rec.lastPositiveTs, ts);
+      }
+    }
+
+    map.set(ev.course_id, rec);
+  }
+
+  return map;
+};
+
+const normalizeMapByMax = (source: Map<string, number>): Map<string, number> => {
+  const out = new Map<string, number>();
+  let max = 0;
+  for (const value of source.values()) {
+    if (value > max) max = value;
+  }
+  if (max <= 0) return out;
+  for (const [key, value] of source.entries()) {
+    out.set(key, value / max);
+  }
+  return out;
+};
+
+const pickPrimaryReasonTag = (
+  contributions: Array<{ key: string; value: number }>
+): string => {
+  const ranked = contributions
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value);
+  return ranked[0]?.key ?? "recommended_for_you";
+};
+
+const applyCategoryDiversity = <
+  T extends { id: string; category_key: string; instructor_key: string; score: number }
+>(
+  sortedItems: T[],
+  targetCount: number,
+  maxPerCategory: number,
+  maxPerInstructor: number
+): T[] => {
+  const selected: T[] = [];
+  const perCategoryCount = new Map<string, number>();
+  const perInstructorCount = new Map<string, number>();
+
+  for (const item of sortedItems) {
+    if (selected.length >= targetCount) break;
+    const key = item.category_key || "uncategorized";
+    const instructorKey = item.instructor_key || "unknown_instructor";
+    const count = perCategoryCount.get(key) ?? 0;
+    const instructorCount = perInstructorCount.get(instructorKey) ?? 0;
+    if (count >= maxPerCategory) continue;
+    if (instructorCount >= maxPerInstructor) continue;
+    selected.push(item);
+    perCategoryCount.set(key, count + 1);
+    perInstructorCount.set(instructorKey, instructorCount + 1);
+  }
+
+  if (selected.length < targetCount) {
+    for (const item of sortedItems) {
+      if (selected.length >= targetCount) break;
+      if (selected.some((s) => s.id === item.id)) continue;
+      selected.push(item);
+    }
+  }
+
+  return selected;
+};
+
+const rerankWithConstraints = <
+  T extends {
+    id: string;
+    score: number;
+    category_key: string;
+    instructor_key: string;
+    is_novel?: boolean;
+    tags?: string[];
+  }
+>(
+  items: T[],
+  targetCount: number,
+  maxPerCategory: number,
+  maxPerInstructor: number,
+  noveltyMinSlots: number
+): T[] => {
+  const selected: T[] = [];
+  const pool = [...items];
+  const perCategory = new Map<string, number>();
+  const perInstructor = new Map<string, number>();
+  let noveltyCount = 0;
+
+  while (selected.length < targetCount && pool.length > 0) {
+    let bestIndex = -1;
+    let bestAdjusted = -Infinity;
+
+    for (let i = 0; i < pool.length; i++) {
+      const item = pool[i];
+      const categoryKey = item.category_key || "uncategorized";
+      const instructorKey = item.instructor_key || "unknown_instructor";
+      const cCount = perCategory.get(categoryKey) ?? 0;
+      const iCount = perInstructor.get(instructorKey) ?? 0;
+      if (cCount >= maxPerCategory || iCount >= maxPerInstructor) continue;
+
+      const selectedTagSet = new Set(
+        selected.flatMap((entry) => (entry.tags ?? []).map(normalizeTag))
+      );
+      const tagOverlap = (item.tags ?? [])
+        .map(normalizeTag)
+        .filter((tag) => selectedTagSet.has(tag)).length;
+
+      const noveltyNeed = Math.max(0, noveltyMinSlots - noveltyCount);
+      const noveltyBonus =
+        noveltyNeed > 0 && item.is_novel ? Math.max(0, RERANK_NOVELTY_BONUS) : 0;
+
+      const adjusted =
+        item.score -
+        cCount * Math.max(0, RERANK_CATEGORY_PENALTY) -
+        iCount * Math.max(0, RERANK_INSTRUCTOR_PENALTY) -
+        tagOverlap * Math.max(0, RERANK_TAG_OVERLAP_PENALTY) +
+        noveltyBonus;
+
+      if (adjusted > bestAdjusted) {
+        bestAdjusted = adjusted;
+        bestIndex = i;
+      }
+    }
+
+    if (bestIndex < 0) break;
+    const picked = pool.splice(bestIndex, 1)[0];
+    selected.push(picked);
+    perCategory.set(
+      picked.category_key || "uncategorized",
+      (perCategory.get(picked.category_key || "uncategorized") ?? 0) + 1
+    );
+    perInstructor.set(
+      picked.instructor_key || "unknown_instructor",
+      (perInstructor.get(picked.instructor_key || "unknown_instructor") ?? 0) + 1
+    );
+    if (picked.is_novel) noveltyCount += 1;
+  }
+
+  if (selected.length < targetCount) {
+    for (const item of items) {
+      if (selected.length >= targetCount) break;
+      if (selected.some((s) => s.id === item.id)) continue;
+      selected.push(item);
+    }
+  }
+
+  return selected;
+};
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
   try {
     const url = new URL(req.url);
-    const userId = url.searchParams.get("userId") || null;
+    const userId = url.searchParams.get("userId");
+    const algo = url.searchParams.get("algo");
+    const learningGoal = url.searchParams.get("learningGoal");
+    const localHourParam = Number(url.searchParams.get("localHour"));
+    const dayOfWeekParam = Number(url.searchParams.get("dayOfWeek"));
+    const now = new Date();
+    const localHour = Number.isFinite(localHourParam)
+      ? clampInt(localHourParam, 0, 23)
+      : now.getUTCHours();
+    const dayOfWeek = Number.isFinite(dayOfWeekParam)
+      ? clampInt(dayOfWeekParam, 0, 6)
+      : now.getUTCDay();
+    const contextFactors = getContextFactors(learningGoal, localHour, dayOfWeek);
+    const assigned = assignAlgoByTrafficSplit(userId);
+    const selectedAlgo = (algo ?? assigned.algo).toLowerCase();
+    const assignmentSource = algo ? "query_param" : "traffic_split";
+    const experiment = getExperimentConfig(selectedAlgo);
+    const scoring = experiment.scoring;
+    const policy = experiment.policy;
+    const requestId = crypto.randomUUID();
 
-    // Fetch candidate courses
+    const courseSelect = `
+      id,
+      title,
+      description,
+      rating,
+      duration_hours,
+      thumbnail_url,
+      created_at,
+      updated_at,
+      tags,
+      instructor_id,
+      category_id,
+      category:categories (
+        name,
+        color
+      )
+    `;
+
+    /* ------------------------------------------------------------------ */
+    /* 1️⃣ Fetch base candidate pool (top-rated) */
+    /* ------------------------------------------------------------------ */
     const { data: courses, error: coursesErr } = await supabase
       .from("courses")
-      .select("id, title, description, level, rating, duration_hours, thumbnail_url, tags")
+      .select(courseSelect)
       .eq("is_published", true)
       .order("rating", { ascending: false, nullsFirst: false })
       .limit(MAX_CANDIDATES);
 
     if (coursesErr) throw coursesErr;
 
-    // Exclude completed by user (optional)
+    /* ------------------------------------------------------------------ */
+    /* 2️⃣ Exclude completed courses (if user provided) */
+    /* ------------------------------------------------------------------ */
     let excluded = new Set<string>();
+    const userEnrolledCourseIds: string[] = [];
+
     if (userId) {
-      const { data: enrollments } = await supabase
+      const { data: enrollments, error: enrollErr } = await supabase
         .from("course_enrollments")
         .select("course_id, is_completed")
         .eq("user_id", userId);
+
+      if (enrollErr) throw enrollErr;
+
+      for (const enrollment of enrollments ?? []) {
+        if (enrollment.course_id) {
+          userEnrolledCourseIds.push(enrollment.course_id);
+        }
+      }
+
       excluded = new Set(
-        (enrollments || [])
+        (enrollments ?? [])
           .filter((e) => e.is_completed)
-          .map((e) => e.course_id as string)
+          .map((e) => e.course_id)
       );
     }
 
-    const candidates = (courses || []).filter((c) => !excluded.has(c.id));
+    const topRatedCandidates = ((courses ?? []) as CourseCandidate[]).filter(
+      (c) => !excluded.has(c.id)
+    );
+    let personalizedCategoryCandidates: CourseCandidate[] = [];
+    let longTailCandidates: CourseCandidate[] = [];
 
-    // Recent events for behavior signals
-    const since = new Date(Date.now() - EVENT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    let eventsQuery = supabase
+    if (userId && userEnrolledCourseIds.length > 0) {
+      const uniqueUserCourseIds = Array.from(new Set(userEnrolledCourseIds));
+      const { data: enrolledCategoryRows, error: enrolledCategoryErr } = await supabase
+        .from("courses")
+        .select("category_id")
+        .in("id", uniqueUserCourseIds);
+      if (enrolledCategoryErr) throw enrolledCategoryErr;
+
+      const enrolledCategoryIds = Array.from(
+        new Set(
+          (enrolledCategoryRows ?? [])
+            .map((row) => row.category_id)
+            .filter((value): value is string => typeof value === "string" && value.length > 0)
+        )
+      );
+
+      if (enrolledCategoryIds.length > 0) {
+        const { data: categoryPool, error: categoryPoolErr } = await supabase
+          .from("courses")
+          .select(courseSelect)
+          .eq("is_published", true)
+          .in("category_id", enrolledCategoryIds)
+          .order("rating", { ascending: false, nullsFirst: false })
+          .limit(CANDIDATE_CATEGORY_POOL_LIMIT);
+        if (categoryPoolErr) throw categoryPoolErr;
+        personalizedCategoryCandidates = ((categoryPool ?? []) as CourseCandidate[]).filter(
+          (c) => !excluded.has(c.id)
+        );
+      }
+    }
+
+    const { data: longTailPool, error: longTailErr } = await supabase
+      .from("courses")
+      .select(courseSelect)
+      .eq("is_published", true)
+      .order("rating", { ascending: true, nullsFirst: true })
+      .limit(CANDIDATE_LONG_TAIL_POOL_LIMIT);
+    if (longTailErr) throw longTailErr;
+    longTailCandidates = ((longTailPool ?? []) as CourseCandidate[]).filter(
+      (c) => !excluded.has(c.id)
+    );
+
+    const mergedCandidates = new Map<string, CourseCandidate>();
+    for (const course of topRatedCandidates) mergedCandidates.set(course.id, course);
+    for (const course of personalizedCategoryCandidates) mergedCandidates.set(course.id, course);
+    for (const course of longTailCandidates) mergedCandidates.set(course.id, course);
+    const candidates = Array.from(mergedCandidates.values()).slice(
+      0,
+      Math.max(MAX_CANDIDATES, MAX_CANDIDATE_POOL)
+    );
+    const courseIds = candidates.map((c) => c.id);
+
+    if (courseIds.length === 0) {
+      const explorationSlots = clampInt(
+        policy.explorationSlots,
+        0,
+        Math.max(0, MAX_RESULTS - 1)
+      );
+      const meta = {
+        model_version: experiment.modelVersion,
+        request_id: requestId,
+        assignment_source: assignmentSource,
+        assigned_algo: selectedAlgo,
+        traffic_bucket: assigned.bucket,
+        cold_start: true,
+        lookback_days: EVENT_LOOKBACK_DAYS,
+        weights: scoring,
+        ranking_policy: {
+          max_candidate_pool: MAX_CANDIDATE_POOL,
+          candidate_category_pool_limit: CANDIDATE_CATEGORY_POOL_LIMIT,
+          candidate_long_tail_pool_limit: CANDIDATE_LONG_TAIL_POOL_LIMIT,
+          min_score_floor: MIN_SCORE_FLOOR,
+          profile_decay_days: PROFILE_DECAY_DAYS,
+          novelty_min_slots: NOVELTY_MIN_SLOTS,
+          session_gap_hours: SESSION_GAP_HOURS,
+          freshness_half_life_days: FRESHNESS_HALF_LIFE_DAYS,
+          quality_min_rating: QUALITY_MIN_RATING,
+          quality_low_rating_penalty: QUALITY_LOW_RATING_PENALTY,
+          rerank_category_penalty: RERANK_CATEGORY_PENALTY,
+          rerank_instructor_penalty: RERANK_INSTRUCTOR_PENALTY,
+          rerank_tag_overlap_penalty: RERANK_TAG_OVERLAP_PENALTY,
+          rerank_novelty_bonus: RERANK_NOVELTY_BONUS,
+          seen_filter_window_hours: SEEN_FILTER_WINDOW_HOURS,
+          seen_filter_min_impressions: SEEN_FILTER_MIN_IMPRESSIONS,
+          session_window_hours: SESSION_WINDOW_HOURS,
+          session_intent_boost: SESSION_INTENT_BOOST,
+          instructor_fatigue_window_hours: INSTRUCTOR_FATIGUE_WINDOW_HOURS,
+          max_exposures_per_instructor_window: MAX_EXPOSURES_PER_INSTRUCTOR_WINDOW,
+          instructor_fatigue_penalty: INSTRUCTOR_FATIGUE_PENALTY,
+          max_per_category: policy.maxPerCategory,
+          max_per_instructor: policy.maxPerInstructor,
+          exploration_slots: explorationSlots,
+          max_exposures_per_course_7d: policy.maxExposuresPerCourse7d,
+          suppression_cooldown_days: policy.suppressionCooldownDays,
+        },
+        context: {
+          learning_goal: learningGoal,
+          local_hour: localHour,
+          day_of_week: dayOfWeek,
+          factors: contextFactors,
+        },
+      };
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: { recommendations: [], meta },
+          recommendations: [],
+          meta,
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 2️⃣b Fetch course content counts for candidates */
+    /* ------------------------------------------------------------------ */
+    const sectionCountsMap = new Map<string, number>();
+    const videoCountsMap = new Map<string, number>();
+    const quizCountsMap = new Map<string, number>();
+
+    if (courseIds.length > 0) {
+      const [
+        { data: sectionCountsData },
+        { data: videoCountsData },
+        { data: quizCountsData },
+      ] = await Promise.all([
+        supabase.rpc("get_section_counts_by_course", { course_ids: courseIds }),
+        supabase.rpc("get_video_counts_by_course", { course_ids: courseIds }),
+        supabase.rpc("get_quiz_counts_by_course", { course_ids: courseIds }),
+      ]);
+
+      for (const row of sectionCountsData ?? []) {
+        sectionCountsMap.set(row.course_id, row.count ?? 0);
+      }
+      for (const row of videoCountsData ?? []) {
+        videoCountsMap.set(row.course_id, row.count ?? 0);
+      }
+      for (const row of quizCountsData ?? []) {
+        quizCountsMap.set(row.course_id, row.count ?? 0);
+      }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 3️⃣ Fetch recent recommendation events */
+    /* ------------------------------------------------------------------ */
+    const since = new Date(
+      Date.now() - EVENT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const { data: globalEvents, error: globalEventsErr } = await supabase
       .from("recommendation_events")
       .select("course_id, event_type, timestamp")
-      .gte("timestamp", since);
+      .gte("timestamp", since)
+      .in("course_id", courseIds);
+    if (globalEventsErr) throw globalEventsErr;
+
+    let userEventsQuery = supabase
+      .from("recommendation_events")
+      .select("course_id, event_type, timestamp")
+      .gte("timestamp", since)
+      .in("course_id", courseIds);
+
+    let userEvents: RecommendationEvent[] = [];
     if (userId) {
-      eventsQuery = eventsQuery.eq("user_id", userId);
-    }
-    const { data: events } = await eventsQuery;
-
-    // Aggregate behavior
-    const behavior = new Map<string, { impressions: number; clicks: number; recency: number }>();
-    const now = Date.now();
-    for (const ev of events || []) {
-      const cid = ev.course_id;
-      if (!cid) continue;
-      const rec = behavior.get(cid) || { impressions: 0, clicks: 0, recency: 0 };
-      if (ev.event_type === "impression") rec.impressions += 1;
-      if (ev.event_type === "click") rec.clicks += 1;
-      const ageMs = now - new Date(ev.timestamp).getTime();
-      rec.recency += Math.exp(-ageMs / (1000 * 60 * 60 * 24 * 7)); // 7-day decay
-      behavior.set(cid, rec);
+      const { data, error } = await userEventsQuery.eq("user_id", userId);
+      if (error) throw error;
+      userEvents = data ?? [];
     }
 
-    // Behavior scores
-    const behScores = new Map<string, { ctrScore: number; ignoredPenalty: number; recentScore: number }>();
-    for (const [cid, rec] of behavior.entries()) {
-      const ctr = (rec.clicks + 1) / (rec.impressions + 3); // Laplace prior
+    const nowTs = Date.now();
+    const seenFilterWindowMs = SEEN_FILTER_WINDOW_HOURS * 60 * 60 * 1000;
+    const sessionWindowMs = SESSION_WINDOW_HOURS * 60 * 60 * 1000;
+    const sessionGapMs = Math.max(0.25, SESSION_GAP_HOURS) * 60 * 60 * 1000;
+    const instructorFatigueWindowMs = INSTRUCTOR_FATIGUE_WINDOW_HOURS * 60 * 60 * 1000;
+    const candidateById = new Map<string, CourseCandidate>(
+      candidates.map((course) => [course.id, course])
+    );
+    const recentSeenImpressionCounts = new Map<string, number>();
+    const recentSessionCategoryRaw = new Map<string, number>();
+    const recentInstructorImpressions = new Map<string, number>();
+    const recentInstructorPositives = new Map<string, number>();
+    const sortedUserEvents = [...userEvents].sort((a, b) => {
+      const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return tb - ta;
+    });
+    const sessionEvents: RecommendationEvent[] = [];
+    let prevTs: number | null = null;
+    for (const ev of sortedUserEvents) {
+      if (!ev.timestamp) continue;
+      const ts = new Date(ev.timestamp).getTime();
+      if (!Number.isFinite(ts) || ts <= 0) continue;
+      if (nowTs - ts > sessionWindowMs) break;
+      if (prevTs !== null && prevTs - ts > sessionGapMs) break;
+      sessionEvents.push(ev);
+      prevTs = ts;
+    }
+    const sessionEventKeys = new Set(
+      sessionEvents.map((ev) => `${ev.course_id ?? ""}|${ev.event_type ?? ""}|${ev.timestamp ?? ""}`)
+    );
+
+    for (const ev of userEvents) {
+      if (!ev.course_id || !ev.timestamp) continue;
+      const ts = new Date(ev.timestamp).getTime();
+      if (!Number.isFinite(ts)) continue;
+      const ageMs = nowTs - ts;
+      if (ageMs < 0) continue;
+      const type = (ev.event_type ?? "").toLowerCase();
+
+      if (
+        ageMs <= seenFilterWindowMs &&
+        (type === "impression" || type === "view")
+      ) {
+        recentSeenImpressionCounts.set(
+          ev.course_id,
+          (recentSeenImpressionCounts.get(ev.course_id) ?? 0) + 1
+        );
+      }
+
+      const inCurrentSession = sessionEventKeys.has(
+        `${ev.course_id ?? ""}|${ev.event_type ?? ""}|${ev.timestamp ?? ""}`
+      );
+      if (
+        inCurrentSession &&
+        (type === "click" || type === "save" || type === "start" || type === "complete")
+      ) {
+        const course = candidateById.get(ev.course_id);
+        if (!course) continue;
+        const categoryKey =
+          course.category?.name ?? course.category_id ?? "uncategorized";
+        const weight =
+          type === "complete" ? 1.5 : type === "start" ? 1.25 : 1;
+        recentSessionCategoryRaw.set(
+          categoryKey,
+          (recentSessionCategoryRaw.get(categoryKey) ?? 0) + weight
+        );
+      }
+
+      if (ageMs <= instructorFatigueWindowMs) {
+        const course = candidateById.get(ev.course_id);
+        if (!course) continue;
+        const instructorKey = course.instructor_id ?? "unknown_instructor";
+        if (type === "impression" || type === "view") {
+          recentInstructorImpressions.set(
+            instructorKey,
+            (recentInstructorImpressions.get(instructorKey) ?? 0) + 1
+          );
+        }
+        if (type === "click" || type === "save" || type === "start" || type === "complete") {
+          recentInstructorPositives.set(
+            instructorKey,
+            (recentInstructorPositives.get(instructorKey) ?? 0) + 1
+          );
+        }
+      }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 4️⃣ Aggregate user + global behavior signals */
+    /* ------------------------------------------------------------------ */
+    const globalBehavior = aggregateBehavior(globalEvents as RecommendationEvent[]);
+    const userBehavior = aggregateBehavior(userEvents as RecommendationEvent[]);
+
+    const popularityRaw = new Map<string, number>();
+    for (const [courseId, rec] of globalBehavior.entries()) {
+      const score = rec.positive * 1.2 + rec.impressions * 0.25 + rec.recency;
+      popularityRaw.set(courseId, score);
+    }
+    const popularityNorm = normalizeMapByMax(popularityRaw);
+
+    const categoryAffinityRaw = new Map<string, number>();
+    const instructorAffinityRaw = new Map<string, number>();
+    const tagAffinityRaw = new Map<string, number>();
+    const difficultyAffinityRaw = new Map<DifficultyLevel, number>();
+    const uniqueUserCourseIds = Array.from(new Set(userEnrolledCourseIds));
+
+    if (userId && uniqueUserCourseIds.length > 0) {
+      const { data: enrolledCourses, error: enrolledCoursesErr } = await supabase
+        .from("courses")
+        .select("id, category_id, instructor_id, tags, category:categories(name)")
+        .in("id", uniqueUserCourseIds);
+      if (enrolledCoursesErr) throw enrolledCoursesErr;
+
+      for (const course of enrolledCourses ?? []) {
+        const categoryKey =
+          course.category?.name ?? course.category_id ?? "uncategorized";
+        categoryAffinityRaw.set(
+          categoryKey,
+          (categoryAffinityRaw.get(categoryKey) ?? 0) + 1
+        );
+        const instructorKey = course.instructor_id ?? "unknown_instructor";
+        instructorAffinityRaw.set(
+          instructorKey,
+          (instructorAffinityRaw.get(instructorKey) ?? 0) + 1
+        );
+        const tags = getCourseTags(course as CourseCandidate);
+        for (const tag of tags) {
+          tagAffinityRaw.set(tag, (tagAffinityRaw.get(tag) ?? 0) + 1);
+        }
+        const difficulty = inferDifficultyLevel(course as CourseCandidate);
+        difficultyAffinityRaw.set(
+          difficulty,
+          (difficultyAffinityRaw.get(difficulty) ?? 0) + 1
+        );
+      }
+    }
+
+    for (const ev of userEvents ?? []) {
+      if (!ev.course_id) continue;
+      const course = candidates.find((item) => item.id === ev.course_id);
+      if (!course) continue;
+
+      const categoryKey =
+        course.category?.name ?? course.category_id ?? "uncategorized";
+      const type = (ev.event_type ?? "").toLowerCase();
+      const ts = ev.timestamp ? new Date(ev.timestamp).getTime() : 0;
+      const ageMs = ts > 0 ? Math.max(0, nowTs - ts) : 0;
+      const decay = Math.exp(-ageMs / (1000 * 60 * 60 * 24 * PROFILE_DECAY_DAYS));
+      const boost =
+        type === "click" || type === "start" || type === "save" || type === "complete"
+          ? 2 * decay
+          : type === "impression" || type === "view"
+            ? 0.5 * decay
+            : 0;
+      if (boost > 0) {
+        categoryAffinityRaw.set(
+          categoryKey,
+          (categoryAffinityRaw.get(categoryKey) ?? 0) + boost
+        );
+        const instructorKey = course.instructor_id ?? "unknown_instructor";
+        instructorAffinityRaw.set(
+          instructorKey,
+          (instructorAffinityRaw.get(instructorKey) ?? 0) + boost
+        );
+        const tags = getCourseTags(course);
+        for (const tag of tags) {
+          tagAffinityRaw.set(tag, (tagAffinityRaw.get(tag) ?? 0) + boost);
+        }
+        const difficulty = inferDifficultyLevel(course);
+        difficultyAffinityRaw.set(
+          difficulty,
+          (difficultyAffinityRaw.get(difficulty) ?? 0) + boost
+        );
+      }
+    }
+    const categoryAffinityNorm = normalizeMapByMax(categoryAffinityRaw);
+    const instructorAffinityNorm = normalizeMapByMax(instructorAffinityRaw);
+    const tagAffinityNorm = normalizeMapByMax(tagAffinityRaw);
+    const difficultyPreference =
+      Array.from(difficultyAffinityRaw.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+      "unknown";
+    const sessionCategoryNorm = normalizeMapByMax(recentSessionCategoryRaw);
+
+    /* ------------------------------------------------------------------ */
+    /* 5️⃣ Compute behavior scores and cold-start state */
+    /* ------------------------------------------------------------------ */
+    const userBehScores = new Map<
+      string,
+      {
+        ctrScore: number;
+        ignoredPenalty: number;
+        recentScore: number;
+        dismissPenalty: number;
+        suppressionPenalty: number;
+        overexposedPenalty: number;
+        instructorFatiguePenalty: number;
+        hardSuppressed: boolean;
+      }
+    >();
+
+    const suppressionWindowMs = policy.suppressionCooldownDays * 24 * 60 * 60 * 1000;
+
+    for (const [cid, rec] of userBehavior.entries()) {
+      const ctr = (rec.positive + 1) / (rec.impressions + 3);
       const ctrScore = ctr * 5;
+
       const ignoredPenalty =
-        rec.impressions > 0 && rec.clicks === 0 ? Math.min(1.5, rec.impressions * 0.1) : 0;
-      const recentScore = rec.recency;
-      behScores.set(cid, { ctrScore, ignoredPenalty, recentScore });
+        rec.impressions > 0 && rec.positive === 0
+          ? Math.min(1.5, rec.impressions * 0.1)
+          : 0;
+
+      const dismissPenalty = Math.min(2, rec.dismissals * 0.4);
+      const recentlyShownWithoutPositive =
+        rec.lastImpressionTs > 0 &&
+        rec.lastImpressionTs > rec.lastPositiveTs &&
+        nowTs - rec.lastImpressionTs < suppressionWindowMs;
+
+      const repeatedIgnored =
+        rec.impressions >= policy.hardSuppressIgnoredImpressions && rec.positive === 0;
+      const repeatedDismissed = rec.dismissals >= policy.hardSuppressDismissals;
+      const overexposed = rec.recentImpressions7d >= policy.maxExposuresPerCourse7d;
+      const hardSuppressed =
+        recentlyShownWithoutPositive || repeatedIgnored || repeatedDismissed || overexposed;
+
+      const suppressionPenalty =
+        (recentlyShownWithoutPositive ? 2.5 : 0) +
+        (repeatedIgnored ? 2.5 : 0) +
+        (repeatedDismissed ? 3 : 0);
+      const overexposedPenalty = overexposed ? 2.5 : 0;
+
+      userBehScores.set(cid, {
+        ctrScore,
+        ignoredPenalty,
+        recentScore: Math.min(5, rec.recency),
+        dismissPenalty,
+        suppressionPenalty: suppressionPenalty + overexposedPenalty,
+        overexposedPenalty,
+        instructorFatiguePenalty: 0,
+        hardSuppressed,
+      });
     }
 
-    // Blend score 0–10
-    const blended = candidates.map((row, idx) => {
-      const beh = behScores.get(row.id) ?? { ctrScore: 0, ignoredPenalty: 0, recentScore: 0 };
-      const base = Number(row.rating) || 0; // use rating as base (0–5)
+    const globalCtrNorm = new Map<string, number>();
+    for (const [cid, rec] of globalBehavior.entries()) {
+      const ctr = (rec.positive + 1) / (rec.impressions + 3);
+      globalCtrNorm.set(cid, ctr);
+    }
 
-      let blendedScore =
-        base * 2 * 0.7 +          // scale rating to ~0–10, weight 0.7
-        beh.ctrScore * 0.15 +     // small CTR influence
-        beh.recentScore * 0.1 -   // small recency boost
-        beh.ignoredPenalty * 0.5; // penalty
+    const isColdStart =
+      !userId ||
+      (userEvents.length < MIN_USER_EVENTS_FOR_PERSONALIZATION &&
+        userEnrolledCourseIds.length === 0);
 
-      blendedScore = Math.max(0, Math.min(10, blendedScore));
+    const seenFilterMinImpressions = Math.max(1, SEEN_FILTER_MIN_IMPRESSIONS);
+    const seenFilteredCandidates =
+      userId && seenFilterWindowMs > 0
+        ? candidates.filter((course) => {
+            const recentSeen = recentSeenImpressionCounts.get(course.id) ?? 0;
+            if (recentSeen < seenFilterMinImpressions) return true;
+            const behavior = userBehavior.get(course.id);
+            const hasPositiveEngagement = (behavior?.positive ?? 0) > 0;
+            return hasPositiveEngagement;
+          })
+        : candidates;
+    const candidatePool =
+      seenFilteredCandidates.length > 0 ? seenFilteredCandidates : candidates;
+    const enrolledIdSet = new Set(userEnrolledCourseIds);
+
+    /* ------------------------------------------------------------------ */
+    /* 6️⃣ Blend final recommendation score (0–10) + explanation tags */
+    /* ------------------------------------------------------------------ */
+    const blended = candidatePool.map((course) => {
+      const userBeh =
+        userBehScores.get(course.id) ?? {
+          ctrScore: 0,
+          ignoredPenalty: 0,
+          recentScore: 0,
+          dismissPenalty: 0,
+          suppressionPenalty: 0,
+          overexposedPenalty: 0,
+          instructorFatiguePenalty: 0,
+          hardSuppressed: false,
+        };
+
+      const baseRating = Number(course.rating) || 0;
+      const ratingNorm = clamp(baseRating / 5, 0, 1);
+      const popularity = clamp(popularityNorm.get(course.id) ?? 0, 0, 1);
+      const globalCtr = clamp(globalCtrNorm.get(course.id) ?? 0, 0, 1);
+      const categoryKey =
+        course.category?.name ?? course.category_id ?? "uncategorized";
+      const categoryAffinity = clamp(categoryAffinityNorm.get(categoryKey) ?? 0, 0, 1);
+      const instructorAffinity = clamp(
+        instructorAffinityNorm.get(course.instructor_id ?? "unknown_instructor") ?? 0,
+        0,
+        1
+      );
+      const courseTags = getCourseTags(course);
+      const tagAffinity =
+        courseTags.length > 0
+          ? clamp(
+              courseTags.reduce((acc, tag) => Math.max(acc, tagAffinityNorm.get(tag) ?? 0), 0),
+              0,
+              1
+            )
+          : 0;
+      const difficultyLevel = inferDifficultyLevel(course);
+      const difficultyMatch =
+        difficultyPreference === "unknown" || difficultyLevel === "unknown"
+          ? 0.5
+          : difficultyPreference === "mixed" || difficultyLevel === "mixed"
+            ? 0.75
+            : difficultyPreference === difficultyLevel
+              ? 1
+              : 0.2;
+      const freshness = getFreshnessScore(course, nowTs, FRESHNESS_HALF_LIFE_DAYS);
+      const qualityPenalty = getQualityPenalty(
+        ratingNorm,
+        QUALITY_MIN_RATING,
+        QUALITY_LOW_RATING_PENALTY
+      );
+      const sessionCategoryBoost =
+        clamp(sessionCategoryNorm.get(categoryKey) ?? 0, 0, 1) *
+        Math.max(0, SESSION_INTENT_BOOST) *
+        Math.max(0.1, contextFactors.session);
+      const instructorKey = course.instructor_id ?? "unknown_instructor";
+      const instructorImpressions =
+        recentInstructorImpressions.get(instructorKey) ?? 0;
+      const instructorPositives =
+        recentInstructorPositives.get(instructorKey) ?? 0;
+      const fatigueThreshold = Math.max(1, MAX_EXPOSURES_PER_INSTRUCTOR_WINDOW);
+      const instructorFatiguePenalty =
+        instructorImpressions >= fatigueThreshold && instructorPositives === 0
+          ? Math.min(
+              3,
+              (instructorImpressions - fatigueThreshold + 1) *
+                Math.max(0, INSTRUCTOR_FATIGUE_PENALTY)
+            )
+          : 0;
+
+      let score = 0;
+      const isNovel =
+        (userBehavior.get(course.id)?.impressions ?? 0) === 0 &&
+        !enrolledIdSet.has(course.id);
+      const explorationScore =
+        popularity * 0.6 * Math.max(0.1, contextFactors.popularity) +
+        globalCtr * 0.3 +
+        ratingNorm * 0.1 * Math.max(0.1, contextFactors.rating) +
+        (isNovel ? contextFactors.noveltyBonus : 0) +
+        contextFactors.explorationBias;
+
+      if (isColdStart) {
+        score =
+          ratingNorm * 10 * scoring.coldRating * Math.max(0.1, contextFactors.rating) +
+          popularity * 10 * scoring.coldPopularity * Math.max(0.1, contextFactors.popularity) +
+          globalCtr * 10 * scoring.coldCtr +
+          freshness * 10 * scoring.freshness;
+
+      } else {
+        score =
+          ratingNorm * 10 * scoring.rating * Math.max(0.1, contextFactors.rating) +
+          userBeh.ctrScore * scoring.userCtr +
+          userBeh.recentScore * scoring.userRecency +
+          categoryAffinity * 10 * scoring.categoryAffinity * Math.max(0.1, contextFactors.category) +
+          instructorAffinity * 10 * scoring.instructorAffinity +
+          tagAffinity * 10 * scoring.tagAffinity +
+          difficultyMatch * 10 * scoring.difficultyMatch +
+          freshness * 10 * scoring.freshness +
+          popularity * 10 * scoring.globalPopularity * Math.max(0.1, contextFactors.popularity) -
+          userBeh.ignoredPenalty * scoring.ignorePenalty -
+          userBeh.dismissPenalty * scoring.dismissPenalty;
+        score += sessionCategoryBoost;
+
+      }
+
+      score -= userBeh.suppressionPenalty;
+      score -= instructorFatiguePenalty;
+      score -= qualityPenalty;
+
+      score = clamp(score, 0, 10);
+      if (!userBeh.hardSuppressed) {
+        score = Math.max(score, clamp(MIN_SCORE_FLOOR, 0, 10));
+      }
+      const primaryReasonTag = isColdStart
+        ? pickPrimaryReasonTag([
+            { key: "highly_rated", value: ratingNorm * 10 * scoring.coldRating },
+            { key: "popular_now", value: popularity * 10 * scoring.coldPopularity },
+            { key: "trending_clicks", value: globalCtr * 10 * scoring.coldCtr },
+          ])
+        : pickPrimaryReasonTag([
+            {
+              key: "matches_your_interests",
+              value: categoryAffinity * 10 * scoring.categoryAffinity,
+            },
+            {
+              key: "based_on_your_recent_clicks",
+              value: userBeh.ctrScore * scoring.userCtr,
+            },
+            {
+              key: "from_instructors_you_like",
+              value: instructorAffinity * 10 * scoring.instructorAffinity,
+            },
+            {
+              key: "matches_your_topics",
+              value: tagAffinity * 10 * scoring.tagAffinity,
+            },
+            {
+              key: "matches_your_level",
+              value: difficultyMatch * 10 * scoring.difficultyMatch,
+            },
+            {
+              key: "based_on_this_session",
+              value: sessionCategoryBoost,
+            },
+            { key: "popular_now", value: popularity * 10 * scoring.globalPopularity },
+            { key: "highly_rated", value: ratingNorm * 10 * scoring.rating },
+          ]);
 
       return {
-        id: row.id ?? `rec_${idx}`,
-        rank: idx + 1, // temporary; recomputed after sort
-        score: blendedScore,
-        reason: "Recommended for you",
-        course: row,
+        id: course.id,
+        score,
+        exploration_score: Number(explorationScore.toFixed(3)),
+        category_key: categoryKey,
+        instructor_key: course.instructor_id ?? "unknown_instructor",
+        tags: courseTags,
+        is_novel: isNovel,
+        suppressed: userBeh.hardSuppressed,
+        primary_reason_tag: primaryReasonTag,
+        score_breakdown: {
+          rating: Number((ratingNorm * 10).toFixed(3)),
+          user_ctr: Number(userBeh.ctrScore.toFixed(3)),
+          user_recency: Number(userBeh.recentScore.toFixed(3)),
+          category_affinity: Number((categoryAffinity * 10).toFixed(3)),
+          instructor_affinity: Number((instructorAffinity * 10).toFixed(3)),
+          tag_affinity: Number((tagAffinity * 10).toFixed(3)),
+          difficulty_match: Number((difficultyMatch * 10).toFixed(3)),
+          freshness: Number((freshness * 10).toFixed(3)),
+          session_intent_boost: Number(sessionCategoryBoost.toFixed(3)),
+          popularity: Number((popularity * 10).toFixed(3)),
+          global_ctr: Number((globalCtr * 10).toFixed(3)),
+          ignored_penalty: Number(userBeh.ignoredPenalty.toFixed(3)),
+          dismiss_penalty: Number(userBeh.dismissPenalty.toFixed(3)),
+          suppression_penalty: Number(userBeh.suppressionPenalty.toFixed(3)),
+          overexposed_penalty: Number(userBeh.overexposedPenalty.toFixed(3)),
+          instructor_fatigue_penalty: Number(instructorFatiguePenalty.toFixed(3)),
+          quality_penalty: Number(qualityPenalty.toFixed(3)),
+        },
+        course: {
+          ...course,
+          category_name: course.category?.name ?? null,
+          category_color: course.category?.color ?? null,
+          total_sections: sectionCountsMap.get(course.id) ?? 0,
+          total_videos: videoCountsMap.get(course.id) ?? 0,
+          total_quizzes: quizCountsMap.get(course.id) ?? 0,
+        },
       };
     });
 
-    const sorted = blended
-      .sort((a, b) => b.score - a.score)
-      .slice(0, MAX_RESULTS)
-      .map((r, i) => ({ ...r, rank: i + 1 }));
+    const unsuppressed = blended.filter((item) => !item.suppressed);
+    const fallbackPool = unsuppressed.length > 0 ? unsuppressed : blended;
+    const sortedByScore = [...fallbackPool].sort((a, b) => b.score - a.score);
 
-    return new Response(JSON.stringify({ success: true, data: sorted }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const explorationSlots = clampInt(
+      policy.explorationSlots,
+      0,
+      Math.max(0, MAX_RESULTS - 1)
+    );
+    const seedSelected = rerankWithConstraints(
+      sortedByScore,
+      MAX_RESULTS,
+      Math.max(1, policy.maxPerCategory),
+      Math.max(1, policy.maxPerInstructor),
+      clampInt(NOVELTY_MIN_SLOTS, 0, MAX_RESULTS)
+    );
+    const diversityFallback =
+      seedSelected.length > 0
+        ? seedSelected
+        : applyCategoryDiversity(
+            sortedByScore,
+            MAX_RESULTS,
+            Math.max(1, policy.maxPerCategory),
+            Math.max(1, policy.maxPerInstructor)
+          );
+
+    const remainingForExplore = sortedByScore.filter(
+      (item) => !diversityFallback.some((picked) => picked.id === item.id)
+    );
+    const explorationSelected = [...remainingForExplore]
+      .sort((a, b) => b.exploration_score - a.exploration_score)
+      .slice(0, explorationSlots);
+
+    const combined = [...diversityFallback, ...explorationSelected];
+    const deduped = combined.filter(
+      (item, index, arr) => arr.findIndex((x) => x.id === item.id) === index
+    );
+
+    let rankedForOutput = deduped.sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS);
+    const noveltyTarget = clampInt(NOVELTY_MIN_SLOTS, 0, MAX_RESULTS);
+    if (noveltyTarget > 0) {
+      let noveltyCount = rankedForOutput.filter((item) => item.is_novel).length;
+      if (noveltyCount < noveltyTarget) {
+        const noveltyCandidates = sortedByScore.filter(
+          (item) =>
+            item.is_novel &&
+            !rankedForOutput.some((picked) => picked.id === item.id)
+        );
+        for (const noveltyItem of noveltyCandidates) {
+          if (noveltyCount >= noveltyTarget) break;
+          const replaceIndex = (() => {
+            for (let i = rankedForOutput.length - 1; i >= 0; i--) {
+              if (!rankedForOutput[i].is_novel) return i;
+            }
+            return -1;
+          })();
+          if (replaceIndex >= 0) {
+            rankedForOutput[replaceIndex] = noveltyItem;
+            noveltyCount += 1;
+          }
+        }
+        rankedForOutput = rankedForOutput.sort((a, b) => b.score - a.score);
+      }
+    }
+
+    const results = rankedForOutput
+      .map((r, i) => {
+        const { exploration_score, category_key, suppressed, is_novel, ...rest } = r;
+        return { ...rest, rank: i + 1 };
+      });
+
+    const meta = {
+      model_version: experiment.modelVersion,
+      request_id: requestId,
+      assignment_source: assignmentSource,
+      assigned_algo: selectedAlgo,
+      traffic_bucket: assigned.bucket,
+      cold_start: isColdStart,
+      lookback_days: EVENT_LOOKBACK_DAYS,
+      weights: scoring,
+      ranking_policy: {
+        max_candidate_pool: MAX_CANDIDATE_POOL,
+        candidate_category_pool_limit: CANDIDATE_CATEGORY_POOL_LIMIT,
+        candidate_long_tail_pool_limit: CANDIDATE_LONG_TAIL_POOL_LIMIT,
+        min_score_floor: MIN_SCORE_FLOOR,
+        profile_decay_days: PROFILE_DECAY_DAYS,
+        novelty_min_slots: noveltyTarget,
+        session_gap_hours: SESSION_GAP_HOURS,
+        freshness_half_life_days: FRESHNESS_HALF_LIFE_DAYS,
+        quality_min_rating: QUALITY_MIN_RATING,
+        quality_low_rating_penalty: QUALITY_LOW_RATING_PENALTY,
+        rerank_category_penalty: RERANK_CATEGORY_PENALTY,
+        rerank_instructor_penalty: RERANK_INSTRUCTOR_PENALTY,
+        rerank_tag_overlap_penalty: RERANK_TAG_OVERLAP_PENALTY,
+        rerank_novelty_bonus: RERANK_NOVELTY_BONUS,
+        seen_filter_window_hours: SEEN_FILTER_WINDOW_HOURS,
+        seen_filter_min_impressions: seenFilterMinImpressions,
+        session_window_hours: SESSION_WINDOW_HOURS,
+        session_intent_boost: SESSION_INTENT_BOOST,
+        instructor_fatigue_window_hours: INSTRUCTOR_FATIGUE_WINDOW_HOURS,
+        max_exposures_per_instructor_window: MAX_EXPOSURES_PER_INSTRUCTOR_WINDOW,
+        instructor_fatigue_penalty: INSTRUCTOR_FATIGUE_PENALTY,
+        max_per_category: policy.maxPerCategory,
+        max_per_instructor: policy.maxPerInstructor,
+        exploration_slots: explorationSlots,
+        max_exposures_per_course_7d: policy.maxExposuresPerCourse7d,
+        suppression_cooldown_days: policy.suppressionCooldownDays,
+      },
+      filtering: {
+        candidate_count_top_rated: topRatedCandidates.length,
+        candidate_count_category_pool: personalizedCategoryCandidates.length,
+        candidate_count_long_tail_pool: longTailCandidates.length,
+        candidate_count_before_seen_filter: candidates.length,
+        candidate_count_after_seen_filter: candidatePool.length,
+        novelty_count_in_results: rankedForOutput.filter((item) => item.is_novel).length,
+        session_event_count: sessionEvents.length,
+      },
+      context: {
+        learning_goal: learningGoal,
+        local_hour: localHour,
+        day_of_week: dayOfWeek,
+        factors: contextFactors,
+      },
+      traffic_split: TRAFFIC_SPLIT,
+    };
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: { recommendations: results, meta },
+        recommendations: results,
+        meta,
+      }),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
   } catch (err: any) {
     console.error("getRecommendations error", err);
+
     return new Response(
       JSON.stringify({
         success: false,

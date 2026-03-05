@@ -18,8 +18,10 @@ export { default as TestScreen } from "./TestScreen";
 export { default as UserProfile } from "./UserProfile";
 export { default as WishlistScreen } from "./WishlistScreen";
 export { default as CertificatesScreen } from "./CertificatesScreen";
-export { default as PDFView } from "./PDFView";
+export { default as DocumentView } from "./DocumentView";
 export { default as LearningGoalScreen } from "./LearningGoalScreen";
+export { default as MessagesScreen } from "./MessagesScreen";
+export { default as ConversationScreen } from "./ConversationScreen";
 
 // Re-export from subdirectories
 export * from "./auth/index";

@@ -141,9 +141,9 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
     style={{ gap: Spacing.lg, padding: Spacing.lg, paddingTop: Spacing.md }}
   >
     <View style={{ flexDirection: "row", gap: Spacing.lg }}>
-      {achievements.map((achievement) => (
+      {achievements.map((achievement, index) => (
         <AchievementCard
-          key={achievement.id}
+          key={String(achievement.id ?? `achievement-${index}-${achievement.title ?? "item"}`)}
           achievement={achievement}
           navigation={navigation}
         />
@@ -160,7 +160,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
             <Text style={styles.compactGoalsCountText}>{goals.length}</Text>
           </View>
           <View style={styles.compactGoalsList}>
-            {goals.slice(0, 2).map((goal) => {
+            {goals.slice(0, 2).map((goal, index) => {
               const progress = goal.target > 0 ? Math.min(goal.current / goal.target, 1) : 0;
               const unitLabel =
                 goal.unit === "hours"
@@ -181,7 +181,10 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
               };
               const displayCurrent = Math.min(goal.current, goal.target);
               return (
-                <View key={goal.id} style={styles.compactGoalItem}>
+                <View
+                  key={String(goal.id ?? `goal-${index}-${goal.label ?? "item"}`)}
+                  style={styles.compactGoalItem}
+                >
                   <View style={styles.compactGoalRow}>
                     <Text style={styles.compactGoalTitle} numberOfLines={1}>
                       {goal.label}
@@ -318,6 +321,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2A2A35",
     borderRadius: 5,
     overflow: "hidden",
+    marginBottom: Spacing.xs,
   },
   compactProgressFill: {
     height: "100%",

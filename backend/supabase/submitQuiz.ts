@@ -24,6 +24,72 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST,OPTIONS',
 };
 
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+const resolveInstructorId = async (supabaseClient: any, course: any) => {
+  if (!course) return null;
+  if (course.instructor_id) return { id: course.instructor_id, name: course.instructor_name };
+  if (!course.instructor_name) return null;
+  const { data: instructor } = await supabaseClient
+    .from('users')
+    .select('id,name')
+    .eq('name', course.instructor_name)
+    .in('role', ['instructor', 'admin'])
+    .limit(1)
+    .maybeSingle();
+  if (!instructor?.id) return null;
+  return { id: instructor.id, name: instructor.name };
+};
+
+const sendNotification = async (supabaseClient: any, payload: Record<string, unknown>) => {
+  const data = payload as any;
+  const insertPayload = {
+    user_id: data.userId || data.user_id,
+    title: data.title,
+    message: data.message,
+    type: data.type || 'system',
+    action_url: data.actionUrl || data.action_url || null,
+    related_entity_type: data.relatedEntityType || data.related_entity_type || null,
+    related_entity_id: data.relatedEntityId || data.related_entity_id || null,
+    priority: data.priority || 'normal',
+    expires_at: data.expiresAt || data.expires_at || null,
+    created_at: data.createdAt || data.created_at || new Date().toISOString(),
+  };
+
+  const insertDirect = async () => {
+    const { error } = await supabaseClient.from('notifications').insert(insertPayload);
+    if (error) {
+      console.error('Direct notification insert failed:', error);
+    }
+  };
+
+  if (!supabaseUrl || !serviceKey) {
+    await insertDirect();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postNotification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postNotification failed:', res.status, text);
+      await insertDirect();
+    }
+  } catch (error) {
+    console.error('Failed to send notification:', error);
+    await insertDirect();
+  }
+};
+
 const getLocalDateString = (date: Date, timeZone: string) => {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -92,8 +158,6 @@ async function notifyStreakUpdate(userId: string, activityAt: string) {
 }
 
 async function recordQuizScore(userId: string, quizId: string, courseId: string, score: number) {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   if (!supabaseUrl || !serviceKey) return;
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
@@ -187,8 +251,6 @@ const isGoalComplete = (goal: any) => {
 async function awardGoalCredits(userId: string, goal: any) {
   const rewardPoints = Number(goal.reward_points ?? 0);
   if (!rewardPoints || rewardPoints <= 0) return;
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   if (!supabaseUrl || !serviceKey) return;
   const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
     method: 'POST',
@@ -297,11 +359,12 @@ async function checkAndUpdateModuleCompletion(supabaseClient: any, userId: strin
     if (completedError) throw completedError;
 
     const completed_videos = completed?.[0]?.completed_videos || 0;
-    const passed_quizzes = completed?.[0]?.passed_quizzes || 0;
+    const passed_quizzes = completed?.[0]?.passed_quizzes || 0; // Includes both passed AND exhausted attempts
 
-    console.log(`📊 Section ${sectionId} progress:`);
+    console.log(`📊 Section ${sectionId} progress (from get_section_completion RPC):`);
     console.log(`   Videos: ${completed_videos}/${total_videos}`);
-    console.log(`   Quizzes: ${passed_quizzes}/${total_quizzes}`);
+    console.log(`   Quizzes (passed or exhausted): ${passed_quizzes}/${total_quizzes}`);
+    console.log(`   ⚠️ NOTE: If passed_quizzes is 0 but you exhausted attempts, the migration hasn't been applied!`);
 
     // Check if module is completed
     const videosComplete = completed_videos === total_videos;
@@ -407,6 +470,19 @@ serve(async (req) => {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('quiz_id', quizId);
+    const maxAttempts =
+      quiz.max_attempts === null || quiz.max_attempts === undefined
+        ? null
+        : Number(quiz.max_attempts);
+    if (maxAttempts !== null && (previousAttempts || 0) >= maxAttempts) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Maximum attempts reached for this quiz",
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // ========================================
     // 2. Get all questions with correct answers
@@ -429,13 +505,57 @@ serve(async (req) => {
     let totalPoints = 0;
     const gradedAnswers = [];
 
+    console.log('\n🎯 Starting answer grading...');
+
     for (const answer of answers) {
       const { questionId, answer: userAnswer } = answer;
       const question = questionsMap.get(questionId);
       
-      if (!question) continue;
+      if (!question) {
+        console.log(`⚠️ Question ${questionId} not found in questionsMap`);
+        continue;
+      }
       
-      const isCorrect = question.correct_answer === userAnswer;
+      console.log(`\n📝 Grading question ${questionId}:`);
+      console.log(`   User answer:`, userAnswer);
+      console.log(`   User answer type:`, Array.isArray(userAnswer) ? 'array' : typeof userAnswer);
+      console.log(`   Correct answer:`, question.correct_answer);
+      console.log(`   Correct answer type:`, Array.isArray(question.correct_answer) ? 'array' : typeof question.correct_answer);
+      
+      // Compare answers properly based on type
+      let isCorrect = false;
+      
+      // Check if both answers are arrays (multiple-correct questions)
+      // Parse both user answer AND correct answer if they're JSON strings
+      const userAnswerArray = Array.isArray(userAnswer) 
+        ? userAnswer 
+        : (typeof userAnswer === 'string' && userAnswer.startsWith('[')
+            ? JSON.parse(userAnswer)
+            : null);
+      const correctAnswerArray = Array.isArray(question.correct_answer) 
+        ? question.correct_answer 
+        : (typeof question.correct_answer === 'string' && question.correct_answer.startsWith('[')
+            ? JSON.parse(question.correct_answer)
+            : null);
+      
+      console.log(`   User answer array:`, userAnswerArray);
+      console.log(`   Correct answer array:`, correctAnswerArray);
+      
+      if (userAnswerArray && correctAnswerArray) {
+        // Multiple-correct: Compare sorted arrays
+        const userSorted = JSON.stringify([...userAnswerArray].sort());
+        const correctSorted = JSON.stringify([...correctAnswerArray].sort());
+        console.log(`   Comparing (sorted):`);
+        console.log(`     User:    ${userSorted}`);
+        console.log(`     Correct: ${correctSorted}`);
+        isCorrect = userSorted === correctSorted;
+      } else {
+        // Single answer or other types: Direct comparison
+        isCorrect = question.correct_answer === userAnswer;
+        console.log(`   Direct comparison: ${question.correct_answer} === ${userAnswer} = ${isCorrect}`);
+      }
+      
+      console.log(`   Result: ${isCorrect ? '✅ CORRECT' : '❌ INCORRECT'}`);
       
       if (isCorrect) {
         correctCount++;
@@ -450,6 +570,8 @@ serve(async (req) => {
     }
 
     const totalQuestions = questions?.length || 0;
+    console.log(`\n📊 Final score: ${correctCount}/${totalQuestions} correct`);
+
     const score = totalQuestions > 0 
       ? Math.round((correctCount / totalQuestions) * 100) 
       : 0;
@@ -525,7 +647,7 @@ serve(async (req) => {
         .eq('course_id', quiz.course_id);
 
       const { data: completedVideos } = await supabaseClient
-        .from('video_progress')
+        .from('user_video_progress')
         .select('video_id')
         .eq('user_id', userId)
         .eq('is_completed', true)
@@ -554,7 +676,8 @@ serve(async (req) => {
           progress_percentage: progressPercentage.toFixed(2),
           is_completed: isEnrollmentCompleted,
           completion_date: isEnrollmentCompleted ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          last_activity_at: new Date().toISOString()
         })
         .eq('user_id', userId)
         .eq('course_id', quiz.course_id);
@@ -580,10 +703,38 @@ serve(async (req) => {
 
     await recordQuizScore(userId, quizId, quiz.course_id, score);
 
+    const { data: course } = await supabaseClient
+      .from('courses')
+      .select('id,title,instructor_id,instructor_name')
+      .eq('id', quiz.course_id)
+      .maybeSingle();
+
+    if (course) {
+      const instructor = await resolveInstructorId(supabaseClient, course);
+      if (instructor?.id) {
+        const { data: student } = await supabaseClient
+          .from('users')
+          .select('name,email')
+          .eq('id', userId)
+          .maybeSingle();
+        const studentName = student?.name || student?.email || "A student";
+        await sendNotification(supabaseClient, {
+          userId: instructor.id,
+          title: "Quiz submitted",
+          message: `${studentName} submitted a quiz in ${course.title}`,
+          type: "assignment",
+          actionUrl: "/assessments",
+          relatedEntityType: "quiz",
+          relatedEntityId: quiz.id,
+        });
+      }
+    }
+
     // ========================================
     // 6. Return response
     // ========================================
-    const attemptsRemaining = Math.max(0, quiz.max_attempts - attemptNumber);
+    const attemptsRemaining =
+      maxAttempts === null ? null : Math.max(0, maxAttempts - attemptNumber);
 
     return new Response(
       JSON.stringify({

@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,13 +15,18 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useCourses } from "../contexts/CourseContext";
 import { useUser } from "../contexts/UserContext";
+import courseService from "../services/courseService";
 import { Colors, Spacing, TextStyles, Typography } from "../constants";
 import type { Course } from "../types";
 import { ImageWithFallback } from "@components/common";
 import { Images } from "../../assets";
 import Screen from "../components/common/Screen";
+import CourseCard from "../components/home/CourseCard";
 import { CustomTextInput } from "@/components";
 import screenStyles from "@/styles/styles";
+import { getAllCategories, type Category } from "../services/courseService";
+import { formatPrimaryRecommendationReason } from "../utils/recommendations";
+
 const { width } = Dimensions.get("window");
 
 const CARD_BG = "#3A3A45";
@@ -35,14 +40,18 @@ function clamp01(n: number) {
 }
 
 function progressFrom(course: Course): number {
-  const p: any = course?.progress;
+  const anyCourse = course as any;
+  const p: any =
+    anyCourse?.progress ??
+    anyCourse?.progress_percentage ??
+    anyCourse?.progressPercent;
   if (p == null) return 0;
   if (typeof p === "number") {
     // if looks like 0..100, convert
     return p > 1 ? clamp01(p / 100) : clamp01(p);
   }
   const candidates = [p.percent, p.percentage, p.progress, p.value].filter(
-    (v) => typeof v === "number"
+    (v) => typeof v === "number",
   ) as number[];
 
   if (!candidates.length) return 0;
@@ -64,22 +73,39 @@ export default function CoursesScreen({ navigation }: any) {
 
   const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
   const isWishlisted = (c: Course) => wishIds.has(c.id);
-  const { enrolledCourses = [] } = useUser();
+  const { enrolledCourses = [], user: profileUser } = useUser();
+  const recommendationUserId = profileUser?.uuid;
 
   // UI state
   const [query, setQuery] = useState("");
-  const [selectedTag, setSelectedTag] = useState<string>("All");
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
-  // Build unique tag chips from all courses
-  const tagChips: string[] = useMemo(() => {
-    const set = new Set<string>();
-    for (const c of courses) {
-      (c.tags ?? []).forEach((t) => t && set.add(t));
+  // Fetch categories from API
+  const fetchCategories = useCallback(async () => {
+    try {
+      setCategoriesLoading(true);
+      const fetchedCategories = await getAllCategories();
+      setCategories(fetchedCategories);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    } finally {
+      setCategoriesLoading(false);
     }
-    return ["All", ...Array.from(set)];
-  }, [courses]);
+  }, []);
 
-  // Search helper (title, instructor, category, tags)
+  // Load categories on mount
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  // Build category chips with "All" option
+  const categoryChips: string[] = useMemo(() => {
+    return ["All", ...categories.map((cat) => cat.name)];
+  }, [categories]);
+
+  // Search helper (title, instructor, category)
   const searchLocal = (q: string, list: Course[]) => {
     const t = q.trim().toLowerCase();
     if (!t) return list;
@@ -87,10 +113,7 @@ export default function CoursesScreen({ navigation }: any) {
       const inTitle = c.title?.toLowerCase().includes(t);
       const inInstr = c.instructor?.name?.toLowerCase().includes(t);
       const inCat = c.category?.toLowerCase().includes(t);
-      const inTags = (c.tags ?? []).some((tag) =>
-        tag.toLowerCase().includes(t)
-      );
-      return inTitle || inInstr || inCat || inTags;
+      return inTitle || inInstr || inCat;
     });
   };
 
@@ -99,7 +122,7 @@ export default function CoursesScreen({ navigation }: any) {
 
   const jumpBackIn = useMemo(
     () => courses.filter((c) => enrolledIds.has(c.id)),
-    [courses, enrolledIds]
+    [courses, enrolledIds],
   );
 
   const recommended = useMemo(() => {
@@ -109,14 +132,14 @@ export default function CoursesScreen({ navigation }: any) {
   }, [courses, enrolledIds, query, recommendedCourses]);
 
   const popular = useMemo(() => {
-    // Not enrolled, filtered by tag and query
+    // Not enrolled, filtered by category and query
     let base = courses.filter((c) => !enrolledIds.has(c.id));
-    if (selectedTag !== "All") {
-      base = base.filter((c) => (c.tags ?? []).includes(selectedTag));
+    if (selectedCategory !== "All") {
+      base = base.filter((c) => c.category === selectedCategory);
     }
     base = searchLocal(query, base);
     return base;
-  }, [courses, enrolledIds, selectedTag, query]);
+  }, [courses, enrolledIds, selectedCategory, query]);
 
   // ---- small UI bits ----
   const MetaRow = ({
@@ -126,12 +149,14 @@ export default function CoursesScreen({ navigation }: any) {
     rating: number;
     modules?: number;
   }) => (
-    <View style={styles.metaRow}>
-      <Ionicons name="star" size={12} color="#FACC15" />
-      <Text style={styles.metaText}>{rating?.toFixed?.(1) ?? rating}</Text>
-      <Text style={styles.metaDot}>•</Text>
-      <Text style={styles.metaText}>{modules ?? 12} modules</Text>
-    </View>
+    <>
+      <View style={styles.metaRow}>
+        <Ionicons name="star" size={12} color="#FACC15" />
+        <Text style={styles.metaText}>{rating?.toFixed?.(1) ?? rating}</Text>
+        <Text style={styles.metaDot}>•</Text>
+        <Text style={styles.metaText}>{modules ?? 12} modules</Text>
+      </View>
+    </>
   );
 
   const ProgressBar = ({ value }: { value: number }) => {
@@ -146,6 +171,32 @@ export default function CoursesScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const lastScrollY = useRef(0);
   const tabHidden = useRef(false);
+  const lastRecommendedImpressionKey = useRef<string>("");
+
+  const handleRecommendedCourseClick = useCallback(
+    (course: Course) => {
+      if (recommendationUserId) {
+        courseService
+          .recordRecommendationEvent({
+            userId: recommendationUserId,
+            courseId: course.id,
+            eventType: "click",
+            requestId: course.recommendationRequestId,
+            context: {
+              placement: "courses_recommended",
+              isRecommendationSurface: true,
+              modelVersion: course.recommendationModelVersion,
+              requestId: course.recommendationRequestId,
+            },
+          })
+          .catch((err) =>
+            console.warn("Failed to record courses rec click", err)
+          );
+      }
+      navigation.navigate("CourseDetail", { courseId: course.id });
+    },
+    [navigation, recommendationUserId]
+  );
 
   const onRefresh = useCallback(async () => {
     if (!refreshCourses) return;
@@ -154,17 +205,15 @@ export default function CoursesScreen({ navigation }: any) {
       await Promise.all([
         refreshCourses?.(),
         refreshRecommended?.(),
+        fetchCategories(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refreshCourses, refreshRecommended]);
+  }, [refreshCourses, refreshRecommended, fetchCategories]);
 
   const BadgeHeartRow = ({ item }: { item: Course }) => (
     <View style={styles.badgeRow}>
-      {/* <View style={styles.levelBadge}>
-        <Text style={styles.levelText}>{item.level}</Text>
-      </View> */}
       <TouchableOpacity
         onPress={(e) => {
           e.stopPropagation();
@@ -190,62 +239,105 @@ export default function CoursesScreen({ navigation }: any) {
   const HCard = ({
     item,
     withProgress,
+    trackRecommendation = false,
+    placement = "courses_recommended",
   }: {
     item: Course;
     withProgress?: boolean;
+    trackRecommendation?: boolean;
+    placement?: string;
   }) => {
     const rankLabel =
       item.recommendationRank || item.recommendationScore
         ? `#${item.recommendationRank ?? "?"} • ${Number(
-            item.recommendationScore ?? 0
+            item.recommendationScore ?? 0,
           ).toFixed(1)}`
         : null;
-    const reason = item.recommendationReason || "Recommended for you";
+    const reason = formatPrimaryRecommendationReason(
+      item.recommendationPrimaryTag
+    );
 
     return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
-      style={styles.hCard}
-    >
-      <View style={styles.imageWrap}>
-        <ImageWithFallback
-          source={{ uri: item.image }}
-          fallback={Images.placeholder}
-          style={styles.hImage}
-        />
-        <BadgeHeartRow item={item} />
-        {rankLabel ? (
-          <View style={styles.rankBadge}>
-            <Text style={styles.rankText}>{rankLabel}</Text>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => {
+          if (trackRecommendation && recommendationUserId) {
+            courseService
+              .recordRecommendationEvent({
+                userId: recommendationUserId,
+                courseId: item.id,
+                eventType: "click",
+                requestId: item.recommendationRequestId,
+                context: {
+                  placement,
+                  isRecommendationSurface: true,
+                  modelVersion: item.recommendationModelVersion,
+                  requestId: item.recommendationRequestId,
+                },
+              })
+              .catch((err) =>
+                console.warn("Failed to record courses rec click", err)
+              );
+          }
+          navigation.navigate("CourseDetail", { courseId: item.id });
+        }}
+        style={styles.hCard}
+      >
+        <View style={styles.imageWrap}>
+          <ImageWithFallback
+            source={{ uri: item.image }}
+            fallback={Images.placeholder}
+            style={styles.hImage}
+          />
+          <BadgeHeartRow item={item} />
+          {rankLabel ? (
+            <View style={styles.rankBadge}>
+              <Text style={styles.rankText}>{rankLabel}</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.hTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <MetaRow rating={item.rating} modules={item.modules} />
+        {reason ? (
+          <Text style={styles.reason} numberOfLines={1}>
+            {reason}
+          </Text>
+        ) : null}
+        {withProgress ? (
+          <View style={{ marginTop: 8 }}>
+            <ProgressBar value={progressFrom(item)} />
+            <Text style={styles.progressLabel}>
+              {Math.round(progressFrom(item) * 100)}% complete
+            </Text>
           </View>
         ) : null}
-      </View>
-      <Text style={styles.hTitle} numberOfLines={2}>
-        {item.title}
-      </Text>
-      <MetaRow rating={item.rating} modules={item.modules} />
-      {reason ? (
-        <Text style={styles.reason} numberOfLines={1}>
-          {reason}
-        </Text>
-      ) : null}
-      {withProgress ? (
-        <View style={{ marginTop: 8 }}>
-          <ProgressBar value={progressFrom(item)} />
-          <Text style={styles.progressLabel}>
-            {Math.round(progressFrom(item) * 100)}% complete
-          </Text>
-        </View>
-      ) : null}
-    </TouchableOpacity>
+      </TouchableOpacity>
     );
   };
 
   const GCard = ({ item }: { item: Course }) => (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
+      onPress={() => {
+        if (recommendationUserId) {
+          courseService
+            .recordRecommendationEvent({
+              userId: recommendationUserId,
+              courseId: item.id,
+              eventType: "click",
+              context: {
+                placement: "courses_popular",
+                isRecommendationSurface: false,
+              },
+            })
+            .catch((err) =>
+              console.warn("Failed to record popular course click", err)
+            );
+        }
+        navigation.navigate("CourseDetail", { courseId: item.id });
+      }}
       style={styles.gCard}
     >
       <View style={styles.imageWrap}>
@@ -256,13 +348,19 @@ export default function CoursesScreen({ navigation }: any) {
         />
         <BadgeHeartRow item={item} />
       </View>
+      <View style={[styles.catBadge, { backgroundColor: item.categoryColor }]}>
+        <Text
+          style={[TextStyles.bodySmall, styles.catBadgeText]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {item.category}
+        </Text>
+      </View>
       <Text style={styles.gTitle} numberOfLines={2}>
         {item.title}
       </Text>
       <MetaRow rating={item.rating} modules={item.modules} />
-      {/* <Text style={styles.gInstructor} numberOfLines={1}>
-        {item.instructor?.name ? `Mr. ${item.instructor.name}` : ""}
-      </Text> */}
     </TouchableOpacity>
   );
 
@@ -281,6 +379,37 @@ export default function CoursesScreen({ navigation }: any) {
       {subtext ? <Text style={styles.emptySubtitle}>{subtext}</Text> : null}
     </View>
   );
+
+  useEffect(() => {
+    if (query) return;
+    if (!recommendationUserId || recommended.length === 0) return;
+    const firstRecommendation = recommended[0];
+
+    const impressionKey = [
+      recommendationUserId,
+      firstRecommendation?.recommendationRequestId || "no_request_id",
+      ...recommended.map((c) => c.id),
+    ].join("|");
+    if (lastRecommendedImpressionKey.current === impressionKey) return;
+    lastRecommendedImpressionKey.current = impressionKey;
+
+    courseService
+      .recordRecommendationEvent({
+        userId: recommendationUserId,
+        eventType: "impression",
+        requestId: firstRecommendation.recommendationRequestId,
+        context: {
+          placement: "courses_recommended",
+          isRecommendationSurface: true,
+          courseIds: recommended.map((c) => c.id),
+          modelVersion: firstRecommendation.recommendationModelVersion,
+          requestId: firstRecommendation.recommendationRequestId,
+        },
+      })
+      .catch((err) =>
+        console.warn("Failed to record courses rec impression", err)
+      );
+  }, [query, recommended, recommendationUserId]);
 
   return (
     <Screen
@@ -326,41 +455,51 @@ export default function CoursesScreen({ navigation }: any) {
             returnKeyType="search"
           />
 
-          {/* Tag chips (from course.tags, no duplicates) */}
-          <FlatList
-            data={tagChips}
-            keyExtractor={(t) => t}
-            renderItem={({ item }) => {
-              const active = item === selectedTag;
-              return (
-                <TouchableOpacity
-                  onPress={() => setSelectedTag(item)}
-                  activeOpacity={0.8}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text
-                    style={[styles.chipText, active && styles.chipTextActive]}
+          {/* Category chips from API */}
+          {categoriesLoading ? (
+            <View style={styles.chipsLoadingContainer}>
+              <ActivityIndicator size="small" color={Colors.purple400} />
+            </View>
+          ) : (
+            <FlatList
+              data={categoryChips}
+              keyExtractor={(t) => t}
+              renderItem={({ item }) => {
+                const active = item === selectedCategory;
+                return (
+                  <TouchableOpacity
+                    onPress={() => setSelectedCategory(item)}
+                    activeOpacity={0.8}
+                    style={[styles.chip, active && styles.chipActive]}
                   >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
-            style={styles.chipsList}
-          />
+                    <Text
+                      style={[styles.chipText, active && styles.chipTextActive]}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+              style={styles.chipsList}
+            />
+          )}
         </View>
 
         <View style={styles.contentWrap}>
           {/* Jump Back In */}
           {jumpBackIn.length > 0 && (
             <>
-              <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>Jump Back In</Text>
+              <Text style={[TextStyles.h4, { marginVertical: Spacing.sm }]}>
+                Jump Back In
+              </Text>
               <FlatList<Course>
                 data={jumpBackIn}
-                keyExtractor={(i) => i.id}
+                keyExtractor={(i, index) =>
+                  String(i.id ?? `jump-back-${index}-${i.title ?? "course"}`)
+                }
                 renderItem={({ item }) => <HCard item={item} withProgress />}
                 horizontal
                 showsVerticalScrollIndicator={false}
@@ -373,7 +512,7 @@ export default function CoursesScreen({ navigation }: any) {
           {/* Recommended (not enrolled) */}
           {!query && (
             <>
-              <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
+              <Text style={[TextStyles.h4, { marginVertical: Spacing.sm }]}>
                 Recommended
               </Text>
 
@@ -385,8 +524,17 @@ export default function CoursesScreen({ navigation }: any) {
               ) : recommended.length ? (
                 <FlatList<Course>
                   data={recommended}
-                  keyExtractor={(i) => i.id}
-                  renderItem={({ item }) => <HCard item={item} />}
+                  keyExtractor={(i, index) =>
+                    String(i.id ?? `recommended-${index}-${i.title ?? "course"}`)
+                  }
+                  renderItem={({ item }) => (
+                    <CourseCard
+                      course={item}
+                      variant="compact"
+                      showInstructor={false}
+                      onPress={handleRecommendedCourseClick}
+                    />
+                  )}
                   horizontal
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.hRow}
@@ -403,8 +551,8 @@ export default function CoursesScreen({ navigation }: any) {
             </>
           )}
 
-          {/* Popular Courses (clean grid, not enrolled, tag + query filtered) */}
-          <Text style={[TextStyles.h4, {marginVertical: Spacing.sm}]}>
+          {/* Popular Courses (clean grid, not enrolled, category + query filtered) */}
+          <Text style={[TextStyles.h4, { marginVertical: Spacing.sm }]}>
             Popular Courses
           </Text>
           {loading || refreshing ? (
@@ -415,7 +563,9 @@ export default function CoursesScreen({ navigation }: any) {
           ) : popular.length ? (
             <FlatList<Course>
               data={popular}
-              keyExtractor={(i) => i.id}
+              keyExtractor={(i, index) =>
+                String(i.id ?? `popular-${index}-${i.title ?? "course"}`)
+              }
               renderItem={({ item }) => <GCard item={item} />}
               numColumns={2}
               columnWrapperStyle={{ justifyContent: "space-between" }}
@@ -446,6 +596,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     marginHorizontal: -Spacing.xl,
     paddingHorizontal: Spacing.xl,
+  },
+  chipsLoadingContainer: {
+    height: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: Spacing.sm,
   },
   stickyControls: {
     backgroundColor: Colors.primary,
@@ -570,6 +726,19 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
   },
+  catBadge: {
+    alignSelf: "flex-start",
+    marginTop: Spacing.md,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    maxWidth: 96,
+  },
+  catBadgeText: {
+    fontSize: 9.5,
+    fontWeight: "600",
+    letterSpacing: 0.1,
+  },
   rankText: {
     color: "#fff",
     fontSize: 11,
@@ -600,7 +769,7 @@ const styles = StyleSheet.create({
     width: (width - Spacing.lg * 2 - Spacing.lg) / 2,
     backgroundColor: "transparent",
     borderRadius: 16,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing["2xl"],
   },
   gImage: {
     width: "100%",
@@ -633,19 +802,6 @@ const styles = StyleSheet.create({
     right: Spacing.sm,
     flexDirection: "row",
     alignItems: "flex-start",
-  },
-  levelBadge: {
-    backgroundColor: Colors.purple400,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  levelText: {
-    color: Colors.white,
-    fontFamily: TextStyles.body.fontFamily,
-    fontSize: 11,
-    fontWeight: "700",
   },
   heartBtn: {
     backgroundColor: "rgba(0,0,0,0.55)",

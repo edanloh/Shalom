@@ -1,14 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { API_BASE_URL } from 'react-native-dotenv';
-import { handleLogoutCleanup } from './NotificationContext';
 import { supabase } from '@/lib/supabase';
-import { AppState } from 'react-native';
-import { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { User, AuthContextType } from '@/types';
-import { useNavigation } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
-import { Platform } from 'react-native';
 import { makeRedirectUri } from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -31,6 +27,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const bypassAuth = process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true';
+  const bypassUserId =
+    process.env.EXPO_PUBLIC_BYPASS_USER_ID || '';
+  const bypassEmail =
+    process.env.EXPO_PUBLIC_BYPASS_USER_EMAIL || 'shalomfyp@gmail.com';
 
   // Set the below to skip auth during development
   // const [user, setUser] = useState<User | null>({
@@ -48,11 +49,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // });
   // const [isAuthenticated, setIsAuthenticated] = useState(true);
 
-  const loginWithToken = async ({ access_token, refresh_token, path }: Tokens & { path?: string }) => {
+  const loginWithToken = async ({ access_token, refresh_token, type }: Tokens & { type?: string }) => {
     console.log('[DeepLink] loginWithToken called', {
       access_token,
       refresh_token,
     });
+    setIsLoading(true);
     const signIn = async () => {
       await supabase.auth.setSession({
         access_token,
@@ -66,7 +68,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } = await signIn();
 
     console.log('[DeepLink] Supabase user after setSession:', supabaseUser);
-    if (path === 'ResetPassword') {
+    if (type === 'recovery') {
       setIsResettingPassword(true);
       setUser({
         id: supabaseUser?.id || '',
@@ -90,17 +92,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setSession(supabaseSession || null);
   };
 
-  const backdoor = () => {
-    // Only enable for web or development
-    // const mockSession: Session = {
-    //   }
-    // } as any;
-    // const mockUser: User = {
-    // };
-    // setUser(mockUser);
-    // setSession(mockSession);
-  };
-
   // // Set the below to skip auth during development
   // useEffect(() => {
   //   // For development backdoor
@@ -108,8 +99,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   //     backdoor();
   //   }
   // }, [session, user]);
+  useEffect(() => {
+    if (!bypassAuth) return;
+    if (!bypassUserId) {
+      console.warn("EXPO_PUBLIC_BYPASS_AUTH is enabled but EXPO_PUBLIC_BYPASS_USER_ID is missing.");
+      return;
+    }
+    setUser({
+      id: bypassUserId,
+      email: bypassEmail,
+      username: 'shalomfyp',
+      name: 'Shalom FYP',
+      role: 'learner',
+      avatar:
+        'https://ui-avatars.com/api/?name=Shalom+FYP&size=50&background=6366F1&color=fff',
+      bio: 'Learning enthusiast exploring various courses',
+      location: 'Singapore',
+      phone: '+65 9123 4567',
+      authProvider: 'dev',
+    });
+    setSession({} as Session);
+  }, [bypassAuth, bypassEmail, bypassUserId]);
 
   const login = async (email: string, password: string) => {
+    if (bypassAuth) {
+      return { success: true, error: undefined };
+    }
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
@@ -133,6 +148,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const register = async (email: string, password: string, name: string) => {
+    if (bypassAuth) {
+      return { success: true, error: undefined };
+    }
     const { data, error } = await supabase.auth.signUp({
       email: email,
       password: password,
@@ -153,6 +171,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
+    if (bypassAuth) {
+      return;
+    }
     supabase.auth.signOut();
     setUser(null);
   };
@@ -186,18 +207,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Supabase Google OAuth for Expo Android
   const loginWithGoogle = async () => {
-    setIsLoading(true);
     try {
       // Use a custom redirect URI for Expo (must be whitelisted in Supabase dashboard)
-      const redirectTo = makeRedirectUri({
-        scheme: 'com.shalom',
-        // native: 'com.shalom://',
-      });
+      const redirectTo = makeRedirectUri();
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo,
+          skipBrowserRedirect: true,
         },
       });
 
@@ -262,50 +280,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw error;
     }
   };
-
-  // const loginWithGoogle = async (tokens: AuthTokens) => {
-  //   try {
-  //     const googlePayload = tokens.id_token
-  //       ? JSON.parse(atob(tokens.id_token.split(".")[1]))
-  //       : null;
-
-  //     if (!googlePayload?.sub) {
-  //       throw new Error("Invalid Google token");
-  //     }
-
-  //     const response = await fetch(
-  //       `${API_BASE_URL}/dev/getUserInfo?username=${encodeURIComponent(
-  //         googlePayload.sub
-  //       )}`,
-  //       { method: "GET", headers: { "Content-Type": "application/json" } }
-  //     );
-
-  //     if (!response.ok) throw new Error("Failed to fetch user info");
-
-  //     const result = await response.json();
-  //     const userInfo = result.attributes || result.body?.attributes || {};
-
-  //     const userData: User = {
-  //       id: userInfo.sub || userInfo.email || googlePayload.sub,
-  //       email: userInfo.email,
-  //       username: userInfo.username || userInfo.email,
-  //       name:
-  //         userInfo.name ||
-  //         (userInfo.email ? userInfo.email.split("@")[0] : "GoogleUser"),
-  //       role: userInfo["custom:role"] || "learner",
-  //       avatar: userInfo.picture,
-  //       phone: userInfo.phone_number,
-  //       bio: userInfo.bio,
-  //       location: userInfo.locale || userInfo.location,
-  //       authProvider: "google",
-  //       accessToken: tokens.access_token,
-  //     };
-
-  //     await persistUser(userData);
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // };
 
   const changePassword = async (
     currentPassword: string,

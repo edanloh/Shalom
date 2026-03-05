@@ -1,4 +1,5 @@
-import { useCourseBuilder, DraggedItem, Module } from './CourseBuilderContext';
+import { type DraggedItem, type Module } from './CourseBuilderContext';
+import { useCourseBuilder } from './useCourseBuilder';
 
 export const useDragAndDrop = () => {
   const {
@@ -95,7 +96,8 @@ export const useDragAndDrop = () => {
       ...module,
       lessons: module.lessons.map((lesson, lessonIndex) => {
         // Extract base title if not already set
-        const baseTitle = lesson.baseTitle || lesson.title.replace(/^Lesson \d+\.\d+:\s*/, '');
+        const baseTitle =
+          lesson.baseTitle ?? lesson.title.replace(/^Lesson \d+\.\d+:\s*/, '');
         
         return {
           ...lesson,
@@ -105,7 +107,8 @@ export const useDragAndDrop = () => {
       }),
       quizzes: module.quizzes.map((quiz, quizIndex) => {
         // Extract base title if not already set
-        const baseTitle = quiz.baseTitle || quiz.title.replace(/^Quiz \d+\.\d+:\s*/, '');
+        const baseTitle =
+          quiz.baseTitle ?? quiz.title.replace(/^Quiz \d+\.\d+:\s*/, '');
         
         return {
           ...quiz,

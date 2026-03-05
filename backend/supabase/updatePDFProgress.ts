@@ -128,11 +128,11 @@ serve(async (req) => {
     }
 
     // Recalculate course progress
-    // Get all course items (videos, quizzes, PDFs)
+    // Get all course items (videos, quizzes, Documents: PDF/PPTX/DOCX)
     const [
       { data: videos },
       { data: quizzes },
-      { data: pdfs },
+      { data: documents },
     ] = await Promise.all([
       supabase
         .from("course_videos")
@@ -146,13 +146,13 @@ serve(async (req) => {
         .from("course_resources")
         .select("id")
         .eq("course_id", courseId)
-        .eq("resource_type", "pdf"),
+        .in("resource_type", ["pdf", "document", "ppt"]),
     ]);
 
     const totalVideos = videos?.length || 0;
     const totalQuizzes = quizzes?.length || 0;
-    const totalPDFs = pdfs?.length || 0;
-    const totalItems = totalVideos + totalQuizzes + totalPDFs;
+    const totalDocuments = documents?.length || 0;
+    const totalItems = totalVideos + totalQuizzes + totalDocuments;
 
     if (totalItems === 0) {
       // No items in course, cannot calculate progress
@@ -174,16 +174,16 @@ serve(async (req) => {
     // Get completed items for user
     const videoIds = (videos || []).map((v: any) => v.id);
     const quizIds = (quizzes || []).map((q: any) => q.id);
-    const pdfIds = (pdfs || []).map((p: any) => p.id);
+    const documentIds = (documents || []).map((d: any) => d.id);
 
     const [
       { data: completedVideos },
       { data: completedQuizzes },
-      { data: completedPDFs },
+      { data: completedDocuments },
     ] = await Promise.all([
       videoIds.length > 0
         ? supabase
-            .from("video_progress")
+            .from("user_video_progress")
             .select("video_id")
             .eq("user_id", userId)
             .in("video_id", videoIds)
@@ -197,12 +197,12 @@ serve(async (req) => {
             .in("quiz_id", quizIds)
             .eq("is_passed", true)
         : { data: [] },
-      pdfIds.length > 0
+      documentIds.length > 0
         ? supabase
             .from("resource_progress")
             .select("resource_id")
             .eq("user_id", userId)
-            .in("resource_id", pdfIds)
+            .in("resource_id", documentIds)
             .eq("is_completed", true)
         : { data: [] },
     ]);
@@ -210,9 +210,9 @@ serve(async (req) => {
     // Count unique completed items
     const completedVideoIds = new Set((completedVideos || []).map((v: any) => v.video_id));
     const completedQuizIds = new Set((completedQuizzes || []).map((q: any) => q.quiz_id));
-    const completedPDFIds = new Set((completedPDFs || []).map((p: any) => p.resource_id));
+    const completedDocumentIds = new Set((completedDocuments || []).map((d: any) => d.resource_id));
 
-    const completedCount = completedVideoIds.size + completedQuizIds.size + completedPDFIds.size;
+    const completedCount = completedVideoIds.size + completedQuizIds.size + completedDocumentIds.size;
     const progressPercentage = ((completedCount / totalItems) * 100).toFixed(2);
     const isAllCompleted = completedCount >= totalItems;
 
@@ -224,6 +224,7 @@ serve(async (req) => {
         is_completed: isAllCompleted,
         completion_date: isAllCompleted ? new Date().toISOString() : null,
         updated_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
       })
       .eq("user_id", userId)
       .eq("course_id", courseId);

@@ -53,10 +53,54 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const url = new URL(req.url);
+    const instructorId = url.searchParams.get("instructorId")?.trim();
+
+    let scopedCourseIds: string[] | null = null;
+    if (instructorId) {
+      const { data: instructor, error: instructorError } = await supabaseClient
+        .from("users")
+        .select("id, name, role")
+        .eq("id", instructorId)
+        .in("role", ["admin", "instructor"])
+        .single();
+
+      if (instructorError || !instructor) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Instructor/Admin not found or invalid role",
+          }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      let { data: instructorCourses, error: instructorCoursesError } =
+        await supabaseClient
+          .from("courses")
+          .select("id")
+          .eq("instructor_id", instructorId);
+
+      if (instructorCoursesError) throw instructorCoursesError;
+
+      if (!instructorCourses || instructorCourses.length === 0) {
+        const fallback = await supabaseClient
+          .from("courses")
+          .select("id")
+          .eq("instructor_name", instructor.name);
+        instructorCourses = fallback.data || [];
+      }
+
+      scopedCourseIds = (instructorCourses || []).map((course: any) => course.id);
+    }
+
     // Get all users with role='student'
     const { data: users, error: usersError } = await supabaseClient
       .from('users')
-      .select('id, name, email, is_active, created_at, role')
+      .select('id, name, email, is_active, created_at, role, avatar_url')
       .eq('role', 'student')
       .order('created_at', { ascending: false });
 
@@ -64,10 +108,22 @@ serve(async (req) => {
       throw usersError;
     }
 
-    // Get enrollment data for all students
-    const { data: enrollments, error: enrollmentsError } = await supabaseClient
-      .from('course_enrollments')
-      .select('user_id, course_id, is_completed, progress_percentage, total_watch_time_minutes, updated_at');
+    // Get enrollment data (optionally scoped to one instructor's courses)
+    const { data: enrollments, error: enrollmentsError } =
+      scopedCourseIds !== null
+        ? scopedCourseIds.length > 0
+          ? await supabaseClient
+              .from("course_enrollments")
+              .select(
+                "user_id, course_id, is_completed, progress_percentage, total_watch_time_minutes, updated_at, last_activity_at"
+              )
+              .in("course_id", scopedCourseIds)
+          : { data: [], error: null }
+        : await supabaseClient
+            .from("course_enrollments")
+            .select(
+              "user_id, course_id, is_completed, progress_percentage, total_watch_time_minutes, updated_at, last_activity_at"
+            );
 
     if (enrollmentsError) {
       throw enrollmentsError;
@@ -90,8 +146,10 @@ serve(async (req) => {
 
       const lastActivity = userEnrollments.length > 0
         ? userEnrollments.reduce((latest: string | null, e: any) => {
-            if (!latest) return e.updated_at;
-            return new Date(e.updated_at) > new Date(latest) ? e.updated_at : latest;
+            const candidate = e.last_activity_at || e.updated_at;
+            if (!candidate) return latest;
+            if (!latest) return candidate;
+            return new Date(candidate) > new Date(latest) ? candidate : latest;
           }, null)
         : null;
 
@@ -103,7 +161,7 @@ serve(async (req) => {
       // Calculate engagement score
       const engagementScore = userEnrollments.length > 0
         ? userEnrollments.reduce((sum: number, e: any) => {
-            return sum + calculateEngagementScore(e.updated_at);
+            return sum + calculateEngagementScore(e.last_activity_at || e.updated_at);
           }, 0) / userEnrollments.length
         : 0;
 
@@ -126,7 +184,11 @@ serve(async (req) => {
         coursesEnrolled: coursesEnrolled,
         completedCourses: completedCourses,
         totalHours: Math.round(totalStudyMinutes / 60), // Convert minutes to hours
+        avatarUrl: user.avatar_url
       };
+    }).filter((student: any) => {
+      if (scopedCourseIds === null) return true;
+      return Number(student.coursesEnrolled || 0) > 0;
     });
 
     // Sort by last activity (most recent first)
@@ -167,7 +229,7 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching students:', error);
 
     return new Response(

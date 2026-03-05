@@ -9,10 +9,11 @@ import {
   Image,
   RefreshControl,
   DeviceEventEmitter,
+  Platform,
 } from "react-native";
 import { Colors, Spacing, TextStyles } from "../constants";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { ImageWithFallback } from "../components/common";
 import { Images } from "../../assets";
 import { getAvatarUri } from "@/utils/avatar";
@@ -22,6 +23,7 @@ import CustomModal from "../components/common/CustomModal";
 import creditService from "../services/creditService";
 import { showToast } from "@/components/common/Toast";
 import { AchievementItem, CreditEvent } from "../types";
+import { useUser } from "@/contexts/UserContext";
 
 const CARD_BG = "#3A3A45";
 const TILE_BG = "#5B38E3";
@@ -38,7 +40,8 @@ const isIconUrl = (value?: string) =>
   !!value && (value.startsWith("http://") || value.startsWith("https://"));
 
 export default function ProfileScreen({ navigation }: any) {
-  const { user, logout } = useAuth();
+  const { user } = useUser();
+  const { logout } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [balance, setBalance] = useState<number>((user as any)?.points ?? 0);
   const [creditHistory, setCreditHistory] = useState<CreditEvent[]>([]);
@@ -46,16 +49,12 @@ export default function ProfileScreen({ navigation }: any) {
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
   const lastScrollY = useRef(0);
   const tabHidden = useRef(false);
 
   // Safe fallbacks so the UI renders even if some fields are missing
   const displayName = user?.name ?? "User";
-  let avatarUri = getAvatarUri(user);
-  if (!avatarUri) {
-    avatarUri = `https://cmtfxsntlfoxgcznanpe.supabase.co/storage/v1/object/public/profilepics/${user?.email}_avatar.png`;
-  }
-  const avatarSrc = avatarUri ? { uri: avatarUri } : Images.profile;
 
   const quickActions = useMemo(
     () => [
@@ -80,7 +79,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   const loadCredits = React.useCallback(async () => {
     try {
-      const uid = user?.id;
+      const uid = user?.uuid;
       if (!uid) {
         setBalance(0);
         setAchievementsData([]);
@@ -122,7 +121,7 @@ export default function ProfileScreen({ navigation }: any) {
         type: "error",
       });
     }
-  }, [user?.id]);
+  }, [user?.uuid]);
 
   const handleRefresh = async () => {
     try {
@@ -160,13 +159,7 @@ export default function ProfileScreen({ navigation }: any) {
         title: "Edit Profile",
         subtitle: "Update your personal information",
         onPress: () => navigation.navigate("EditProfile"),
-      },
-      {
-        icon: "shield-checkmark-outline",
-        title: "Privacy & Security",
-        subtitle: "Manage your privacy settings",
-        onPress: () => console.log("Navigate to Privacy & Security"),
-      },
+      }
     ];
     if (user?.auth_provider !== "google") {
       items.push({
@@ -218,13 +211,38 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={externalStyles.scrollContent}>
           {/* Avatar & name */}
           <View style={[externalStyles.header, { marginBottom: 16 }]}>
-            <View style={[externalStyles.logo, { marginBottom: 16 }]}>
+            <Pressable
+              style={[externalStyles.logo, { marginBottom: 16 }]}
+              onPress={() => setShowAvatarModal(true)}
+              accessibilityLabel="View profile picture"
+              accessibilityRole="imagebutton"
+            >
               <ImageWithFallback
-                source={avatarSrc}
+                source={{ uri: getAvatarUri() }}
                 fallback={Images.profile}
                 style={externalStyles.avatar}
               />
-            </View>
+              {user?.auth_provider && user?.auth_provider == "google" && (
+                <Image
+                  source={require("@assets/google.png")}
+                  style={styles.avatarGoogleIcon}
+                />
+              )}
+            </Pressable>
+              {/* Avatar Modal */}
+              <CustomModal
+                visible={showAvatarModal}
+                onClose={() => setShowAvatarModal(false)}
+              >
+                <View style={{ alignItems: "center", justifyContent: "center"}}>
+                  <ImageWithFallback
+                    source={{ uri: getAvatarUri() }}
+                    fallback={Images.profile}
+                    style={{ width: 150, height: 150, borderRadius: 75, marginBottom: 12 }}
+                  />
+                  <Text style={[TextStyles.h3, { textAlign: "center", color: Colors.textSecondary }]}>{displayName}</Text>
+                </View>
+              </CustomModal>
             <View
               style={{
                 flexDirection: "row",
@@ -235,18 +253,6 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={[TextStyles.h3, { marginBottom: Spacing.xs }]}>
                 {displayName}
               </Text>
-              {user?.auth_provider && user?.auth_provider == "google" && (
-                <Image
-                  source={require("@assets/google.png")}
-                  style={{
-                    width: 24,
-                    height: 24,
-                    resizeMode: "contain",
-                    marginLeft: 12,
-                    marginBottom: 8,
-                  }}
-                />
-              )}
             </View>
             <Text style={TextStyles.bodyMedium}>{balance} points</Text>
           </View>
@@ -525,9 +531,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   emptyAchievementsText: {
+    ...TextStyles.body,
     textAlign: "center",
     color: Colors.textSecondary,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.base,
   },
   historyCard: {
     marginHorizontal: Spacing.lg,
@@ -663,5 +670,20 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
+  },
+  avatarGoogleIcon: {
+    position: "absolute",
+    bottom: 2,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: Platform.OS === "web" ? 3 : 0,
+    borderColor: Colors.white,
+    outlineWidth: 3,
+    outlineColor: Colors.white,
   },
 });

@@ -15,7 +15,7 @@ export {
   useMyCourses,
   useRecommendedCourses,
   type UseCoursesReturn,
-  type UseMyCOursesReturn,
+  type UseMyCoursesReturn,
 } from './useCourses';
 
 export {

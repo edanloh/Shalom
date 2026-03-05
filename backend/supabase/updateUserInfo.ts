@@ -52,6 +52,7 @@ serve(async (req) => {
     if ("bio" in body.payload) update.bio = body.payload.bio;
     if ("location" in body.payload) update.location = body.payload.location;
     if ("phone" in body.payload) update.phone = body.payload.phone;
+    if ("avatar_url" in body.payload) update.avatar_url = body.payload.avatar_url;
 
     if (Object.keys(update).length === 0) {
       return new Response(JSON.stringify({ success: false, message: "no fields to update" }), {

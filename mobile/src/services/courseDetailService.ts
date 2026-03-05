@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/Colors';
 import { apiService } from './apiService';
 
 export interface CourseDetailResponse {
@@ -10,10 +11,8 @@ export interface CourseDetailResponse {
       description: string;
       instructor_id: string;
       category_id: string;
-      level: string;
       duration_hours: number;
       thumbnail_url: string;
-      video_preview_url: string | null;
       rating: string | number;
       total_ratings?: number;
       totalRatings?: number;
@@ -54,6 +53,14 @@ export interface CourseDetailResponse {
         reviewer_avatar?: string | null;
         reviewerAvatar?: string | null;
         is_anonymous?: boolean;
+        instructor_reply?: string | null;
+        instructorReply?: string | null;
+        instructor_replied_at?: string | null;
+        instructorRepliedAt?: string | null;
+        acknowledged_at?: string | null;
+        acknowledgedAt?: string | null;
+        is_pinned?: boolean;
+        isPinned?: boolean;
       }>;
     };
     sections: any[];
@@ -108,8 +115,8 @@ export interface ProcessedCourseDetail {
   totalRatings: number;
   studentCount: number;
   duration: string;
-  level: string;
   category: string;
+  categoryColor: string;
   tags: string[];
   modules: CourseModule[];
   reviews: Array<{
@@ -118,6 +125,10 @@ export interface ProcessedCourseDetail {
     reviewerName: string;
     reviewerAvatar: string;
     createdAt: string;
+    instructorReply?: string | null;
+    instructorRepliedAt?: string | null;
+    acknowledgedAt?: string | null;
+    isPinned?: boolean;
   }>;
   ratingBreakdown: Record<number, number>;
   requirements: string[];
@@ -171,6 +182,11 @@ class CourseDetailService {
       reviewerName: review.reviewer_name ?? review.reviewerName ?? "Anonymous",
       reviewerAvatar: review.reviewer_avatar ?? review.reviewerAvatar ?? null,
       createdAt: review.created_at ?? review.createdAt ?? new Date().toISOString(),
+      instructorReply: review.instructor_reply ?? review.instructorReply ?? null,
+      instructorRepliedAt:
+        review.instructor_replied_at ?? review.instructorRepliedAt ?? null,
+      acknowledgedAt: review.acknowledged_at ?? review.acknowledgedAt ?? null,
+      isPinned: Boolean(review.is_pinned ?? review.isPinned),
     }));
 
     // Calculate actual rating breakdown from reviews
@@ -195,8 +211,8 @@ class CourseDetailService {
       ),
       studentCount: course.student_count || 0,
       duration: this.formatDuration(course.duration_hours || 0),
-      level: course.level,
       category: course.category_name || 'Uncategorized',
+      categoryColor: course.category_color || Colors.accent,
       tags: course.tags || [],
       modules,
       reviews: processedReviews,

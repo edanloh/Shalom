@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Award, Trash2, Search, Star, Trophy, Medal, Target } from "lucide-react";
+import { ValidationModal } from "@/components/CourseBuilder/ValidationModal";
+import { Plus, Award, Trash2, Search, Star, Trophy, Medal, Target, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -35,6 +36,9 @@ import {
   updateAchievement,
   uploadAchievementIcon,
 } from "@/services/achievementService";
+import { useAuth } from '@/contexts/useAuth';
+import { useUser } from "@/contexts/useUser";
+import { courseService } from "@/services";
 
 interface BadgeItem {
   id: string;
@@ -47,10 +51,16 @@ interface BadgeItem {
   earnedBy: number;
   type?: string;
   color?: string | null;
+  scopeType?: "global" | "instructor" | "course";
+  scopeId?: string | null;
 }
 
 const BadgeManagement = () => {
   const { toast } = useToast();
+  const { authUser } = useAuth();
+  const { user: profileUser } = useUser();
+  const instructorId = authUser?.id ?? "";
+  const instructorDbId = profileUser?.uuid ?? "";
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newBadgeName, setNewBadgeName] = useState("");
@@ -60,6 +70,8 @@ const BadgeManagement = () => {
   const [newBadgePoints, setNewBadgePoints] = useState("100");
   const [newBadgeIcon, setNewBadgeIcon] = useState<File | null>(null);
   const [badgeIconPreview, setBadgeIconPreview] = useState<string>("");
+  const [newBadgeScopeType, setNewBadgeScopeType] = useState<"instructor" | "course">("instructor");
+  const [newBadgeScopeCourseId, setNewBadgeScopeCourseId] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6);
   const [deleteTarget, setDeleteTarget] = useState<BadgeItem | null>(null);
@@ -67,6 +79,13 @@ const BadgeManagement = () => {
   const [badges, setBadges] = useState<BadgeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showCreateErrors, setShowCreateErrors] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationMessage, setValidationMessage] = useState({
+    title: "",
+    description: "",
+  });
+  const [instructorCourses, setInstructorCourses] = useState<Array<{ id: string; title: string }>>([]);
 
   const iconOptions = [
     { value: "trophy", icon: Trophy, label: "Trophy" },
@@ -119,12 +138,19 @@ const BadgeManagement = () => {
     earnedBy: Number(record.earnedBy ?? 0),
     type: record.type,
     color: record.color ?? null,
+    scopeType: (record.scope_type as any) ?? "global",
+    scopeId: record.scope_id ?? null,
   });
 
   const loadBadges = async () => {
+    if (!instructorId) {
+      setBadges([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
-      const response = await listAchievements({ type: "badge" });
+      const response = await listAchievements(instructorId, { type: "badge" });
       const items = response.items.map(mapBadge);
       setBadges(items);
     } catch (error) {
@@ -141,7 +167,24 @@ const BadgeManagement = () => {
 
   useEffect(() => {
     loadBadges();
-  }, []);
+  }, [instructorId]);
+
+  useEffect(() => {
+    const loadInstructorCourses = async () => {
+      if (!instructorDbId) {
+        setInstructorCourses([]);
+        return;
+      }
+      try {
+        const items = await courseService.getCourses({ instructorId: instructorDbId, limit: 200 });
+        setInstructorCourses(items.map((c) => ({ id: c.id, title: c.title })));
+      } catch (error) {
+        console.error("Failed to load instructor courses for badge scope:", error);
+        setInstructorCourses([]);
+      }
+    };
+    loadInstructorCourses();
+  }, [instructorDbId]);
 
   const resetCreateForm = () => {
     setNewBadgeName("");
@@ -151,24 +194,66 @@ const BadgeManagement = () => {
     setNewBadgePoints("100");
     setNewBadgeIcon(null);
     setBadgeIconPreview("");
+    setNewBadgeScopeType("instructor");
+    setNewBadgeScopeCourseId("");
+    setShowCreateErrors(false);
+    setShowValidationModal(false);
   };
 
   const handleCreateBadge = async () => {
-    const criteriaCount = parseInt(newBadgeCriteriaCount, 10);
-    if (!newBadgeName || !newBadgeDescription) {
+    if (!instructorId) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive"
+        title: "Missing account context",
+        description: "Please sign in again and retry.",
+        variant: "destructive",
       });
       return;
     }
-    if (!newBadgeCriteriaType || !Number.isFinite(criteriaCount) || criteriaCount <= 0) {
-      toast({
-        title: "Error",
-        description: "Please set a valid criteria type and count",
-        variant: "destructive",
+    const criteriaCount = parseInt(newBadgeCriteriaCount, 10);
+    const pointsValue = parseInt(newBadgePoints, 10);
+    if (!newBadgeName.trim() || !newBadgeDescription.trim()) {
+      setShowCreateErrors(true);
+      setValidationMessage({
+        title: "Missing required fields",
+        description: "Please fill in all required fields before creating a badge.",
       });
+      setShowValidationModal(true);
+      return;
+    }
+    if (!newBadgeCriteriaType || !Number.isFinite(criteriaCount) || criteriaCount <= 0) {
+      setShowCreateErrors(true);
+      setValidationMessage({
+        title: "Invalid criteria",
+        description: "Please set a valid criteria type and count.",
+      });
+      setShowValidationModal(true);
+      return;
+    }
+    if (!Number.isFinite(pointsValue) || pointsValue <= 0) {
+      setShowCreateErrors(true);
+      setValidationMessage({
+        title: "Invalid points value",
+        description: "Please enter a valid points value greater than 0.",
+      });
+      setShowValidationModal(true);
+      return;
+    }
+    if (newBadgeScopeType === "instructor" && !instructorDbId) {
+      setShowCreateErrors(true);
+      setValidationMessage({
+        title: "Missing instructor profile",
+        description: "Instructor profile ID is required to create instructor-scoped badges.",
+      });
+      setShowValidationModal(true);
+      return;
+    }
+    if (newBadgeScopeType === "course" && !newBadgeScopeCourseId) {
+      setShowCreateErrors(true);
+      setValidationMessage({
+        title: "Course scope required",
+        description: "Please select a course for a course-scoped badge.",
+      });
+      setShowValidationModal(true);
       return;
     }
 
@@ -180,7 +265,7 @@ const BadgeManagement = () => {
         iconValue = upload?.url || upload?.publicUrl || upload?.path || "award";
       }
 
-      const created = await createAchievement({
+      const created = await createAchievement(instructorId, {
         name: newBadgeName,
         description: newBadgeDescription,
         icon: iconValue,
@@ -191,6 +276,8 @@ const BadgeManagement = () => {
         },
         points: parseInt(newBadgePoints, 10) || 100,
         isActive: true,
+        scopeType: newBadgeScopeType,
+        scopeId: newBadgeScopeType === "course" ? newBadgeScopeCourseId : instructorDbId,
       });
 
       if (created?.id) {
@@ -231,12 +318,13 @@ const BadgeManagement = () => {
   };
 
   const toggleBadgeStatus = async (badgeId: string) => {
+    if (!instructorId) return;
     const badge = badges.find((item) => item.id === badgeId);
     if (!badge) return;
     const nextActive = !badge.active;
     setBadges(badges.map(b => (b.id === badgeId ? { ...b, active: nextActive } : b)));
     try {
-      await updateAchievement({ id: badgeId, isActive: nextActive });
+      await updateAchievement(instructorId, { id: badgeId, isActive: nextActive });
       toast({
         title: "Badge Status Updated",
         description: "Badge status has been changed",
@@ -253,10 +341,11 @@ const BadgeManagement = () => {
   };
 
   const deleteBadge = async (badgeId: string) => {
+    if (!instructorId) return;
     const prev = badges;
     setBadges(badges.filter(badge => badge.id !== badgeId));
     try {
-      await deleteAchievement(badgeId);
+      await deleteAchievement(instructorId, badgeId);
       toast({
         title: "Badge Deleted",
         description: "Badge has been removed successfully",
@@ -306,6 +395,8 @@ const BadgeManagement = () => {
             open={isCreateDialogOpen}
             onOpenChange={(open) => {
               if (!open) resetCreateForm();
+              if (open) setShowCreateErrors(false);
+              if (open) setShowValidationModal(false);
               setIsCreateDialogOpen(open);
             }}
           >
@@ -322,16 +413,25 @@ const BadgeManagement = () => {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="badge-name">Badge Name *</Label>
+                  <Label htmlFor="badge-name">
+                    Badge Name <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="badge-name"
                     value={newBadgeName}
                     onChange={(e) => setNewBadgeName(e.target.value)}
                     placeholder="e.g., Course Master"
                   />
+                  {showCreateErrors && !newBadgeName.trim() && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Badge name is required.
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="badge-description">Description *</Label>
+                  <Label htmlFor="badge-description">
+                    Description <span className="text-red-500">*</span>
+                  </Label>
                   <Textarea
                     id="badge-description"
                     value={newBadgeDescription}
@@ -339,9 +439,16 @@ const BadgeManagement = () => {
                     placeholder="Describe what this badge represents..."
                     rows={3}
                   />
+                  {showCreateErrors && !newBadgeDescription.trim() && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Description is required.
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="badge-criteria">Earning Criteria *</Label>
+                  <Label htmlFor="badge-criteria">
+                    Earning Criteria <span className="text-red-500">*</span>
+                  </Label>
                   <div className="grid gap-3 md:grid-cols-2">
                     <Select value={newBadgeCriteriaType} onValueChange={setNewBadgeCriteriaType}>
                       <SelectTrigger id="badge-criteria">
@@ -364,9 +471,16 @@ const BadgeManagement = () => {
                       placeholder="Count"
                     />
                   </div>
+                  {showCreateErrors && (!newBadgeCriteriaType || !Number.isFinite(parseInt(newBadgeCriteriaCount, 10)) || parseInt(newBadgeCriteriaCount, 10) <= 0) && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Criteria type and count are required.
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="badge-points">Points Value</Label>
+                  <Label htmlFor="badge-points">
+                    Points Value <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="badge-points"
                     type="number"
@@ -374,6 +488,58 @@ const BadgeManagement = () => {
                     onChange={(e) => setNewBadgePoints(e.target.value)}
                     placeholder="100"
                   />
+                  {showCreateErrors && (!Number.isFinite(parseInt(newBadgePoints, 10)) || parseInt(newBadgePoints, 10) <= 0) && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Points value is required.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="badge-scope">
+                    Badge Scope <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="grid gap-3">
+                    <Select
+                      value={newBadgeScopeType}
+                      onValueChange={(value: "instructor" | "course") => {
+                        setNewBadgeScopeType(value);
+                        if (value !== "course") setNewBadgeScopeCourseId("");
+                      }}
+                    >
+                      <SelectTrigger id="badge-scope">
+                        <SelectValue placeholder="Select badge scope" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="instructor">Instructor (recommended)</SelectItem>
+                        <SelectItem value="course">Specific Course</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {newBadgeScopeType === "course" && (
+                      <Select
+                        value={newBadgeScopeCourseId}
+                        onValueChange={setNewBadgeScopeCourseId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a course" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {instructorCourses.map((course) => (
+                            <SelectItem key={course.id} value={course.id}>
+                              {course.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  {showCreateErrors && newBadgeScopeType === "course" && !newBadgeScopeCourseId && (
+                    <p className="text-xs text-red-500 mt-1">
+                      A course must be selected for course-scoped badges.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Instructor/course scopes award badges only from relevant activity.
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="badge-icon">Badge Icon (Optional)</Label>
@@ -408,6 +574,12 @@ const BadgeManagement = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <ValidationModal
+            open={showValidationModal}
+            onOpenChange={setShowValidationModal}
+            title={validationMessage.title}
+            description={validationMessage.description}
+          />
         </div>
 
         {/* Search */}
@@ -425,8 +597,8 @@ const BadgeManagement = () => {
 
         {/* Badge Grid */}
         {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading badges...</p>
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : paginatedBadges.length > 0 ? (
           <>
@@ -473,6 +645,10 @@ const BadgeManagement = () => {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Earned by:</span>
                         <span className="font-medium">{badge.earnedBy} students</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Scope:</span>
+                        <span className="font-medium capitalize">{badge.scopeType ?? "global"}</span>
                       </div>
                     </div>
 

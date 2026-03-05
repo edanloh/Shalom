@@ -43,7 +43,6 @@ This HomeScreen implementation exactly matches the provided design mockup with:
 
 #### Suggested Courses
 - **Horizontal Scroll**: Two course cards shown
-- **Level Badges**: "Intermediate" tags
 - **Rating Display**: Stars and module counts
 - **Course Images**: High-quality placeholder images
 
@@ -113,7 +112,6 @@ interface Course {
   rating: number;
   image: string;
   category: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
   modules: number;
 }
 ```

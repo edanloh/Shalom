@@ -21,18 +21,21 @@ interface BackendQuizQuestion {
   explanation: string;
   points: number;
   order_index: number;
+  image_url?: string; // Optional question image
 }
 
 // Frontend Question Structure (after transformation)
 export interface QuizQuestion {
   id: string;
   question_text: string;
-  question_type: 'multiple-choice' | 'true-false';
+  question_type: 'multiple-choice' | 'multiple-correct' | 'true-false' | 'short-answer' | 'matching';
   order_index: number;
   options: QuizOption[];
   explanation?: string;
   points: number;
+  correct_answer?: string;
   image_url?: string; // Optional question image
+  matching_pairs?: Array<{ left: string; right: string }>; // For matching type
 }
 
 // Backend Quiz Detail Response
@@ -45,7 +48,7 @@ interface BackendQuizDetailResponse {
     description: string;
     passing_score: number;
     time_limit_minutes: number | null;
-    max_attempts: number;
+    max_attempts: number | null;
     course: {
       id: string;
       title: string;
@@ -58,7 +61,11 @@ interface BackendQuizDetailResponse {
     userAttempts: Array<{
       attempt_number: number;
       score: number;
+      total_questions?: number;
+      correct_answers?: number;
+      time_taken_minutes?: number | null;
       is_passed: boolean;
+      answers?: Record<string, string> | null;
       completed_at: string;
     }>;
   };
@@ -74,7 +81,7 @@ export interface QuizDetailResponse {
     description: string;
     passing_score: number;
     time_limit_minutes: number | null;
-    max_attempts: number;
+    max_attempts: number | null;
     course: {
       id: string;
       title: string;
@@ -87,7 +94,11 @@ export interface QuizDetailResponse {
     userAttempts: Array<{
       attempt_number: number;
       score: number;
+      total_questions?: number;
+      correct_answers?: number;
+      time_taken_minutes?: number | null;
       is_passed: boolean;
+      answers?: Record<string, string> | null;
       completed_at: string;
     }>;
   };
@@ -114,7 +125,7 @@ export interface SubmitQuizResponse {
     correctAnswers: number;
     isPassed: boolean;
     attemptNumber: number;
-    attemptsRemaining: number;
+    attemptsRemaining: number | null;
     answers: Array<{
       questionId: string;
       isCorrect: boolean;
@@ -129,18 +140,52 @@ class QuizService {
    * Converts string array options to QuizOption objects
    */
   private transformQuestion(backendQuestion: BackendQuizQuestion): QuizQuestion {
-    return {
+    // Map question types properly
+    let questionType: 'multiple-choice' | 'multiple-correct' | 'true-false' | 'short-answer' | 'matching';
+    
+    switch (backendQuestion.question_type) {
+      case 'true-false':
+        questionType = 'true-false';
+        break;
+      case 'multiple-correct':
+        questionType = 'multiple-correct';
+        break;
+      case 'short-answer':
+      case 'text':
+        questionType = 'short-answer';
+        break;
+      case 'matching':
+        questionType = 'matching';
+        break;
+      default:
+        questionType = 'multiple-choice';
+    }
+
+    const transformed: QuizQuestion = {
       id: backendQuestion.id,
       question_text: backendQuestion.question_text,
-      question_type: backendQuestion.question_type === 'true-false' ? 'true-false' : 'multiple-choice',
+      question_type: questionType,
       order_index: backendQuestion.order_index,
-      options: backendQuestion.options.map((optionText, index) => ({
+      options: (backendQuestion.options || []).map((optionText, index) => ({
         id: `${backendQuestion.id}-option-${index}`,
         option_text: optionText,
       })),
       explanation: backendQuestion.explanation,
       points: backendQuestion.points,
+      correct_answer: backendQuestion.correct_answer,
+      image_url: backendQuestion.image_url,
     };
+
+    // For matching questions, parse the correct_answer JSON
+    if (questionType === 'matching') {
+      try {
+        transformed.matching_pairs = JSON.parse(backendQuestion.correct_answer || '[]');
+      } catch {
+        transformed.matching_pairs = [];
+      }
+    }
+
+    return transformed;
   }
 
   /**
@@ -238,7 +283,11 @@ class QuizService {
   /**
    * Check if user can retry quiz
    */
-  canRetryQuiz(userAttempts: QuizDetailResponse['data']['userAttempts'], maxAttempts: number): boolean {
+  canRetryQuiz(
+    userAttempts: QuizDetailResponse['data']['userAttempts'],
+    maxAttempts: number | null
+  ): boolean {
+    if (maxAttempts === null) return true;
     if (!userAttempts) return true;
     return userAttempts.length < maxAttempts;
   }
@@ -246,7 +295,11 @@ class QuizService {
   /**
    * Calculate attempts remaining
    */
-  getAttemptsRemaining(userAttempts: QuizDetailResponse['data']['userAttempts'], maxAttempts: number): number {
+  getAttemptsRemaining(
+    userAttempts: QuizDetailResponse['data']['userAttempts'],
+    maxAttempts: number | null
+  ): number | null {
+    if (maxAttempts === null) return null;
     if (!userAttempts) return maxAttempts;
     return Math.max(0, maxAttempts - userAttempts.length);
   }
@@ -269,19 +322,35 @@ class QuizService {
 
   /**
    * Validate that all questions are answered
+   * For multiple-correct, ensure at least one option is selected
    */
-  validateAnswers(answers: Map<string, string>, totalQuestions: number): boolean {
-    return answers.size === totalQuestions;
+  validateAnswers(answers: Map<string, string | string[]>, totalQuestions: number): boolean {
+    if (answers.size !== totalQuestions) {
+      return false;
+    }
+    
+    // Check that all answers have content (including non-empty arrays for multiple-correct)
+    for (const answer of answers.values()) {
+      if (Array.isArray(answer) && answer.length === 0) {
+        return false;
+      }
+      if (!Array.isArray(answer) && !answer) {
+        return false;
+      }
+    }
+    
+    return true;
   }
 
   /**
    * Convert Map to array format for API
    * Maps question IDs to the selected option text
+   * For multiple-correct questions, the answer is an array that gets stringified
    */
-  convertAnswersToArray(answers: Map<string, string>): Array<{ questionId: string; answer: string }> {
+  convertAnswersToArray(answers: Map<string, string | string[]>): Array<{ questionId: string; answer: string }> {
     return Array.from(answers.entries()).map(([questionId, answerText]) => ({
       questionId,
-      answer: answerText,
+      answer: Array.isArray(answerText) ? JSON.stringify(answerText) : answerText,
     }));
   }
 }

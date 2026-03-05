@@ -14,17 +14,18 @@ import { Colors, ContainerStyles, Spacing, Typography, TextStyles } from '../con
 import { useNavigation, CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 import { ActionButton, Screen } from '@/components';
 
 // components (values)
 import ProfileHeader from '../components/home/ProfileHeader';
 import ProgressSection from '../components/home/ProgressSection';
-import SwipeableCourseCards from '../components/home/SwipeableCourseCards';
 import CourseCard from '../components/home/CourseCard';
 
 // Import hooks and types
 import { useCourses } from '../contexts/CourseContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
 import courseService from '../services/courseService';
 import creditService from '../services/creditService';
 import { showToast } from '@/components/common/Toast';
@@ -50,6 +51,8 @@ export default function HomeScreen({ navigation, route }: any) {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { user, login, register } = useAuth();
+  const { user: profileUser } = useUser();
+  const recommendationUserId = profileUser?.uuid;
   const [certCount, setCertCount] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [goalProgress, setGoalProgress] = useState<{
@@ -100,28 +103,34 @@ export default function HomeScreen({ navigation, route }: any) {
   // Debug logging for user state
   useEffect(() => {
     console.log('HomeScreen - Current user from AuthContext:', user);
-    if (user) {
-      console.log('HomeScreen - User ID for enrollment fetch:', user.id);
+    if (profileUser) {
+      console.log('HomeScreen - DB User ID for enrollment fetch:', profileUser.uuid);
     }
-  }, [user]);
+  }, [profileUser]);
 
   const loadCreditMeta = React.useCallback(async () => {
     try {
-      if (!user?.id) {
+      if (!profileUser?.uuid) {
         setCertCount(0);
         setStreakDays(0);
         return;
       }
-      const [certs, goals] = await Promise.all([
-        creditService.getCertificates(user.id).catch(() => []),
-        creditService.getGoals(user.id).catch(() => []),
+      const [certs, goalStats] = await Promise.all([
+        creditService.getCertificates(profileUser.uuid).catch(() => []),
+        creditService.getGoalsWithProgress(profileUser.uuid).catch(() => ({
+          goals: [],
+          completedCourses: 0,
+          totalTimeMinutes: 0,
+          streakDays: 0,
+        })),
       ]);
-      creditService.recordGoalMilestones(goals, user?.id);
+      const goals = Array.isArray(goalStats?.goals) ? goalStats.goals : [];
+      creditService.recordGoalMilestones(goals, profileUser.uuid);
       setCertCount(Array.isArray(certs) ? certs.length : 0);
-      const maxStreak = Array.isArray(goals)
+      const maxGoalStreak = Array.isArray(goals)
         ? goals.reduce((m, g) => Math.max(m, g.streakDays || 0), 0)
         : 0;
-      setStreakDays(maxStreak);
+      setStreakDays(Math.max(Number(goalStats?.streakDays ?? 0), maxGoalStreak));
       if (Array.isArray(goals)) {
         const activeGoals = goals.filter((g) => g.isActive && !g.isExpired && !g.completedAt);
         const goal =
@@ -264,7 +273,7 @@ export default function HomeScreen({ navigation, route }: any) {
       console.warn('Home: failed to load credit stats', err);
       setGoalList([]);
     }
-  }, [user?.id]);
+  }, [profileUser?.uuid]);
 
   useEffect(() => {
     loadCreditMeta();
@@ -364,50 +373,36 @@ export default function HomeScreen({ navigation, route }: any) {
     navigation.navigate('Wishlist');
   };
 
-  // Handle course actions for swipeable cards
-  const handleCourseComplete = (courseId: string) => {
-    console.log('Course marked as completed:', courseId);
-    if (user?.id) {
-      creditService
-        .recordCreditEvent({
-          userId: user.id,
-          type: 'course_completed',
-          title: 'Course completed',
-          points: 120,
-          courseId,
-        })
-        .then(() =>
-          showToast({
-            title: 'Credits earned',
-            message: '+120 for completing a course',
-            type: 'success',
-          })
-        )
-        .catch((err) => {
-          console.warn('Failed to record course credit', err);
-          showToast({
-            title: 'Unable to record credits',
-            message: 'Something unexpected happened. Please try again later.',
-            type: 'error',
-          });
-        });
-    }
-    // TODO: Update course completion status via API
-  };
-
-  const handleCourseLike = (courseId: string) => {
-    console.log('Course liked/continued:', courseId);
-    // TODO: Update course like status or mark as in-progress via API
-  };
 
   const handleRecommendationClick = async (course: Course) => {
-    if (user?.id) {
+    if (recommendationUserId) {
       courseService.recordRecommendationEvent({
-        userId: user.id,
+        userId: recommendationUserId,
         courseId: course.id,
         eventType: 'click',
-        context: { placement: 'home_recommended' },
+        requestId: course.recommendationRequestId,
+        context: {
+          placement: 'home_recommended',
+          isRecommendationSurface: true,
+          modelVersion: course.recommendationModelVersion,
+          requestId: course.recommendationRequestId,
+        },
       }).catch((err) => console.warn('Failed to record rec click', err));
+    }
+    navigation.navigate('CourseDetail', { courseId: course.id });
+  };
+
+  const handleWishlistCourseClick = async (course: Course) => {
+    if (recommendationUserId) {
+      courseService.recordRecommendationEvent({
+        userId: recommendationUserId,
+        courseId: course.id,
+        eventType: 'click',
+        context: {
+          placement: 'wishlist',
+          isRecommendationSurface: false,
+        },
+      }).catch((err) => console.warn('Failed to record wishlist click', err));
     }
     navigation.navigate('CourseDetail', { courseId: course.id });
   };
@@ -422,23 +417,27 @@ export default function HomeScreen({ navigation, route }: any) {
   const recommendedListLoading = recommendedLoading || coursesLoading;
 
   useEffect(() => {
-    if (user?.id && recommendedList.length > 0) {
+    if (recommendationUserId && recommendedList.length > 0) {
+      const firstRecommendation = recommendedList[0];
       courseService.recordRecommendationEvent({
-        userId: user.id,
+        userId: recommendationUserId,
         eventType: 'impression',
+        requestId: firstRecommendation?.recommendationRequestId,
         context: {
           placement: 'home_recommended',
+          isRecommendationSurface: true,
           courseIds: recommendedList.map((c) => c.id),
+          modelVersion: firstRecommendation?.recommendationModelVersion,
+          requestId: firstRecommendation?.recommendationRequestId,
         },
       }).catch((err) => console.warn('Failed to record rec impression', err));
     }
-  }, [user?.id, recommendedList]);
+  }, [recommendationUserId, recommendedList]);
 
   const getTop10Courses = (courses: Course[]): Course[] => {
-    // Sort by percentage completed descending and return top 10
-    return courses
-      .sort((a, b) => b.progress.percentage - a.progress.percentage)
-      .slice(0, 10);
+    // Return top 10 courses - already sorted by last_activity_at from API
+    // Do NOT re-sort here to preserve the most recently active order
+    return courses.slice(0, 10);
   }
 
   // Handle user loading state
@@ -466,8 +465,7 @@ export default function HomeScreen({ navigation, route }: any) {
       onRefresh={handleRefresh}
     >
       {/* Combined Header with Profile, Welcome, and Notifications */}
-      <ProfileHeader 
-        user={user}
+      <ProfileHeader
         hasNotifications={true}
         onNotificationPress={handleNotificationPress}
       />
@@ -493,46 +491,41 @@ export default function HomeScreen({ navigation, route }: any) {
                 <Text style={styles.viewAllText}>View All</Text>
               </TouchableOpacity>
             </View>
-            
-            {myCoursesLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.purple400} />
-                <Text style={styles.loadingText}>Loading your courses...</Text>
-              </View>
-            ) : myCoursesError ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{myCoursesError}</Text>
-                <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
-                  <Text style={styles.retryText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (myCoursesData?.length ?? 0) === 0 ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>You haven't enrolled in any courses yet.</Text>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Courses')}
-                  style={styles.retryButton}
-                >
-                  <Text style={styles.retryText}>Browse courses</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <>
-              {/* <SwipeableCourseCards 
-                courses={myCoursesData}
-                onCourseComplete={handleCourseComplete}
-                onCourseLike={handleCourseLike}
-                onToggleWishlist={toggleWishlist}
-                isWishlisted={(id) => isWishlisted?.(id) ?? false}
-              /> */}
-              <CourseCarousel
-                courses={getTop10Courses(myCoursesData)}
-                // onCourseLike={(courseId: string) => {console.log("Liked" + courseId)}}
-                onToggleWishlist={toggleWishlist}
-                isWishlisted={(id) => isWishlisted?.(id) ?? false}
-              />
-            </>
-            )}
+
+            <View style={styles.sectionContentFrame}>
+              {myCoursesLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={Colors.purple400} />
+                  <Text style={styles.loadingText}>Loading your courses...</Text>
+                </View>
+              ) : myCoursesError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{myCoursesError}</Text>
+                  <TouchableOpacity onPress={refreshMyCourses} style={styles.retryButton}>
+                    <Text style={styles.retryText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (myCoursesData?.length ?? 0) === 0 ? (
+                <View style={styles.errorContainer}>
+                  <View style={styles.emptyIconBadge}>
+                    <Ionicons name="library-outline" size={48} color={Colors.textMuted ?? Colors.textSecondary} />
+                  </View>
+                  <Text style={styles.errorText}>You haven't enrolled in any courses yet.</Text>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Courses')}
+                    style={styles.retryButton}
+                  >
+                    <Text style={styles.retryText}>Browse courses</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <CourseCarousel
+                  courses={getTop10Courses(myCoursesData)}
+                  onToggleWishlist={toggleWishlist}
+                  isWishlisted={(id) => isWishlisted?.(id) ?? false}
+                />
+              )}
+            </View>
           </View>
 
           {/* Wishlist Section */}
@@ -546,39 +539,45 @@ export default function HomeScreen({ navigation, route }: any) {
               </TouchableOpacity>
             </View>
 
-            {wishlistLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.purple400} />
-                <Text style={styles.loadingText}>Loading wishlist...</Text>
-              </View>
-            ) : wishlistError ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{wishlistError}</Text>
-                <TouchableOpacity onPress={refreshWishlist} style={styles.retryButton}>
-                  <Text style={styles.retryText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : wishlist.length === 0 ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>You haven't added any courses into your wishlist yet.</Text>
-              </View>
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
-              >
-                {wishlist.map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    course={course}
-                    variant="compact"
-                    showInstructor={false}
-                    onPress={(c) => navigation.navigate('CourseDetail', { courseId: c.id })}
-                  />
-                ))}
-              </ScrollView>
-            )}
+            <View style={styles.sectionContentFrame}>
+              {wishlistLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={Colors.purple400} />
+                  <Text style={styles.loadingText}>Loading wishlist...</Text>
+                </View>
+              ) : wishlistError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{wishlistError}</Text>
+                  <TouchableOpacity onPress={refreshWishlist} style={styles.retryButton}>
+                    <Text style={styles.retryText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : wishlist.length === 0 ? (
+                <View style={styles.errorContainer}>
+                  <View style={styles.emptyIconBadge}>
+                    <Ionicons name="heart-outline" size={48} color={Colors.textMuted ?? Colors.textSecondary} />
+                  </View>
+                  <Text style={styles.errorText}>You haven't added any courses into your wishlist yet.</Text>
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
+                >
+                  {wishlist.map((course, index) => (
+                    <CourseCard
+                      key={String(course.id ?? `wishlist-${index}-${course.title ?? "course"}`)}
+                      course={course}
+                      variant="compact"
+                      showInstructor={false}
+                      showRecommendationReason={false}
+                      onPress={(c) => handleWishlistCourseClick(c)}
+                    />
+                  ))}
+                </ScrollView>
+              )}
+            </View>
           </View>
 
           {/* Suggested Courses Section */}
@@ -589,35 +588,37 @@ export default function HomeScreen({ navigation, route }: any) {
               </Text>
             </View>
 
-            {recommendedListLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.purple400} />
-                <Text style={styles.loadingText}>Loading suggestions...</Text>
-              </View>
-            ) : recommendedError || coursesError ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{recommendedError || coursesError}</Text>
-                <TouchableOpacity onPress={refreshRecommended} style={styles.retryButton}>
-                  <Text style={styles.retryText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
-              >
-                {recommendedList.map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    course={course}
-                    variant="compact"
-                    showInstructor={false}
-                    onPress={(c) => handleRecommendationClick(c)}
-                  />
-                ))}
-              </ScrollView>
-            )}
+            <View style={styles.sectionContentFrame}>
+              {recommendedListLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={Colors.purple400} />
+                  <Text style={styles.loadingText}>Loading suggestions...</Text>
+                </View>
+              ) : recommendedError || coursesError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{recommendedError || coursesError}</Text>
+                  <TouchableOpacity onPress={refreshRecommended} style={styles.retryButton}>
+                    <Text style={styles.retryText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingLeft: Spacing.lg, paddingRight: Spacing.base }}
+                >
+                  {recommendedList.map((course, index) => (
+                    <CourseCard
+                      key={String(course.id ?? `recommended-${index}-${course.title ?? "course"}`)}
+                      course={course}
+                      variant="compact"
+                      showInstructor={false}
+                      onPress={(c) => handleRecommendationClick(c)}
+                    />
+                  ))}
+                </ScrollView>
+              )}
+            </View>
         </View>
         <View style={{ height: 130 }} />
 
@@ -672,6 +673,9 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: Spacing.md,
   },
+  sectionContentFrame: {
+    minHeight: 300,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -679,6 +683,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.lg,
     minHeight: 200,
+  },
+  emptyIconBadge: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.base,
   },
   errorText: {
     fontFamily: TextStyles.body.fontFamily,

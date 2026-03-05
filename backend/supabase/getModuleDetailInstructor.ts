@@ -61,14 +61,15 @@ serve(async (req) => {
     const { data: course, error: courseError } = await supabaseClient
       .from('courses')
       .select(`
-        id, title, description, instructor_name, level,
-        duration_hours, thumbnail_url, video_preview_url,
+        id, title, description, instructor_name,
+        duration_hours, thumbnail_url,
         rating, total_ratings, student_count, is_published,
-        is_featured, language, subtitles, tags,
+        is_featured, language, tags,
         created_at, updated_at,
         categories (
           id,
-          name
+          name, 
+          color
         )
       `)
       .eq('id', courseId)
@@ -103,7 +104,7 @@ serve(async (req) => {
     // }
 
     // ========================================
-    // 2. Fetch sections, lessons, quizzes, quiz questions, requirements, outcomes, reviews in parallel
+    // 2. Fetch sections, lessons, quizzes, quiz questions, outcomes in parallel
     // ========================================
     // First, get section IDs for filtering videos
     const sectionIds = await getSectionIds(supabaseClient, courseId);
@@ -115,9 +116,7 @@ serve(async (req) => {
       { data: pdfResources, error: pdfResourcesError },
       { data: quizzes, error: quizzesError },
       { data: quizQuestions, error: quizQuestionsError },
-      { data: requirements, error: requirementsError },
-      { data: outcomes, error: outcomesError },
-      { data: reviews, error: reviewsError }
+      { data: outcomes, error: outcomesError }
     ] = await Promise.all([
       supabaseClient
         .from('course_sections')
@@ -139,7 +138,7 @@ serve(async (req) => {
         .from('course_resources')
         .select(`
           id, section_id, title, description, resource_url,
-          order_index, resource_type, is_preview, thumbnail_url,
+          order_index, resource_type, is_preview,
           file_size_bytes, is_downloadable
         `)
         .in('section_id', sectionIds)
@@ -159,35 +158,18 @@ serve(async (req) => {
       supabaseClient
         .from('quiz_questions')
         .select(`
-          id, quiz_id, question, question_type,
-          options, correct_answer, explanation, points, order_index
+          id, quiz_id, question, question_type, 
+          options, correct_answer, explanation, points, order_index, image_url
         `)
         .in('quiz_id', await getQuizIds(supabaseClient, courseId))
         .order('quiz_id', { ascending: true })
         .order('order_index', { ascending: true }),
       
       supabaseClient
-        .from('course_requirements')
-        .select('requirement, order_index')
-        .eq('course_id', courseId)
-        .order('order_index', { ascending: true }),
-      
-      supabaseClient
         .from('course_outcomes')
         .select('outcome, order_index')
         .eq('course_id', courseId)
-        .order('order_index', { ascending: true }),
-      
-      supabaseClient
-        .from('course_ratings')
-        .select(`
-          id, rating, review, created_at,
-          users (
-            id, name, avatar_url
-          )
-        `)
-        .eq('course_id', courseId)
-        .order('created_at', { ascending: false })
+        .order('order_index', { ascending: true })
     ]);
 
     // Log any errors from parallel queries
@@ -196,9 +178,7 @@ serve(async (req) => {
     if (pdfResourcesError) console.error('PDF resources error:', pdfResourcesError);
     if (quizzesError) console.error('Quizzes error:', quizzesError);
     if (quizQuestionsError) console.error('Quiz questions error:', quizQuestionsError);
-    if (requirementsError) console.error('Requirements error:', requirementsError);
     if (outcomesError) console.error('Outcomes error:', outcomesError);
-    if (reviewsError) console.error('Reviews error:', reviewsError);
 
     console.log('Fetched lessons count:', lessons?.length || 0);
     console.log('Fetched PDF resources count:', pdfResources?.length || 0);
@@ -219,23 +199,46 @@ serve(async (req) => {
           duration_seconds: l.duration_seconds || 0 // Already in seconds
         }));
 
-      // Get PDF resources for this section
+      // Helper function to detect file type from URL extension
+      const detectFileTypeFromUrl = (url: string): 'pdf' | 'document' | 'ppt' => {
+        if (!url) return 'pdf';
+        const lowercaseUrl = url.toLowerCase();
+        if (lowercaseUrl.includes('.docx') || lowercaseUrl.includes('.doc')) {
+          return 'document';
+        }
+        if (lowercaseUrl.includes('.pptx') || lowercaseUrl.includes('.ppt')) {
+          return 'ppt';
+        }
+        return 'pdf';
+      };
+
+      // Get document resources (PDFs, DOCX, PPTX) for this section
       const sectionPdfResources = (pdfResources || [])
         .filter((r: any) => r.section_id === section.id)
-        .map((r: any) => ({
-          id: r.id,
-          section_id: r.section_id,
-          title: r.title,
-          description: r.description,
-          resource_url: r.resource_url,
-          resource_type: r.resource_type,
-          thumbnail_url: r.thumbnail_url,
-          is_preview: r.is_preview,
-          is_downloadable: r.is_downloadable,
-          file_size_bytes: r.file_size_bytes,
-          order_index: r.order_index,
-          type: "pdf"
-        }));
+        .map((r: any) => {
+          // Determine type: prioritize resource_type from DB, fallback to URL extension
+          const dbType = r.resource_type?.toLowerCase();
+          let finalType = dbType || detectFileTypeFromUrl(r.resource_url);
+          
+          // If DB says "document" but URL is actually a PDF, use the URL extension
+          if (dbType === 'document' && r.resource_url.toLowerCase().includes('.pdf')) {
+            finalType = 'pdf';
+          }
+          
+          return {
+            id: r.id,
+            section_id: r.section_id,
+            title: r.title,
+            description: r.description,
+            resource_url: r.resource_url,
+            resource_type: finalType,
+            is_preview: r.is_preview,
+            is_downloadable: r.is_downloadable,
+            file_size_bytes: r.file_size_bytes,
+            order_index: r.order_index,
+            type: finalType
+          };
+        });
 
       // Get quizzes for this section and add questions
       const sectionQuizzes = (quizzes || [])
@@ -256,7 +259,8 @@ serve(async (req) => {
               explanation: qq.explanation,
               points: qq.points,
               order: qq.order_index,
-              order_index: qq.order_index // Also include as 'order_index' for compatibility
+              order_index: qq.order_index, // Also include as 'order_index' for compatibility
+              image_url: qq.image_url
             }));
 
           return {
@@ -283,32 +287,7 @@ serve(async (req) => {
       };
     });
 
-    // ========================================
-    // 4. Process reviews and calculate ratings
-    // ========================================
-    const processedReviews = (reviews || []).map((review: any) => ({
-      id: review.id,
-      rating: review.rating,
-      review: review.review,
-      createdAt: review.created_at,
-      reviewerName: review.users?.name || 'Anonymous',
-      reviewerAvatar: review.users?.avatar_url || null,
-      reviewerId: review.users?.id || null
-    }));
-
-    // Calculate average rating and rating breakdown
-    let averageRating = 0;
     const ratingBreakdown: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    
-    if (processedReviews.length > 0) {
-      const totalRating = processedReviews.reduce((sum: number, r: any) => sum + r.rating, 0);
-      averageRating = totalRating / processedReviews.length;
-      
-      // Calculate rating breakdown counts
-      processedReviews.forEach((r: any) => {
-        ratingBreakdown[r.rating]++;
-      });
-    }
 
     // ========================================
     // 5. Construct structured response for instructor
@@ -318,12 +297,14 @@ serve(async (req) => {
         ...course,
         category_name: course.categories?.name,
         category_id: course.categories?.id,
-        requirements: (requirements || []).map((r: any) => r.requirement),
+        category_color: course.categories?.color,
+        requirements: [],
         outcomes: (outcomes || []).map((o: any) => o.outcome),
-        rating: averageRating,
-        totalRatings: processedReviews.length,
+        rating: Number(course.rating || 0),
+        totalRatings: Number(course.total_ratings || 0),
         ratingBreakdown: ratingBreakdown,
-        reviews: processedReviews
+        // Reviews are served by getInstructorReviews for instructor workflows.
+        reviews: []
       },
       sections: sectionsWithContent,
       totalSections: sections?.length || 0,

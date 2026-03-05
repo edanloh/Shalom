@@ -110,18 +110,18 @@ serve(async (req) => {
         .from('course_wishlist')
         .select(`
           created_at,
-          courses (
+          courses!inner ( 
             id,
             title,
             description,
             instructor_name,
-            level,
             duration_hours,
             thumbnail_url,
             rating,
             total_ratings,
             student_count,
             tags,
+            is_published,
             categories (
               name,
               color
@@ -129,9 +129,37 @@ serve(async (req) => {
           )
         `)
         .eq('user_id', userId)
+        .eq('courses.is_published', true) 
         .order('created_at', { ascending: false });
 
       if (wishlistError) throw wishlistError;
+
+      const courseIds = (wishlistItems || []).map((item: any) => item.courses.id);
+      const sectionCountsMap = new Map<string, number>();
+      const videoCountsMap = new Map<string, number>();
+      const quizCountsMap = new Map<string, number>();
+
+      if (courseIds.length > 0) {
+        const [
+          { data: sectionCountsData },
+          { data: videoCountsData },
+          { data: quizCountsData },
+        ] = await Promise.all([
+          supabaseClient.rpc('get_section_counts_by_course', { course_ids: courseIds }),
+          supabaseClient.rpc('get_video_counts_by_course', { course_ids: courseIds }),
+          supabaseClient.rpc('get_quiz_counts_by_course', { course_ids: courseIds })
+        ]);
+
+        for (const row of sectionCountsData ?? []) {
+          sectionCountsMap.set(row.course_id, row.count ?? 0);
+        }
+        for (const row of videoCountsData ?? []) {
+          videoCountsMap.set(row.course_id, row.count ?? 0);
+        }
+        for (const row of quizCountsData ?? []) {
+          quizCountsMap.set(row.course_id, row.count ?? 0);
+        }
+      }
 
       // Format response to match Lambda structure
       const courses = (wishlistItems || []).map((item: any) => ({
@@ -139,7 +167,6 @@ serve(async (req) => {
         title: item.courses.title,
         description: item.courses.description,
         instructor_name: item.courses.instructor_name,
-        level: item.courses.level,
         duration_hours: item.courses.duration_hours,
         thumbnail_url: item.courses.thumbnail_url,
         rating: item.courses.rating,
@@ -148,6 +175,9 @@ serve(async (req) => {
         tags: item.courses.tags,
         category_name: item.courses.categories?.name,
         category_color: item.courses.categories?.color,
+        total_sections: sectionCountsMap.get(item.courses.id) ?? 0,
+        total_videos: videoCountsMap.get(item.courses.id) ?? 0,
+        total_quizzes: quizCountsMap.get(item.courses.id) ?? 0,
         added_at: item.created_at
       }));
 
@@ -176,10 +206,11 @@ serve(async (req) => {
         .from('courses')
         .select('id')
         .eq('id', courseIdQueryParam)
+        .eq('is_published', true)
         .single();
 
       if (courseError || !course) {
-        return notFound("Course not found");
+        return notFound("Course not found or not published");
       }
 
       // Check if already in wishlist

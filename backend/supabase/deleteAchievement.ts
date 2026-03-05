@@ -34,7 +34,7 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    const { id } = body ?? {};
+    const { id, createdBy } = body ?? {};
 
     if (!id) {
       return new Response(JSON.stringify({ success: false, message: "id is required" }), {
@@ -43,13 +43,23 @@ serve(async (req) => {
       });
     }
 
+    if (!createdBy) {
+      return new Response(
+        JSON.stringify({ success: false, message: "createdBy is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { data: existing, error: fetchError } = await supabase
       .from("achievements")
-      .select("id, icon")
+      .select("id, icon, created_by, scope_type")
       .eq("id", id)
       .single();
 
-    if (fetchError) {
+    if (fetchError && (fetchError as any).code !== "PGRST116") {
       return new Response(JSON.stringify({ success: false, message: fetchError.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -63,10 +73,32 @@ serve(async (req) => {
       });
     }
 
+    // System/platform achievements (typically global + no creator) are not deletable via instructor endpoint.
+    if (!existing.created_by || existing.scope_type === "global") {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "system achievements cannot be deleted from instructor badge management",
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (existing.created_by !== createdBy) {
+      return new Response(JSON.stringify({ success: false, message: "achievement not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data, error } = await supabase
       .from("achievements")
       .delete()
       .eq("id", id)
+      .eq("created_by", createdBy)
       .select("id")
       .single();
 

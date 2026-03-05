@@ -6,7 +6,7 @@ export { apiService, ApiError, NetworkError, TimeoutError } from "./apiService";
 export { courseService } from "./courseService";
 export { courseDetailService } from "./courseDetailService";
 export { videoService } from "./videoService";
-export { pdfService } from "./pdfService";
+export { pdfService, documentService } from "./documentService";
 export { quizService } from "./quizService";
 export { moduleService } from "./moduleService";
 
@@ -30,7 +30,7 @@ export type {
   PDFDetailResponse,
   MarkPDFCompletedRequest,
   MarkPDFCompletedResponse,
-} from "./pdfService";
+} from "./documentService";
 export type {
   QuizOption,
   QuizQuestion,
