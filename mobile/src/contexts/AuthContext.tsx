@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const bypassAuth = true;
+  const bypassAuth = false;
   const bypassUserId =
     process.env.EXPO_PUBLIC_BYPASS_USER_ID || '550e8400-e29b-41d4-a716-446655440101';
   const bypassEmail =
