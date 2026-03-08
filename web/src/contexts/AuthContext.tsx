@@ -171,12 +171,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     newPassword: string,
   ) => {
     setIsLoading(true);
-    const { data, error } = await supabase.auth.updateUser({
-      email,
-      password: newPassword,
-    });
-    if (error) throw error;
-    setIsLoading(false);
+    try {
+      // Step 1: Re-authenticate user with current password to verify it's correct
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: oldPassword,
+      });
+      if (signInError) {
+        throw new Error('Invalid current password');
+      }
+
+      // Step 2: Update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) throw updateError;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const register = async (email: string, password: string, name: string) => {
