@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { act, render } from '@testing-library/react-native';
 import ImageWithFallback from '../../components/common/ImageWithFallback';
 
 // Mock image source
@@ -60,7 +60,9 @@ describe('ImageWithFallback', () => {
 
       // Simulate error
       if (image.props.onError) {
-        image.props.onError();
+        act(() => {
+          image.props.onError();
+        });
       }
 
       expect(mockOnError).toHaveBeenCalled();
@@ -80,7 +82,9 @@ describe('ImageWithFallback', () => {
 
       // Simulate error
       if (image.props.onError) {
-        image.props.onError();
+        act(() => {
+          image.props.onError();
+        });
       }
 
       // Component should still render
@@ -103,7 +107,9 @@ describe('ImageWithFallback', () => {
 
       // Simulate load
       if (image.props.onLoad) {
-        image.props.onLoad();
+        act(() => {
+          image.props.onLoad();
+        });
       }
 
       expect(image).toBeTruthy();

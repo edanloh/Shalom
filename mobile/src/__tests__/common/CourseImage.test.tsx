@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { act, render } from '@testing-library/react-native';
 import CourseImage from '../../components/common/CourseImage';
 
 // Mock the Images import
@@ -77,7 +77,9 @@ describe('CourseImage', () => {
         const image = images[0];
         // Simulate error
         if (image.props.onError) {
-          image.props.onError();
+          act(() => {
+            image.props.onError();
+          });
         }
       }
 
@@ -101,7 +103,9 @@ describe('CourseImage', () => {
         const image = images[0];
         // Simulate error
         if (image.props.onError) {
-          image.props.onError();
+          act(() => {
+            image.props.onError();
+          });
         }
       }
 
@@ -126,7 +130,9 @@ describe('CourseImage', () => {
         const image = images[0];
         // Simulate load
         if (image.props.onLoad) {
-          image.props.onLoad();
+          act(() => {
+            image.props.onLoad();
+          });
         }
       }
 
@@ -148,7 +154,9 @@ describe('CourseImage', () => {
         const image = images[0];
         // Simulate load start
         if (image.props.onLoadStart) {
-          image.props.onLoadStart();
+          act(() => {
+            image.props.onLoadStart();
+          });
         }
       }
 
