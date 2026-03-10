@@ -44,9 +44,13 @@ export default function ActionButton({
   return (
     <TouchableOpacity style={buttonStyle} onPress={onPress} disabled={disabled}>
       {loading ? (
-        <ActivityIndicator color={variant === "primary" ? "#fff" : "#564beb"} />
+        <ActivityIndicator 
+          testID="activity-indicator"
+          color={variant === "primary" ? "#fff" : "#564beb"} 
+        />
       ) : imageSource ? (
         <Image
+          testID="button-image"
           source={imageSource}
           style={imageStyle ? imageStyle : styles.image}
         />

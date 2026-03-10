@@ -34,7 +34,7 @@ const Stats = () => {
   const numColumns = screenWidth > 768 ? 4 : 2; // responsive columns
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView testID="stats-scroll" contentContainerStyle={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Trusted by Millions Worldwide</Text>
