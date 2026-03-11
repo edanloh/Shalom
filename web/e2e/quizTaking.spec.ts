@@ -250,6 +250,38 @@ test.describe('Quiz taking page', () => {
     ).toBeVisible();
   });
 
+  test('disables previous on first question and shows next item on last question', async ({
+    page,
+  }) => {
+    await loginThenNavigateToQuiz(page);
+
+    const previousButton = page.getByRole('button', {
+      name: 'Previous Question',
+    });
+
+    await expect(previousButton).toBeDisabled();
+
+    await page.getByRole('button', { name: 'Next Question' }).click();
+
+    await expect(previousButton).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Next Item' })).toBeVisible();
+  });
+
+  test('renders true-false question options and hides explanation when absent', async ({
+    page,
+  }) => {
+    await loginThenNavigateToQuiz(page);
+
+    await page.getByRole('button', { name: 'Next Question' }).click();
+
+    await expect(
+      page.getByText('Question 2 of 2', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText('True(Correct Answer)')).toBeVisible();
+    await expect(page.getByText('False')).toBeVisible();
+    await expect(page.getByText('Explanation:')).not.toBeVisible();
+  });
+
   test('navigates to next lesson item after last question', async ({
     page,
   }) => {

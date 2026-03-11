@@ -230,6 +230,17 @@ test.describe('Assessments page', () => {
     ).toBeVisible();
   });
 
+  test('browse courses opens the course selector dialog', async ({ page }) => {
+    await loginThenNavigateToAssessments(page);
+
+    await page.getByRole('button', { name: 'Browse Courses' }).first().click();
+
+    await expect(page.getByText('Select Course')).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Search courses by name...'),
+    ).toBeVisible();
+  });
+
   test('shows published and draft courses in selector, with draft disabled', async ({
     page,
   }) => {
@@ -283,6 +294,49 @@ test.describe('Assessments page', () => {
 
     await expect(page.getByText('Aggregation Quiz')).toBeVisible();
     await expect(page.getByText('SQL Basics Quiz')).not.toBeVisible();
+  });
+
+  test('shows empty state when no quizzes match search query', async ({
+    page,
+  }) => {
+    await loginThenNavigateToAssessments(page);
+
+    await page.getByRole('button', { name: 'Select a course...' }).click();
+    await page
+      .locator('button')
+      .filter({ hasText: 'Data Science Fundamentals' })
+      .first()
+      .click();
+
+    await page.getByPlaceholder('Search quizzes...').fill('does-not-exist');
+
+    await expect(page.getByText('No Quizzes Found')).toBeVisible();
+    await expect(
+      page.getByText('No quizzes match "does-not-exist"'),
+    ).toBeVisible();
+  });
+
+  test('clear all resets selected course and returns to selection prompt', async ({
+    page,
+  }) => {
+    await loginThenNavigateToAssessments(page);
+
+    await page.getByRole('button', { name: 'Select a course...' }).click();
+    await page
+      .locator('button')
+      .filter({ hasText: 'Data Science Fundamentals' })
+      .first()
+      .click();
+
+    await expect(page.getByText('Active filters:')).toBeVisible();
+    await page.getByRole('button', { name: 'Clear all' }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Select a Course' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Select a course...' }),
+    ).toBeVisible();
   });
 
   test('grading queue shows pending submissions and quick grade feedback', async ({
