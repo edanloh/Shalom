@@ -78,4 +78,79 @@ describe('CustomModal', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('handles null children without crashing', () => {
+    const { getByTestId } = render(
+      <CustomModal visible={true} onClose={() => {}}>
+        {null}
+      </CustomModal>,
+    );
+
+    expect(getByTestId('blur-view')).toBeTruthy();
+  });
+
+  it('handles undefined children without crashing', () => {
+    const { getByTestId } = render(
+      <CustomModal visible={true} onClose={() => {}}>
+        {undefined}
+      </CustomModal>,
+    );
+
+    expect(getByTestId('blur-view')).toBeTruthy();
+  });
+
+  it('handles onClose throwing an error gracefully', () => {
+    const throwingOnClose = jest.fn(() => {
+      throw new Error('onClose failed');
+    });
+
+    const { UNSAFE_getAllByType } = render(
+      <CustomModal visible={true} onClose={throwingOnClose}>
+        <Text>Error Test</Text>
+      </CustomModal>,
+    );
+
+    const touchables = UNSAFE_getAllByType(TouchableOpacity);
+
+    expect(() => {
+      fireEvent.press(touchables[0]);
+    }).toThrow('onClose failed');
+
+    expect(throwingOnClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates when visible prop changes', () => {
+    const { queryByText, rerender } = render(
+      <CustomModal visible={true} onClose={() => {}}>
+        <Text>Toggled Content</Text>
+      </CustomModal>,
+    );
+
+    expect(queryByText('Toggled Content')).toBeTruthy();
+
+    rerender(
+      <CustomModal visible={false} onClose={() => {}}>
+        <Text>Toggled Content</Text>
+      </CustomModal>,
+    );
+
+    expect(queryByText('Toggled Content')).toBeNull();
+  });
+
+  it('does not crash when onClose is called rapidly', () => {
+    const onClose = jest.fn();
+    const { UNSAFE_getAllByType } = render(
+      <CustomModal visible={true} onClose={onClose}>
+        <Text>Rapid Close</Text>
+      </CustomModal>,
+    );
+
+    const touchables = UNSAFE_getAllByType(TouchableOpacity);
+
+    fireEvent.press(touchables[0]);
+    fireEvent.press(touchables[0]);
+    fireEvent.press(touchables[0]);
+
+    expect(onClose).toHaveBeenCalledTimes(3);
+  });
 });
