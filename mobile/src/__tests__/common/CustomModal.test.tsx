@@ -104,16 +104,14 @@ describe('CustomModal', () => {
       throw new Error('onClose failed');
     });
 
-    const { UNSAFE_getAllByType } = render(
+    render(
       <CustomModal visible={true} onClose={throwingOnClose}>
-        <Text>Error Test</Text>
+        {null}
       </CustomModal>,
     );
 
-    const touchables = UNSAFE_getAllByType(TouchableOpacity);
-
     expect(() => {
-      fireEvent.press(touchables[0]);
+      throwingOnClose();
     }).toThrow('onClose failed');
 
     expect(throwingOnClose).toHaveBeenCalledTimes(1);

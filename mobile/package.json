@@ -13,7 +13,8 @@
     "eas-build-pre-install": "./eas-pre-install.sh",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "prepare": "husky ../.husky && git -C .. config core.hooksPath .husky"
   },
   "dependencies": {
     "@craftzdog/react-native-buffer": "^6.1.0",
@@ -89,6 +90,7 @@
     "babel-plugin-module-resolver": "^5.0.2",
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "husky": "^9.1.7",
     "jest": "^30.3.0",
     "jest-expo": "^55.0.9",
     "nodemon": "^3.1.11",
