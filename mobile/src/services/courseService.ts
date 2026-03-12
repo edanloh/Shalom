@@ -30,7 +30,29 @@ const ENDPOINTS = {
   POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, 
   CATEGORIES: '/categoryHandler',
   RECOMMENDATIONS: '/getRecommendations',
+  ML_RECOMMENDATIONS: '/getMLRecommendations',
   RECOMMENDATION_EVENT: '/postRecommendationEvent',
+};
+
+// ── ML traffic routing ────────────────────────────────────────────────────────
+// Set EXPO_PUBLIC_ML_SPLIT=20 to send 20 % of users to the ML re-ranker.
+// Uses the same deterministic hash-bucket approach as the edge function so
+// assignment is sticky per userId (same user always gets the same path).
+const ML_SPLIT = Number(process.env.EXPO_PUBLIC_ML_SPLIT ?? '0');
+
+const hashToBucket100 = (uid: string): number => {
+  // djb2-style hash, matches hashToBucket100 in getRecommendations.ts
+  let hash = 2166136261;
+  for (let i = 0; i < uid.length; i++) {
+    hash ^= uid.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0) % 100;
+};
+
+const shouldUseML = (uid: string): boolean => {
+  if (ML_SPLIT <= 0) return false;
+  return hashToBucket100(uid) < ML_SPLIT;
 };
 
 const getRecommendationCacheKey = (userId: string): string =>
@@ -563,101 +585,110 @@ class CourseService {
   /**
    * Get recommended courses (remaining courses after enrolled ones)
    */
-  async getRecommendedCourses(userId?: string): Promise<Course[]> {
+  async getRecommendedCourses(userId?: string): Promise<{
+    courses: Course[];
+    meta: any;
+    recommendations: any[];
+  }> {
     const uid = userId || DEFAULT_USER_ID;
 
     try {
-      if (!uid) return [];
+      if (!uid) {
+        return { courses: [], meta: {}, recommendations: [] };
+      }
       const cacheKey = getRecommendationCacheKey(uid);
-      const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
-      if (cachedCourses) {
-        return cachedCourses;
+      const cached = await CacheManager.get<{
+        courses: Course[];
+        meta: any;
+        recommendations: any[];
+      }>(cacheKey);
+      if (cached) {
+        return cached;
       }
 
-      const resp = await apiService.get<any>(ENDPOINTS.RECOMMENDATIONS, {
+      const useML = shouldUseML(uid);
+      const recoEndpoint = useML ? ENDPOINTS.ML_RECOMMENDATIONS : ENDPOINTS.RECOMMENDATIONS;
+
+      const resp = await apiService.get<any>(recoEndpoint, {
         userId: uid,
         limit: '8',
+        placement: 'home',
+        // Pass local time so context-factors (evening boost, weekend explore) work correctly
+        localHour: String(new Date().getHours()),
+        dayOfWeek: String(new Date().getDay()),
       });
 
-      const recs =
-        (Array.isArray(resp?.data) ? resp?.data : null) ??
-        resp?.data?.data?.recommendations ??
+      const recommendations =
         resp?.data?.recommendations ??
         resp?.recommendations ??
+        resp?.recommendations ??
         [];
-      const meta =
+      const meta = resp?.meta ??
         resp?.data?.data?.meta ??
         resp?.data?.meta ??
         resp?.meta ??
         {};
-
-      const sorted = Array.isArray(recs)
-        ? [...recs].sort((a, b) => {
-            const sa = Number(a.score ?? a.recommendation_score ?? 0);
-            const sb = Number(b.score ?? b.recommendation_score ?? 0);
-            if (sb !== sa) return sb - sa;
-            const ra = Number(a.rank ?? a.recommendation_rank ?? Infinity);
-            const rb = Number(b.rank ?? b.recommendation_rank ?? Infinity);
-            return ra - rb;
-          })
+      const sorted = Array.isArray(recommendations)
+        ? [...recommendations]
+            .sort((a, b) => {
+              const sa = Number(a.score ?? a.recommendation_score ?? 0);
+              const sb = Number(b.score ?? b.recommendation_score ?? 0);
+              if (sb !== sa) return sb - sa;
+              const ra = Number(a.rank ?? a.recommendation_rank ?? Infinity);
+              const rb = Number(b.rank ?? b.recommendation_rank ?? Infinity);
+              return ra - rb;
+            })
         : [];
 
-      const courses = sorted
-        .map((item: any, idx: number) => {
-          const recommendationScore = Number(
-            item?.score ??
-              item?.recommendation_score ??
-              item?.course?.recommendation_score ??
-              item?.course?.score ??
-              0
-          );
-
-          let coursePayload: any = item.course || item;
-          if (typeof coursePayload === 'string') {
-            try {
-              coursePayload = JSON.parse(coursePayload);
-            } catch {
-              coursePayload = null;
-            }
-          }
-          if (!coursePayload || typeof coursePayload !== 'object') {
-            return null;
-          }
+      const courses = sorted.map((r: any) => {
+        const coursePayload = r?.course || r;
+        let course = coursePayload;
+        if (typeof course === 'string') {
           try {
-            const course = convertAWSCourseToAppCourse(coursePayload);
-            return {
-              ...course,
-              recommendationPrimaryTag:
-                item.primary_reason_tag ||
-                coursePayload.recommendation_primary_tag ||
-                undefined,
-              recommendationModelVersion:
-                meta?.model_version ||
-                item.model_version ||
-                coursePayload.recommendation_model_version,
-              recommendationRequestId:
-                meta?.request_id ||
-                item.request_id ||
-                coursePayload.recommendation_request_id,
-              recommendationScore:
-                Number.isFinite(recommendationScore) ? recommendationScore : 0,
-              recommendationRank: item.rank ?? item.recommendation_rank ?? idx + 1,
-            };
-          } catch (err) {
-            console.warn('Failed to map recommendation item', err);
-            return null;
+            course = JSON.parse(course);
+          } catch {
+            course = null;
           }
-        })
-        .filter(Boolean) as Course[];
+        }
+        if (!course || typeof course !== 'object') {
+          return null;
+        }
+        return {
+          ...(convertAWSCourseToAppCourse(course) || course),
+          primary_reason_tag: r.primary_reason_tag ?? null,
+          recommendationPrimaryTag: r.primary_reason_tag ?? null,
+          // ml_score is 0-1 probability — scale to 0-10 to match rule-based score display
+          // fall back to r.score (rule-based 0-10) if ml_score not present
+          recommendationScore: Number.isFinite(Number(r.ml_score))
+            ? Number((r.ml_score * 10).toFixed(1))
+            : Number.isFinite(Number(r.score))
+              ? Number(Number(r.score).toFixed(1))
+              : null,
+          recommendationRank: Number.isFinite(Number(r.rank)) ? Number(r.rank) : null,
+          recommendationRequestId: r.context?.requestId ?? meta?.request_id ?? null,
+          recommendationModelVersion: r.context?.modelVersion ?? meta?.model_version ?? null,
+          score_breakdown: r.score_breakdown ?? null,
+        };
+      }).filter(Boolean) as Course[];
 
-      await CacheManager.set(cacheKey, courses);
-      return courses;
+      const result = { courses, meta, recommendations: sorted };
+      await CacheManager.set(cacheKey, result);
+      return result;
     } catch (error) {
       console.warn('Error fetching recommended courses, falling back to empty list:', error);
       const cacheKey = getRecommendationCacheKey(uid);
-      const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
-      return cachedCourses ?? [];
+      const cached = await CacheManager.get<{
+        courses: Course[];
+        meta: any;
+        recommendations: any[];
+      }>(cacheKey);
+      return cached ?? { courses: [], meta: {}, recommendations: [] };
     }
+  }
+
+  async clearRecommendationCache(userId?: string): Promise<void> {
+    if (!userId) return;
+    await CacheManager.clear(getRecommendationCacheKey(userId));
   }
 
 async getWishlist(userId: string): Promise<Course[]> {
@@ -909,35 +940,63 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
   async recordRecommendationEvent(payload: {
     userId?: string;
     courseId?: string;
-    eventType: 'impression' | 'view' | 'click' | 'start' | 'complete' | 'dismiss' | 'save';
+    eventType: 'impression' | 'view' | 'click' | 'start' | 'complete' | 'dismiss' | 'save' | 'wishlist' | 'enroll';
     context?: Record<string, any>;
     requestId?: string;
   }): Promise<void> {
     const resolvedUserId = payload.userId || DEFAULT_USER_ID;
     if (!resolvedUserId) return;
-    const body = {
+    await this.postRecommendationEvent({
       userId: resolvedUserId,
-      courseId: payload.courseId ?? null,
+      courseId: payload.courseId || '',
       eventType: payload.eventType,
-      context: payload.context || {},
-      requestId: payload.requestId,
+      placement: 'home',
+      context: {
+        ...(payload.context || {}),
+        ...(payload.requestId ? { requestId: payload.requestId } : {}),
+      },
+    });
+  }
+
+  async postRecommendationEvent(payload: {
+    userId: string;
+    courseId: string;
+    eventType: string;
+    placement?: string;
+    context?: Record<string, unknown>;
+  }): Promise<void> {
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !anonKey || !payload.userId || !payload.courseId) {
+      return;
+    }
+
+    const body = {
+      userId: payload.userId,
+      courseId: payload.courseId,
+      eventType: payload.eventType,
+      placement: payload.placement ?? 'home',
+      context: payload.context ?? {},
     };
 
     try {
-      await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
-      if (body.userId && body.userId !== 'anon') {
-        await CacheManager.clear(getRecommendationCacheKey(body.userId));
-      }
-      console.info('rec_event_ok', {
-        eventType: body.eventType,
-        courseId: body.courseId,
-        placement: body.context?.placement,
+      await fetch(`${supabaseUrl}/functions/v1${ENDPOINTS.RECOMMENDATION_EVENT}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${anonKey}`,
+          'apikey': anonKey,
+        },
+        body: JSON.stringify(body),
       });
+      if (payload.userId && payload.userId !== 'anon') {
+        await CacheManager.clear(getRecommendationCacheKey(payload.userId));
+      }
     } catch (err) {
       console.warn('rec_event_fail', {
         eventType: body.eventType,
         courseId: body.courseId,
-        placement: body.context?.placement,
+        placement: body.placement,
         error: (err as any)?.message || err,
       });
       throw err;

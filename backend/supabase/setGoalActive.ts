@@ -60,9 +60,18 @@ serve(async (req) => {
       }
     }
 
+    const updatePatch: Record<string, unknown> = { is_active: isActive };
+    if (isActive) {
+      updatePatch.current_hours = 0;
+      updatePatch.current_courses = 0;
+      updatePatch.current_points = 0;
+      updatePatch.current_lessons = 0;
+      updatePatch.current_quizzes = 0;
+    }
+
     const { data, error } = await supabase
       .from("learning_goals")
-      .update({ is_active: isActive })
+      .update(updatePatch)
       .eq("user_id", userId)
       .eq("id", goalId)
       .select("*")

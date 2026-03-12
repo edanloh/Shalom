@@ -452,7 +452,7 @@ async function awardAchievementsForCreditEvent(
   return unlocked;
 }
 
-async function syncPointGoals(userId: string, balance: number) {
+async function syncPointGoals(userId: string, deltaPoints: number) {
   const now = new Date();
   const { data: goals, error } = await supabase
     .from("learning_goals")
@@ -469,8 +469,9 @@ async function syncPointGoals(userId: string, balance: number) {
 
   for (const goal of goals) {
     const targetPoints = Number(goal.target_points ?? 0);
-    const cappedPoints = targetPoints > 0 ? Math.min(balance, targetPoints) : balance;
     const currentPoints = Number(goal.current_points ?? 0);
+    const nextPoints = Math.max(0, currentPoints + deltaPoints);
+    const cappedPoints = targetPoints > 0 ? Math.min(nextPoints, targetPoints) : nextPoints;
     if (currentPoints !== cappedPoints) {
       const { error: updateErr } = await supabase
         .from("learning_goals")
@@ -529,7 +530,7 @@ serve(async (req) => {
 
       if (existing) {
         const balanceBefore = await computeBalance(event.user_id);
-        await syncPointGoals(event.user_id, balanceBefore);
+        await syncPointGoals(event.user_id, 0);
         const awardedAchievements = await awardAchievementsForCreditEvent(
           event.user_id,
           event,
@@ -549,7 +550,7 @@ serve(async (req) => {
     if (insertErr) throw insertErr;
 
     const balanceBefore = await computeBalance(event.user_id);
-    await syncPointGoals(event.user_id, balanceBefore);
+    await syncPointGoals(event.user_id, pointsNum);
     const awardedAchievements = await awardAchievementsForCreditEvent(
       event.user_id,
       event,

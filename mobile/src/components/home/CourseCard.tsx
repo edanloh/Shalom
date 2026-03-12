@@ -47,10 +47,9 @@ export default function CourseCard({
   const heartScale = useRef(new Animated.Value(1)).current;
   const hasRecommendationScore = Number.isFinite(course.recommendationScore);
   const hasRecommendationRank = Number.isFinite(course.recommendationRank);
-  const rankLabel =
-    hasRecommendationRank || hasRecommendationScore
-      ? `#${course.recommendationRank ?? "?"} • ${Number(course.recommendationScore ?? 0).toFixed(1)}`
-      : null;
+  const rankLabel = hasRecommendationRank
+    ? `#${course.recommendationRank}`
+    : null;
   const reasonText = formatPrimaryRecommendationReason(
     course.recommendationPrimaryTag
   );
