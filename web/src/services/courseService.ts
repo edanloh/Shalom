@@ -616,6 +616,7 @@ class CourseService {
       completedCourses: number;
       totalHours: number;
       enabled?: boolean;
+      avatarUrl?: string;
     }>;
     statistics: {
       total_students: number;
@@ -655,7 +656,8 @@ class CourseService {
           coursesEnrolled: Number(student.coursesEnrolled ?? 0),
           completedCourses: Number(student.completedCourses ?? 0),
           totalHours: Number(student.totalHours ?? 0),
-          enabled: student.enabled
+          enabled: student.enabled,
+          avatarUrl: student.avatarUrl
         })),
         statistics
       };

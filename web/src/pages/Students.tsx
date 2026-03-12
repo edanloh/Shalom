@@ -18,6 +18,7 @@ import { postNotification } from "@/services/notificationService";
 import { disableUser } from "@/services/userService";
 import { supabase } from '@/lib/supabase';
 import { useToast } from "@/hooks/use-toast";
+import { getAvatarUri } from '@/utils/avatar';
 import {
   Select,
   SelectContent,
@@ -132,6 +133,7 @@ const Students = () => {
 				completedCourses: student.completedCourses || 0,
 				totalHours: student.totalHours || 0,
 				enabled: student.enabled !== false, // Get from API, default to true if null/undefined
+        avatarUrl: student.avatarUrl || "" // Get from API, default to empty string if null/undefined
 			}));
 			
 			setStudents(transformedStudents);
@@ -780,7 +782,16 @@ const Students = () => {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar>
-                          <AvatarFallback>{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                          {student.avatarUrl && student.avatarUrl.includes("avatar") ? (
+                            // <AvatarImage src={student.avatarUrl} alt={student.name} />
+                            <img
+                              src={getAvatarUri(student.avatarUrl)}
+                              alt="Profile"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <AvatarFallback>{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                          )}
                         </Avatar>
                         <div>
                           <p className="font-medium text-foreground">{student.name}</p>
@@ -832,9 +843,17 @@ const Students = () => {
                               {/* Header */}
                               <div className="flex items-center gap-4 pb-6 border-b border-border">
                                 <Avatar className="h-20 w-20">
-                                  <AvatarFallback className="text-2xl bg-primary">
-                                    {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
-                                  </AvatarFallback>
+                                  {activeProfileBase.avatarUrl && activeProfileBase.avatarUrl.includes("avatar") ? (
+                                    <img
+                                      src={getAvatarUri(activeProfileBase.avatarUrl)}
+                                      alt="Profile"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <AvatarFallback className="text-2xl bg-primary">
+                                      {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
+                                    </AvatarFallback>
+                                  )}
                                 </Avatar>
                                 <div className="flex-1">
                                   <h3 className="font-semibold text-2xl text-foreground">{activeProfileBase.name}</h3>

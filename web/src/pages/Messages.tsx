@@ -40,6 +40,7 @@ const Messages = () => {
   const [conversations, setConversations] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [composeMessage, setComposeMessage] = useState('');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const { toast } = useToast();
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -269,6 +270,15 @@ const Messages = () => {
         title: 'Message Sent',
         description: 'Your message has been sent to the selected recipients',
       });
+      // Send notifications to all recipients
+      for (const user of selectedUsers) {
+        await postNotification({
+          userIds: [user.id],
+          title: user.name,
+          message: newMessage,
+          type: "message",
+        });
+      }
       setIsComposeOpen(false);
       setNewMessage('');
       setSelectedUsers([]);
@@ -407,22 +417,14 @@ const Messages = () => {
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="subject">Subject</Label>
-                  <Input
-                    id="subject"
-                    className="my-2"
-                    placeholder="Message subject..."
-                  />
-                </div>
-                <div>
                   <Label htmlFor="message-content">Message</Label>
                   <Textarea
                     id="message-content"
                     className="my-2"
                     placeholder="Type your message..."
                     rows={6}
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    value={composeMessage}
+                    onChange={(e) => setComposeMessage(e.target.value)}
                   />
                 </div>
               </div>
