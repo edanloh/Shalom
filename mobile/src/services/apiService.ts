@@ -17,11 +17,15 @@ const API_CONFIG = {
   BASE_URL: supabaseUrl 
     ? `${supabaseUrl}/functions/v1` 
     : 'https://cmtfxsntlfoxgcznanpe.supabase.co/functions/v1',
-  SUPABASE_ANON_KEY: supabaseAnonKey || 'sb_publishable_bwjUUwC-IlqND-F2-7t9yg_OWb4angZ',
+  SUPABASE_ANON_KEY: supabaseAnonKey || '',
   TIMEOUT: 10000, // 10 seconds
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second
 };
+
+if (!supabaseAnonKey) {
+  console.warn('Missing Supabase anon key env; API calls will fail until configured.');
+}
 
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY;
 

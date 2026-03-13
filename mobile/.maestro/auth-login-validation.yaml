@@ -1,0 +1,17 @@
+appId: com.jasmine02.shalom
+---
+- extendedWaitUntil:
+    visible:
+      text: 'Login to your Account'
+    timeout: 30000
+
+# Submit empty form — should show inline validation warning
+- tapOn: 'Sign In'
+- assertVisible: 'Please fill in all the fields'
+
+# Enter only email, leave password blank — warning should persist
+- tapOn:
+    text: 'Email'
+- inputText: 'test@example.com'
+- tapOn: 'Sign In'
+- assertVisible: 'Please fill in all the fields'

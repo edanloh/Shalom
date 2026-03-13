@@ -1,0 +1,19 @@
+appId: com.jasmine02.shalom
+---
+- extendedWaitUntil:
+    visible:
+      text: 'Login to your Account'
+    timeout: 30000
+
+# Navigate to the Register screen
+- tapOn: 'Sign Up'
+- assertVisible: 'Create Your Account'
+
+# Verify all register form fields are present
+- assertVisible: 'Name'
+- assertVisible: 'Email'
+- assertVisible: 'Password'
+
+# Navigate back to Login
+- tapOn: 'Login'
+- assertVisible: 'Login to your Account'

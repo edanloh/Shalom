@@ -1,0 +1,131 @@
+name: React Native Production CI/CD
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'mobile/**'
+
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'mobile/**'
+
+  workflow_dispatch:
+    inputs:
+      buildType:
+        type: choice
+        description: 'Build type to run'
+        options:
+          - dev
+          - all
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  NODE_OPTIONS: --openssl-legacy-provider
+
+jobs:
+  check-skip:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - name: Skip CI check
+        run: echo "Proceeding with workflow"
+
+  build-and-deploy:
+    needs: check-skip
+    if: >
+      (github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+      (github.event_name == 'pull_request' &&
+      (github.base_ref == 'main' || github.base_ref == 'master')) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🏗 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: 📦 Install dependencies
+        run: |
+          npm ci
+          npm install -g eas-cli@latest
+        working-directory: mobile
+
+        # 🚀 HUGE SPEEDUP: cache Gradle
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('mobile/android/**/*.gradle*', 'mobile/android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # ⚡ Speed up JS bundling
+      - name: Cache Expo & Metro
+        uses: actions/cache@v3
+        with:
+          path: |
+            mobile/.expo
+            mobile/node_modules/.cache
+          key: expo-${{ hashFiles('mobile/package-lock.json') }}
+
+      - name: 📱 Setup EAS build cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.eas-build-local
+          key: ${{ runner.os }}-eas-build-${{ hashFiles('mobile/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-eas-build-
+
+      - name: 🔄 Verify EAS CLI
+        run: eas --version
+        working-directory: mobile
+
+      - name: 📱 Build Production Android APK
+        working-directory: mobile
+        run: |
+          # Fix the permission issue for the pre-install script
+          chmod +x eas-pre-install.sh
+
+          if [ -z "${EXPO_PUBLIC_SUPABASE_URL:-}" ] || [ -z "${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+            if [ -f ".env" ]; then
+              set -a
+              . ./.env
+              set +a
+            fi
+          fi
+
+          if [ -z "${EXPO_PUBLIC_SUPABASE_URL:-}" ] || [ -z "${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+            echo "Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY for production build"
+            exit 1
+          fi
+
+          export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
+
+          eas build \
+            --platform android \
+            --profile production \
+            --local \
+            --non-interactive \
+            --output=../app-prod.apk
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          NODE_ENV: production
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: 📦 Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-prod-apk
+          path: app-prod.apk
+          retention-days: 7
