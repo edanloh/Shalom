@@ -505,15 +505,18 @@ const Assessments = () => {
 
   const sortedQuestionGrading = useMemo(() => {
     let filtered = [...questionGrading];
-    
-    // Apply course/module filter if selected (but don't sort questions - maintain original order)
+
+    // REMOVE questions with 0 pending
+    filtered = filtered.filter(q => q.totalPendingCount > 0);
+
+    // Apply course/module filter
     if (selectedCourse) {
       filtered = filtered.filter(q => q.courseId === selectedCourse);
       if (selectedModule) {
         filtered = filtered.filter(q => q.moduleId === selectedModule);
       }
     }
-    
+
     return filtered;
   }, [questionGrading, selectedCourse, selectedModule]);
 
