@@ -94,7 +94,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: react-native-cicd.yml
           workflow_conclusion: success
-          name: android-dev-apk
+          name: android-prod-apk
           path: .
           if_no_artifact_found: warn
 
@@ -105,15 +105,15 @@ jobs:
           if [ -f "app-from-url.apk" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
             echo "path=app-from-url.apk" >> "$GITHUB_OUTPUT"
-          elif [ -f "app-dev.apk" ]; then
+          elif [ -f "app-prod.apk" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "path=app-dev.apk" >> "$GITHUB_OUTPUT"
-          elif [ -f "android-dev-apk/app-dev.apk" ]; then
+            echo "path=app-prod.apk" >> "$GITHUB_OUTPUT"
+          elif [ -f "android-prod-apk/app-prod.apk" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "path=android-dev-apk/app-dev.apk" >> "$GITHUB_OUTPUT"
+            echo "path=android-prod-apk/app-prod.apk" >> "$GITHUB_OUTPUT"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "path=app-dev.apk" >> "$GITHUB_OUTPUT"
+            echo "path=app-prod.apk" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install dependencies
@@ -136,20 +136,20 @@ jobs:
           chmod +x eas-pre-install.sh
           ./eas-pre-install.sh
 
-      - name: Build Development Android APK (EAS local)
+      - name: Build Production Android APK (EAS local)
         if: steps.apk.outputs.found != 'true'
         working-directory: mobile
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          NODE_ENV: development
+          NODE_ENV: production
         run: |
           export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
           eas build \
             --platform android \
-            --profile development \
+            --profile production \
             --local \
             --non-interactive \
-            --output=../app-dev.apk
+            --output=../app-prod.apk
 
       - name: Run Maestro smoke test on emulator
         uses: reactivecircus/android-emulator-runner@v2
