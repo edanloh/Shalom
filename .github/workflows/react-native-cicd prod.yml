@@ -37,6 +37,8 @@ jobs:
     if: >
       (github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+      (github.event_name == 'pull_request' &&
+      (github.base_ref == 'main' || github.base_ref == 'master')) ||
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -93,9 +95,9 @@ jobs:
         run: |
           # Fix the permission issue for the pre-install script
           chmod +x eas-pre-install.sh
-          
+
           export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
-          
+
           eas build \
             --platform android \
             --profile production \
