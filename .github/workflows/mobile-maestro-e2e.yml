@@ -159,17 +159,16 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           emulator-boot-timeout: 900
-          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -camera-back none -gpu swiftshader_indirect -no-metrics
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -camera-back none -gpu swiftshader_indirect -no-metrics -memory 2048
           disable-animations: true
           script: |
-            adb kill-server
-            adb start-server
-            adb reconnect offline || true
             adb wait-for-device
             adb devices
             adb install -r "${{ steps.apk.outputs.path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
             "$HOME/.maestro/bin/maestro" --version
+            # Brief pause to let the app settle before Maestro runs
+            sleep 5
             "$HOME/.maestro/bin/maestro" test mobile/.maestro/smoke.yaml
 
       - name: Upload Maestro debug artifacts
