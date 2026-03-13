@@ -4,6 +4,15 @@ set -euo pipefail
 APP_ID="com.jasmine02.shalom"
 LOGCAT_FILE="/tmp/maestro-logcat.txt"
 
+append_crash_report() {
+  {
+    echo "===== Crash Buffer (latest) ====="
+    adb logcat -d -b crash || true
+    echo "===== App/Fatal Filter ====="
+    adb logcat -d | grep -E "${APP_ID}|FATAL EXCEPTION|Fatal signal|Abort message|JsErrorHandler|BridgelessReact|supabaseUrl is required" || true
+  } >> "$LOGCAT_FILE"
+}
+
 dismiss_system_dialogs() {
   local ui
   ui="$(adb exec-out uiautomator dump /dev/tty 2>/dev/null || true)"
@@ -50,6 +59,7 @@ for flow in $(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" | sort); d
   echo "===== Running flow: ${flow} ====="
   if ! wait_for_login_screen; then
     echo "Preflight failed before ${flow}"
+    append_crash_report
     adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
     overall_exit=1
     continue
@@ -57,6 +67,7 @@ for flow in $(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" | sort); d
 
   if ! "$HOME/.maestro/bin/maestro" test "$flow"; then
     echo "Flow failed: ${flow}"
+    append_crash_report
     adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
     overall_exit=1
   fi
