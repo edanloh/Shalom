@@ -22,21 +22,20 @@ Multiple Correct - At least one answer must be selected
 */
 
 import {
-  createContext,
-  useContext,
   useState,
   useEffect,
   ReactNode,
 } from "react";
 import courseService from "../../services/courseService";
 import categoryService from "@/services/categoryService";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from '../../contexts/useAuth';
 import { StorageService } from "../../services/storageService";
 import { useCategories } from "../../hooks/useCategories";
 import { Colors } from "@/constants";
-import { useUser } from '@/contexts/UserContext';
+import { useUser } from '@/contexts/useUser';
 import { postNotification } from "@/services/notificationService";
 import { Student } from "@/services";
+import { CourseBuilderContext } from "./CourseBuilderContextStore";
 
 // Types
 export interface Question {
@@ -124,7 +123,7 @@ export interface ModalState {
 }
 
 // Context Interface
-interface CourseBuilderContextType {
+export interface CourseBuilderContextType {
   // Course state
   courseName: string;
   setCourseName: (name: string) => void;
@@ -207,11 +206,6 @@ interface CourseBuilderContextType {
   isSaving: boolean;
 }
 
-// Create Context
-const CourseBuilderContext = createContext<
-  CourseBuilderContextType | undefined
->(undefined);
-
 // Provider Component
 interface CourseBuilderProviderProps {
   children: ReactNode;
@@ -276,7 +270,10 @@ export const CourseBuilderProvider = ({
       setIsLoadingCourse(true);
 
       try {
-        const adminId = user?.uuid || "550e8400-e29b-41d4-a716-446655440101";
+        if (!user?.uuid) {
+          throw new Error("User not authenticated");
+        }
+        const adminId = user.uuid;
 
         // Fetch all course data using the service
         const courseBuilderData = await courseService.getCourseBuilderData(
@@ -325,7 +322,7 @@ export const CourseBuilderProvider = ({
     };
 
     fetchCourseData();
-  }, [courseId]);
+  }, [courseId, user?.uuid]);
 
   useEffect(() => {
     if (categories.length > 0 && localCategories.length === 0) {
@@ -1387,14 +1384,4 @@ export const CourseBuilderProvider = ({
       {children}
     </CourseBuilderContext.Provider>
   );
-};
-
-export const useCourseBuilder = () => {
-  const context = useContext(CourseBuilderContext);
-  if (!context) {
-    throw new Error(
-      "useCourseBuilder must be used within CourseBuilderProvider",
-    );
-  }
-  return context;
 };

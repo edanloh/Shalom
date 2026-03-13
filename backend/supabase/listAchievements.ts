@@ -39,6 +39,7 @@ serve(async (req) => {
     const type = url.searchParams.get("type");
     const isActiveRaw = url.searchParams.get("isActive");
     const includeEarned = url.searchParams.get("includeEarned") !== "false";
+    const createdBy = url.searchParams.get("createdBy");
 
     const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 200);
     const offset = Math.max(Number(offsetRaw) || 0, 0);
@@ -46,7 +47,7 @@ serve(async (req) => {
 
     let query = supabase
       .from("achievements")
-      .select("id, name, description, icon, type, criteria, points, color, is_active, created_at", {
+      .select("id, name, description, icon, type, criteria, points, color, is_active, created_at, scope_type, scope_id", {
         count: "exact",
       })
       .order("created_at", { ascending: false })
@@ -58,6 +59,10 @@ serve(async (req) => {
 
     if (isActiveRaw === "true" || isActiveRaw === "false") {
       query = query.eq("is_active", isActiveRaw === "true");
+    }
+
+    if (createdBy) {
+      query = query.eq("created_by", createdBy);
     }
 
     const { data, error, count } = await query;
@@ -86,7 +91,7 @@ serve(async (req) => {
         });
       }
 
-      earnedBy = (ua ?? []).reduce<Record<string, number>>((acc, row) => {
+      earnedBy = (ua ?? []).reduce((acc: Record<string, number>, row: any) => {
         const key = row.achievement_id as string;
         acc[key] = (acc[key] || 0) + 1;
         return acc;

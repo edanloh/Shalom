@@ -42,8 +42,8 @@ serve(async (req) => {
 
     if (error) {
       if (error.code === "PGRST116") {
-        // Row not found
-        return fail("User preferences not found", 404);
+        // First-run state: no preferences saved yet
+        return ok({});
       }
       throw error;
     }

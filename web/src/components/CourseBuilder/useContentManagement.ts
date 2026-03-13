@@ -1,4 +1,5 @@
-import { useCourseBuilder, Module, Lesson, Quiz, Question } from './CourseBuilderContext';
+import { type Module, type Lesson, type Quiz, type Question } from './CourseBuilderContext';
+import { useCourseBuilder } from './useCourseBuilder';
 import { useDragAndDrop } from './useDragAndDrop';
 
 export const useContentManagement = () => {

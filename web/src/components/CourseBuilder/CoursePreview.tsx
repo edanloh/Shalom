@@ -14,7 +14,7 @@ import {
   Eye,
   UserPlus,
 } from "lucide-react";
-import { useCourseBuilder } from "./CourseBuilderContext";
+import { useCourseBuilder } from "./useCourseBuilder";
 import { Badge } from "../ui/badge";
 import { DEFAULT_COURSE_THUMBNAIL } from "@/constants/images";
 import { Progress } from "../ui/progress";
@@ -309,7 +309,7 @@ export const CoursePreview = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-accent" />
+                  <Clock className="h-5 w-5 text-primary" />
                   <div>
                     <div className="text-2xl font-bold">
                       -{/* {Math.floor(totalDuration / 3600)}h */}
@@ -376,7 +376,7 @@ export const CoursePreview = () => {
                           >
                             <div className="flex items-center gap-3">
                               {item.type === "lesson" || item.type === "video" ? (
-                                <Video className="h-4 w-4 text-accent" />
+                                <Video className="h-4 w-4 text-primary" />
                               ) : item.type === "document" || item.type === "pdf" || item.type === "ppt" ? (
                                 <FileText className="h-4 w-4 text-primary" />
                               ) : (

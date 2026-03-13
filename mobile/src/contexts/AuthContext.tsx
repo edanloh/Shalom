@@ -1,335 +1,248 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as WebBrowser from 'expo-web-browser';
-import { API_BASE_URL } from 'react-native-dotenv';
+import { useState, useEffect, useCallback, ReactNode } from 'react';
+import { AuthContext } from './AuthContextStore';
+
 import { supabase } from '@/lib/supabase';
-import { Session } from '@supabase/supabase-js';
-import { User, AuthContextType } from '@/types';
-import * as Linking from 'expo-linking';
-import { makeRedirectUri } from 'expo-auth-session';
+import {
+  registerCheck,
+  fetchUserProfile,
+  approveInstructor as ApproveInstructor,
+} from '@/services/userService';
 
-WebBrowser.maybeCompleteAuthSession();
-
-export interface AuthTokens {
-  access_token: string;
-  id_token?: string;
-  refresh_token?: string;
+interface SupabaseUser {
+  id: string;
+  email: string;
+  [key: string]: any;
+  name: string;
+  auth_provider: string;
 }
 
-export type Tokens = {
-  access_token: string;
-  refresh_token: string;
-};
+export interface AuthContextType {
+  authUser: SupabaseUser | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  changePassword: (
+    email: string,
+    oldPassword: string,
+    newPassword: string,
+  ) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    name: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  approveInstructor: (uuid: string) => Promise<any>;
+}
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [authUser, setAuthUser] = useState<SupabaseUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const bypassAuth = false;
-  const bypassUserId =
-    process.env.EXPO_PUBLIC_BYPASS_USER_ID || '550e8400-e29b-41d4-a716-446655440101';
-  const bypassEmail =
-    process.env.EXPO_PUBLIC_BYPASS_USER_EMAIL || 'shalomfyp@gmail.com';
-
-  // Set the below to skip auth during development
-  // const [user, setUser] = useState<User | null>({
-  //   id: "550e8400-e29b-41d4-a716-446655440101",
-  //   email: "shalomfyp@gmail.com",
-  //   username: "shalomfyp",
-  //   name: "Shalom FYP",
-  //   role: "learner",
-  //   avatar:
-  //     "https://ui-avatars.com/api/?name=Shalom+FYP&size=50&background=6366F1&color=fff",
-  //   bio: "Learning enthusiast exploring various courses",
-  //   location: "Singapore",
-  //   phone: "+65 9123 4567",
-  //   authProvider: "google",
-  // });
-  // const [isAuthenticated, setIsAuthenticated] = useState(true);
-
-  const loginWithToken = async ({ access_token, refresh_token, type }: Tokens & { type?: string }) => {
-    console.log('[DeepLink] loginWithToken called', {
-      access_token,
-      refresh_token,
-    });
-    setIsLoading(true);
-    const signIn = async () => {
-      await supabase.auth.setSession({
-        access_token,
-        refresh_token,
-      });
-      return await supabase.auth.refreshSession();
+  const toAuthUser = useCallback((user: any): SupabaseUser => {
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.user_metadata?.full_name || '',
+      auth_provider: user.app_metadata?.provider,
+      ...user,
     };
+  }, []);
 
-    const {
-      data: { user: supabaseUser, session: supabaseSession },
-    } = await signIn();
+  const hasAllowedRole = useCallback((role?: string) => {
+    return role === 'instructor' || role === 'admin';
+  }, []);
 
-    console.log('[DeepLink] Supabase user after setSession:', supabaseUser);
-    if (type === 'recovery') {
-      setIsResettingPassword(true);
-      setUser({
-        id: supabaseUser?.id || '',
-        email: supabaseUser?.email || '',
-        name: supabaseUser?.user_metadata?.first_name || '',
-        joined_at: supabaseUser?.created_at || '',
-        last_login: supabaseUser?.last_sign_in_at || '',
-        auth_provider: supabaseUser?.app_metadata?.provider || 'email',
-      });
-    } else {
-      // Google login
-      setUser({
-        id: supabaseUser?.id || '',
-        email: supabaseUser?.email || '',
-        name: supabaseUser?.user_metadata?.name || '',
-        joined_at: supabaseUser?.created_at || '',
-        last_login: supabaseUser?.last_sign_in_at || '',
-        auth_provider: supabaseUser?.app_metadata?.provider || 'email',
-      });
-    }
-    setSession(supabaseSession || null);
-  };
+  const validateAndSetAuthorizedUser = useCallback(
+    async (user: any) => {
+      const auth_user = toAuthUser(user);
+      const check = await registerCheck(auth_user);
 
-  // // Set the below to skip auth during development
-  // useEffect(() => {
-  //   // For development backdoor
-  //   if (session === null || user === null) {
-  //     backdoor();
-  //   }
-  // }, [session, user]);
+      if (!check?.success) {
+        setAuthUser(null);
+        return {
+          success: false,
+          error: check?.error || 'Login failed. Please try again.',
+        };
+      }
+
+      if (!hasAllowedRole(check?.user?.role)) {
+        setAuthUser(null);
+        await supabase.auth.signOut();
+        return {
+          success: false,
+          error: 'Unauthorized role. Access denied.',
+        };
+      }
+
+      setAuthUser(auth_user);
+      await fetchUserProfile(check.user.email);
+      return { success: true };
+    },
+    [hasAllowedRole, toAuthUser],
+  );
+
   useEffect(() => {
-    if (!bypassAuth) return;
-    setUser({
-      id: bypassUserId,
-      email: bypassEmail,
-      username: 'shalomfyp',
-      name: 'Shalom FYP',
-      role: 'learner',
-      avatar:
-        'https://ui-avatars.com/api/?name=Shalom+FYP&size=50&background=6366F1&color=fff',
-      bio: 'Learning enthusiast exploring various courses',
-      location: 'Singapore',
-      phone: '+65 9123 4567',
-      authProvider: 'dev',
-    });
-    setSession({} as Session);
-  }, [bypassAuth, bypassEmail, bypassUserId]);
+    const getSession = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          setAuthUser(null);
+        } else if (data?.user) {
+          await validateAndSetAuthorizedUser(data.user);
+        } else {
+          setAuthUser(null);
+        }
+      } catch (err) {
+        setAuthUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    getSession();
+    // Listen for auth state changes
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        const syncAuthState = async () => {
+          setIsLoading(true);
+          try {
+            if (session?.user) {
+              await validateAndSetAuthorizedUser(session.user);
+            } else {
+              setAuthUser(null);
+            }
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        void syncAuthState();
+      },
+    );
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
+  }, [validateAndSetAuthorizedUser]);
 
   const login = async (email: string, password: string) => {
-    if (bypassAuth) {
-      return { success: true, error: undefined };
-    }
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
-    if (!error) {
-      setSession(data.session);
-      setUser({
-        id: data.user.id,
-        email: data.user.email || '',
-        name: data.user.user_metadata?.first_name,
-        joined_at: data.user.created_at || '',
-        last_login: data.user.last_sign_in_at || '',
-        auth_provider: data.user.app_metadata?.provider || 'email',
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      setIsResettingPassword(false);
+      if (error) throw error;
+      if (data?.user) {
+        return await validateAndSetAuthorizedUser(data.user);
+      }
+      setAuthUser(null);
+      return {
+        success: false,
+        error: 'Login failed. Please try again.',
+      };
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-    return {
-      success: !error,
-      error: error?.message,
-    };
+  };
+
+  const approveInstructor = async (id: string) => {
+    const sessionResponse = await supabase.auth.getSession();
+    const accessToken = sessionResponse.data.session?.access_token;
+    const response = await ApproveInstructor(id, accessToken);
+    return response;
+  };
+
+  const logout = async () => {
+    setIsLoading(true);
+    await supabase.auth.signOut();
+    setAuthUser(null);
+    setIsLoading(false);
+    window.location.href = '/login';
+  };
+
+  const changePassword = async (
+    email: string,
+    oldPassword: string,
+    newPassword: string,
+  ) => {
+    setIsLoading(true);
+    try {
+      // Step 1: Re-authenticate user with current password to verify it's correct
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: oldPassword,
+      });
+      if (signInError) {
+        throw new Error('Invalid current password');
+      }
+
+      // Step 2: Update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) throw updateError;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const register = async (email: string, password: string, name: string) => {
-    if (bypassAuth) {
-      return { success: true, error: undefined };
-    }
+    setIsLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email: email,
       password: password,
       options: {
         data: {
           first_name: name,
+          name: name,
+          role: 'instructor',
         },
       },
     });
-    return {
-      success: data.session != null && data.user != null,
-      error:
-        error?.message ||
-        (data.session == null || data.user == null
-          ? 'Registration failed'
-          : undefined),
-    };
-  };
-
-  const logout = async () => {
-    if (bypassAuth) {
-      return;
-    }
-    supabase.auth.signOut();
-    setUser(null);
-  };
-
-  const requestResetPassword = async (email: string) => {
-    const resetPasswordURL = Linking.createURL('/ResetPassword');
-
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: resetPasswordURL,
-    });
-
-    return { data, error };
-  };
-
-  const resetPassword = async (newPassword: string) => {
-    try {
-      const { data, error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (data) alert('Password updated successfully!');
-      if (error) alert('There was an error updating your password.');
-      if (!error) setIsResettingPassword(false);
-      return {
-        success: !error,
-        error: error?.message,
+    if (error) throw error;
+    if (data?.user) {
+      const auth_user = {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.user_metadata.name || '',
+        auth_provider: data.user.app_metadata.provider,
+        ...data.user,
       };
-    } finally {
-      setIsLoading(false);
+      setAuthUser(null);
+      await supabase.auth.signOut();
+      const response = await registerCheck(auth_user);
+      return response;
     }
+    setIsLoading(false);
   };
 
-  // Supabase Google OAuth for Expo Android
-  const loginWithGoogle = async () => {
-    try {
-      // Use a custom redirect URI for Expo (must be whitelisted in Supabase dashboard)
-      const redirectTo = makeRedirectUri();
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) throw error;
-
-      // Open the returned URL in a browser for the user to complete Google login
-      if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectTo
-        );
-        if (result.type === 'success' && result.url) {
-          // Parse the URL fragment for access_token, refresh_token, etc.
-          const url = result.url;
-          const params = Linking.parse(url);
-          // After redirect, Supabase should handle session automatically if storage is set up
-          // Fetch the session from Supabase
-          const { data: sessionData } = await supabase.auth.getSession();
-          setSession(sessionData.session);
-          const supabaseUser = sessionData.session?.user;
-          setUser(
-            supabaseUser
-              ? {
-                  id: supabaseUser.id,
-                  email: supabaseUser.email || '',
-                  name: supabaseUser.user_metadata?.name || '',
-                  joined_at: supabaseUser.created_at || '',
-                  last_login: supabaseUser.last_sign_in_at || '',
-                  auth_provider:
-                    supabaseUser.app_metadata?.provider || 'google',
-                }
-              : null
-          );
-        } else {
-          throw new Error('Google sign-in cancelled or failed');
-        }
-      } else {
-        throw new Error('No URL returned from Supabase OAuth');
-      }
-    } catch (err) {
-      alert('Google sign-in failed: ' + err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchEmail = async (email: string) => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/dev/getUserInfo?email=${email}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-      if (!response.ok) {
-        throw new Error('Failed to fetch user info from API Gateway');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching email:', error);
-      throw error;
-    }
-  };
-
-  const changePassword = async (
-    currentPassword: string,
-    newPassword: string
-  ) => {
-    if (!user?.email) {
-      return { success: false, error: 'User email not found' };
-    }
-    // Step 1: Re-authenticate user with current password
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: currentPassword,
-    });
-    if (signInError) {
-      return { success: false, error: 'Current password is incorrect' };
-    }
-    // Step 2: Update password
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-    if (updateError) {
-      return { success: false, error: updateError.message };
-    }
-    return { success: true };
+  const getSession = async () => {
+    setIsLoading(true);
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data?.session?.access_token;
+    setIsLoading(false);
+    return { data };
   };
 
   return (
     <AuthContext.Provider
       value={{
-        user,
+        authUser,
+        isAuthenticated: authUser != null,
         isLoading,
-        session,
         login,
-        register,
         logout,
-        requestResetPassword,
-        resetPassword,
-        loginWithGoogle,
         changePassword,
-        fetchEmail,
-        loginWithToken,
-        isResettingPassword,
-        setIsResettingPassword,
+        register,
+        approveInstructor,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

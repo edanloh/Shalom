@@ -11,6 +11,7 @@ import { DEFAULT_COURSE_THUMBNAIL } from '@/constants/images';
 const ENDPOINTS = {
   COURSES: '/getAllCourse',
   COURSE_BY_ID_INSTRUCTOR: (adminId: string, courseId: string) => `/getModuleDetailInstructor/${adminId}/${courseId}`,
+  INSTRUCTOR_REVIEWS: (instructorId: string) => `/getInstructorReviews/${instructorId}`,
   COURSE_STUDENTS: (courseId: string) => `/getCourseStudents/${courseId}`,
   AVAILABLE_STUDENTS: (courseId: string) => `/getAvailableStudents/${courseId}`,
   ALL_STUDENTS: '/getAllStudents',
@@ -24,6 +25,7 @@ const ENDPOINTS = {
   COURSE_DUPLICATE: (courseId: string) => `/courseDuplicateHandler/${encodeURIComponent(courseId)}`,
   RECOMMENDATIONS: '/recommendations',
   RECOMMENDATION_EVENT: '/recommendations/events',
+  INSTRUCTOR_REVIEW_ACTION: '/postInstructorReviewAction',
 };
 
 export interface CourseListParams {
@@ -31,6 +33,7 @@ export interface CourseListParams {
   category?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  instructorId?: string;
 }
 
 export interface Course {
@@ -55,7 +58,9 @@ export interface Course {
   lastUpdated: string;
   tags?: string[];
   outcomes?: string[];
-  recommendationReason?: string;
+  recommendationPrimaryTag?: string;
+  recommendationModelVersion?: string;
+  recommendationRequestId?: string;
   recommendationScore?: number;
 }
 
@@ -100,11 +105,24 @@ export interface Lesson {
 }
 
 export interface Review {
-  id: number;
+  id: string | number;
   studentName: string;
   rating: number;
   date: string;
   comment: string;
+  reviewStatus?: "visible" | "hidden" | "flagged" | "resolved";
+  contextSectionId?: string | null;
+  contextSectionTitle?: string | null;
+  flagReason?: string | null;
+  moderationNote?: string | null;
+  moderatedBy?: string | null;
+  moderatedAt?: string | null;
+  instructorReply?: string | null;
+  instructorRepliedAt?: string | null;
+  acknowledgedAt?: string | null;
+  isPinned?: boolean;
+  pinnedAt?: string | null;
+  pinnedBy?: string | null;
 }
 
 export interface Student {
@@ -154,7 +172,6 @@ export interface EnrollmentCourse {
 export interface CourseDetailResponse {
   course: Course;
   modules: any[];
-  reviews: Review[];
   enrolledStudents: Student[];
   availableStudents: Array<{
     id: string;
@@ -163,6 +180,21 @@ export interface CourseDetailResponse {
     totalEnrollments?: number;
     averageProgress?: number;
   }>;
+}
+
+export interface InstructorReviewsResponse {
+  reviews: Review[];
+  summary: {
+    total_reviews: number;
+    average_rating: number;
+    courses_covered: number;
+  };
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+    has_more: boolean;
+  };
 }
 
 // CourseBuilder-specific interfaces
@@ -363,7 +395,9 @@ const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course =
     createdDate: awsCourse.created_at ? new Date(awsCourse.created_at).toLocaleDateString() : 'N/A',
     lastUpdated: awsCourse.updated_at ? new Date(awsCourse.updated_at).toLocaleDateString() : 'N/A',
     tags: Array.isArray(awsCourse.tags) ? awsCourse.tags : [],
-    recommendationReason: awsCourse.recommendation_reason,
+    recommendationPrimaryTag: awsCourse.recommendation_primary_tag,
+    recommendationModelVersion: awsCourse.recommendation_model_version,
+    recommendationRequestId: awsCourse.recommendation_request_id,
     recommendationScore: awsCourse.recommendation_score,
   };
 
@@ -383,6 +417,7 @@ class CourseService {
       if (params?.category) queryParams.append('filterValue', params.category);
       if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+      if (params?.instructorId) queryParams.append('instructorId', params.instructorId);
       
       const response = await apiService.get<any>(ENDPOINTS.COURSES + `?${queryParams.toString()}`);    
 
@@ -405,16 +440,20 @@ class CourseService {
       return convertedCourses;
     } catch (error) {
       console.error('Error fetching courses:', error);
+      // Instructor-scoped empty state should not hard-fail page rendering.
+      if (params?.instructorId) {
+        return [];
+      }
       throw error;
     }
   }
 
 
   /**
-   * Get complete course details with modules, reviews, and students (for CourseDetail page)
+   * Get complete course details with modules and students (for CourseDetail page)
    * @param courseId - The course ID
    * @param adminId - The admin/instructor ID
-   * @returns Complete course data including modules, reviews, and students
+   * @returns Complete course data including modules and students
    */
   async getCourseDetailData(courseId: string, adminId: string): Promise<CourseDetailResponse> {
     try {
@@ -469,25 +508,6 @@ class CourseService {
       // Extract modules/sections
       const modules = fullData.data.sections || [];
 
-      // Extract and format reviews
-      const reviews: Review[] = courseData.reviews
-        ? courseData.reviews.map((review: any, index: number) => ({
-            id: review.id || index,
-            studentName:
-              review.reviewerName ||
-              review.reviewer_name ||
-              review.student_name ||
-              "Anonymous",
-            rating: parseFloat(review.rating || "5"),
-            date: review.createdAt
-              ? new Date(review.createdAt).toLocaleDateString()
-              : review.created_at
-                ? new Date(review.created_at).toLocaleDateString()
-                : "N/A",
-            comment: review.review || review.comment || "",
-          }))
-        : [];
-
       // Fetch enrolled students
       let enrolledStudents: Student[] = [];
       try {
@@ -525,7 +545,6 @@ class CourseService {
       return {
         course,
         modules,
-        reviews,
         enrolledStudents,
         availableStudents,
       };
@@ -584,7 +603,7 @@ class CourseService {
   /**
    * Get all students in the system with enrollment statistics
    */
-  async getAllStudents(): Promise<{
+  async getAllStudents(instructorId?: string): Promise<{
     students: Array<{
       id: string;
       name: string;
@@ -597,6 +616,7 @@ class CourseService {
       completedCourses: number;
       totalHours: number;
       enabled?: boolean;
+      avatarUrl?: string;
     }>;
     statistics: {
       total_students: number;
@@ -608,7 +628,10 @@ class CourseService {
     };
   }> {
     try {
-      const response = await apiService.get<any>(ENDPOINTS.ALL_STUDENTS);
+      const response = await apiService.get<any>(
+        ENDPOINTS.ALL_STUDENTS,
+        instructorId ? { instructorId } : undefined
+      );
 
       const payload = response?.data ?? response;
       const students = Array.isArray(payload?.students) ? payload.students : [];
@@ -633,7 +656,8 @@ class CourseService {
           coursesEnrolled: Number(student.coursesEnrolled ?? 0),
           completedCourses: Number(student.completedCourses ?? 0),
           totalHours: Number(student.totalHours ?? 0),
-          enabled: student.enabled
+          enabled: student.enabled,
+          avatarUrl: student.avatarUrl
         })),
         statistics
       };
@@ -644,26 +668,103 @@ class CourseService {
   }
 
   /**
-   * Get reviews for a course
+   * Get instructor-scoped reviews (optionally filtered to a single course)
    */
-  async getCourseReviews(courseId: string): Promise<Review[]> {
-    try {
-      const response = await apiService.get<any>(ENDPOINTS.COURSE_REVIEWS(courseId));
-      
-      if (!response || !response.data || !response.data.reviews) {
-        return [];
-      }
+  async getInstructorReviews(input: {
+    instructorId: string;
+    courseId?: string;
+    sort?: "latest" | "lowest_rating" | "highest_rating";
+    status?: "all" | "visible" | "hidden" | "flagged" | "resolved";
+    q?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<InstructorReviewsResponse> {
+    const params: Record<string, string> = {
+      sort: input.sort || "latest",
+      limit: String(input.limit ?? 100),
+      offset: String(input.offset ?? 0),
+    };
 
-      return response.data.reviews.map((review: any, index: number) => ({
+    if (input.courseId) {
+      params.courseId = input.courseId;
+    }
+    if (input.status && input.status !== "all") {
+      params.status = input.status;
+    }
+    if (input.q && input.q.trim().length > 0) {
+      params.q = input.q.trim();
+    }
+
+    try {
+      const response = await apiService.get<any>(
+        ENDPOINTS.INSTRUCTOR_REVIEWS(input.instructorId),
+        params
+      );
+
+      const payload = response?.data ?? response ?? {};
+      const reviews = (payload?.reviews ?? []).map((review: any, index: number) => ({
         id: review.id || index,
-        studentName: review.student_name || review.username,
-        rating: parseFloat(review.rating || '5'),
-        date: review.created_at ? new Date(review.created_at).toLocaleDateString() : 'N/A',
-        comment: review.comment || review.review_text || '',
+        studentName:
+          review.reviewer_name ||
+          review.reviewerName ||
+          review.student_name ||
+          "Anonymous",
+        rating: parseFloat(String(review.rating || "0")),
+        date: review.created_at
+          ? new Date(review.created_at).toLocaleDateString()
+          : review.createdAt
+            ? new Date(review.createdAt).toLocaleDateString()
+            : "N/A",
+        comment: review.review || review.comment || "",
+        reviewStatus: review.review_status || review.reviewStatus || "visible",
+        contextSectionId: review.context_section_id || review.contextSectionId || null,
+        contextSectionTitle:
+          review.context_section_title || review.contextSectionTitle || null,
+        flagReason: review.flag_reason || review.flagReason || null,
+        moderationNote: review.moderation_note || review.moderationNote || null,
+        moderatedBy: review.moderated_by || review.moderatedBy || null,
+        moderatedAt: review.moderated_at || review.moderatedAt || null,
+        instructorReply: review.instructor_reply || review.instructorReply || null,
+        instructorRepliedAt:
+          review.instructor_replied_at || review.instructorRepliedAt || null,
+        acknowledgedAt: review.acknowledged_at || review.acknowledgedAt || null,
+        isPinned: Boolean(review.is_pinned ?? review.isPinned),
+        pinnedAt: review.pinned_at || review.pinnedAt || null,
+        pinnedBy: review.pinned_by || review.pinnedBy || null,
       }));
+      return {
+        reviews,
+        summary: {
+          total_reviews: Number(payload?.summary?.total_reviews || 0),
+          average_rating: Number(payload?.summary?.average_rating || 0),
+          courses_covered: Number(payload?.summary?.courses_covered || 0),
+        },
+        pagination: {
+          limit: Number(payload?.pagination?.limit || input.limit || 100),
+          offset: Number(payload?.pagination?.offset || input.offset || 0),
+          total: Number(payload?.pagination?.total || 0),
+          has_more: Boolean(payload?.pagination?.has_more || false),
+        },
+      };
     } catch (error) {
-      console.error(`Error fetching reviews for course ${courseId}:`, error);
-      return [];
+      console.error(
+        `Error fetching instructor reviews for ${input.instructorId}:`,
+        error
+      );
+      return {
+        reviews: [],
+        summary: {
+          total_reviews: 0,
+          average_rating: 0,
+          courses_covered: 0,
+        },
+        pagination: {
+          limit: Number(input.limit || 100),
+          offset: Number(input.offset || 0),
+          total: 0,
+          has_more: false,
+        },
+      };
     }
   }
 
@@ -1251,19 +1352,35 @@ class CourseService {
    * Get personalized recommendations
    */
   async getRecommendations(userId: string, limit = 6): Promise<Course[]> {
-    const uid = userId || '550e8400-e29b-41d4-a716-446655440201';
+    if (!userId) {
+      throw new Error("Missing userId for recommendations");
+    }
+    const uid = userId;
     const response = await apiService.get<any>(ENDPOINTS.RECOMMENDATIONS, {
       userId: uid,
       limit: String(limit),
     });
 
     const recs = response?.data?.recommendations ?? response?.recommendations ?? [];
+    const meta =
+      response?.data?.meta ??
+      response?.meta ??
+      {};
     return recs.map((item: any) => {
       const coursePayload = item.course || item;
       const course = convertAWSCourseToWebCourse(coursePayload, coursePayload.statistics);
       return {
         ...course,
-        recommendationReason: item.reason || coursePayload.recommendation_reason,
+        recommendationPrimaryTag:
+          item.primary_reason_tag || coursePayload.recommendation_primary_tag,
+        recommendationModelVersion:
+          meta?.model_version ||
+          item.model_version ||
+          coursePayload.recommendation_model_version,
+        recommendationRequestId:
+          meta?.request_id ||
+          item.request_id ||
+          coursePayload.recommendation_request_id,
         recommendationScore: item.score || coursePayload.recommendation_score,
       };
     });
@@ -1276,8 +1393,11 @@ class CourseService {
     context?: Record<string, any>;
     requestId?: string;
   }): Promise<void> {
+    if (!payload.userId) {
+      throw new Error("Missing userId for recommendation event");
+    }
     const body = {
-      userId: payload.userId || '550e8400-e29b-41d4-a716-446655440201',
+      userId: payload.userId,
       courseId: payload.courseId ?? null,
       eventType: payload.eventType,
       context: payload.context || {},
@@ -1285,6 +1405,32 @@ class CourseService {
     };
 
     await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
+  }
+
+  async applyInstructorReviewAction(input: {
+    instructorId: string;
+    reviewId: string;
+    action:
+      | "hide"
+      | "unhide"
+      | "flag"
+      | "resolve"
+      | "acknowledge"
+      | "reply"
+      | "pin"
+      | "unpin";
+    moderationNote?: string;
+    flagReason?: string;
+    instructorReply?: string;
+  }): Promise<void> {
+    await apiService.post(ENDPOINTS.INSTRUCTOR_REVIEW_ACTION, {
+      instructorId: input.instructorId,
+      reviewId: input.reviewId,
+      action: input.action,
+      moderationNote: input.moderationNote ?? null,
+      flagReason: input.flagReason ?? null,
+      instructorReply: input.instructorReply ?? null,
+    });
   }
 
   /**

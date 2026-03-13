@@ -104,7 +104,7 @@ serve(async (req) => {
     // }
 
     // ========================================
-    // 2. Fetch sections, lessons, quizzes, quiz questions, outcomes, reviews in parallel
+    // 2. Fetch sections, lessons, quizzes, quiz questions, outcomes in parallel
     // ========================================
     // First, get section IDs for filtering videos
     const sectionIds = await getSectionIds(supabaseClient, courseId);
@@ -116,8 +116,7 @@ serve(async (req) => {
       { data: pdfResources, error: pdfResourcesError },
       { data: quizzes, error: quizzesError },
       { data: quizQuestions, error: quizQuestionsError },
-      { data: outcomes, error: outcomesError },
-      { data: reviews, error: reviewsError }
+      { data: outcomes, error: outcomesError }
     ] = await Promise.all([
       supabaseClient
         .from('course_sections')
@@ -170,18 +169,7 @@ serve(async (req) => {
         .from('course_outcomes')
         .select('outcome, order_index')
         .eq('course_id', courseId)
-        .order('order_index', { ascending: true }),
-      
-      supabaseClient
-        .from('course_ratings')
-        .select(`
-          id, rating, review, created_at,
-          users (
-            id, name, avatar_url
-          )
-        `)
-        .eq('course_id', courseId)
-        .order('created_at', { ascending: false })
+        .order('order_index', { ascending: true })
     ]);
 
     // Log any errors from parallel queries
@@ -191,7 +179,6 @@ serve(async (req) => {
     if (quizzesError) console.error('Quizzes error:', quizzesError);
     if (quizQuestionsError) console.error('Quiz questions error:', quizQuestionsError);
     if (outcomesError) console.error('Outcomes error:', outcomesError);
-    if (reviewsError) console.error('Reviews error:', reviewsError);
 
     console.log('Fetched lessons count:', lessons?.length || 0);
     console.log('Fetched PDF resources count:', pdfResources?.length || 0);
@@ -300,32 +287,7 @@ serve(async (req) => {
       };
     });
 
-    // ========================================
-    // 4. Process reviews and calculate ratings
-    // ========================================
-    const processedReviews = (reviews || []).map((review: any) => ({
-      id: review.id,
-      rating: review.rating,
-      review: review.review,
-      createdAt: review.created_at,
-      reviewerName: review.users?.name || 'Anonymous',
-      reviewerAvatar: review.users?.avatar_url || null,
-      reviewerId: review.users?.id || null
-    }));
-
-    // Calculate average rating and rating breakdown
-    let averageRating = 0;
     const ratingBreakdown: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    
-    if (processedReviews.length > 0) {
-      const totalRating = processedReviews.reduce((sum: number, r: any) => sum + r.rating, 0);
-      averageRating = totalRating / processedReviews.length;
-      
-      // Calculate rating breakdown counts
-      processedReviews.forEach((r: any) => {
-        ratingBreakdown[r.rating]++;
-      });
-    }
 
     // ========================================
     // 5. Construct structured response for instructor
@@ -338,10 +300,11 @@ serve(async (req) => {
         category_color: course.categories?.color,
         requirements: [],
         outcomes: (outcomes || []).map((o: any) => o.outcome),
-        rating: averageRating,
-        totalRatings: processedReviews.length,
+        rating: Number(course.rating || 0),
+        totalRatings: Number(course.total_ratings || 0),
         ratingBreakdown: ratingBreakdown,
-        reviews: processedReviews
+        // Reviews are served by getInstructorReviews for instructor workflows.
+        reviews: []
       },
       sections: sectionsWithContent,
       totalSections: sections?.length || 0,

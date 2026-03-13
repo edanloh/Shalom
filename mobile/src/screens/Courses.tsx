@@ -15,14 +15,17 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useCourses } from "../contexts/CourseContext";
 import { useUser } from "../contexts/UserContext";
+import courseService from "../services/courseService";
 import { Colors, Spacing, TextStyles, Typography } from "../constants";
 import type { Course } from "../types";
 import { ImageWithFallback } from "@components/common";
 import { Images } from "../../assets";
 import Screen from "../components/common/Screen";
+import CourseCard from "../components/home/CourseCard";
 import { CustomTextInput } from "@/components";
 import screenStyles from "@/styles/styles";
 import { getAllCategories, type Category } from "../services/courseService";
+import { formatPrimaryRecommendationReason } from "../utils/recommendations";
 
 const { width } = Dimensions.get("window");
 
@@ -37,7 +40,11 @@ function clamp01(n: number) {
 }
 
 function progressFrom(course: Course): number {
-  const p: any = course?.progress;
+  const anyCourse = course as any;
+  const p: any =
+    anyCourse?.progress ??
+    anyCourse?.progress_percentage ??
+    anyCourse?.progressPercent;
   if (p == null) return 0;
   if (typeof p === "number") {
     // if looks like 0..100, convert
@@ -66,7 +73,8 @@ export default function CoursesScreen({ navigation }: any) {
 
   const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
   const isWishlisted = (c: Course) => wishIds.has(c.id);
-  const { enrolledCourses = [] } = useUser();
+  const { enrolledCourses = [], user: profileUser } = useUser();
+  const recommendationUserId = profileUser?.uuid;
 
   // UI state
   const [query, setQuery] = useState("");
@@ -163,6 +171,32 @@ export default function CoursesScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const lastScrollY = useRef(0);
   const tabHidden = useRef(false);
+  const lastRecommendedImpressionKey = useRef<string>("");
+
+  const handleRecommendedCourseClick = useCallback(
+    (course: Course) => {
+      if (recommendationUserId) {
+        courseService
+          .recordRecommendationEvent({
+            userId: recommendationUserId,
+            courseId: course.id,
+            eventType: "click",
+            requestId: course.recommendationRequestId,
+            context: {
+              placement: "courses_recommended",
+              isRecommendationSurface: true,
+              modelVersion: course.recommendationModelVersion,
+              requestId: course.recommendationRequestId,
+            },
+          })
+          .catch((err) =>
+            console.warn("Failed to record courses rec click", err)
+          );
+      }
+      navigation.navigate("CourseDetail", { courseId: course.id });
+    },
+    [navigation, recommendationUserId]
+  );
 
   const onRefresh = useCallback(async () => {
     if (!refreshCourses) return;
@@ -205,9 +239,13 @@ export default function CoursesScreen({ navigation }: any) {
   const HCard = ({
     item,
     withProgress,
+    trackRecommendation = false,
+    placement = "courses_recommended",
   }: {
     item: Course;
     withProgress?: boolean;
+    trackRecommendation?: boolean;
+    placement?: string;
   }) => {
     const rankLabel =
       item.recommendationRank || item.recommendationScore
@@ -215,14 +253,34 @@ export default function CoursesScreen({ navigation }: any) {
             item.recommendationScore ?? 0,
           ).toFixed(1)}`
         : null;
-    const reason = item.recommendationReason || "Recommended for you";
+    const reason = formatPrimaryRecommendationReason(
+      item.recommendationPrimaryTag
+    );
 
     return (
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() =>
-          navigation.navigate("CourseDetail", { courseId: item.id })
-        }
+        onPress={() => {
+          if (trackRecommendation && recommendationUserId) {
+            courseService
+              .recordRecommendationEvent({
+                userId: recommendationUserId,
+                courseId: item.id,
+                eventType: "click",
+                requestId: item.recommendationRequestId,
+                context: {
+                  placement,
+                  isRecommendationSurface: true,
+                  modelVersion: item.recommendationModelVersion,
+                  requestId: item.recommendationRequestId,
+                },
+              })
+              .catch((err) =>
+                console.warn("Failed to record courses rec click", err)
+              );
+          }
+          navigation.navigate("CourseDetail", { courseId: item.id });
+        }}
         style={styles.hCard}
       >
         <View style={styles.imageWrap}>
@@ -262,7 +320,24 @@ export default function CoursesScreen({ navigation }: any) {
   const GCard = ({ item }: { item: Course }) => (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
+      onPress={() => {
+        if (recommendationUserId) {
+          courseService
+            .recordRecommendationEvent({
+              userId: recommendationUserId,
+              courseId: item.id,
+              eventType: "click",
+              context: {
+                placement: "courses_popular",
+                isRecommendationSurface: false,
+              },
+            })
+            .catch((err) =>
+              console.warn("Failed to record popular course click", err)
+            );
+        }
+        navigation.navigate("CourseDetail", { courseId: item.id });
+      }}
       style={styles.gCard}
     >
       <View style={styles.imageWrap}>
@@ -271,19 +346,16 @@ export default function CoursesScreen({ navigation }: any) {
           fallback={Images.placeholder}
           style={styles.gImage}
         />
-        {/* Category Badge - Top Left */}
-        <View
-          style={[styles.catBadge, { backgroundColor: item.categoryColor }]}
-        >
-          <Text
-            style={[TextStyles.bodySmall, styles.catBadgeText]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {item.category}
-          </Text>
-        </View>
         <BadgeHeartRow item={item} />
+      </View>
+      <View style={[styles.catBadge, { backgroundColor: item.categoryColor }]}>
+        <Text
+          style={[TextStyles.bodySmall, styles.catBadgeText]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {item.category}
+        </Text>
       </View>
       <Text style={styles.gTitle} numberOfLines={2}>
         {item.title}
@@ -307,6 +379,37 @@ export default function CoursesScreen({ navigation }: any) {
       {subtext ? <Text style={styles.emptySubtitle}>{subtext}</Text> : null}
     </View>
   );
+
+  useEffect(() => {
+    if (query) return;
+    if (!recommendationUserId || recommended.length === 0) return;
+    const firstRecommendation = recommended[0];
+
+    const impressionKey = [
+      recommendationUserId,
+      firstRecommendation?.recommendationRequestId || "no_request_id",
+      ...recommended.map((c) => c.id),
+    ].join("|");
+    if (lastRecommendedImpressionKey.current === impressionKey) return;
+    lastRecommendedImpressionKey.current = impressionKey;
+
+    courseService
+      .recordRecommendationEvent({
+        userId: recommendationUserId,
+        eventType: "impression",
+        requestId: firstRecommendation.recommendationRequestId,
+        context: {
+          placement: "courses_recommended",
+          isRecommendationSurface: true,
+          courseIds: recommended.map((c) => c.id),
+          modelVersion: firstRecommendation.recommendationModelVersion,
+          requestId: firstRecommendation.recommendationRequestId,
+        },
+      })
+      .catch((err) =>
+        console.warn("Failed to record courses rec impression", err)
+      );
+  }, [query, recommended, recommendationUserId]);
 
   return (
     <Screen
@@ -394,7 +497,9 @@ export default function CoursesScreen({ navigation }: any) {
               </Text>
               <FlatList<Course>
                 data={jumpBackIn}
-                keyExtractor={(i) => i.id}
+                keyExtractor={(i, index) =>
+                  String(i.id ?? `jump-back-${index}-${i.title ?? "course"}`)
+                }
                 renderItem={({ item }) => <HCard item={item} withProgress />}
                 horizontal
                 showsVerticalScrollIndicator={false}
@@ -419,8 +524,17 @@ export default function CoursesScreen({ navigation }: any) {
               ) : recommended.length ? (
                 <FlatList<Course>
                   data={recommended}
-                  keyExtractor={(i) => i.id}
-                  renderItem={({ item }) => <HCard item={item} />}
+                  keyExtractor={(i, index) =>
+                    String(i.id ?? `recommended-${index}-${i.title ?? "course"}`)
+                  }
+                  renderItem={({ item }) => (
+                    <CourseCard
+                      course={item}
+                      variant="compact"
+                      showInstructor={false}
+                      onPress={handleRecommendedCourseClick}
+                    />
+                  )}
                   horizontal
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.hRow}
@@ -449,7 +563,9 @@ export default function CoursesScreen({ navigation }: any) {
           ) : popular.length ? (
             <FlatList<Course>
               data={popular}
-              keyExtractor={(i) => i.id}
+              keyExtractor={(i, index) =>
+                String(i.id ?? `popular-${index}-${i.title ?? "course"}`)
+              }
               renderItem={({ item }) => <GCard item={item} />}
               numColumns={2}
               columnWrapperStyle={{ justifyContent: "space-between" }}
@@ -611,10 +727,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   catBadge: {
-    position: "absolute",
-    top: 12,
-    left: 14,
-    zIndex: 10,
+    alignSelf: "flex-start",
+    marginTop: Spacing.md,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -655,7 +769,7 @@ const styles = StyleSheet.create({
     width: (width - Spacing.lg * 2 - Spacing.lg) / 2,
     backgroundColor: "transparent",
     borderRadius: 16,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing["2xl"],
   },
   gImage: {
     width: "100%",

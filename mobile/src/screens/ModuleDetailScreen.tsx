@@ -346,7 +346,7 @@ const ModuleDetailScreen = () => {
 
     return (
       <TouchableOpacity
-        key={item.id}
+        key={String(item.id ?? `module-item-${index}-${item.title ?? item.type ?? "item"}`)}
         style={[styles.itemCard, isLocked && styles.itemCardLocked]}
         onPress={() => handleItemPress(item)}
         activeOpacity={isLocked ? 1 : 0.7}
@@ -441,7 +441,9 @@ const ModuleDetailScreen = () => {
                 size={16}
                 color={Colors.green}
               />
-              <Text style={styles.completedText}>Completed</Text>
+              <Text style={styles.completedText} numberOfLines={1}>
+                Completed
+              </Text>
             </View>
           )}
           {isLocked && (
@@ -451,7 +453,9 @@ const ModuleDetailScreen = () => {
                 size={14}
                 color={Colors.textSecondary}
               />
-              <Text style={styles.lockedBadgeText}>Locked</Text>
+              <Text style={styles.lockedBadgeText} numberOfLines={1}>
+                Locked
+              </Text>
             </View>
           )}
         </View>
@@ -826,6 +830,8 @@ const styles = StyleSheet.create({
     color: Colors.green,
     marginLeft: 6,
     fontWeight: "600",
+    flex: 1,
+    flexShrink: 1,
   },
   sectionCard: {
     backgroundColor: Colors.textInputBg,
@@ -862,7 +868,9 @@ const styles = StyleSheet.create({
   sectionStats: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    rowGap: Spacing.sm,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.gray500,
@@ -870,17 +878,18 @@ const styles = StyleSheet.create({
   statItem: {
     flexDirection: "row",
     alignItems: "center",
+    width: "47%",
+    minWidth: 0,
   },
   statDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: Colors.gray500,
+    display: "none",
   },
   statText: {
     fontSize: 13,
     color: Colors.textPrimary,
     marginLeft: 6,
     fontWeight: "500",
+    flexShrink: 1,
   },
   contentSection: {
     marginTop: Spacing.xl,
@@ -923,6 +932,7 @@ const styles = StyleSheet.create({
   },
   itemContent: {
     flex: 1,
+    minWidth: 0,
   },
   itemHeader: {
     flexDirection: "row",
@@ -946,25 +956,33 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    minWidth: 0,
   },
   itemMetaContainer: {
     flexDirection: "row",
     alignItems: "center",
+    flexShrink: 1,
+    minWidth: 0,
   },
   itemMeta: {
     flexDirection: "row",
     alignItems: "center",
+    flexShrink: 1,
+    minWidth: 0,
   },
   itemMetaText: {
     fontSize: 12,
     color: Colors.textSecondary,
     marginLeft: 4,
+    flexShrink: 1,
   },
   badgeContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginRight: Spacing.xs,
+    flexShrink: 0,
+    maxWidth: 120,
   },
   completedBadge: {
     flexDirection: "row",
@@ -973,12 +991,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    maxWidth: 120,
   },
   completedText: {
     fontSize: 11,
     color: Colors.green,
     marginLeft: 4,
     fontWeight: "600",
+    flexShrink: 1,
   },
   progressContainer: {
     marginTop: Spacing.sm,
@@ -1054,12 +1074,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    maxWidth: 110,
   },
   lockedBadgeText: {
     fontSize: 11,
     color: Colors.textSecondary,
     marginLeft: 4,
     fontWeight: "600",
+    flexShrink: 1,
   },
 });
 

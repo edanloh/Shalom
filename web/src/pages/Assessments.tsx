@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/Pagination";
 import { courseService, Course, quizService, QuestionGrading, AnswerVariation, StudentAnswer, QuizResultsStats, StudentAttemptDetails } from "@/services";
 import moduleService from "@/services/moduleService";
-import { useUser } from "@/contexts/UserContext";
+import { useUser } from '@/contexts/useUser';
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 
@@ -58,8 +58,12 @@ const Assessments = () => {
   };
 
   const fetchCourses = async () => {
+    if (!user?.uuid) {
+      setCourses([]);
+      return;
+    }
     try {
-      const data = await courseService.getCourses();
+      const data = await courseService.getCourses({ instructorId: user.uuid });
       setCourses(data);
       console.log('Fetched courses:', data);
     } catch (err) {
@@ -75,7 +79,7 @@ const Assessments = () => {
   // Fetch courses on mount
   useEffect(() => {
     fetchCourses();
-  }, []);
+  }, [user?.uuid]);
 
   useEffect(() => {
     if (selectedCourse) {

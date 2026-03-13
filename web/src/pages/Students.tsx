@@ -18,6 +18,7 @@ import { postNotification } from "@/services/notificationService";
 import { disableUser } from "@/services/userService";
 import { supabase } from '@/lib/supabase';
 import { useToast } from "@/hooks/use-toast";
+import { getAvatarUri } from '@/utils/avatar';
 import {
   Select,
   SelectContent,
@@ -26,9 +27,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useUser } from '@/contexts/useUser';
 import { useNavigate } from "react-router-dom";
 
 const Students = () => {
+  const { user } = useUser();
+  const instructorId = user?.uuid;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -110,7 +114,11 @@ const Students = () => {
 		setLoading(true);
 		setError("");
 		try {
-			const result = await courseService.getAllStudents();
+			if (!instructorId) {
+        setStudents([]);
+        return;
+      }
+			const result = await courseService.getAllStudents(instructorId);
 			
 			// Transform API data to match the expected structure
 			const transformedStudents = result.students.map((student: any) => ({
@@ -125,6 +133,7 @@ const Students = () => {
 				completedCourses: student.completedCourses || 0,
 				totalHours: student.totalHours || 0,
 				enabled: student.enabled !== false, // Get from API, default to true if null/undefined
+        avatarUrl: student.avatarUrl || "" // Get from API, default to empty string if null/undefined
 			}));
 			
 			setStudents(transformedStudents);
@@ -137,7 +146,7 @@ const Students = () => {
 
   useEffect(() => {
     fetchStudents();
-  }, []);
+  }, [instructorId]);
 
   const activeProfileBase = selectedStudent
     ? profileCache[selectedStudent.id] || selectedStudent
@@ -768,12 +777,21 @@ const Students = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedStudents.map((student) => (
+                {paginatedStudents.length > 0 ? paginatedStudents.map((student) => (
                   <TableRow key={student.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar>
-                          <AvatarFallback>{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                          {student.avatarUrl && student.avatarUrl.includes("avatar") ? (
+                            // <AvatarImage src={student.avatarUrl} alt={student.name} />
+                            <img
+                              src={getAvatarUri(student.avatarUrl)}
+                              alt="Profile"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <AvatarFallback>{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                          )}
                         </Avatar>
                         <div>
                           <p className="font-medium text-foreground">{student.name}</p>
@@ -825,9 +843,17 @@ const Students = () => {
                               {/* Header */}
                               <div className="flex items-center gap-4 pb-6 border-b border-border">
                                 <Avatar className="h-20 w-20">
-                                  <AvatarFallback className="text-2xl bg-primary">
-                                    {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
-                                  </AvatarFallback>
+                                  {activeProfileBase.avatarUrl && activeProfileBase.avatarUrl.includes("avatar") ? (
+                                    <img
+                                      src={getAvatarUri(activeProfileBase.avatarUrl)}
+                                      alt="Profile"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <AvatarFallback className="text-2xl bg-primary">
+                                      {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
+                                    </AvatarFallback>
+                                  )}
                                 </Avatar>
                                 <div className="flex-1">
                                   <h3 className="font-semibold text-2xl text-foreground">{activeProfileBase.name}</h3>
@@ -1238,20 +1264,30 @@ const Students = () => {
                     </Sheet>
                   </TableCell>
                 </TableRow>
-              ))}
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                      {searchQuery.trim().length > 0
+                        ? "No students match your search and filters."
+                        : "No students found for your courses yet."}
+                    </TableCell>
+                  </TableRow>
+                )}
             </TableBody>
           </Table>
 
-            <Pagination
-              currentPage={currentPage}
-              totalPages={Math.ceil(filteredStudents.length / itemsPerPage)}
-              onPageChange={(page) => {
-                setCurrentPage(page);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              itemsPerPage={itemsPerPage}
-              totalItems={filteredStudents.length}
-            />
+            {filteredStudents.length > 0 ? (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(filteredStudents.length / itemsPerPage)}
+                onPageChange={(page) => {
+                  setCurrentPage(page);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                itemsPerPage={itemsPerPage}
+                totalItems={filteredStudents.length}
+              />
+            ) : null}
             </>
           </Card>
         )}

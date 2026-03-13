@@ -64,7 +64,7 @@ serve(async (req) => {
 
     const { data: user, error: userError } = await supabase
       .from("users")
-      .select("id,name,email,is_active,created_at")
+      .select("id,name,email,is_active,created_at,avatar_url")
       .eq("id", userId)
       .single();
     if (userError || !user) throw userError || new Error("User not found");
@@ -236,6 +236,7 @@ serve(async (req) => {
       averageScore,
       strengths,
       risks,
+      avatarUrl: user.avatar_url
     };
 
     return new Response(JSON.stringify({ success: true, data: payload }), {
