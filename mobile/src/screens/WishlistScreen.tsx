@@ -11,8 +11,6 @@ import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 
 import { useCourses } from "../contexts/CourseContext";
-import { useUser } from "../contexts/UserContext";
-import courseService from "../services/courseService";
 import type { MainStackParamList } from "@/types/navigation";
 import { Colors, Typography, Spacing, TextStyles } from "../constants";
 import { ImageWithFallback } from "../components/common";
@@ -32,35 +30,20 @@ const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
 
 export default function WishlistScreen() {
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
-  const { user: profileUser } = useUser();
-  const recommendationUserId = profileUser?.uuid;
   const {
     wishlist,
     wishlistLoading,
     wishlistError,
     refreshWishlist,
     toggleWishlist,
+    recordRecommendationEvent,
   } = useCourses();
 
   const renderItem = ({ item }: any) => (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={() => {
-        if (recommendationUserId) {
-          courseService
-            .recordRecommendationEvent({
-              userId: recommendationUserId,
-              courseId: item.id,
-              eventType: "click",
-              context: {
-                placement: "wishlist",
-                isRecommendationSurface: false,
-              },
-            })
-            .catch((err) =>
-              console.warn("Failed to record wishlist course click", err)
-            );
-        }
+        recordRecommendationEvent(item.id, 'click', 'wishlist').catch(() => {});
         navigation.navigate("CourseDetail", { courseId: item.id });
       }}
       style={styles.card}

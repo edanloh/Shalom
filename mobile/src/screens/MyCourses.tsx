@@ -38,7 +38,7 @@ export default function MyCourses({ navigation }: any) {
   const { user } = useAuth();
   const { courses, loading, error, refreshing, refresh, retry } =
     useMyCourses();
-  const { wishlist = [], toggleWishlist } = useCourses();
+  const { wishlist = [], toggleWishlist, recordRecommendationEvent } = useCourses();
 
   const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
 
@@ -133,9 +133,11 @@ export default function MyCourses({ navigation }: any) {
                 return (
                   <TouchableOpacity
                     style={styles.cwCard}
-                    onPress={() =>
-                      navigation.navigate("CourseDetail", { courseId: item.id })
-                    }
+                    onPress={() => {
+                      // Log as profile signal only — not a recommendation success event
+                      recordRecommendationEvent(item.id, 'click', 'my_courses').catch(() => {});
+                      navigation.navigate("CourseDetail", { courseId: item.id });
+                    }}
                   >
                     <View style={styles.cwThumbWrapper}>
                       <ImageWithFallback
@@ -194,9 +196,11 @@ export default function MyCourses({ navigation }: any) {
                 <TouchableOpacity
                   key={String(item.id ?? `my-course-${index}-${item.title ?? "course"}`)}
                   activeOpacity={0.9}
-                  onPress={() =>
-                    navigation.navigate("CourseDetail", { courseId: item.id })
-                  }
+                  onPress={() => {
+                    // Log as profile signal only — not a recommendation success event
+                    recordRecommendationEvent(item.id, 'click', 'my_courses').catch(() => {});
+                    navigation.navigate("CourseDetail", { courseId: item.id });
+                  }}
                   style={styles.ipCard}
                 >
                   <View style={styles.ipLeft}>

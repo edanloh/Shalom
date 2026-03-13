@@ -652,11 +652,11 @@ const Assessments = () => {
                 </DialogHeader>
                 
                 <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-                  <div className="relative flex-shrink-0">
+                  <div className="relative flex-shrink-0 pr-2">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search courses by name..."
-                      className="pl-10"
+                      className="pl-10 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary"
                       value={courseSearchQuery}
                       onChange={(e) => setCourseSearchQuery(e.target.value)}
                       autoFocus

@@ -69,6 +69,7 @@ export default function CoursesScreen({ navigation }: any) {
     refreshRecommended,
     wishlist = [],
     toggleWishlist,
+    recordRecommendationEvent,
   } = useCourses();
 
   const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
@@ -175,27 +176,12 @@ export default function CoursesScreen({ navigation }: any) {
 
   const handleRecommendedCourseClick = useCallback(
     (course: Course) => {
-      if (recommendationUserId) {
-        courseService
-          .recordRecommendationEvent({
-            userId: recommendationUserId,
-            courseId: course.id,
-            eventType: "click",
-            requestId: course.recommendationRequestId,
-            context: {
-              placement: "courses_recommended",
-              isRecommendationSurface: true,
-              modelVersion: course.recommendationModelVersion,
-              requestId: course.recommendationRequestId,
-            },
-          })
-          .catch((err) =>
-            console.warn("Failed to record courses rec click", err)
-          );
-      }
+      recordRecommendationEvent(course.id, 'click', 'courses_recommended')
+        .then(() => refreshRecommended?.().catch(() => {}))
+        .catch((err) => console.warn("Failed to record courses rec click", err));
       navigation.navigate("CourseDetail", { courseId: course.id });
     },
-    [navigation, recommendationUserId]
+    [navigation, recordRecommendationEvent, refreshRecommended]
   );
 
   const onRefresh = useCallback(async () => {
@@ -247,12 +233,9 @@ export default function CoursesScreen({ navigation }: any) {
     trackRecommendation?: boolean;
     placement?: string;
   }) => {
-    const rankLabel =
-      item.recommendationRank || item.recommendationScore
-        ? `#${item.recommendationRank ?? "?"} • ${Number(
-            item.recommendationScore ?? 0,
-          ).toFixed(1)}`
-        : null;
+    const rankLabel = Number.isFinite(item.recommendationRank)
+      ? `#${item.recommendationRank}`
+      : null;
     const reason = formatPrimaryRecommendationReason(
       item.recommendationPrimaryTag
     );
@@ -261,23 +244,9 @@ export default function CoursesScreen({ navigation }: any) {
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => {
-          if (trackRecommendation && recommendationUserId) {
-            courseService
-              .recordRecommendationEvent({
-                userId: recommendationUserId,
-                courseId: item.id,
-                eventType: "click",
-                requestId: item.recommendationRequestId,
-                context: {
-                  placement,
-                  isRecommendationSurface: true,
-                  modelVersion: item.recommendationModelVersion,
-                  requestId: item.recommendationRequestId,
-                },
-              })
-              .catch((err) =>
-                console.warn("Failed to record courses rec click", err)
-              );
+          if (trackRecommendation) {
+            recordRecommendationEvent(item.id, 'click', placement)
+              .catch((err) => console.warn("Failed to record courses rec click", err));
           }
           navigation.navigate("CourseDetail", { courseId: item.id });
         }}
@@ -321,21 +290,10 @@ export default function CoursesScreen({ navigation }: any) {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => {
-        if (recommendationUserId) {
-          courseService
-            .recordRecommendationEvent({
-              userId: recommendationUserId,
-              courseId: item.id,
-              eventType: "click",
-              context: {
-                placement: "courses_popular",
-                isRecommendationSurface: false,
-              },
-            })
-            .catch((err) =>
-              console.warn("Failed to record popular course click", err)
-            );
-        }
+        // Popular courses aren't personalised so no score_breakdown, but
+        // still record via context for consistency
+        recordRecommendationEvent(item.id, 'click', 'courses_popular')
+          .catch((err) => console.warn("Failed to record popular course click", err));
         navigation.navigate("CourseDetail", { courseId: item.id });
       }}
       style={styles.gCard}
@@ -382,34 +340,21 @@ export default function CoursesScreen({ navigation }: any) {
 
   useEffect(() => {
     if (query) return;
-    if (!recommendationUserId || recommended.length === 0) return;
-    const firstRecommendation = recommended[0];
+    if (recommended.length === 0) return;
 
     const impressionKey = [
-      recommendationUserId,
-      firstRecommendation?.recommendationRequestId || "no_request_id",
+      recommended[0]?.recommendationRequestId || "no_request_id",
       ...recommended.map((c) => c.id),
     ].join("|");
     if (lastRecommendedImpressionKey.current === impressionKey) return;
     lastRecommendedImpressionKey.current = impressionKey;
 
-    courseService
-      .recordRecommendationEvent({
-        userId: recommendationUserId,
-        eventType: "impression",
-        requestId: firstRecommendation.recommendationRequestId,
-        context: {
-          placement: "courses_recommended",
-          isRecommendationSurface: true,
-          courseIds: recommended.map((c) => c.id),
-          modelVersion: firstRecommendation.recommendationModelVersion,
-          requestId: firstRecommendation.recommendationRequestId,
-        },
-      })
-      .catch((err) =>
-        console.warn("Failed to record courses rec impression", err)
-      );
-  }, [query, recommended, recommendationUserId]);
+    // Fire per-course impressions via context so score_breakdown is attached
+    recommended.forEach((course) => {
+      recordRecommendationEvent(course.id, 'impression', 'courses_recommended')
+        .catch(() => {});
+    });
+  }, [query, recommended, recordRecommendationEvent]);
 
   return (
     <Screen
@@ -532,6 +477,7 @@ export default function CoursesScreen({ navigation }: any) {
                       course={item}
                       variant="compact"
                       showInstructor={false}
+                      showRecommendationReason={true}
                       onPress={handleRecommendedCourseClick}
                     />
                   )}

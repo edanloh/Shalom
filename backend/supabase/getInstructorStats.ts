@@ -71,7 +71,7 @@ serve(async (req) => {
       );
     }
 
-    // Get this instructor's published courses only
+    // Get this instructor's published courses for dashboard/course stats
     const { data: courses, error: coursesError } = await supabaseClient
       .from("courses")
       .select("id, title, rating, is_published")
@@ -81,6 +81,17 @@ serve(async (req) => {
     if (coursesError) throw coursesError;
 
     const publishedCourseIds = courses?.map((c) => c.id) || [];
+
+    // Fetch all instructor courses for assessment grading counts so the dashboard
+    // matches the Assessments page queue.
+    const { data: allInstructorCourses, error: allCoursesError } = await supabaseClient
+      .from("courses")
+      .select("id")
+      .eq("instructor_id", adminId);
+
+    if (allCoursesError) throw allCoursesError;
+
+    const allInstructorCourseIds = allInstructorCourses?.map((c) => c.id) || [];
 
     // Get enrollments for PUBLISHED courses only
     const { data: enrollments, error: enrollmentsError } =
@@ -172,19 +183,52 @@ serve(async (req) => {
 
     if (upcomingError) throw upcomingError;
 
-    const { count: pendingSubmissionsCount, error: submissionsError } =
-      publishedCourseIds.length > 0
-        ? await supabaseClient
-            .from("assignment_submissions")
-            .select("id, assignments!inner(course_id)", {
-              count: "exact",
-              head: true,
-            })
-            .eq("submission_status", "submitted")
-            .in("assignments.course_id", publishedCourseIds)
-        : { count: 0, error: null };
+    let pendingAssessmentCount = 0;
 
-    if (submissionsError) throw submissionsError;
+    if (allInstructorCourseIds.length > 0) {
+      const { data: assessmentQuizzes, error: quizzesError } = await supabaseClient
+        .from("course_quizzes")
+        .select("id")
+        .in("course_id", allInstructorCourseIds);
+
+      if (quizzesError) throw quizzesError;
+
+      const assessmentQuizIds = assessmentQuizzes?.map((q) => q.id) || [];
+
+      if (assessmentQuizIds.length > 0) {
+        const { data: shortAnswerQuestions, error: questionsError } = await supabaseClient
+          .from("quiz_questions")
+          .select("id, quiz_id, graded_variations")
+          .in("quiz_id", assessmentQuizIds)
+          .in("question_type", ["short-answer", "text"]);
+
+        if (questionsError) throw questionsError;
+
+        if ((shortAnswerQuestions || []).length > 0) {
+          const { data: quizAttempts, error: attemptsError } = await supabaseClient
+            .from("quiz_attempts")
+            .select("quiz_id, answers")
+            .in("quiz_id", assessmentQuizIds);
+
+          if (attemptsError) throw attemptsError;
+
+          for (const question of shortAnswerQuestions || []) {
+            const gradedVariations = question.graded_variations || {};
+            for (const attempt of quizAttempts || []) {
+              if (attempt.quiz_id !== question.quiz_id) continue;
+
+              const userAnswer = attempt.answers?.[question.id];
+              if (!userAnswer) continue;
+
+              const normalizedAnswer = String(userAnswer).trim().toLowerCase();
+              if (!gradedVariations[normalizedAnswer]) {
+                pendingAssessmentCount++;
+              }
+            }
+          }
+        }
+      }
+    }
 
     const { data: manualTasks, error: manualTasksError } = await supabaseClient
       .from("instructor_tasks")
@@ -213,11 +257,10 @@ serve(async (req) => {
 
     const { count: unreadMessagesCount, error: unreadMessagesError } =
       await supabaseClient
-        .from("notifications")
+        .from("direct_messages")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", adminId)
-        .eq("is_read", false)
-        .eq("type", "message");
+        .eq("recipient_id", adminId)
+        .eq("is_read", false);
 
     if (unreadMessagesError) throw unreadMessagesError;
 
@@ -342,8 +385,8 @@ serve(async (req) => {
         })),
         {
           id: "assignment_grading",
-          title: "Assignments to Grade",
-          count: Number(pendingSubmissionsCount || 0),
+          title: "Assessments to Grade",
+          count: Number(pendingAssessmentCount || 0),
           status: "pending",
           due_at: null,
           formatted_due: null,

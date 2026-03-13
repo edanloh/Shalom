@@ -219,10 +219,14 @@ export const useRecommendedCourses = () => {
   const fetchRecommendedCourses = useCallback(async () => {
     try {
       console.log('Fetching recommended courses...');
-      const coursesData = await courseService.getRecommendedCourses(dbUserId);
-      
+      // getRecommendedCourses now returns { courses, meta, recommendations }
+      const result = await courseService.getRecommendedCourses(dbUserId);
+      const coursesData: Course[] = Array.isArray(result)
+        ? result
+        : result.courses ?? [];
+
       if (!isMountedRef.current) return;
-      
+
       console.log('Fetched recommended courses:', coursesData.length);
       setCourses(coursesData);
       setError(null);

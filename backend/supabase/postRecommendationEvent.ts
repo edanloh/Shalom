@@ -7,6 +7,19 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
 };
 
+// All recognised event types — anything outside this set is rejected
+const VALID_EVENT_TYPES = new Set([
+  "impression",
+  "view",
+  "click",
+  "save",
+  "wishlist",  // added: wishlist toggle is a strong positive signal
+  "start",
+  "enroll",    // added: enrollment is the strongest positive signal
+  "complete",
+  "dismiss",
+]);
+
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "" // keep this secret
@@ -41,12 +54,24 @@ serve(async (req) => {
         body.requestId ||
         body.request_id ||
         null,
+      // rank: position of this course in the recommendation list at the time it
+      // was shown. Used by train_reranker.py for inverse propensity scoring (IPS)
+      // to correct position bias. Sent by CourseContext impression events.
+      rank:
+        baseContext.rank != null ? Number(baseContext.rank) :
+        body.rank       != null ? Number(body.rank)        :
+        null,
     };
+
+    const rawEventType = (body.eventType || body.event_type || "unknown").toLowerCase();
+    if (!VALID_EVENT_TYPES.has(rawEventType)) {
+      return fail(`Unknown event_type: "${rawEventType}"`, 400);
+    }
 
     const event = {
       user_id: body.userId || body.user_id || "anon",
       course_id: body.courseId || body.course_id || null,
-      event_type: body.eventType || body.event_type || "unknown",
+      event_type: rawEventType,
       placement: context?.placement || body.placement || "unknown",
       context,
       timestamp: body.timestamp || new Date().toISOString(),

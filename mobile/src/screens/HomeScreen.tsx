@@ -98,6 +98,7 @@ export default function HomeScreen({ navigation, route }: any) {
     refreshWishlist,
     toggleWishlist,
     isWishlisted,
+    recordRecommendationEvent,
   } = useCourses();
 
   // Debug logging for user state
@@ -375,35 +376,17 @@ export default function HomeScreen({ navigation, route }: any) {
 
 
   const handleRecommendationClick = async (course: Course) => {
-    if (recommendationUserId) {
-      courseService.recordRecommendationEvent({
-        userId: recommendationUserId,
-        courseId: course.id,
-        eventType: 'click',
-        requestId: course.recommendationRequestId,
-        context: {
-          placement: 'home_recommended',
-          isRecommendationSurface: true,
-          modelVersion: course.recommendationModelVersion,
-          requestId: course.recommendationRequestId,
-        },
-      }).catch((err) => console.warn('Failed to record rec click', err));
-    }
+    // recordRecommendationEvent (from context) automatically attaches score_breakdown
+    // so evaluate.py can use real data for ML training and evaluation
+    recordRecommendationEvent(course.id, 'click', 'home_recommended')
+      .then(() => refreshRecommended().catch(() => {}))
+      .catch((err) => console.warn('Failed to record rec click', err));
     navigation.navigate('CourseDetail', { courseId: course.id });
   };
 
   const handleWishlistCourseClick = async (course: Course) => {
-    if (recommendationUserId) {
-      courseService.recordRecommendationEvent({
-        userId: recommendationUserId,
-        courseId: course.id,
-        eventType: 'click',
-        context: {
-          placement: 'wishlist',
-          isRecommendationSurface: false,
-        },
-      }).catch((err) => console.warn('Failed to record wishlist click', err));
-    }
+    recordRecommendationEvent(course.id, 'click', 'wishlist')
+      .catch((err) => console.warn('Failed to record wishlist click', err));
     navigation.navigate('CourseDetail', { courseId: course.id });
   };
 
@@ -416,23 +399,8 @@ export default function HomeScreen({ navigation, route }: any) {
 
   const recommendedListLoading = recommendedLoading || coursesLoading;
 
-  useEffect(() => {
-    if (recommendationUserId && recommendedList.length > 0) {
-      const firstRecommendation = recommendedList[0];
-      courseService.recordRecommendationEvent({
-        userId: recommendationUserId,
-        eventType: 'impression',
-        requestId: firstRecommendation?.recommendationRequestId,
-        context: {
-          placement: 'home_recommended',
-          isRecommendationSurface: true,
-          courseIds: recommendedList.map((c) => c.id),
-          modelVersion: firstRecommendation?.recommendationModelVersion,
-          requestId: firstRecommendation?.recommendationRequestId,
-        },
-      }).catch((err) => console.warn('Failed to record rec impression', err));
-    }
-  }, [recommendationUserId, recommendedList]);
+  // Impressions are now recorded inside CourseContext.loadRecommendedCourses
+  // with score_breakdown attached, so the separate useEffect here is removed.
 
   const getTop10Courses = (courses: Course[]): Course[] => {
     // Return top 10 courses - already sorted by last_activity_at from API

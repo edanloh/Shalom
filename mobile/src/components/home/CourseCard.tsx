@@ -45,10 +45,11 @@ export default function CourseCard({
   const { wishlist = [], toggleWishlist } = useCourses();
   const isWishlisted = !!wishlist?.some((c) => c.id === course.id);
   const heartScale = useRef(new Animated.Value(1)).current;
-  const rankLabel =
-    course.recommendationRank || course.recommendationScore
-      ? `#${course.recommendationRank ?? "?"} • ${Number(course.recommendationScore ?? 0).toFixed(1)}`
-      : null;
+  const hasRecommendationScore = Number.isFinite(course.recommendationScore);
+  const hasRecommendationRank = Number.isFinite(course.recommendationRank);
+  const rankLabel = hasRecommendationRank
+    ? `#${course.recommendationRank}`
+    : null;
   const reasonText = formatPrimaryRecommendationReason(
     course.recommendationPrimaryTag
   );
