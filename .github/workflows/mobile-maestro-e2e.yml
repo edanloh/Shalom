@@ -54,7 +54,7 @@ jobs:
       - name: Install emulator dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpulse0 libglu1-mesa
+          sudo apt-get install -y libpulse0 libglu1-mesa libxcb-cursor0
 
       - name: Download APK from URL (optional)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.apkUrl != ''
@@ -159,7 +159,7 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           emulator-boot-timeout: 900
-          emulator-options: -no-snapshot -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -camera-back none -gpu swiftshader_indirect -no-metrics
           disable-animations: true
           script: |
             adb kill-server
