@@ -48,8 +48,21 @@ jobs:
       - name: Download APK from URL (optional)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.apkUrl != ''
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -fL "${{ github.event.inputs.apkUrl }}" -o app-from-url.bin
+          URL="${{ github.event.inputs.apkUrl }}"
+          if [[ "$URL" =~ /artifacts/([0-9]+) ]]; then
+            ARTIFACT_ID="${BASH_REMATCH[1]}"
+            API_URL="https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip"
+            curl -fL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$API_URL" \
+              -o app-from-url.bin
+          else
+            curl -fL "$URL" -o app-from-url.bin
+          fi
           if unzip -tqq app-from-url.bin >/dev/null 2>&1; then
             mkdir -p apk-from-url
             unzip -oq app-from-url.bin -d apk-from-url
