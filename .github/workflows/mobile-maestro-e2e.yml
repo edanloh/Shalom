@@ -21,7 +21,7 @@ on:
 jobs:
   maestro-android:
     name: Maestro Android Smoke Test
-    runs-on: ubuntu-latest
+    runs-on: macos-13
     permissions:
       contents: read
       actions: read
@@ -148,7 +148,7 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           emulator-boot-timeout: 900
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
             adb kill-server
