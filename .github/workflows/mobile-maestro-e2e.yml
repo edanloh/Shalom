@@ -167,68 +167,7 @@ jobs:
             adb install -r "${{ steps.apk.outputs.path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
             "$HOME/.maestro/bin/maestro" --version
-            APP_ID="com.jasmine02.shalom"
-
-            dismiss_system_dialogs() {
-              local ui
-              ui="$(adb exec-out uiautomator dump /dev/tty 2>/dev/null || true)"
-
-              # "System UI isn't responding" dialog
-              if echo "$ui" | grep -q 'resource-id="android:id/aerr_wait"'; then
-                adb shell input tap 720 1454 || true
-                sleep 2
-              fi
-
-              # "<App> keeps stopping" dialog
-              if echo "$ui" | grep -q 'resource-id="android:id/aerr_close"'; then
-                adb shell input tap 720 1454 || true
-                sleep 2
-              fi
-            }
-
-            wait_for_login_screen() {
-              local attempt ui
-              for attempt in 1 2 3 4 5; do
-                echo "Preflight attempt ${attempt}: launch app and verify login screen"
-                adb shell am force-stop "$APP_ID" || true
-                sleep 1
-                adb shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
-                sleep 8
-                dismiss_system_dialogs
-
-                ui="$(adb exec-out uiautomator dump /dev/tty 2>/dev/null || true)"
-                if echo "$ui" | grep -q 'Login to your Account'; then
-                  echo "Login screen is visible"
-                  return 0
-                fi
-              done
-
-              echo "Login screen did not appear after retries"
-              return 1
-            }
-
-            adb logcat -c || true
-            LOGCAT_FILE="/tmp/maestro-logcat.txt"
-            : > "$LOGCAT_FILE"
-
-            overall_exit=0
-            for flow in $(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" | sort); do
-              echo "===== Running flow: ${flow} ====="
-              if ! wait_for_login_screen; then
-                echo "Preflight failed before ${flow}"
-                adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
-                overall_exit=1
-                continue
-              fi
-
-              if ! "$HOME/.maestro/bin/maestro" test "$flow"; then
-                echo "Flow failed: ${flow}"
-                adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
-                overall_exit=1
-              fi
-            done
-
-            exit $overall_exit
+            bash mobile/.maestro/run-ci-suite.sh
 
       - name: Upload Maestro debug artifacts
         if: always()
