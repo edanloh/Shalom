@@ -33,14 +33,35 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache-dependency-path: |
+            mobile/package-lock.json
+            package-lock.json
+
+      - name: Detect project paths
+        id: paths
+        shell: bash
+        run: |
+          if [ -d "mobile/android" ]; then
+            echo "project_dir=mobile" >> "$GITHUB_OUTPUT"
+            echo "android_dir=mobile/android" >> "$GITHUB_OUTPUT"
+            echo "apk_path=mobile/android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
+            echo "flow_path=mobile/.maestro/smoke.yaml" >> "$GITHUB_OUTPUT"
+          elif [ -d "android" ]; then
+            echo "project_dir=." >> "$GITHUB_OUTPUT"
+            echo "android_dir=android" >> "$GITHUB_OUTPUT"
+            echo "apk_path=android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
+            echo "flow_path=.maestro/smoke.yaml" >> "$GITHUB_OUTPUT"
+          else
+            echo "Could not find Android project folder (expected mobile/android or android)."
+            exit 1
+          fi
 
       - name: Install dependencies
-        working-directory: mobile
+        working-directory: ${{ steps.paths.outputs.project_dir }}
         run: npm ci
 
       - name: Build Android debug APK
-        working-directory: mobile/android
+        working-directory: ${{ steps.paths.outputs.android_dir }}
         run: |
           chmod +x gradlew
           ./gradlew :app:assembleDebug --no-daemon
@@ -54,8 +75,8 @@ jobs:
           disable-animations: true
           script: |
             adb wait-for-device
-            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r "${{ steps.paths.outputs.apk_path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
             export PATH="$PATH:$HOME/.maestro/bin"
             maestro --version
-            maestro test mobile/.maestro/smoke.yaml
+            maestro test "${{ steps.paths.outputs.flow_path }}"
