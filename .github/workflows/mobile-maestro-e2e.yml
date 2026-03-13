@@ -169,6 +169,5 @@ jobs:
             adb devices
             adb install -r "${{ steps.apk.outputs.path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
-            export PATH="$PATH:$HOME/.maestro/bin"
-            maestro --version
-            maestro test mobile/.maestro/smoke.yaml
+            "$HOME/.maestro/bin/maestro" --version
+            "$HOME/.maestro/bin/maestro" test mobile/.maestro/smoke.yaml
