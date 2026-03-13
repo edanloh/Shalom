@@ -167,12 +167,19 @@ jobs:
             adb install -r "${{ steps.apk.outputs.path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
             "$HOME/.maestro/bin/maestro" --version
-            # Wait for System UI to fully stabilize before running Maestro
+            # Pre-warm: launch the app so System UI ANR can fire and be dismissed via adb
+            # before Maestro takes over — avoids the ANR dialog blocking the login screen
+            adb shell monkey -p com.jasmine02.shalom -c android.intent.category.LAUNCHER 1 || true
             sleep 20
-            # Dismiss any lingering ANR/crash dialogs before Maestro starts
+            # Dismiss any ANR/crash dialog (KEYCODE_BACK)
             adb shell input keyevent 4 2>/dev/null || true
+            sleep 2
             adb shell input keyevent 4 2>/dev/null || true
-            "$HOME/.maestro/bin/maestro" test mobile/.maestro/smoke.yaml
+            sleep 2
+            # Force-stop so Maestro can do a clean launch
+            adb shell am force-stop com.jasmine02.shalom
+            sleep 3
+            "$HOME/.maestro/bin/maestro" test mobile/.maestro/
 
       - name: Upload Maestro debug artifacts
         if: always()
