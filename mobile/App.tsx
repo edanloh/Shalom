@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import UserProvider from "./src/contexts/UserContext";
 import CourseProvider from "./src/contexts/CourseContext";
 import { NotificationProvider } from "./src/contexts/NotificationContext";
+import { MessageProvider } from "./src/contexts/MessageContext";
 import SplashScreen from "./src/screens/SplashScreen";
 import type { RootStackParamList } from "./src/types/navigation";
 import * as Linking from "expo-linking";
@@ -194,12 +195,14 @@ const App = () => {
         <UserProvider>
           <CourseProvider>
             <NotificationProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <SafeAreaProvider>
-                  <StatusBar style="dark" />
-                  <AppNavigator />
-                </SafeAreaProvider>
-              </GestureHandlerRootView>
+              <MessageProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <SafeAreaProvider>
+                    <StatusBar style="dark" />
+                    <AppNavigator />
+                  </SafeAreaProvider>
+                </GestureHandlerRootView>
+              </MessageProvider>
             </NotificationProvider>
           </CourseProvider>
         </UserProvider>

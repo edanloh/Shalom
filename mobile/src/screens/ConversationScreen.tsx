@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, TextStyles, Shadows } from '../constants';
 import { useUser } from '../contexts/UserContext';
+import { useMessages } from '@/contexts/MessageContext';
 import { supabase } from '@/lib/supabase';
 import { CustomTextInput } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,6 +41,7 @@ type Message = {
 
 export default function ConversationScreen({ navigation }: any) {
   const { user } = useUser();
+  const { refreshUnreadMessages } = useMessages();
   const route = useRoute();
   // Accept params as any, fallback to null
   const conversation: Conversation | null =
@@ -84,7 +86,9 @@ export default function ConversationScreen({ navigation }: any) {
     });
     if (error) {
       console.error('Failed to mark messages as read:', error);
+      return;
     }
+    refreshUnreadMessages();
   };
 
   useFocusEffect(() => () => {
@@ -110,6 +114,9 @@ export default function ConversationScreen({ navigation }: any) {
               msg.recipient_id === user.uuid)
           ) {
             setMessages((prev) => [...prev, msg]);
+            if (msg.sender_id === selectedConversation.id) {
+              refreshUnreadMessages();
+            }
           }
         },
       )
