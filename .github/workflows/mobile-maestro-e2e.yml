@@ -17,6 +17,9 @@ jobs:
   maestro-android:
     name: Maestro Android Smoke Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     env:
       NODE_OPTIONS: --openssl-legacy-provider
 
@@ -37,13 +40,41 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
+      - name: Download existing APK artifact
+        id: download_apk
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: react-native-cicd.yml
+          workflow_conclusion: success
+          name: android-dev-apk
+          path: .
+          if_no_artifact_found: warn
+
+      - name: Detect downloaded APK
+        id: apk
+        shell: bash
+        run: |
+          if [ -f "app-dev.apk" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "path=app-dev.apk" >> "$GITHUB_OUTPUT"
+          elif [ -f "android-dev-apk/app-dev.apk" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "path=android-dev-apk/app-dev.apk" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "path=app-dev.apk" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install dependencies
+        if: steps.apk.outputs.found != 'true'
         working-directory: mobile
         run: |
           npm ci
           npm install -g eas-cli@latest
 
       - name: Decrypt google-services.json
+        if: steps.apk.outputs.found != 'true'
         working-directory: mobile
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -56,6 +87,7 @@ jobs:
           ./eas-pre-install.sh
 
       - name: Build Development Android APK (EAS local)
+        if: steps.apk.outputs.found != 'true'
         working-directory: mobile
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -78,7 +110,7 @@ jobs:
           disable-animations: true
           script: |
             adb wait-for-device
-            adb install -r app-dev.apk
+            adb install -r "${{ steps.apk.outputs.path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
             export PATH="$PATH:$HOME/.maestro/bin"
             maestro --version
