@@ -41,24 +41,31 @@ jobs:
         id: paths
         shell: bash
         run: |
-          if [ -d "mobile/android" ]; then
+          if [ -f "mobile/package.json" ]; then
             echo "project_dir=mobile" >> "$GITHUB_OUTPUT"
             echo "android_dir=mobile/android" >> "$GITHUB_OUTPUT"
             echo "apk_path=mobile/android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
             echo "flow_path=mobile/.maestro/smoke.yaml" >> "$GITHUB_OUTPUT"
-          elif [ -d "android" ]; then
+          elif [ -f "package.json" ]; then
             echo "project_dir=." >> "$GITHUB_OUTPUT"
-            echo "android_dir=android" >> "$GITHUB_OUTPUT"
-            echo "apk_path=android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
+            echo "android_dir=./android" >> "$GITHUB_OUTPUT"
+            echo "apk_path=./android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
             echo "flow_path=.maestro/smoke.yaml" >> "$GITHUB_OUTPUT"
           else
-            echo "Could not find Android project folder (expected mobile/android or android)."
+            echo "Could not find JS project folder (expected mobile/package.json or package.json)."
             exit 1
           fi
 
       - name: Install dependencies
         working-directory: ${{ steps.paths.outputs.project_dir }}
         run: npm ci
+
+      - name: Ensure Android native project exists
+        working-directory: ${{ steps.paths.outputs.project_dir }}
+        run: |
+          if [ ! -d "android" ]; then
+            npx expo prebuild --platform android --non-interactive
+          fi
 
       - name: Build Android debug APK
         working-directory: ${{ steps.paths.outputs.android_dir }}
