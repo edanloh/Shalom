@@ -26,7 +26,6 @@ jobs:
       NODE_OPTIONS: --openssl-legacy-provider
 
     steps:
-
       # -------------------------------
       # Checkout repo
       # -------------------------------
@@ -40,11 +39,36 @@ jobs:
         id: apk_url
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.apkUrl != ''
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Downloading APK from URL: ${{ github.event.inputs.apkUrl }}"
-          curl -fL "${{ github.event.inputs.apkUrl }}" -o app-from-url.apk
-          echo "found=true" >> "$GITHUB_OUTPUT"
-          echo "path=app-from-url.apk" >> "$GITHUB_OUTPUT"
+          URL="${{ github.event.inputs.apkUrl }}"
+          echo "Downloading APK from URL: $URL"
+
+          if [[ "$URL" =~ /artifacts/([0-9]+) ]]; then
+            ARTIFACT_ID="${BASH_REMATCH[1]}"
+            API_URL="https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip"
+            curl -fL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$API_URL" \
+              -o app-from-url.bin
+          else
+            curl -fL "$URL" -o app-from-url.bin
+          fi
+
+          if unzip -tqq app-from-url.bin >/dev/null 2>&1; then
+            mkdir -p apk-from-url
+            unzip -oq app-from-url.bin -d apk-from-url
+            APK_PATH=$(find apk-from-url -type f -name "*.apk" | head -n 1)
+            if [ -z "$APK_PATH" ]; then
+              echo "Downloaded ZIP does not contain an APK file."
+              exit 1
+            fi
+            cp "$APK_PATH" app-from-url.apk
+          else
+            mv app-from-url.bin app-from-url.apk
+          fi
 
       # -------------------------------
       # Download previous artifact
