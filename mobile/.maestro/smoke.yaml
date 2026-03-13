@@ -5,8 +5,8 @@ appId: com.jasmine02.shalom
 # Dismiss "System UI isn't responding" ANR dialog if it appears on the CI emulator
 - tapOn:
     text: 'Wait'
-    optional: true
-- extendedWaitUntil:
+    optional: true# Re-launch the app since it goes to background after the ANR dialog is dismissed
+- launchApp- extendedWaitUntil:
     visible:
       text: 'Login to your Account'
     timeout: 30000

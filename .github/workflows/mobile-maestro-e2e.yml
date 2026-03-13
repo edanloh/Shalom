@@ -167,8 +167,11 @@ jobs:
             adb install -r "${{ steps.apk.outputs.path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
             "$HOME/.maestro/bin/maestro" --version
-            # Brief pause to let the app settle before Maestro runs
-            sleep 5
+            # Wait for System UI to fully stabilize before running Maestro
+            sleep 20
+            # Dismiss any lingering ANR/crash dialogs before Maestro starts
+            adb shell input keyevent 4 2>/dev/null || true
+            adb shell input keyevent 4 2>/dev/null || true
             "$HOME/.maestro/bin/maestro" test mobile/.maestro/smoke.yaml
 
       - name: Upload Maestro debug artifacts
