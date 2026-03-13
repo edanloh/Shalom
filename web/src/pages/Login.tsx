@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/useAuth';
-import { useUser } from '@/contexts/useUser';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -20,7 +19,6 @@ const Login = () => {
   const [error, setError] = useState('');
 
   const { login, isAuthenticated, isLoading } = useAuth();
-  const { user } = useUser();
   const navigate = useNavigate();
   React.useEffect(() => {
     // Only redirect if auth check is complete and user is authenticated
@@ -35,7 +33,7 @@ const Login = () => {
     setError('');
     try {
       const resp = await login(email, password);
-      if (!resp.success) {
+      if (!resp?.success) {
         setError(resp.error || 'Login failed. Please try again.');
       } else {
         setError('');
@@ -103,10 +101,7 @@ const Login = () => {
             </Button>
             <p className="text-sm text-center">
               Don't have an account?
-              <a
-                href="/register"
-                className="text-primary hover:underline ml-1"
-              >
+              <a href="/register" className="text-primary hover:underline ml-1">
                 Register here
               </a>
             </p>

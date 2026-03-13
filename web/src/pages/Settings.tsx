@@ -147,7 +147,7 @@ const Settings = () => {
     const currentPassword = currentPasswordInput.value;
     const newPassword = newPasswordInput.value;
     const confirmPassword = confirmPasswordInput.value;
-    if (!validatePassword(newPassword)) {
+    if (validatePassword(newPassword)) {
       toast({
         title: 'Error',
         description: 'New password does not meet requirements.',
@@ -155,7 +155,7 @@ const Settings = () => {
       });
       return;
     }
-    if (!validatePassword(confirmPassword)) {
+    if (validatePassword(confirmPassword)) {
       toast({
         title: 'Error',
         description: 'Confirm password does not meet requirements.',

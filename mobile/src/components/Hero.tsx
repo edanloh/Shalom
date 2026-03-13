@@ -11,7 +11,7 @@ import { Ionicons, MaterialIcons, FontAwesome } from "@expo/vector-icons";
 
 const Hero = () => {
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView testID="hero-scroll" contentContainerStyle={styles.container}>
       {/* Content */}
       <View style={styles.content}>
         {/* Badge */}
@@ -33,7 +33,7 @@ const Hero = () => {
 
         {/* CTA Buttons */}
         <View style={styles.buttons}>
-          <TouchableOpacity style={[styles.button, styles.primaryButton]}>
+          <TouchableOpacity testID="cta-primary" style={[styles.button, styles.primaryButton]}>
             <Ionicons
               name="play"
               size={20}
@@ -43,7 +43,7 @@ const Hero = () => {
             <Text style={styles.buttonText}>Start Learning Free</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.button, styles.outlineButton]}>
+          <TouchableOpacity testID="cta-secondary" style={[styles.button, styles.outlineButton]}>
             <Text style={[styles.buttonText, { color: "#8B5CF6" }]}>
               Browse Courses
             </Text>
@@ -73,6 +73,7 @@ const Hero = () => {
       {/* Hero Image */}
       <View style={styles.imageWrapper}>
         <Image
+          testID="hero-image"
           source={require("@assets/hero-image.jpg")}
           style={styles.heroImage}
           resizeMode="cover"

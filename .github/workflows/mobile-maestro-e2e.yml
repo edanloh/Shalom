@@ -1,0 +1,143 @@
+name: Mobile Maestro E2E
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-maestro-e2e.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-maestro-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      apkUrl:
+        description: Direct URL to APK or ZIP containing APK (optional)
+        required: false
+        type: string
+
+jobs:
+  maestro-android:
+    name: Maestro Android Smoke Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      NODE_OPTIONS: --openssl-legacy-provider
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Download APK from URL (optional)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.apkUrl != ''
+        shell: bash
+        run: |
+          curl -fL "${{ github.event.inputs.apkUrl }}" -o app-from-url.bin
+          if unzip -tqq app-from-url.bin >/dev/null 2>&1; then
+            mkdir -p apk-from-url
+            unzip -oq app-from-url.bin -d apk-from-url
+            APK_PATH=$(find apk-from-url -type f -name "*.apk" | head -n 1)
+            if [ -z "$APK_PATH" ]; then
+              echo "Downloaded ZIP does not contain an APK file."
+              exit 1
+            fi
+            cp "$APK_PATH" app-from-url.apk
+          else
+            mv app-from-url.bin app-from-url.apk
+          fi
+
+      - name: Download existing APK artifact
+        id: download_apk
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: react-native-cicd.yml
+          workflow_conclusion: success
+          name: android-dev-apk
+          path: .
+          if_no_artifact_found: warn
+
+      - name: Detect downloaded APK
+        id: apk
+        shell: bash
+        run: |
+          if [ -f "app-from-url.apk" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "path=app-from-url.apk" >> "$GITHUB_OUTPUT"
+          elif [ -f "app-dev.apk" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "path=app-dev.apk" >> "$GITHUB_OUTPUT"
+          elif [ -f "android-dev-apk/app-dev.apk" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "path=android-dev-apk/app-dev.apk" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "path=app-dev.apk" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.apk.outputs.found != 'true'
+        working-directory: mobile
+        run: |
+          npm ci
+          npm install -g eas-cli@latest
+
+      - name: Decrypt google-services.json
+        if: steps.apk.outputs.found != 'true'
+        working-directory: mobile
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          if [ -f "google-services.json.gpg" ] && [ -z "$GPG_PASSPHRASE" ]; then
+            echo "GPG_PASSPHRASE secret is required to decrypt google-services.json.gpg"
+            exit 1
+          fi
+          chmod +x eas-pre-install.sh
+          ./eas-pre-install.sh
+
+      - name: Build Development Android APK (EAS local)
+        if: steps.apk.outputs.found != 'true'
+        working-directory: mobile
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          NODE_ENV: development
+        run: |
+          export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
+          eas build \
+            --platform android \
+            --profile development \
+            --local \
+            --non-interactive \
+            --output=../app-dev.apk
+
+      - name: Run Maestro smoke test on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          script: |
+            adb wait-for-device
+            adb install -r "${{ steps.apk.outputs.path }}"
+            curl -Ls "https://get.maestro.mobile.dev" | bash
+            export PATH="$PATH:$HOME/.maestro/bin"
+            maestro --version
+            maestro test mobile/.maestro/smoke.yaml
