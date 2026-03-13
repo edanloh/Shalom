@@ -171,3 +171,11 @@ jobs:
             curl -Ls "https://get.maestro.mobile.dev" | bash
             "$HOME/.maestro/bin/maestro" --version
             "$HOME/.maestro/bin/maestro" test mobile/.maestro/smoke.yaml
+
+      - name: Upload Maestro debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-debug-artifacts
+          path: /home/runner/.maestro/tests
+          if-no-files-found: warn
