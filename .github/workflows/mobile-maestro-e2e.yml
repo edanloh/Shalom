@@ -17,6 +17,8 @@ jobs:
   maestro-android:
     name: Maestro Android Smoke Test
     runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --openssl-legacy-provider
 
     steps:
       - name: Checkout
@@ -33,45 +35,39 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: |
-            mobile/package-lock.json
-            package-lock.json
-
-      - name: Detect project paths
-        id: paths
-        shell: bash
-        run: |
-          if [ -f "mobile/package.json" ]; then
-            echo "project_dir=mobile" >> "$GITHUB_OUTPUT"
-            echo "android_dir=mobile/android" >> "$GITHUB_OUTPUT"
-            echo "apk_path=mobile/android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
-            echo "flow_path=mobile/.maestro/smoke.yaml" >> "$GITHUB_OUTPUT"
-          elif [ -f "package.json" ]; then
-            echo "project_dir=." >> "$GITHUB_OUTPUT"
-            echo "android_dir=./android" >> "$GITHUB_OUTPUT"
-            echo "apk_path=./android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
-            echo "flow_path=.maestro/smoke.yaml" >> "$GITHUB_OUTPUT"
-          else
-            echo "Could not find JS project folder (expected mobile/package.json or package.json)."
-            exit 1
-          fi
+          cache-dependency-path: mobile/package-lock.json
 
       - name: Install dependencies
-        working-directory: ${{ steps.paths.outputs.project_dir }}
-        run: npm ci
-
-      - name: Ensure Android native project exists
-        working-directory: ${{ steps.paths.outputs.project_dir }}
+        working-directory: mobile
         run: |
-          if [ ! -d "android" ]; then
-            npx expo prebuild --platform android --non-interactive
+          npm ci
+          npm install -g eas-cli@latest
+
+      - name: Decrypt google-services.json
+        working-directory: mobile
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          if [ -f "google-services.json.gpg" ] && [ -z "$GPG_PASSPHRASE" ]; then
+            echo "GPG_PASSPHRASE secret is required to decrypt google-services.json.gpg"
+            exit 1
           fi
+          chmod +x eas-pre-install.sh
+          ./eas-pre-install.sh
 
-      - name: Build Android debug APK
-        working-directory: ${{ steps.paths.outputs.android_dir }}
+      - name: Build Development Android APK (EAS local)
+        working-directory: mobile
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          NODE_ENV: development
         run: |
-          chmod +x gradlew
-          ./gradlew :app:assembleDebug --no-daemon
+          export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
+          eas build \
+            --platform android \
+            --profile development \
+            --local \
+            --non-interactive \
+            --output=../app-dev.apk
 
       - name: Run Maestro smoke test on emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -82,8 +78,8 @@ jobs:
           disable-animations: true
           script: |
             adb wait-for-device
-            adb install -r "${{ steps.paths.outputs.apk_path }}"
+            adb install -r app-dev.apk
             curl -Ls "https://get.maestro.mobile.dev" | bash
             export PATH="$PATH:$HOME/.maestro/bin"
             maestro --version
-            maestro test "${{ steps.paths.outputs.flow_path }}"
+            maestro test mobile/.maestro/smoke.yaml
