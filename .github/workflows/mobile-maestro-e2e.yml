@@ -25,8 +25,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-    env:
-      NODE_OPTIONS: --openssl-legacy-provider
 
     steps:
       - name: Checkout
@@ -37,13 +35,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
 
       - name: Enable KVM
         run: |
@@ -109,68 +100,15 @@ jobs:
         shell: bash
         run: |
           if [ -f "app-from-url.apk" ]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
             echo "path=app-from-url.apk" >> "$GITHUB_OUTPUT"
           elif [ -f "app-prod.apk" ]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
             echo "path=app-prod.apk" >> "$GITHUB_OUTPUT"
           elif [ -f "android-prod-apk/app-prod.apk" ]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
             echo "path=android-prod-apk/app-prod.apk" >> "$GITHUB_OUTPUT"
           else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "path=app-prod.apk" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Install dependencies
-        if: steps.apk.outputs.found != 'true'
-        working-directory: mobile
-        run: |
-          npm ci
-          npm install -g eas-cli@latest
-
-      - name: Decrypt google-services.json
-        if: steps.apk.outputs.found != 'true'
-        working-directory: mobile
-        env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          if [ -f "google-services.json.gpg" ] && [ -z "$GPG_PASSPHRASE" ]; then
-            echo "GPG_PASSPHRASE secret is required to decrypt google-services.json.gpg"
+            echo "No APK found. Provide one via the apkUrl input or ensure the android-prod-apk artifact exists from a previous build."
             exit 1
           fi
-          chmod +x eas-pre-install.sh
-          ./eas-pre-install.sh
-
-      - name: Build Production Android APK (EAS local)
-        if: steps.apk.outputs.found != 'true'
-        working-directory: mobile
-        env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          NODE_ENV: production
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-        run: |
-          if [ -z "${EXPO_PUBLIC_SUPABASE_URL:-}" ] || [ -z "${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
-            if [ -f ".env" ]; then
-              set -a
-              . ./.env
-              set +a
-            fi
-          fi
-
-          if [ -z "${EXPO_PUBLIC_SUPABASE_URL:-}" ] || [ -z "${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
-            echo "Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY for production build"
-            exit 1
-          fi
-
-          export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
-          eas build \
-            --platform android \
-            --profile production \
-            --local \
-            --non-interactive \
-            --output=../app-prod.apk
 
       - name: Run Maestro test suite on emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -191,9 +129,7 @@ jobs:
             adb wait-for-device
             adb devices
             adb install -r "${{ steps.apk.outputs.path }}"
-            if [ ! -x "$HOME/.maestro/bin/maestro" ]; then
-              curl -Ls "https://get.maestro.mobile.dev" | bash
-            fi
+            [ -x "$HOME/.maestro/bin/maestro" ] || curl -Ls "https://get.maestro.mobile.dev" | bash
             "$HOME/.maestro/bin/maestro" --version
             bash mobile/.maestro/run-ci-suite.sh
 
