@@ -20,7 +20,7 @@ on:
 
 jobs:
   maestro-android:
-    name: Maestro Android Smoke Test
+    name: Maestro Android E2E Test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,6 +55,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libpulse0 libglu1-mesa libxcb-cursor0
+
+      - name: Cache Maestro CLI
+        uses: actions/cache@v4
+        with:
+          path: ~/.maestro
+          key: maestro-${{ runner.os }}-v1
 
       - name: Download APK from URL (optional)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.apkUrl != ''
@@ -166,7 +172,7 @@ jobs:
             --non-interactive \
             --output=../app-prod.apk
 
-      - name: Run Maestro smoke test on emulator
+      - name: Run Maestro test suite on emulator
         uses: reactivecircus/android-emulator-runner@v2
         env:
           MAESTRO_TEST_EMAIL: ${{ secrets.MAESTRO_TEST_EMAIL }}
@@ -185,7 +191,9 @@ jobs:
             adb wait-for-device
             adb devices
             adb install -r "${{ steps.apk.outputs.path }}"
-            curl -Ls "https://get.maestro.mobile.dev" | bash
+            if [ ! -x "$HOME/.maestro/bin/maestro" ]; then
+              curl -Ls "https://get.maestro.mobile.dev" | bash
+            fi
             "$HOME/.maestro/bin/maestro" --version
             bash mobile/.maestro/run-ci-suite.sh
 
