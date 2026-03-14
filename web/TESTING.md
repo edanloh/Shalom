@@ -87,7 +87,7 @@ npm run test:e2e:debug  # Debug mode
 - `courseBuilder.spec.ts` - Course creation form
 - `settings.spec.ts` - User settings and preferences
 
-#### 2. Workflow Tests (`e2e/journeys/*.spec.ts`)
+#### 2. Workflow Tests (`e2e/integration/*-workflow.spec.ts` + `@journey` tag)
 Test complete user journeys across multiple pages.
 
 **Coverage**: 3 critical workflows implemented
@@ -100,8 +100,8 @@ npm run test:e2e:journeys:ui     # Open in UI mode
 
 **Implemented workflows**:
 - ✅ `instructor-course-lifecycle.spec.ts` - Course creation → editing → publishing → analytics
-- ✅ `student-learning-journey.spec.ts` - Course discovery → enrollment → lessons → completion → certificate
-- ✅ `assessment-grading-workflow.spec.ts` - Quiz creation → student takes quiz → instructor grades → results
+- ✅ `student-learning-journey.spec.ts` - Instructor student monitoring (students page → courses → analytics)
+- ✅ `assessment-grading-workflow.spec.ts` - Instructor assessment center navigation → quiz oversight → analytics
 
 **Planned workflows**:
 - ⏳ Communication flow (messages & notifications)
@@ -246,12 +246,10 @@ web/
 ├── e2e/
 │   ├── *.spec.ts               # Page-level E2E tests (17 files)
 │   │
-│   ├── journeys/               # Workflow E2E tests
-│   │   ├── instructor-course-lifecycle.spec.ts
-│   │   ├── student-learning-journey.spec.ts
-│   │   └── assessment-grading-workflow.spec.ts
-│   │
-│   └── integration/            # Integration tests (real database)
+│   └── integration/            # Workflow + integration E2E tests
+│       ├── instructor-course-lifecycle.spec.ts
+│       ├── student-learning-journey.spec.ts
+│       ├── assessment-grading-workflow.spec.ts
 │       ├── README.md           # Setup instructions
 │       ├── setup.ts            # Database utilities
 │       └── enrollment-flow.spec.ts
@@ -352,7 +350,7 @@ npx playwright install  # Install browser binaries
 - ✅ Navigate across multiple pages
 - ✅ Test complete user journeys
 - ✅ Verify state persistence across pages
-- ✅ Test multi-user scenarios (instructor + student)
+- ✅ Test role-correct web scenarios (instructor/admin only)
 - ❌ Don't test individual page details (that's page-level tests)
 - ❌ Don't duplicate page-level test cases
 
@@ -568,15 +566,10 @@ e2e/
 │   ├── courseBuilder.spec.ts
 │   └── ... (17 files)
 │
-├── journeys/                     # Workflow tests (NEW)
+├── integration/                  # Workflow + integration tests (NEW)
 │   ├── instructor-course-lifecycle.spec.ts
 │   ├── student-learning-journey.spec.ts
 │   ├── assessment-grading-workflow.spec.ts
-│   ├── communication-flow.spec.ts
-│   ├── badge-achievement-workflow.spec.ts
-│   └── admin-user-management.spec.ts
-│
-├── integration/                  # Database integration tests (NEW)
 │   ├── course-crud.spec.ts
 │   ├── enrollment-flow.spec.ts
 │   ├── progress-tracking.spec.ts
@@ -593,7 +586,7 @@ e2e/
 ## Priority 1: Workflow Tests (CREATED ✅)
 
 ### Instructor Course Lifecycle
-**File**: `e2e/journeys/instructor-course-lifecycle.spec.ts`
+**File**: `e2e/integration/instructor-course-lifecycle.spec.ts`
 
 **Tests**:
 - Complete course creation, editing, publishing workflow
@@ -606,7 +599,7 @@ e2e/
 - Tests error scenarios and validation
 
 ### Student Learning Journey
-**File**: `e2e/journeys/student-learning-journey.spec.ts`
+**File**: `e2e/integration/student-learning-journey.spec.ts`
 
 **Tests**:
 - Full learning journey from discovery to certification
@@ -619,7 +612,7 @@ e2e/
 - Tests resume functionality after logout/login
 
 ### Assessment & Grading Workflow
-**File**: `e2e/journeys/assessment-grading-workflow.spec.ts`
+**File**: `e2e/integration/assessment-grading-workflow.spec.ts`
 
 **Tests**:
 - Complete assessment lifecycle (creation to grading)
@@ -972,7 +965,7 @@ test.describe('Accessibility Tests', () => {
 ## Priority 6: Additional Workflow Tests
 
 ### Communication Flow
-**File**: `e2e/journeys/communication-flow.spec.ts`
+**File**: `e2e/integration/communication-flow.spec.ts`
 
 **Workflow**:
 - Student sends message to instructor
@@ -983,7 +976,7 @@ test.describe('Accessibility Tests', () => {
 - Verify message persistence
 
 ### Badge & Achievement Workflow
-**File**: `e2e/journeys/badge-achievement-workflow.spec.ts`
+**File**: `e2e/integration/badge-achievement-workflow.spec.ts`
 
 **Workflow**:
 - Complete requirements for badge
@@ -993,7 +986,7 @@ test.describe('Accessibility Tests', () => {
 - Badge sharing functionality
 
 ### Admin User Management
-**File**: `e2e/journeys/admin-user-management.spec.ts`
+**File**: `e2e/integration/admin-user-management.spec.ts`
 
 **Workflow**:
 - Admin approves instructor application
@@ -1008,7 +1001,7 @@ test.describe('Accessibility Tests', () => {
 ## Implementation Timeline
 
 ### Week 1: Foundation
-- ✅ Create `e2e/journeys/` directory structure
+- ✅ Create workflow tests under `e2e/integration/`
 - ✅ Implement 3 core workflow tests (instructor, student, assessment)
 - ✅ Document gaps and create improvement plan
 
@@ -1100,7 +1093,7 @@ jobs:
 {
   "scripts": {
     "test:e2e": "playwright test e2e/*.spec.ts",
-    "test:e2e:journeys": "playwright test e2e/journeys/*.spec.ts",
+    "test:e2e:journeys": "playwright test --grep @journey",
     "test:e2e:integration": "playwright test e2e/integration/*.spec.ts",
     "test:e2e:performance": "playwright test e2e/performance/*.spec.ts --grep @performance",
     "test:e2e:a11y": "playwright test e2e/accessibility/*.spec.ts",
