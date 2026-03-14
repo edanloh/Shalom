@@ -1,0 +1,28 @@
+appId: com.jasmine02.shalom
+---
+- extendedWaitUntil:
+    visible: 'Login to your Account'
+    timeout: 30000
+
+# Sign in with env-provided test credentials.
+- tapOn:
+    text: 'Email'
+- inputText: ${MAESTRO_TEST_EMAIL}
+- hideKeyboard
+
+- tapOn:
+    text: 'Password'
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- hideKeyboard
+
+- tapOn:
+    text: 'Sign In'
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+
+# Successful auth should land on the main app shell.
+- extendedWaitUntil:
+    visible: 'My Courses'
+    timeout: 30000
+- assertVisible: 'My Courses'
+- assertNotVisible: 'Login to your Account'

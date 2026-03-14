@@ -168,6 +168,9 @@ jobs:
 
       - name: Run Maestro smoke test on emulator
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          MAESTRO_TEST_EMAIL: ${{ secrets.MAESTRO_TEST_EMAIL }}
+          MAESTRO_TEST_PASSWORD: ${{ secrets.MAESTRO_TEST_PASSWORD }}
         with:
           api-level: 31
           target: default
@@ -196,6 +199,7 @@ jobs:
             if [ -f "$LOG_FILE" ]; then
               PASSED_TOTAL_LINE="$(grep -E '^Passed/Total: ' "$LOG_FILE" | tail -n 1 || true)"
               FAILED_COUNT_LINE="$(grep -E '^Failed: ' "$LOG_FILE" | tail -n 1 || true)"
+              SKIPPED_COUNT_LINE="$(grep -E '^Skipped: ' "$LOG_FILE" | tail -n 1 || true)"
 
               if [ -n "$PASSED_TOTAL_LINE" ]; then
                 echo "- $PASSED_TOTAL_LINE"
@@ -205,6 +209,10 @@ jobs:
 
               if [ -n "$FAILED_COUNT_LINE" ]; then
                 echo "- $FAILED_COUNT_LINE"
+              fi
+
+              if [ -n "$SKIPPED_COUNT_LINE" ]; then
+                echo "- $SKIPPED_COUNT_LINE"
               fi
 
               echo ""

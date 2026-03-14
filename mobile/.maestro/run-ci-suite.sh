@@ -63,11 +63,30 @@ overall_exit=0
 total_flows=0
 passed_flows=0
 failed_flows=0
+skipped_flows=0
 failed_flow_list=""
+skipped_flow_list=""
+
+maestro_env_args=()
+if [ -n "${MAESTRO_TEST_EMAIL:-}" ]; then
+  maestro_env_args+=("-e" "MAESTRO_TEST_EMAIL=${MAESTRO_TEST_EMAIL}")
+fi
+if [ -n "${MAESTRO_TEST_PASSWORD:-}" ]; then
+  maestro_env_args+=("-e" "MAESTRO_TEST_PASSWORD=${MAESTRO_TEST_PASSWORD}")
+fi
 
 for flow in $(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" | sort); do
   total_flows=$((total_flows + 1))
   echo "===== Running flow: ${flow} ====="
+
+  if [ "$(basename "$flow")" = "auth-login-success.yaml" ] && { [ -z "${MAESTRO_TEST_EMAIL:-}" ] || [ -z "${MAESTRO_TEST_PASSWORD:-}" ]; }; then
+    echo "Skipping ${flow}: MAESTRO_TEST_EMAIL and MAESTRO_TEST_PASSWORD are required for successful auth flow"
+    skipped_flows=$((skipped_flows + 1))
+    skipped_flow_list+="${flow}\n"
+    echo "Flow status: SKIPPED (${flow})"
+    continue
+  fi
+
   if ! wait_for_login_screen; then
     echo "Preflight failed before ${flow}"
     append_crash_report
@@ -79,7 +98,7 @@ for flow in $(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" | sort); d
     continue
   fi
 
-  if ! "$HOME/.maestro/bin/maestro" test "$flow"; then
+  if ! "$HOME/.maestro/bin/maestro" test "${maestro_env_args[@]}" "$flow"; then
     echo "Flow failed: ${flow}"
     # append_crash_report
     adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
@@ -96,9 +115,14 @@ done
 echo "===== Maestro Flow Summary ====="
 echo "Passed/Total: ${passed_flows}/${total_flows}"
 echo "Failed: ${failed_flows}"
+echo "Skipped: ${skipped_flows}"
 if [ "$failed_flows" -gt 0 ]; then
   echo "Failed flows:"
   printf "%b" "$failed_flow_list"
+fi
+if [ "$skipped_flows" -gt 0 ]; then
+  echo "Skipped flows:"
+  printf "%b" "$skipped_flow_list"
 fi
 
 exit $overall_exit
