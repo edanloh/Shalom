@@ -894,8 +894,8 @@ test.describe('CourseDetail Page', () => {
     });
     await enrollDialogButton.click();
 
-    // Should show success message
-    await expect(page.getByText(/enrolled successfully/i)).toBeVisible({
+    // Should show success message (target exact toast content to avoid strict-mode collisions)
+    await expect(page.getByText('1 student enrolled successfully', { exact: true })).toBeVisible({
       timeout: 5000,
     });
   });

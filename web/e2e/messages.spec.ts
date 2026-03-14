@@ -392,7 +392,9 @@ test.describe('Messages page', () => {
     await expect(
       page.getByText('Sure, let us review it tomorrow.').last(),
     ).toBeVisible();
-    expect(mockState.insertedDirectMessageCount).toBe(1);
+    await expect
+      .poll(() => mockState.insertedDirectMessageCount)
+      .toBe(1);
   });
 
   test('prevents sending empty messages', async ({ page }) => {
@@ -502,7 +504,13 @@ test.describe('Messages page', () => {
 
     // Check for unread badge (implementation may vary)
     await expect(page.getByText('John Doe')).toBeVisible();
-    await expect(page.getByText('3')).toBeVisible();
+    const conversationBadge = page
+      .locator('button, div')
+      .filter({ hasText: 'John Doe' })
+      .locator('span, div')
+      .filter({ hasText: /^3$/ })
+      .first();
+    await expect(conversationBadge).toBeVisible();
   });
 
   test('marks messages as read when conversation is selected', async ({

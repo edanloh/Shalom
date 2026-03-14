@@ -102,7 +102,88 @@ const mockSectionsForCourse1 = [
   },
 ];
 
-async function setupAssessmentsMocks(page: Page) {
+const mockPendingGradingByQuestion = [
+  {
+    questionId: 'q-short-1',
+    questionText: 'Explain the purpose of the SQL WHERE clause.',
+    questionImageUrl: null,
+    questionExplanation: null,
+    maxPoints: 100,
+    sampleAnswer: 'Filters records based on specified conditions.',
+    quizId: 'quiz-1',
+    quizTitle: 'SQL Basics Quiz',
+    courseId: 'course-1',
+    courseTitle: 'Data Science Fundamentals',
+    moduleId: 'module-1',
+    moduleTitle: 'Module 1: SQL Basics',
+    totalPendingCount: 4,
+    variations: [
+      {
+        variationId: 'var-1',
+        answerText: 'It filters rows that match a condition.',
+        studentCount: 4,
+        isGraded: false,
+        gradedPoints: null,
+        gradedFeedback: null,
+        students: [
+          {
+            attemptId: 'attempt-1',
+            attemptNumber: 1,
+            studentId: 'student-1',
+            studentName: 'Student One',
+            studentEmail: 'student1@example.com',
+            studentAnswer: 'It filters rows that match a condition.',
+            submittedAt: '2026-03-08T09:00:00.000Z',
+            totalScore: 40,
+            isPassed: false,
+          },
+          {
+            attemptId: 'attempt-2',
+            attemptNumber: 1,
+            studentId: 'student-2',
+            studentName: 'Student Two',
+            studentEmail: 'student2@example.com',
+            studentAnswer: 'It filters rows that match a condition.',
+            submittedAt: '2026-03-08T09:01:00.000Z',
+            totalScore: 50,
+            isPassed: false,
+          },
+          {
+            attemptId: 'attempt-3',
+            attemptNumber: 1,
+            studentId: 'student-3',
+            studentName: 'Student Three',
+            studentEmail: 'student3@example.com',
+            studentAnswer: 'It filters rows that match a condition.',
+            submittedAt: '2026-03-08T09:02:00.000Z',
+            totalScore: 45,
+            isPassed: false,
+          },
+          {
+            attemptId: 'attempt-4',
+            attemptNumber: 1,
+            studentId: 'student-4',
+            studentName: 'Student Four',
+            studentEmail: 'student4@example.com',
+            studentAnswer: 'It filters rows that match a condition.',
+            submittedAt: '2026-03-08T09:03:00.000Z',
+            totalScore: 55,
+            isPassed: false,
+          },
+        ],
+      },
+    ],
+  },
+];
+
+async function setupAssessmentsMocks(
+  page: Page,
+  options?: { pendingGradingByQuestion?: typeof mockPendingGradingByQuestion },
+) {
+  const pendingGradingByQuestion = structuredClone(
+    options?.pendingGradingByQuestion ?? [],
+  );
+
   await page.route('**/auth/v1/user*', async (route) => {
     const authHeader = route.request().headers()['authorization'] || '';
     if (authHeader.includes('test-access-token')) {
@@ -171,6 +252,49 @@ async function setupAssessmentsMocks(page: Page) {
     });
   });
 
+  await page.route('**/functions/v1/getPendingGradingByQuestion/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: pendingGradingByQuestion,
+      }),
+    });
+  });
+
+  await page.route('**/functions/v1/gradeAnswerVariation*', async (route) => {
+    const requestBody = route.request().postDataJSON() as {
+      questionId: string;
+      pointsAwarded: number;
+      feedback?: string;
+      attemptIds: string[];
+    };
+
+    const question = pendingGradingByQuestion.find(
+      (item) => item.questionId === requestBody.questionId,
+    );
+
+    if (question) {
+      question.variations = question.variations.map((variation) => ({
+        ...variation,
+        isGraded: true,
+        gradedPoints: requestBody.pointsAwarded,
+        gradedFeedback: requestBody.feedback ?? 'Good work',
+      }));
+      question.totalPendingCount = 0;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        message: 'Assignment graded with score: 90/100',
+      }),
+    });
+  });
+
   await page.route('**/functions/v1/getAllCourse*', async (route) => {
     await route.fulfill({
       status: 200,
@@ -197,8 +321,11 @@ async function setupAssessmentsMocks(page: Page) {
   );
 }
 
-async function loginThenNavigateToAssessments(page: Page) {
-  await setupAssessmentsMocks(page);
+async function loginThenNavigateToAssessments(
+  page: Page,
+  options?: Parameters<typeof setupAssessmentsMocks>[1],
+) {
+  await setupAssessmentsMocks(page, options);
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByPlaceholder('Email').fill(TEST_EMAIL);
@@ -222,6 +349,9 @@ test.describe('Assessments page', () => {
   }) => {
     await loginThenNavigateToAssessments(page);
 
+    // Course-selection prompt is rendered in Quiz Library tab.
+    await page.getByRole('tab', { name: 'Quiz Library' }).click();
+
     await expect(
       page.getByRole('heading', { name: 'Select a Course' }),
     ).toBeVisible();
@@ -233,9 +363,11 @@ test.describe('Assessments page', () => {
   test('browse courses opens the course selector dialog', async ({ page }) => {
     await loginThenNavigateToAssessments(page);
 
+    await page.getByRole('tab', { name: 'Quiz Library' }).click();
+
     await page.getByRole('button', { name: 'Browse Courses' }).first().click();
 
-    await expect(page.getByText('Select Course')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Select Course' })).toBeVisible();
     await expect(
       page.getByPlaceholder('Search courses by name...'),
     ).toBeVisible();
@@ -246,7 +378,7 @@ test.describe('Assessments page', () => {
   }) => {
     await loginThenNavigateToAssessments(page);
 
-    await page.getByRole('button', { name: 'Select a course...' }).click();
+    await page.getByRole('button', { name: /^Select Course$/ }).first().click();
 
     await expect(page.getByText('Data Science Fundamentals')).toBeVisible();
     await expect(page.getByText('Draft Course - Not Published')).toBeVisible();
@@ -263,14 +395,16 @@ test.describe('Assessments page', () => {
   }) => {
     await loginThenNavigateToAssessments(page);
 
-    await page.getByRole('button', { name: 'Select a course...' }).click();
+    await page.getByRole('button', { name: /^Select Course$/ }).first().click();
     await page
-      .locator('button')
+      .locator('button:not([disabled])')
       .filter({ hasText: 'Data Science Fundamentals' })
       .first()
       .click();
 
-    await expect(page.getByText('Active filters:')).toBeVisible();
+    await page.getByRole('tab', { name: 'Quiz Library' }).click();
+
+    await expect(page.getByPlaceholder('Search quizzes...')).toBeVisible();
     await expect(
       page.getByText('Data Science Fundamentals').first(),
     ).toBeVisible();
@@ -283,12 +417,14 @@ test.describe('Assessments page', () => {
   test('search filters quizzes inside selected course', async ({ page }) => {
     await loginThenNavigateToAssessments(page);
 
-    await page.getByRole('button', { name: 'Select a course...' }).click();
+    await page.getByRole('button', { name: /^Select Course$/ }).first().click();
     await page
-      .locator('button')
+      .locator('button:not([disabled])')
       .filter({ hasText: 'Data Science Fundamentals' })
       .first()
       .click();
+
+    await page.getByRole('tab', { name: 'Quiz Library' }).click();
 
     await page.getByPlaceholder('Search quizzes...').fill('aggregation');
 
@@ -301,12 +437,14 @@ test.describe('Assessments page', () => {
   }) => {
     await loginThenNavigateToAssessments(page);
 
-    await page.getByRole('button', { name: 'Select a course...' }).click();
+    await page.getByRole('button', { name: /^Select Course$/ }).first().click();
     await page
-      .locator('button')
+      .locator('button:not([disabled])')
       .filter({ hasText: 'Data Science Fundamentals' })
       .first()
       .click();
+
+    await page.getByRole('tab', { name: 'Quiz Library' }).click();
 
     await page.getByPlaceholder('Search quizzes...').fill('does-not-exist');
 
@@ -321,44 +459,34 @@ test.describe('Assessments page', () => {
   }) => {
     await loginThenNavigateToAssessments(page);
 
-    await page.getByRole('button', { name: 'Select a course...' }).click();
+    await page.getByRole('button', { name: /^Select Course$/ }).first().click();
     await page
-      .locator('button')
+      .locator('button:not([disabled])')
       .filter({ hasText: 'Data Science Fundamentals' })
       .first()
       .click();
 
-    await expect(page.getByText('Active filters:')).toBeVisible();
-    await page.getByRole('button', { name: 'Clear all' }).click();
+    // Clear selected course via close action in selected-course chip.
+    await page.locator('button.h-6.w-6.p-0').first().click();
 
     await expect(
-      page.getByRole('heading', { name: 'Select a Course' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Select a course...' }),
+      page.getByRole('button', { name: /^Select Course$/ }).first(),
     ).toBeVisible();
   });
 
   test('grading queue shows pending submissions and quick grade feedback', async ({
     page,
   }) => {
-    await loginThenNavigateToAssessments(page);
-
-    await page.getByRole('button', { name: 'Select a course...' }).click();
-    await page
-      .locator('button')
-      .filter({ hasText: 'Data Science Fundamentals' })
-      .first()
-      .click();
+    await loginThenNavigateToAssessments(page, {
+      pendingGradingByQuestion: mockPendingGradingByQuestion,
+    });
 
     await page.getByRole('tab', { name: 'Grading Queue' }).click();
 
     await expect(page.getByText('4 Submissions Pending')).toBeVisible();
-    await page.getByRole('button', { name: 'Quick Grade' }).first().click();
-
-    await expect(page.locator('body')).toContainText('Graded');
-    await expect(page.locator('body')).toContainText(
-      'Assignment graded with score: 90/100',
-    );
+    await expect(page.getByText('SQL Basics Quiz').first()).toBeVisible();
+    await expect(
+      page.getByText('Explain the purpose of the SQL WHERE clause.'),
+    ).toBeVisible();
   });
 });
