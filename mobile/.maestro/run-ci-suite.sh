@@ -3,6 +3,11 @@ set -euo pipefail
 
 APP_ID="com.jasmine02.shalom"
 LOGCAT_FILE="/tmp/maestro-logcat.txt"
+SUITE_LOG_FILE="/tmp/maestro-suite.log"
+
+# Mirror all runner output to file for GitHub job summary parsing.
+: > "$SUITE_LOG_FILE"
+exec > >(tee -a "$SUITE_LOG_FILE") 2>&1
 
 append_crash_report() {
   {

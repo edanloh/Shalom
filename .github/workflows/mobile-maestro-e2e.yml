@@ -184,10 +184,7 @@ jobs:
             adb install -r "${{ steps.apk.outputs.path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
             "$HOME/.maestro/bin/maestro" --version
-            RUN_EXIT=0
-            bash mobile/.maestro/run-ci-suite.sh > /tmp/maestro-suite.log 2>&1 || RUN_EXIT=$?
-            cat /tmp/maestro-suite.log
-            exit "$RUN_EXIT"
+            bash mobile/.maestro/run-ci-suite.sh
 
       - name: Publish Maestro summary
         if: always()

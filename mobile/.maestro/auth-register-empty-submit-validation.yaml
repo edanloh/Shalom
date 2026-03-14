@@ -5,24 +5,18 @@ appId: com.jasmine02.shalom
       text: 'Login to your Account'
     timeout: 30000
 
-# Navigate to the Register screen
+# Open register screen and submit empty form
 - tapOn: 'Sign Up'
 - waitForAnimationToEnd
 - assertVisible: 'Create Your Account'
+- tapOn: 'Sign Up'
 
-# Verify all register form fields are present
-- assertVisible: 'Name'
-- assertVisible: 'Email'
-- assertVisible: 'Password'
+# Android alert should show required fields message
+- assertVisible: 'Please fill in all fields'
+- tapOn: 'OK'
 
-# Navigate back to Login
-- scrollUntilVisible:
-    element:
-      text: 'Login'
-    direction: DOWN
-- tapOn:
-    text: 'Login'
-    retryTapIfNoChange: true
+# Return to login and verify
+- tapOn: 'Login'
 - waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
