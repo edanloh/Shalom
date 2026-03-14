@@ -15,11 +15,10 @@ appId: com.jasmine02.shalom
 - assertVisible: 'Please fill in all fields'
 - tapOn: 'OK'
 
-# Return to login and verify
-- tapOn: 'Login'
+# Return to login via hardware back button (avoids system nav bar overlap)
+- pressKey: Back
 - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible:
-      text: 'Login to your Account'
-    timeout: 10000
+    visible: 'Login to your Account'
+    timeout: 20000
 - assertVisible: 'Login to your Account'

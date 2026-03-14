@@ -172,7 +172,7 @@ jobs:
           api-level: 31
           target: default
           arch: x86_64
-          profile: Nexus 6
+          profile: pixel_xl
           cores: 2
           ram-size: 3072
           emulator-boot-timeout: 900

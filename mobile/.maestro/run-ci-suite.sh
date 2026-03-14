@@ -81,7 +81,7 @@ for flow in $(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" | sort); d
 
   if ! "$HOME/.maestro/bin/maestro" test "$flow"; then
     echo "Flow failed: ${flow}"
-    append_crash_report
+    # append_crash_report
     adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
     failed_flows=$((failed_flows + 1))
     failed_flow_list+="${flow}\n"

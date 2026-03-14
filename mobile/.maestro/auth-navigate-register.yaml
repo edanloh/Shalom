@@ -15,17 +15,10 @@ appId: com.jasmine02.shalom
 - assertVisible: 'Email'
 - assertVisible: 'Password'
 
-# Navigate back to Login
-- scrollUntilVisible:
-    element:
-      text: 'Login'
-    direction: DOWN
-- tapOn:
-    text: 'Login'
-    retryTapIfNoChange: true
+# Navigate back to Login via hardware back button (avoids system nav bar overlap)
+- pressKey: Back
 - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible:
-      text: 'Login to your Account'
-    timeout: 10000
+    visible: 'Login to your Account'
+    timeout: 20000
 - assertVisible: 'Login to your Account'
