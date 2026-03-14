@@ -179,14 +179,15 @@ jobs:
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -camera-back none -gpu swiftshader_indirect -no-metrics -memory 2048
           disable-animations: true
           script: |
-            set -o pipefail
             adb wait-for-device
             adb devices
             adb install -r "${{ steps.apk.outputs.path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
             "$HOME/.maestro/bin/maestro" --version
-            bash mobile/.maestro/run-ci-suite.sh | tee /tmp/maestro-suite.log
-            exit ${PIPESTATUS[0]}
+            RUN_EXIT=0
+            bash mobile/.maestro/run-ci-suite.sh > /tmp/maestro-suite.log 2>&1 || RUN_EXIT=$?
+            cat /tmp/maestro-suite.log
+            exit "$RUN_EXIT"
 
       - name: Publish Maestro summary
         if: always()
