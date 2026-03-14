@@ -55,12 +55,21 @@ adb logcat -c || true
 : > "$LOGCAT_FILE"
 
 overall_exit=0
+total_flows=0
+passed_flows=0
+failed_flows=0
+failed_flow_list=""
+
 for flow in $(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" | sort); do
+  total_flows=$((total_flows + 1))
   echo "===== Running flow: ${flow} ====="
   if ! wait_for_login_screen; then
     echo "Preflight failed before ${flow}"
     append_crash_report
     adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
+    failed_flows=$((failed_flows + 1))
+    failed_flow_list+="${flow}\n"
+    echo "Flow status: FAILED (${flow})"
     overall_exit=1
     continue
   fi
@@ -69,8 +78,22 @@ for flow in $(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" | sort); d
     echo "Flow failed: ${flow}"
     append_crash_report
     adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
+    failed_flows=$((failed_flows + 1))
+    failed_flow_list+="${flow}\n"
+    echo "Flow status: FAILED (${flow})"
     overall_exit=1
+  else
+    passed_flows=$((passed_flows + 1))
+    echo "Flow status: PASSED (${flow})"
   fi
 done
+
+echo "===== Maestro Flow Summary ====="
+echo "Passed/Total: ${passed_flows}/${total_flows}"
+echo "Failed: ${failed_flows}"
+if [ "$failed_flows" -gt 0 ]; then
+  echo "Failed flows:"
+  printf "%b" "$failed_flow_list"
+fi
 
 exit $overall_exit

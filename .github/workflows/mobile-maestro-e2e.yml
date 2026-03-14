@@ -179,12 +179,56 @@ jobs:
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -camera-back none -gpu swiftshader_indirect -no-metrics -memory 2048
           disable-animations: true
           script: |
+            set -o pipefail
             adb wait-for-device
             adb devices
             adb install -r "${{ steps.apk.outputs.path }}"
             curl -Ls "https://get.maestro.mobile.dev" | bash
             "$HOME/.maestro/bin/maestro" --version
-            bash mobile/.maestro/run-ci-suite.sh
+            bash mobile/.maestro/run-ci-suite.sh | tee /tmp/maestro-suite.log
+            exit ${PIPESTATUS[0]}
+
+      - name: Publish Maestro summary
+        if: always()
+        shell: bash
+        run: |
+          LOG_FILE="/tmp/maestro-suite.log"
+          {
+            echo "## Maestro E2E Summary"
+            if [ -f "$LOG_FILE" ]; then
+              PASSED_TOTAL_LINE="$(grep -E '^Passed/Total: ' "$LOG_FILE" | tail -n 1 || true)"
+              FAILED_COUNT_LINE="$(grep -E '^Failed: ' "$LOG_FILE" | tail -n 1 || true)"
+
+              if [ -n "$PASSED_TOTAL_LINE" ]; then
+                echo "- $PASSED_TOTAL_LINE"
+              else
+                echo "- Passed/Total: unavailable"
+              fi
+
+              if [ -n "$FAILED_COUNT_LINE" ]; then
+                echo "- $FAILED_COUNT_LINE"
+              fi
+
+              echo ""
+              echo "### Flow Status"
+              FLOW_STATUS_LINES="$(grep -E '^Flow status: ' "$LOG_FILE" || true)"
+              if [ -n "$FLOW_STATUS_LINES" ]; then
+                echo "$FLOW_STATUS_LINES" | sed 's/^/- /'
+              else
+                echo "- No per-flow status lines found."
+              fi
+
+              if grep -q '^Failed flows:' "$LOG_FILE"; then
+                echo ""
+                echo "### Failed Flows"
+                awk '/^Failed flows:/{flag=1; next} /^=====/{if (flag) exit} flag {print}' "$LOG_FILE" \
+                  | sed '/^\s*$/d' \
+                  | sed 's/^/- /'
+              fi
+            else
+              echo "- Maestro run log not found at $LOG_FILE"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Maestro debug artifacts
         if: always()

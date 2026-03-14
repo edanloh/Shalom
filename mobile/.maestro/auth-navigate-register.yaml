@@ -6,7 +6,9 @@ appId: com.jasmine02.shalom
     timeout: 30000
 
 # Navigate to the Register screen
-- tapOn: 'Sign Up'
+- tapOn:
+  text: 'Sign Up'
+- waitForAnimationToEnd
 - assertVisible: 'Create Your Account'
 
 # Verify all register form fields are present
@@ -15,5 +17,16 @@ appId: com.jasmine02.shalom
 - assertVisible: 'Password'
 
 # Navigate back to Login
-- tapOn: 'Login'
+- scrollUntilVisible:
+    element:
+      text: 'Login'
+    direction: DOWN
+- tapOn:
+    text: 'Login'
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      text: 'Login to your Account'
+    timeout: 10000
 - assertVisible: 'Login to your Account'
