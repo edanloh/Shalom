@@ -25,14 +25,22 @@ append_recent_logcat() {
 
 capture_flow_screenshot() {
   local flow="$1"
-  local flow_name ts screenshot_file
-  flow_name="$(basename "$flow" .yaml)"
-  ts="$(date +%Y%m%d-%H%M%S)"
+  local flow_name ts screenshot_file tmp_file
+  flow_name="$(basename "$flow")"
+  flow_name="${flow_name%.yaml}"
+  flow_name="${flow_name%.yml}"
+  ts="$(date +%Y%m%d-%H%M%S-%N)"
   screenshot_file="${SCREENSHOT_DIR}/${ts}-${flow_name}.png"
+  tmp_file="${screenshot_file}.tmp"
 
   # Keep the suite running even when screenshot capture fails.
-  adb exec-out screencap -p > "$screenshot_file" 2>/dev/null || true
-  echo "Screenshot saved: ${screenshot_file}"
+  if adb exec-out screencap -p > "$tmp_file" 2>/dev/null && [ -s "$tmp_file" ]; then
+    mv "$tmp_file" "$screenshot_file"
+    echo "Screenshot saved: ${screenshot_file}"
+  else
+    rm -f "$tmp_file"
+    echo "Screenshot capture failed for ${flow}"
+  fi
 }
 
 dismiss_system_dialogs() {
@@ -96,9 +104,17 @@ record_skip() {
 
 should_skip_flow() {
   local flow="$1"
-  [ "$(basename "$flow")" = "auth-login-success.yaml" ] && {
-    [ -z "${MAESTRO_TEST_EMAIL:-}" ] || [ -z "${MAESTRO_TEST_PASSWORD:-}" ]
-  }
+  local flow_file
+  flow_file="$(basename "$flow")"
+
+  case "$flow_file" in
+    auth-login-success.yaml|main-*.yaml)
+      [ -z "${MAESTRO_TEST_EMAIL:-}" ] || [ -z "${MAESTRO_TEST_PASSWORD:-}" ]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 run_flow() {

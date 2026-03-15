@@ -195,3 +195,11 @@ jobs:
           name: android-logcat
           path: /tmp/maestro-logcat.txt
           if-no-files-found: warn
+
+      - name: Upload Maestro screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-screenshots
+          path: /tmp/maestro-screenshots
+          if-no-files-found: warn
