@@ -50,9 +50,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   const loginWithToken = async ({ access_token, refresh_token, type }: Tokens & { type?: string }) => {
-    console.log('[DeepLink] loginWithToken called', {
+    console.log('loginWithToken called', {
       access_token,
       refresh_token,
+      type,
     });
     setIsLoading(true);
     const signIn = async () => {
@@ -67,7 +68,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       data: { user: supabaseUser, session: supabaseSession },
     } = await signIn();
 
-    console.log('[DeepLink] Supabase user after setSession:', supabaseUser);
+    // console.log('[DeepLink] Supabase user after setSession:', supabaseUser);
+    // console.log('[DeepLink] Supabase session after setSession:', supabaseSession);
     if (type === 'recovery') {
       setIsResettingPassword(true);
       setUser({
@@ -78,6 +80,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         last_login: supabaseUser?.last_sign_in_at || '',
         auth_provider: supabaseUser?.app_metadata?.provider || 'email',
       });
+      setIsLoading(false);
     } else {
       // Google login
       setUser({
@@ -228,27 +231,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           redirectTo
         );
         if (result.type === 'success' && result.url) {
-          // Parse the URL fragment for access_token, refresh_token, etc.
-          const url = result.url;
-          const params = Linking.parse(url);
-          // After redirect, Supabase should handle session automatically if storage is set up
-          // Fetch the session from Supabase
-          const { data: sessionData } = await supabase.auth.getSession();
-          setSession(sessionData.session);
-          const supabaseUser = sessionData.session?.user;
-          setUser(
-            supabaseUser
-              ? {
-                  id: supabaseUser.id,
-                  email: supabaseUser.email || '',
-                  name: supabaseUser.user_metadata?.name || '',
-                  joined_at: supabaseUser.created_at || '',
-                  last_login: supabaseUser.last_sign_in_at || '',
-                  auth_provider:
-                    supabaseUser.app_metadata?.provider || 'google',
-                }
-              : null
-          );
+          // console.log("OAuth result:", result);
+          // Parse the fragment after '#'
+          const fragment = result.url.split('#')[1];
+          const params = new URLSearchParams(fragment);
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          if (access_token && refresh_token) {
+            await loginWithToken({ access_token, refresh_token, type: 'google' });
+          } else {
+            throw new Error('Tokens not found in OAuth result');
+          }
+          // // After redirect, Supabase should handle session automatically if storage is set up
+          // // Fetch the session from Supabase
+          // const { data: sessionData } = await supabase.auth.getSession();
+          // setSession(sessionData.session);
+          // console.log('[Google OAuth] Session after login:', sessionData.session);
+          // const data = await supabase.auth.getUser(); // Ensure user data is loaded
+          // console.log('[Google OAuth] User after login:', data);
+          // const supabaseUser = sessionData.session?.user;
+          // setUser(
+          //   supabaseUser
+          //     ? {
+          //         id: supabaseUser.id,
+          //         email: supabaseUser.email || '',
+          //         name: supabaseUser.user_metadata?.name || '',
+          //         joined_at: supabaseUser.created_at || '',
+          //         last_login: supabaseUser.last_sign_in_at || '',
+          //         auth_provider:
+          //           supabaseUser.app_metadata?.provider || 'google',
+          //       }
+          //     : null
+          // );
         } else {
           throw new Error('Google sign-in cancelled or failed');
         }

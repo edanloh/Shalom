@@ -91,7 +91,8 @@ const AppNavigator = () => {
         const refresh_token = parsedUrl.queryParams?.refresh_token;
         if (
           typeof access_token === "string" &&
-          typeof refresh_token === "string"
+          typeof refresh_token === "string" && 
+          parsedUrl.queryParams?.type === 'recovery'
         ) {
           console.log("[DeepLink] Found tokens in initial URL");
           void loginWithToken({ access_token, refresh_token, type: parsedUrl.queryParams?.type});
@@ -115,7 +116,8 @@ const AppNavigator = () => {
       const refresh_token = parsedUrl.queryParams?.refresh_token;
       if (
         typeof access_token === "string" &&
-        typeof refresh_token === "string"
+        typeof refresh_token === "string" && 
+        parsedUrl.queryParams?.type === 'recovery'
       ) {
         void loginWithToken({ access_token, refresh_token, type: parsedUrl.queryParams?.type });
       }
