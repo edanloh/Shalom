@@ -129,6 +129,10 @@ run_flow() {
   record_success "$flow"
 }
 
+discover_flows() {
+  find mobile/.maestro -maxdepth 1 -type f \( -name "*.yaml" -o -name "*.yml" \) -print0 | sort -z
+}
+
 adb logcat -c || true
 : > "$LOGCAT_FILE"
 mkdir -p "$SCREENSHOT_DIR"
@@ -149,11 +153,17 @@ if [ -n "${MAESTRO_TEST_PASSWORD:-}" ]; then
   maestro_env_args+=("-e" "MAESTRO_TEST_PASSWORD=${MAESTRO_TEST_PASSWORD}")
 fi
 
-while IFS= read -r -d '' flow; do
+mapfile -d '' flows < <(discover_flows)
+echo "Discovered ${#flows[@]} Maestro flow file(s)"
+for flow in "${flows[@]}"; do
+  echo "Flow discovered: ${flow}"
+done
+
+for flow in "${flows[@]}"; do
   total_flows=$((total_flows + 1))
   run_flow "$flow"
   capture_flow_screenshot "$flow"
-done < <(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" -print0 | sort -z)
+done
 
 echo "===== Maestro Flow Summary ====="
 echo "Passed/Total: ${passed_flows}/${total_flows}"
