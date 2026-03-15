@@ -4,6 +4,7 @@ set -euo pipefail
 APP_ID="com.jasmine02.shalom"
 LOGCAT_FILE="/tmp/maestro-logcat.txt"
 SUITE_LOG_FILE="/tmp/maestro-suite.log"
+SCREENSHOT_DIR="/tmp/maestro-screenshots"
 
 # Mirror all runner output to file for GitHub job summary parsing.
 : > "$SUITE_LOG_FILE"
@@ -16,6 +17,22 @@ append_crash_report() {
     echo "===== App/Fatal Filter ====="
     adb logcat -d | grep -E "${APP_ID}|FATAL EXCEPTION|Fatal signal|Abort message|JsErrorHandler|BridgelessReact|supabaseUrl is required" || true
   } >> "$LOGCAT_FILE"
+}
+
+append_recent_logcat() {
+  adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
+}
+
+capture_flow_screenshot() {
+  local flow="$1"
+  local flow_name ts screenshot_file
+  flow_name="$(basename "$flow" .yaml)"
+  ts="$(date +%Y%m%d-%H%M%S)"
+  screenshot_file="${SCREENSHOT_DIR}/${ts}-${flow_name}.png"
+
+  # Keep the suite running even when screenshot capture fails.
+  adb exec-out screencap -p > "$screenshot_file" 2>/dev/null || true
+  echo "Screenshot saved: ${screenshot_file}"
 }
 
 dismiss_system_dialogs() {
@@ -56,8 +73,65 @@ wait_for_login_screen() {
   return 1
 }
 
+record_failure() {
+  local flow="$1"
+  failed_flows=$((failed_flows + 1))
+  failed_flow_list+="${flow}\n"
+  echo "Flow status: FAILED (${flow})"
+  overall_exit=1
+}
+
+record_success() {
+  local flow="$1"
+  passed_flows=$((passed_flows + 1))
+  echo "Flow status: PASSED (${flow})"
+}
+
+record_skip() {
+  local flow="$1"
+  skipped_flows=$((skipped_flows + 1))
+  skipped_flow_list+="${flow}\n"
+  echo "Flow status: SKIPPED (${flow})"
+}
+
+should_skip_flow() {
+  local flow="$1"
+  [ "$(basename "$flow")" = "auth-login-success.yaml" ] && {
+    [ -z "${MAESTRO_TEST_EMAIL:-}" ] || [ -z "${MAESTRO_TEST_PASSWORD:-}" ]
+  }
+}
+
+run_flow() {
+  local flow="$1"
+  echo "===== Running flow: ${flow} ====="
+
+  if should_skip_flow "$flow"; then
+    echo "Skipping ${flow}: MAESTRO_TEST_EMAIL and MAESTRO_TEST_PASSWORD are required for successful auth flow"
+    record_skip "$flow"
+    return 0
+  fi
+
+  if ! wait_for_login_screen; then
+    echo "Preflight failed before ${flow}"
+    append_crash_report
+    append_recent_logcat
+    record_failure "$flow"
+    return 0
+  fi
+
+  if ! "$HOME/.maestro/bin/maestro" test "${maestro_env_args[@]}" "$flow"; then
+    echo "Flow failed: ${flow}"
+    append_recent_logcat
+    record_failure "$flow"
+    return 0
+  fi
+
+  record_success "$flow"
+}
+
 adb logcat -c || true
 : > "$LOGCAT_FILE"
+mkdir -p "$SCREENSHOT_DIR"
 
 overall_exit=0
 total_flows=0
@@ -75,42 +149,11 @@ if [ -n "${MAESTRO_TEST_PASSWORD:-}" ]; then
   maestro_env_args+=("-e" "MAESTRO_TEST_PASSWORD=${MAESTRO_TEST_PASSWORD}")
 fi
 
-for flow in $(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" | sort); do
+while IFS= read -r -d '' flow; do
   total_flows=$((total_flows + 1))
-  echo "===== Running flow: ${flow} ====="
-
-  if [ "$(basename "$flow")" = "auth-login-success.yaml" ] && { [ -z "${MAESTRO_TEST_EMAIL:-}" ] || [ -z "${MAESTRO_TEST_PASSWORD:-}" ]; }; then
-    echo "Skipping ${flow}: MAESTRO_TEST_EMAIL and MAESTRO_TEST_PASSWORD are required for successful auth flow"
-    skipped_flows=$((skipped_flows + 1))
-    skipped_flow_list+="${flow}\n"
-    echo "Flow status: SKIPPED (${flow})"
-    continue
-  fi
-
-  if ! wait_for_login_screen; then
-    echo "Preflight failed before ${flow}"
-    append_crash_report
-    adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
-    failed_flows=$((failed_flows + 1))
-    failed_flow_list+="${flow}\n"
-    echo "Flow status: FAILED (${flow})"
-    overall_exit=1
-    continue
-  fi
-
-  if ! "$HOME/.maestro/bin/maestro" test "${maestro_env_args[@]}" "$flow"; then
-    echo "Flow failed: ${flow}"
-    # append_crash_report
-    adb logcat -d | tee -a "$LOGCAT_FILE" | tail -n 400 || true
-    failed_flows=$((failed_flows + 1))
-    failed_flow_list+="${flow}\n"
-    echo "Flow status: FAILED (${flow})"
-    overall_exit=1
-  else
-    passed_flows=$((passed_flows + 1))
-    echo "Flow status: PASSED (${flow})"
-  fi
-done
+  run_flow "$flow"
+  capture_flow_screenshot "$flow"
+done < <(find mobile/.maestro -maxdepth 1 -type f -name "*.yaml" -print0 | sort -z)
 
 echo "===== Maestro Flow Summary ====="
 echo "Passed/Total: ${passed_flows}/${total_flows}"
