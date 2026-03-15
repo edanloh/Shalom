@@ -25,13 +25,15 @@ appId: com.jasmine02.shalom
     timeout: 30000
 
 # Navigate to profile first in case the app lands on a different tab.
-- tapOn: 'Profile'
+- tapOn:
+    point: '88%, 88%' # Profile tab
 - extendedWaitUntil:
     visible: 'Profile'
     timeout: 20000
 
 # Verify quick-action pages can be opened and closed.
-- tapOn: 'Points History'
+- tapOn:
+    point: '17%, 48%' # Points History quick-action card (leftmost of 3)
 - extendedWaitUntil:
     visible: 'Points History'
     timeout: 20000
@@ -41,7 +43,8 @@ appId: com.jasmine02.shalom
     visible: 'Profile'
     timeout: 20000
 
-- tapOn: 'Learning Goal'
+- tapOn:
+    point: '50%, 48%' # Learning Goal quick-action card (center)
 - extendedWaitUntil:
     visible: 'Learning Goals'
     timeout: 20000
@@ -51,7 +54,8 @@ appId: com.jasmine02.shalom
     visible: 'Profile'
     timeout: 20000
 
-- tapOn: 'Certificates'
+- tapOn:
+    point: '83%, 48%' # Certificates quick-action card (rightmost of 3)
 - extendedWaitUntil:
     visible: 'Certificates'
     timeout: 20000

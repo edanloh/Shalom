@@ -25,25 +25,29 @@ appId: com.jasmine02.shalom
     timeout: 30000
 
 # Smoke-check each main tab without relying on backend list data.
-- tapOn: 'Courses'
+- tapOn:
+    point: '31%, 88%' # Courses tab
 - extendedWaitUntil:
     visible: 'Browse Courses'
     timeout: 20000
 - assertVisible: 'Browse Courses'
 
-- tapOn: 'Notifications'
+- tapOn:
+    point: '50%, 88%' # Notifications tab
 - extendedWaitUntil:
     visible: 'Notifications'
     timeout: 20000
 - assertVisible: 'Notifications'
 
-- tapOn: 'Messages'
+- tapOn:
+    point: '69%, 88%' # Messages tab
 - extendedWaitUntil:
     visible: 'Messages'
     timeout: 20000
 - assertVisible: 'Messages'
 
-- tapOn: 'Profile'
+- tapOn:
+    point: '88%, 88%' # Profile tab
 - extendedWaitUntil:
     visible: 'Profile'
     timeout: 20000

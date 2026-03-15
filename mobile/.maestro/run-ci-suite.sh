@@ -146,7 +146,7 @@ run_flow() {
 }
 
 discover_flows() {
-  find mobile/.maestro -maxdepth 1 -type f \( -name "*.yaml" -o -name "*.yml" \) -print0 | sort -z
+  find mobile/.maestro -maxdepth 1 -type f \( -name "*.yaml" -o -name "*.yml" \) ! -name "_*.yaml" ! -name "_*.yml" -print0 | sort -z
 }
 
 adb logcat -c || true
