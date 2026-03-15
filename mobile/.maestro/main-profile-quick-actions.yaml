@@ -21,7 +21,7 @@ appId: com.jasmine02.shalom
 - waitForAnimationToEnd
 
 - extendedWaitUntil:
-    visible: 'Profile'
+    visible: 'My Courses'
     timeout: 30000
 
 # Navigate to profile first in case the app lands on a different tab.
