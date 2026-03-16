@@ -28,12 +28,12 @@ serve(async (req) => {
     const url = new URL(req.url);
 
     // Query parameters
-    const limit = Number(url.searchParams.get("limit") ?? 20);
+    const limit = Number(url.searchParams.get("limit") ?? 24);
     const offset = Number(url.searchParams.get("offset") ?? 0);
     const filterField = url.searchParams.get("filterField");
     const filterValue = url.searchParams.get("filterValue");
-    const sortBy = url.searchParams.get("sortBy") ?? "created_at";
-    const sortOrder = url.searchParams.get("sortOrder") ?? "asc";
+    const sortBy = url.searchParams.get("sortBy") ?? "updated_at";
+    const sortOrder = url.searchParams.get("sortOrder") ?? "desc";
 
     const allowedSortFields = [
       "title",
@@ -44,7 +44,7 @@ serve(async (req) => {
     ];
 
     // Validate sort parameters
-    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "created_at";
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "updated_at";
     const ascending = sortOrder.toLowerCase() !== "desc";
 
     // Build query
@@ -58,8 +58,11 @@ serve(async (req) => {
         )
       `, { count: 'exact' })
       .eq('is_published', true)  // Only return published courses
-      .range(offset, offset + limit - 1)
       .order(safeSortBy, { ascending });
+
+    if (Number.isFinite(limit) && limit > 0) {
+      query = query.range(offset, offset + limit - 1);
+    }
 
     // Apply filters
     if (filterField && filterValue && filterField !== "level") {

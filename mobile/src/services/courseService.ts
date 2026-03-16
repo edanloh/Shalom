@@ -211,6 +211,16 @@ export interface CategoryApiResponse {
   };
 }
 
+export interface PaginatedCoursesResult {
+  courses: Course[];
+  pagination: {
+    limit: number;
+    offset: number;
+    totalCount: number;
+    hasMore: boolean;
+  };
+}
+
 // Cache utility functions
 class CacheManager {
   static async get<T>(key: string): Promise<T | null> {
@@ -254,6 +264,41 @@ class CacheManager {
     }
   }
 }
+
+const getCoursesCacheKey = (params?: CourseListParams): string => {
+  const paramString = params ? JSON.stringify(params) : 'default';
+  return `${CACHE_CONFIG.COURSES_KEY}_${paramString}`;
+};
+
+const extractCoursesResponse = (response: any): PaginatedCoursesResult => {
+  if (!response) {
+    throw new Error('No response received from API');
+  }
+
+  let coursesArray;
+  if (Array.isArray(response.data)) {
+    coursesArray = response.data;
+  } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
+    coursesArray = response.data.courses;
+  } else if (response.courses && Array.isArray(response.courses)) {
+    coursesArray = response.courses;
+  } else if (Array.isArray(response)) {
+    coursesArray = response;
+  } else {
+    console.error('Invalid API response structure:', JSON.stringify(response).slice(0, 500));
+    throw new Error('Invalid API response: courses array not found');
+  }
+
+  return {
+    courses: coursesArray.map(convertAWSCourseToAppCourse),
+    pagination: {
+      limit: Number(response?.pagination?.limit ?? coursesArray.length ?? 0),
+      offset: Number(response?.pagination?.offset ?? 0),
+      totalCount: Number(response?.pagination?.totalCount ?? coursesArray.length ?? 0),
+      hasMore: Boolean(response?.pagination?.hasMore),
+    },
+  };
+};
 
 // Helper function to convert AWS course format to our app format
 const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
@@ -460,8 +505,7 @@ class CourseService {
   async getCourses(params?: CourseListParams): Promise<Course[]> {
     try {
       // Check cache first
-      const paramString = params ? JSON.stringify(params) : 'default';
-      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_${paramString}`;
+      const cacheKey = getCoursesCacheKey(params);
       const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
       if (cachedCourses) {
         return cachedCourses;
@@ -469,42 +513,16 @@ class CourseService {
 
       // Build query parameters
       const queryParams: Record<string, string> = {};
-      if (params?.limit) queryParams.limit = params.limit.toString();
+      queryParams.limit = String(params?.limit ?? 24);
       if (params?.category) queryParams.category = params.category;
-      if (params?.sortBy) queryParams.sortBy = params.sortBy;
-      if (params?.sortOrder) queryParams.sortOrder = params.sortOrder;
+      queryParams.sortBy = params?.sortBy ?? 'updated_at';
+      queryParams.sortOrder = params?.sortOrder ?? 'desc';
 
       const response = await apiService.get<any>(
         ENDPOINTS.COURSES,
         queryParams
       );
-      // Safety check: ensure response exists
-      if (!response) {
-        throw new Error('No response received from API');
-      }
-
-      // The API response structure is: { success: true, data: [...], pagination: {...} }
-      // Where data is the array of courses directly
-      let coursesArray;
-      if (Array.isArray(response.data)) {
-        // Format: { success: true, data: [...] }
-        coursesArray = response.data;
-      } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
-        // Nested format: { success: true, data: { courses: [...] } }
-        coursesArray = response.data.courses;
-      } else if (response.courses && Array.isArray(response.courses)) {
-        // Direct format: { courses: [...] }
-        coursesArray = response.courses;
-      } else if (Array.isArray(response)) {
-        // Array format: [...]
-        coursesArray = response;
-      } else {
-        console.error('Invalid API response structure:', JSON.stringify(response).slice(0, 500));
-        throw new Error('Invalid API response: courses array not found');
-      }
-      
-      // Convert AWS course format to our app format
-      const courses = coursesArray.map(convertAWSCourseToAppCourse);
+      const { courses } = extractCoursesResponse(response);
 
       // Cache the response
       await CacheManager.set(cacheKey, courses);
@@ -514,6 +532,26 @@ class CourseService {
       console.error('Error fetching courses:', error);
       throw error;
     }
+  }
+
+  async getPublishedCoursesPage(
+    params?: CourseListParams & { offset?: number }
+  ): Promise<PaginatedCoursesResult> {
+    const queryParams: Record<string, string> = {
+      limit: String(params?.limit ?? 24),
+      offset: String(params?.offset ?? 0),
+      sortBy: params?.sortBy ?? 'updated_at',
+      sortOrder: params?.sortOrder ?? 'desc',
+    };
+
+    if (params?.category) queryParams.category = params.category;
+
+    const response = await apiService.get<any>(ENDPOINTS.COURSES, queryParams);
+    return extractCoursesResponse(response);
+  }
+
+  async clearCoursesCache(params?: CourseListParams): Promise<void> {
+    await CacheManager.clear(getCoursesCacheKey(params));
   }
 
   /**

@@ -1265,6 +1265,7 @@ const courseSelect = `
 
       const dismissPenalty = Math.min(2, rec.dismissals * 0.4);
       const recentlyShownWithoutPositive =
+        rec.impressions >= 2 &&
         rec.lastImpressionTs > 0 &&
         rec.lastImpressionTs > rec.lastPositiveTs &&
         nowTs - rec.lastImpressionTs < suppressionWindowMs;
