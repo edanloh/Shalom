@@ -1,0 +1,35 @@
+appId: com.jasmine02.shalom
+---
+- extendedWaitUntil:
+    visible: 'Login to your Account'
+    timeout: 30000
+
+# Authenticate with CI-provided credentials.
+- tapOn:
+    text: 'Email'
+- inputText: ${MAESTRO_TEST_EMAIL}
+- hideKeyboard
+
+- tapOn:
+    text: 'Password'
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- hideKeyboard
+
+- tapOn:
+    text: 'Sign In'
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible: 'My Courses'
+    timeout: 30000
+
+# Open Courses tab and verify core Courses UI.
+- tapOn:
+    point: '31%, 88%' # Courses tab
+- extendedWaitUntil:
+    visible: 'Browse Courses'
+    timeout: 20000
+- assertVisible: 'Browse Courses'
+- assertVisible: 'Search for courses'
+- assertVisible: 'Recommended'

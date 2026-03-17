@@ -61,7 +61,7 @@ function progressFrom(course: Course): number {
 
 export default function CoursesScreen({ navigation }: any) {
   const {
-    courses = [],
+    myCourses = [],
     recommendedCourses = [],
     loading,
     recommendedLoading,
@@ -70,18 +70,24 @@ export default function CoursesScreen({ navigation }: any) {
     wishlist = [],
     toggleWishlist,
     recordRecommendationEvent,
-  } = useCourses();
+} = useCourses();
+
+  const PAGE_SIZE = 24;
 
   const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
   const isWishlisted = (c: Course) => wishIds.has(c.id);
-  const { enrolledCourses = [], user: profileUser } = useUser();
-  const recommendationUserId = profileUser?.uuid;
+  const { enrolledCourses = [] } = useUser();
 
   // UI state
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [catalogCourses, setCatalogCourses] = useState<Course[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogLoadingMore, setCatalogLoadingMore] = useState(false);
+  const [catalogHasMore, setCatalogHasMore] = useState(true);
+  const [catalogOffset, setCatalogOffset] = useState(0);
 
   // Fetch categories from API
   const fetchCategories = useCallback(async () => {
@@ -100,6 +106,49 @@ export default function CoursesScreen({ navigation }: any) {
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  const loadCatalogPage = useCallback(
+    async ({ reset = false, offset }: { reset?: boolean; offset?: number } = {}) => {
+      const startOffset = reset ? 0 : (offset ?? catalogOffset);
+      if (!reset && (catalogLoading || catalogLoadingMore || !catalogHasMore)) return;
+
+      if (reset) {
+        setCatalogLoading(true);
+      } else {
+        setCatalogLoadingMore(true);
+      }
+
+      try {
+        const result = await courseService.getPublishedCoursesPage({
+          limit: PAGE_SIZE,
+          offset: startOffset,
+          sortBy: "updated_at",
+          sortOrder: "desc",
+        });
+
+        setCatalogCourses((prev) => {
+          if (reset) return result.courses;
+          const existing = new Set(prev.map((course) => course.id));
+          return [...prev, ...result.courses.filter((course) => !existing.has(course.id))];
+        });
+        setCatalogOffset(startOffset + result.courses.length);
+        setCatalogHasMore(result.pagination.hasMore);
+      } catch (error) {
+        console.error("Error loading course catalog:", error);
+      } finally {
+        if (reset) {
+          setCatalogLoading(false);
+        } else {
+          setCatalogLoadingMore(false);
+        }
+      }
+    },
+    [catalogHasMore, catalogLoading, catalogLoadingMore, catalogOffset, PAGE_SIZE]
+  );
+
+  useEffect(() => {
+    loadCatalogPage({ reset: true });
+  }, []);
 
   // Build category chips with "All" option
   const categoryChips: string[] = useMemo(() => {
@@ -122,25 +171,25 @@ export default function CoursesScreen({ navigation }: any) {
   const enrolledIds = new Set<string>(enrolledCourses as string[]);
 
   const jumpBackIn = useMemo(
-    () => courses.filter((c) => enrolledIds.has(c.id)),
-    [courses, enrolledIds],
+    () => myCourses.filter((c) => enrolledIds.has(c.id)),
+    [myCourses, enrolledIds],
   );
 
   const recommended = useMemo(() => {
     if (query) return [];
     if (recommendedCourses.length) return recommendedCourses;
-    return courses.filter((c) => !enrolledIds.has(c.id)).slice(0, 10);
-  }, [courses, enrolledIds, query, recommendedCourses]);
+    return catalogCourses.filter((c) => !enrolledIds.has(c.id)).slice(0, 10);
+  }, [catalogCourses, enrolledIds, query, recommendedCourses]);
 
   const popular = useMemo(() => {
     // Not enrolled, filtered by category and query
-    let base = courses.filter((c) => !enrolledIds.has(c.id));
+    let base = catalogCourses.filter((c) => !enrolledIds.has(c.id));
     if (selectedCategory !== "All") {
       base = base.filter((c) => c.category === selectedCategory);
     }
     base = searchLocal(query, base);
     return base;
-  }, [courses, enrolledIds, selectedCategory, query]);
+  }, [catalogCourses, enrolledIds, selectedCategory, query]);
 
   // ---- small UI bits ----
   const MetaRow = ({
@@ -192,11 +241,12 @@ export default function CoursesScreen({ navigation }: any) {
         refreshCourses?.(),
         refreshRecommended?.(),
         fetchCategories(),
+        loadCatalogPage({ reset: true }),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refreshCourses, refreshRecommended, fetchCategories]);
+  }, [refreshCourses, refreshRecommended, fetchCategories, loadCatalogPage]);
 
   const BadgeHeartRow = ({ item }: { item: Course }) => (
     <View style={styles.badgeRow}>
@@ -501,7 +551,7 @@ export default function CoursesScreen({ navigation }: any) {
           <Text style={[TextStyles.h4, { marginVertical: Spacing.sm }]}>
             Popular Courses
           </Text>
-          {loading || refreshing ? (
+          {catalogLoading || loading || refreshing ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.purple400} />
               <Text style={styles.loadingText}>Loading popular courses…</Text>
@@ -525,6 +575,21 @@ export default function CoursesScreen({ navigation }: any) {
               subtext="Pull down to refresh."
             />
           )}
+          {catalogHasMore ? (
+            <View style={styles.paginationFooter}>
+              {catalogLoadingMore ? (
+                <ActivityIndicator size="small" color={Colors.purple400} />
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => loadCatalogPage({ offset: catalogOffset })}
+                  style={styles.loadMoreButton}
+                >
+                  <Text style={styles.loadMoreButtonText}>Load more courses</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
           <View style={{ height: 120 }} />
         </View>
       </ScrollView>
@@ -600,6 +665,27 @@ const styles = StyleSheet.create({
     fontSize: TextStyles.body.fontSize,
     color: Colors.textSecondary,
     marginTop: Spacing.md,
+  },
+  paginationFooter: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+  },
+  loadMoreButton: {
+    minWidth: 180,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.purple400,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadMoreButtonText: {
+    color: Colors.white,
+    fontFamily: TextStyles.body.fontFamily,
+    fontSize: TextStyles.body.fontSize,
+    fontWeight: "600",
   },
 
   emptyWrap: {

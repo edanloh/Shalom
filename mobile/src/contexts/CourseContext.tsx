@@ -213,6 +213,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   };
 
   const refreshCourses = async () => {
+    await courseService.clearCoursesCache();
     await loadCourses();
   };
 

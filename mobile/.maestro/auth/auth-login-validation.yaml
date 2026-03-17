@@ -13,5 +13,9 @@ appId: com.jasmine02.shalom
 - tapOn:
     text: 'Email'
 - inputText: 'test@example.com'
-- tapOn: 'Sign In'
+- hideKeyboard
+- tapOn:
+    text: 'Sign In'
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
 - assertVisible: 'Please fill in all the fields'

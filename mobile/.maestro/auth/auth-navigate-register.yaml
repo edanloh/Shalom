@@ -7,6 +7,7 @@ appId: com.jasmine02.shalom
 
 # Navigate to the Register screen
 - tapOn: 'Sign Up'
+- waitForAnimationToEnd
 - assertVisible: 'Create Your Account'
 
 # Verify all register form fields are present
@@ -14,6 +15,10 @@ appId: com.jasmine02.shalom
 - assertVisible: 'Email'
 - assertVisible: 'Password'
 
-# Navigate back to Login
-- tapOn: 'Login'
+# Navigate back to Login via hardware back button (avoids system nav bar overlap)
+- pressKey: Back
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: 'Login to your Account'
+    timeout: 20000
 - assertVisible: 'Login to your Account'

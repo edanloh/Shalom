@@ -1,0 +1,54 @@
+appId: com.jasmine02.shalom
+---
+- extendedWaitUntil:
+    visible: 'Login to your Account'
+    timeout: 30000
+
+# Authenticate with CI-provided credentials.
+- tapOn:
+    text: 'Email'
+- inputText: ${MAESTRO_TEST_EMAIL}
+- hideKeyboard
+
+- tapOn:
+    text: 'Password'
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- hideKeyboard
+
+- tapOn:
+    text: 'Sign In'
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible: 'My Courses'
+    timeout: 30000
+
+# Smoke-check each main tab without relying on backend list data.
+- tapOn:
+    point: '31%, 88%' # Courses tab
+- extendedWaitUntil:
+    visible: 'Browse Courses'
+    timeout: 20000
+- assertVisible: 'Browse Courses'
+
+- tapOn:
+    point: '50%, 88%' # Notifications tab
+- extendedWaitUntil:
+    visible: 'Notifications'
+    timeout: 20000
+- assertVisible: 'Notifications'
+
+- tapOn:
+    point: '69%, 88%' # Messages tab
+- extendedWaitUntil:
+    visible: 'Messages'
+    timeout: 20000
+- assertVisible: 'Messages'
+
+- tapOn:
+    point: '88%, 88%' # Profile tab
+- extendedWaitUntil:
+    visible: 'Profile'
+    timeout: 20000
+- assertVisible: 'Profile'
