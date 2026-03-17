@@ -24,7 +24,13 @@ import LessonDetail from "./pages/LessonDetail";
 import QuizTaking from "./pages/QuizTaking";
 import { UserProvider } from "./contexts/UserContext";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <AuthProvider>

@@ -12,7 +12,6 @@ import {
   fetchUserProfile,
   updateUserProfile,
   uploadProfilePic,
-  registerCheck,
 } from '@/services/userService';
 
 export interface UserContextType {
@@ -27,6 +26,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { authUser } = useAuth();
+  const authUserId = authUser?.id;
 
   const fetchUser = useCallback(
     async (email: string): Promise<User> => {
@@ -35,14 +35,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         const data = await fetchUserProfile(email);
         // Change the db's id to uuid
         data.uuid = data.id;
-        data.id = authUser!.id; // set id to authUser id
+        if (authUserId) {
+          data.id = authUserId; // set id to auth user id when available
+        }
         setUser(data);
         return data;
       } finally {
         setIsLoading(false);
       }
     },
-    [authUser],
+    [authUserId],
   );
 
   useEffect(() => {
@@ -50,8 +52,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (authUser) {
         setIsLoading(true);
         try {
-          await registerCheck(authUser);
           await fetchUser(authUser!.email);
+        } catch {
+          setUser(null);
         } finally {
           setIsLoading(false);
         }

@@ -122,9 +122,11 @@ export const Header = () => {
 
     return () => {
       isActive = false;
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel).catch(() => {
+        // Channel may be closing before websocket is fully established.
+      });
     };
-  }, [userId, location.pathname]);
+  }, [userId]);
 
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/" },

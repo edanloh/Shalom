@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback, ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { AuthContext } from './AuthContextStore';
 
 import { supabase } from '@/lib/supabase';
 import {
   registerCheck,
-  fetchUserProfile,
   approveInstructor as ApproveInstructor,
 } from '@/services/userService';
 
@@ -41,6 +40,11 @@ export interface AuthContextType {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authUser, setAuthUser] = useState<SupabaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const authUserRef = useRef<SupabaseUser | null>(null);
+
+  useEffect(() => {
+    authUserRef.current = authUser;
+  }, [authUser]);
 
   const toAuthUser = useCallback((user: any): SupabaseUser => {
     return {
@@ -59,7 +63,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const validateAndSetAuthorizedUser = useCallback(
     async (user: any) => {
       const auth_user = toAuthUser(user);
-      const check = await registerCheck(auth_user);
+      let check: any;
+      try {
+        check = await registerCheck(auth_user);
+      } catch {
+        return {
+          success: false,
+          error: 'Unable to verify account right now. Please try again.',
+        };
+      }
 
       if (!check?.success) {
         setAuthUser(null);
@@ -78,8 +90,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      setAuthUser(auth_user);
-      await fetchUserProfile(check.user.email);
+      setAuthUser((prev) => {
+        if (prev && prev.id === auth_user.id && prev.email === auth_user.email) {
+          return prev;
+        }
+        return auth_user;
+      });
       return { success: true };
     },
     [hasAllowedRole, toAuthUser],
@@ -106,7 +122,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     getSession();
     // Listen for auth state changes
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        // Supabase emits TOKEN_REFRESHED when focus returns; avoid full auth loading flicker.
+        if (event === 'TOKEN_REFRESHED') {
+          return;
+        }
+
+        // SIGNED_IN can re-fire on tab focus for the same active user.
+        if (
+          event === 'SIGNED_IN' &&
+          session?.user &&
+          authUserRef.current?.id === session.user.id &&
+          authUserRef.current?.email === session.user.email
+        ) {
+          return;
+        }
+
         const syncAuthState = async () => {
           setIsLoading(true);
           try {
@@ -115,6 +146,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             } else {
               setAuthUser(null);
             }
+          } catch {
+            // Keep current auth state on transient failures (timeouts/network hiccups).
           } finally {
             setIsLoading(false);
           }
