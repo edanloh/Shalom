@@ -230,7 +230,7 @@ export interface CourseBuilderQuizQuestion {
   text: string;
   type: 'multiple-choice' | 'true-false' | 'multiple-correct';
   options: string[];
-  correctAnswer: number | number[];
+  correctAnswer: number | number[] | null;
   imageUrl?: string | null;
   points: number;
   sampleAnswer: string;
@@ -911,8 +911,16 @@ class CourseService {
               }
 
               // Parse correctAnswer: Backend stores index as string, convert to number
-              let correctAnswer: number | number[];
-              const questionType = question.question_type || question.type || "multiple-choice";
+              let correctAnswer: number | number[] | null;
+              const rawQuestionType = question.question_type || question.type || "multiple-choice";
+              const questionType =
+                rawQuestionType === "mcq" || rawQuestionType === "multiple_choice"
+                  ? "multiple-choice"
+                  : rawQuestionType === "true_false"
+                    ? "true-false"
+                    : rawQuestionType === "short_answer"
+                      ? "short-answer"
+                      : rawQuestionType;
 
               if (questionType === "multiple-choice" || questionType === "multiple_choice") {
                 // Handle both old format (text values) and new format (numeric indices)
@@ -930,10 +938,10 @@ class CourseService {
                   } else {
                     // Not found as text, try parsing as numeric index (handles "0", "1", etc.)
                     const numericAnswer = parseInt(rawCorrectAnswer, 10);
-                    correctAnswer = !isNaN(numericAnswer) ? numericAnswer : 0;
+                    correctAnswer = !isNaN(numericAnswer) ? numericAnswer : null;
                   }
                 } else {
-                  correctAnswer = 0;
+                  correctAnswer = null;
                 }
               } else if (questionType === "true-false") {
                 // For true/false, backend stores index as string ("0" or "1")
@@ -956,29 +964,36 @@ class CourseService {
                 } else if (rawCorrectAnswer === false) {
                   correctAnswer = 1;
                 } else {
-                  correctAnswer = 0;
+                  correctAnswer = null;
                 }
               } else if (questionType === "multiple-correct") {
                 // Multiple correct answers - can be stored as:
                 // - NEW format: array of numeric indices [0, 1, 2]
                 // - OLD format: array of text values ["2", "4", "3"]
                 if (Array.isArray(rawCorrectAnswer)) {
-                  correctAnswer = rawCorrectAnswer.map((ans: any) => {
+                  const mappedAnswers = rawCorrectAnswer.map((ans: any) => {
                     if (typeof ans === "number") {
                       // NEW format: numeric index, use directly
                       return ans;
                     } else if (typeof ans === "string") {
                       // OLD format: text value, find in options array
                       const idx = options.findIndex((opt: string) => String(opt).trim() === String(ans).trim());
-                      return idx >= 0 ? idx : 0;
+                      return idx;
                     }
-                    return 0;
+                    return -1;
                   });
+                  correctAnswer = Array.from(
+                    new Set(
+                      mappedAnswers.filter(
+                        (idx: number) => Number.isInteger(idx) && idx >= 0 && idx < options.length,
+                      ),
+                    ),
+                  );
                 } else {
-                  correctAnswer = [0];
+                  correctAnswer = [];
                 }
               } else {
-                correctAnswer = 0;
+                correctAnswer = null;
               }
 
               // Parse matching pairs - for matching type, correct_answer contains the pairs

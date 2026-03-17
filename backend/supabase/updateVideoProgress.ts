@@ -366,22 +366,30 @@ serve(async (req) => {
     const completedAt = isCompleted ? new Date().toISOString() : null;
     const { data: existingProgress, error: existingProgressError } = await supabaseClient
       .from('user_video_progress')
-      .select('watch_time_seconds,is_completed')
+      .select('watch_time_seconds,is_completed,completed_at')
       .eq('user_id', userId)
       .eq('video_id', videoId)
       .maybeSingle();
 
     if (existingProgressError) throw existingProgressError;
 
+    const existingWatchTime = Number(existingProgress?.watch_time_seconds ?? 0);
+    const incomingWatchTime = Number(watchTimeSeconds ?? 0);
+    const nextWatchTime = Math.max(existingWatchTime, incomingWatchTime);
+    const nextIsCompleted = Boolean(existingProgress?.is_completed) || Boolean(isCompleted);
+    const nextCompletedAt = nextIsCompleted
+      ? (existingProgress?.completed_at || completedAt || new Date().toISOString())
+      : null;
+
     const { data: progress, error: progressError } = await supabaseClient
       .from('user_video_progress')
       .upsert({
         user_id: userId,
         video_id: videoId,
-        watch_time_seconds: watchTimeSeconds,
-        is_completed: isCompleted || false,
+        watch_time_seconds: nextWatchTime,
+        is_completed: nextIsCompleted,
         last_position_seconds: lastPositionSeconds,
-        completed_at: completedAt,
+        completed_at: nextCompletedAt,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'user_id,video_id',

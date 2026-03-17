@@ -78,7 +78,10 @@ export const QuizHeader = ({
               value={quiz?.passingScore || 70}
               onChange={(e) =>
                 updateQuiz(moduleId, quiz.id, {
-                  passingScore: parseInt(e.target.value) || 70,
+                  passingScore:
+                    e.target.value === ""
+                      ? 70
+                      : Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)),
                 })
               }
               min="0"

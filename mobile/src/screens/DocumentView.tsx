@@ -96,7 +96,10 @@ const DocumentView = () => {
   const docType = documentDetail?.resource_type || documentType || 'pdf';
   const supportedViewers = useMemo(() => {
     if (docType === "document") {
-      return DOCUMENT_VIEWERS.filter((viewer) => viewer.name === "Office Online");
+      return DOCUMENT_VIEWERS.filter(
+        (viewer) =>
+          viewer.name === "Office Online" || viewer.name === "Google Drive Viewer"
+      );
     }
     const filtered = DOCUMENT_VIEWERS.filter((viewer) =>
       viewer.supportedTypes.includes(docType as any)
@@ -239,12 +242,16 @@ const DocumentView = () => {
 
   // Automatically try next viewer on error
   const handleDocumentError = () => {
+    if (documentLoadError) return;
+
     console.log(`❌ Document Viewer error with ${supportedViewers[currentViewerIndex]?.name || 'viewer'}`);
     
     clearAllTimeouts();
     
     // Record this attempt
-    setViewerAttempts((prev) => [...prev, currentViewerIndex]);
+    setViewerAttempts((prev) =>
+      prev.includes(currentViewerIndex) ? prev : [...prev, currentViewerIndex]
+    );
 
     // Auto-advance to next viewer
     if (currentViewerIndex < supportedViewers.length - 1) {
@@ -272,7 +279,11 @@ const DocumentView = () => {
 
   // Start load timeout when viewer changes
   useEffect(() => {
-    if (documentDetail?.resource_url && !successfulViewer && currentViewerIndex < supportedViewers.length) {
+    if (
+      documentDetail?.resource_url &&
+      successfulViewer === null &&
+      currentViewerIndex < supportedViewers.length
+    ) {
       clearAllTimeouts();
       
       const currentViewer = supportedViewers[currentViewerIndex];
@@ -290,7 +301,24 @@ const DocumentView = () => {
     }
     
     return () => clearAllTimeouts();
-  }, [currentViewerIndex, documentDetail?.resource_url, supportedViewers]);
+  }, [
+    currentViewerIndex,
+    documentDetail?.resource_url,
+    supportedViewers,
+    successfulViewer,
+    isLoadingViewer,
+    documentLoadError,
+  ]);
+
+  // Reset viewer pipeline when a different document is opened.
+  useEffect(() => {
+    clearAllTimeouts();
+    setCurrentViewerIndex(0);
+    setViewerAttempts([]);
+    setDocumentLoadError(false);
+    setIsLoadingViewer(true);
+    setSuccessfulViewer(null);
+  }, [documentDetail?.id, docType]);
 
   // Handle WebView load events
   const handleWebViewLoad = (syntheticEvent: any) => {
@@ -316,9 +344,9 @@ const DocumentView = () => {
   };
 
   const handleWebViewLoadEnd = () => {
-    // Only mark as success if we haven't detected errors
-    if (!viewerAttempts.includes(currentViewerIndex)) {
-      // Will be confirmed by injected JavaScript check
+    // Some providers block JS bridge checks; treat load-end as success fallback.
+    if (successfulViewer === null && !viewerAttempts.includes(currentViewerIndex)) {
+      handleDocumentLoadSuccess();
     }
   };
 

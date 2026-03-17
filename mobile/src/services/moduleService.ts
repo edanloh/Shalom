@@ -129,7 +129,20 @@ class ModuleService {
         throw new Error(response.message || 'Failed to fetch module details');
       }
 
-      return response.data;
+      // Ensure deterministic ordering for lock/progress logic.
+      const normalizedSections = [...(response.data.sections || [])]
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((section) => ({
+          ...section,
+          items: [...(section.items || [])].sort(
+            (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0),
+          ),
+        }));
+
+      return {
+        ...response.data,
+        sections: normalizedSections,
+      };
     } catch (error) {
       console.error('Error fetching module details:', error);
       throw error;
@@ -190,6 +203,18 @@ class ModuleService {
       return false;
     }
     return false;
+  }
+
+  /**
+   * Check if entire section is completed.
+   */
+  isSectionCompleted(section: CourseSection, userProgress?: UserProgress): boolean {
+    if (section.module_is_completed !== undefined) {
+      return section.module_is_completed;
+    }
+
+    if (!section.items || section.items.length === 0) return false;
+    return section.items.every((item) => this.isItemCompleted(item, userProgress));
   }
 
   /**

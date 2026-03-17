@@ -259,6 +259,25 @@ const LessonEditor = ({
 // Helper: Get errors for a single question
 const getQuestionErrors = (question: any): string[] => {
   const errors: string[] = [];
+  const options = Array.isArray(question.options) ? question.options : [];
+
+  const resolveAnswerIndex = (answer: any): number => {
+    if (Number.isInteger(answer)) return answer;
+    if (typeof answer === "string") {
+      return options.findIndex(
+        (opt: any) => String(opt).trim() === answer.trim(),
+      );
+    }
+    return -1;
+  };
+
+  const resolveAnswerIndices = (answer: any): number[] => {
+    const raw = Array.isArray(answer) ? answer : [answer];
+    const mapped = raw
+      .map((item: any) => resolveAnswerIndex(item))
+      .filter((idx: number) => Number.isInteger(idx) && idx >= 0);
+    return Array.from(new Set(mapped));
+  };
 
   if (!question.text?.trim()) {
     errors.push("Question text is required");
@@ -272,25 +291,21 @@ const getQuestionErrors = (question: any): string[] => {
 
   // Type-specific validation
   if (question.type === "multiple-choice") {
-    // Must have a correct answer selected
-    if (
-      question.correctAnswer === null ||
-      question.correctAnswer === undefined
-    ) {
+    const answerIndex = resolveAnswerIndex(question.correctAnswer);
+
+    // Must have a correct answer selected and resolvable to an option index
+    if (answerIndex < 0) {
       errors.push("Select a correct answer");
     }
+
     // The selected answer must point to a non-empty option
-    if (
-      question.correctAnswer !== null &&
-      question.correctAnswer !== undefined
-    ) {
-      const selectedOption = question.options?.[question.correctAnswer];
-      if (!selectedOption || !String(selectedOption).trim()) {
-        errors.push("Correct answer points to an empty option");
-      }
+    const selectedOption = options[answerIndex];
+    if (answerIndex >= 0 && (!selectedOption || !String(selectedOption).trim())) {
+      errors.push("Correct answer points to an empty option");
     }
+
     // At least one non-empty option
-    const hasOptions = question.options?.some((opt: any) => String(opt).trim());
+    const hasOptions = options.some((opt: any) => String(opt).trim());
     if (!hasOptions) {
       errors.push("At least one option is required");
     }
@@ -298,22 +313,20 @@ const getQuestionErrors = (question: any): string[] => {
 
   if (question.type === "multiple-correct") {
     // Must have at least one answer checked
-    const checkedAnswers = Array.isArray(question.correctAnswer)
-      ? question.correctAnswer
-      : [];
+    const checkedAnswers = resolveAnswerIndices(question.correctAnswer);
     if (checkedAnswers.length === 0) {
       errors.push("Select at least one correct answer");
     }
     // None of the checked answers should point to empty options
     for (const idx of checkedAnswers) {
-      const option = question.options?.[idx];
+      const option = options[idx];
       if (!option || !String(option).trim()) {
         errors.push("A correct answer points to an empty option");
         break;
       }
     }
     // At least one non-empty option
-    const hasOptions = question.options?.some((opt: any) => String(opt).trim());
+    const hasOptions = options.some((opt: any) => String(opt).trim());
     if (!hasOptions) {
       errors.push("At least one option is required");
     }

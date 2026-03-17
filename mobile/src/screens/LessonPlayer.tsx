@@ -246,7 +246,7 @@ const LessonPlayer = () => {
     try {
       // Only mark as completed if user watched at least 90% of the video
       const watchPercentage = (currentPosition / duration) * 100;
-      const isCompleted = currentPosition >= duration * 0.90;
+      const isCompleted = isVideoCompleted || currentPosition >= duration * 0.90;
       
       console.log('💾 Saving progress:', {
         currentPosition,
@@ -266,6 +266,7 @@ const LessonPlayer = () => {
       // Update local state if video is now completed
       if (isCompleted && videoDetail && videoDetail.userProgress) {
         console.log('✅ Updating local state - video completed!');
+        setIsVideoCompleted(true);
         setVideoDetail({
           ...videoDetail,
           userProgress: {
@@ -550,7 +551,10 @@ const LessonPlayer = () => {
           if (currentTime >= 1 && videoDuration > 0) {
             const watchPercentage = (currentTime / videoDuration) * 100;
             // Force completion if state is "ended", otherwise use 90% threshold
-            const isCompleted = state === "ended" || currentTime >= videoDuration * 0.90;
+            const isCompleted =
+              isVideoCompleted ||
+              state === "ended" ||
+              currentTime >= videoDuration * 0.90;
 
             console.log("📹 Saving YouTube progress directly:", {
               currentTime,
@@ -603,16 +607,6 @@ const LessonPlayer = () => {
               lastPositionSeconds: Math.floor(currentTime),
             }).catch(err => {
               console.error("❌ Error saving YouTube progress:", err);
-              // Optionally revert UI state if API call fails
-              if (isCompleted && videoDetail && videoDetail.userProgress) {
-                setVideoDetail((prevDetail) => ({
-                  ...prevDetail!,
-                  userProgress: {
-                    ...prevDetail!.userProgress!,
-                    is_completed: false,
-                  },
-                }));
-              }
             });
           } else {
             console.log(
