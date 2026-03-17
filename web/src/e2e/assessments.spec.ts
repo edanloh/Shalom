@@ -176,7 +176,7 @@ const mockPendingGradingByQuestion = [
   },
 ];
 
-async function setupAssessmentsMocks(
+async function setupQuizMocks(
   page: Page,
   options?: { pendingGradingByQuestion?: typeof mockPendingGradingByQuestion },
 ) {
@@ -321,11 +321,11 @@ async function setupAssessmentsMocks(
   );
 }
 
-async function loginThenNavigateToAssessments(
+async function loginThenNavigateToQuiz(
   page: Page,
-  options?: Parameters<typeof setupAssessmentsMocks>[1],
+  options?: Parameters<typeof setupQuizMocks>[1],
 ) {
-  await setupAssessmentsMocks(page, options);
+  await setupQuizMocks(page, options);
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByPlaceholder('Email').fill(TEST_EMAIL);
@@ -337,17 +337,17 @@ async function loginThenNavigateToAssessments(
     waitUntil: 'domcontentloaded',
   });
 
-  await page.goto('/assessments', { waitUntil: 'domcontentloaded' });
+  await page.goto('/quiz', { waitUntil: 'domcontentloaded' });
   await expect(
     page.getByRole('heading', { name: 'Assessment Center' }),
   ).toBeVisible();
 }
 
-test.describe('Assessments page', () => {
+test.describe('Quiz page', () => {
   test('shows course selection prompt before filters are applied', async ({
     page,
   }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
     // Course-selection prompt is rendered in Quiz Library tab.
     await page.getByRole('tab', { name: 'Quiz Library' }).click();
@@ -361,7 +361,7 @@ test.describe('Assessments page', () => {
   });
 
   test('browse courses opens the course selector dialog', async ({ page }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
     await page.getByRole('tab', { name: 'Quiz Library' }).click();
 
@@ -376,7 +376,7 @@ test.describe('Assessments page', () => {
   test('shows published and draft courses in selector, with draft disabled', async ({
     page,
   }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
     await page.getByRole('button', { name: /^Select Course$/ }).first().click();
 
@@ -393,7 +393,7 @@ test.describe('Assessments page', () => {
   test('selecting a published course loads quiz library cards', async ({
     page,
   }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
     await page.getByRole('button', { name: /^Select Course$/ }).first().click();
     await page
@@ -415,7 +415,7 @@ test.describe('Assessments page', () => {
   });
 
   test('search filters quizzes inside selected course', async ({ page }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
     await page.getByRole('button', { name: /^Select Course$/ }).first().click();
     await page
@@ -435,7 +435,7 @@ test.describe('Assessments page', () => {
   test('shows empty state when no quizzes match search query', async ({
     page,
   }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
     await page.getByRole('button', { name: /^Select Course$/ }).first().click();
     await page
@@ -457,7 +457,7 @@ test.describe('Assessments page', () => {
   test('clear all resets selected course and returns to selection prompt', async ({
     page,
   }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
     await page.getByRole('button', { name: /^Select Course$/ }).first().click();
     await page
@@ -477,7 +477,7 @@ test.describe('Assessments page', () => {
   test('grading queue shows pending submissions and quick grade feedback', async ({
     page,
   }) => {
-    await loginThenNavigateToAssessments(page, {
+    await loginThenNavigateToQuiz(page, {
       pendingGradingByQuestion: mockPendingGradingByQuestion,
     });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import Assessments from '@/pages/Assessments';
+import Quiz from '@/pages/Quiz';
 
 // Mock all dependencies
 vi.mock('@/components/Header', () => ({
@@ -59,14 +59,14 @@ const renderWithRouter = (component: React.ReactElement) => {
   return render(<BrowserRouter>{component}</BrowserRouter>);
 };
 
-describe('Assessments Page', () => {
+describe('Quiz Page', () => {
   beforeEach(() => {
     vi. clearAllMocks();
   });
 
   describe('Component Rendering', () => {
     it('should render without crashing', async () => {
-      renderWithRouter(<Assessments />);
+      renderWithRouter(<Quiz />);
 
       await waitFor(() => {
         expect(screen.getByText('Header')).toBeInTheDocument();
@@ -74,7 +74,7 @@ describe('Assessments Page', () => {
     });
 
     it('should render page components', async () => {
-      renderWithRouter(<Assessments />);
+      renderWithRouter(<Quiz />);
 
       await waitFor(() => {
         const buttons = screen.getAllByRole('button');

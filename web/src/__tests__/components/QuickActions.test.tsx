@@ -56,14 +56,14 @@ describe('QuickActions', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/students');
   });
 
-  it('navigates to assessments when Grade is clicked', async () => {
+  it('navigates to quiz when Grade is clicked', async () => {
     const user = userEvent.setup();
     renderWithRouter(<QuickActions />);
 
     const gradeButton = screen.getByText('Grade');
     await user.click(gradeButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/assessments');
+    expect(mockNavigate).toHaveBeenCalledWith('/quiz');
   });
 
   it('navigates to badges when Badges is clicked', async () => {

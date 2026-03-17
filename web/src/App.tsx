@@ -12,7 +12,7 @@ import Courses from "./pages/Courses";
 import Analytics from "./pages/Analytics";
 import Students from "./pages/Students";
 import CourseStudents from "./pages/CourseStudents";
-import Assessments from "./pages/Assessments";
+import Quiz from "./pages/Quiz";
 import Messages from "./pages/Messages";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -46,7 +46,7 @@ const App = () => (
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/students" element={<Students />} />
                 <Route path="/course/:courseId/students" element={<CourseStudents />} />
-                <Route path="/assessments" element={<Assessments />} />
+                <Route path="/quiz" element={<Quiz />} />
                 <Route path="/messages" element={<Messages />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route

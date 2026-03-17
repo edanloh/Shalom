@@ -85,7 +85,7 @@ test.describe('Instructor Student Monitoring Journey - Complete Workflow @journe
     // Instructors create and manage quizzes via the Assessment Center.
     await loginAsInstructor(page);
 
-    await page.goto('/assessments');
+    await page.goto('/quiz');
     await page.waitForLoadState('domcontentloaded');
     await expect(
       page.getByRole('heading', { name: 'Assessment Center' })

@@ -580,7 +580,7 @@ const Index = () => {
                               <div className="space-y-3">
                                 {derivedTasks.map((task: any) => {
                                   const systemTaskRoutes: Record<string, string> = {
-                                    assignment_grading: "/assessments",
+                                    assignment_grading: "/quiz",
                                     unread_messages: "/messages",
                                   };
                                   const route = systemTaskRoutes[task.id];

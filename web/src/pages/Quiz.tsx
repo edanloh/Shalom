@@ -17,7 +17,7 @@ import { useUser } from '@/contexts/useUser';
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 
-const Assessments = () => {
+const Quiz = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [courseSearchQuery, setCourseSearchQuery] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<string>("");
@@ -647,7 +647,7 @@ const Assessments = () => {
                 <DialogHeader>
                   <DialogTitle>Select Course</DialogTitle>
                   <DialogDescription>
-                    Choose a course to filter assessments and grading queue
+                    Choose a course to filter quiz and grading queue
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -1750,4 +1750,4 @@ const Assessments = () => {
   );
 };
 
-export default Assessments;
+export default Quiz;

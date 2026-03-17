@@ -8,7 +8,7 @@ import { setupAllWorkflowMocks } from './mocks';
  * The web app is for instructors and admins only.
  *
  * These tests validate the complete instructor assessment workflow:
- *   Login → Access Assessments → Create/Review Quizzes → View Analytics
+ *   Login → Access Quiz → Create/Review Quizzes → View Analytics
  */
 
 async function loginAsInstructor(page: Page) {
@@ -32,7 +32,7 @@ test.describe('Assessment & Grading Workflow - Instructor Web @journey', () => {
     await expect(page).toHaveURL('/');
 
     // ====== INSTRUCTOR: ACCESS ASSESSMENT TOOLS ======
-    await page.goto('/assessments');
+    await page.goto('/quiz');
     await page.waitForLoadState('domcontentloaded');
     await expect(
       page.getByRole('heading', { name: 'Assessment Center' })
@@ -49,8 +49,8 @@ test.describe('Assessment & Grading Workflow - Instructor Web @journey', () => {
   test('should navigate assessment creation workflow', async ({ page }) => {
     await loginAsInstructor(page);
 
-    // Navigate to assessments page
-    await page.goto('/assessments');
+    // Navigate to quiz page
+    await page.goto('/quiz');
     await page.waitForLoadState('domcontentloaded');
 
     // Verify assessment page loaded
@@ -65,8 +65,8 @@ test.describe('Assessment & Grading Workflow - Instructor Web @journey', () => {
     // instructors can review quiz analytics and results on the web.
     await loginAsInstructor(page);
 
-    // Instructor reviews all assessments
-    await page.goto('/assessments');
+    // Instructor reviews all quiz
+    await page.goto('/quiz');
     await page.waitForLoadState('domcontentloaded');
     await expect(
       page.getByRole('heading', { name: 'Assessment Center' })

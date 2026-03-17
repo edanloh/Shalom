@@ -131,7 +131,7 @@ export const Header = () => {
     { icon: BookOpen, label: "Courses", path: "/courses" },
     { icon: BarChart3, label: "Analytics", path: "/analytics" },
     { icon: Users, label: "Students", path: "/students" },
-    { icon: ClipboardCheck, label: "Assessments", path: "/assessments" },
+    { icon: ClipboardCheck, label: "Quiz", path: "/quiz" },
     { icon: MessageSquare, label: "Messages", path: "/messages" },
     { icon: Star, label: "Badges", path: "/badges" },
   ];
