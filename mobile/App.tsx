@@ -80,53 +80,31 @@ const AppNavigator = () => {
     return url;
   };
 
-  // Handle initial URL on mount (cold start or resume)
+  const handleUrl = (url: string) => {
+    const transformedUrl = parseSupabaseUrl(url);
+    const parsedUrl = Linking.parse(transformedUrl);
+    const access_token = parsedUrl.queryParams?.access_token;
+    const refresh_token = parsedUrl.queryParams?.refresh_token;
+    if (
+      typeof access_token === "string" &&
+      typeof refresh_token === "string" &&
+      parsedUrl.queryParams?.type === "recovery"
+    ) {
+      void loginWithToken({ access_token, refresh_token, type: parsedUrl.queryParams?.type });
+    }
+  };
+
   useEffect(() => {
     (async () => {
+      // Check if the app was opened from a deep link
       const url = await getInitialURL();
-      console.log("[DeepLink] Initial URL:", url);
-      if (url) {
-        const parsedUrl = Linking.parse(url);
-        console.log("[DeepLink] Parsed initial URL:", parsedUrl);
-        const access_token = parsedUrl.queryParams?.access_token;
-        const refresh_token = parsedUrl.queryParams?.refresh_token;
-        if (
-          typeof access_token === "string" &&
-          typeof refresh_token === "string"
-        ) {
-          console.log("[DeepLink] Found tokens in initial URL");
-          void loginWithToken({ access_token, refresh_token, type: parsedUrl.queryParams?.type});
-        }
-      }
+      if (url) handleUrl(url);
     })();
 
-    // Register deep link event listener for background/foreground
-    const unsubscribe = subscribe((url) => {
-      console.log("[DeepLink] subscribe listener triggered with URL:", url);
-    });
-    return unsubscribe;
+    // Listen for incoming deep links while the app is open
+    const sub = Linking.addEventListener("url", ({ url }) => handleUrl(url));
+    return () => sub.remove();
   }, []);
-
-  const subscribe = (listener: (url: string) => void) => {
-    const onReceiveURL = ({ url }: { url: string }) => {
-      console.log("Received deep link URL:", url);
-      const transformedUrl = parseSupabaseUrl(url);
-      const parsedUrl = Linking.parse(transformedUrl);
-      const access_token = parsedUrl.queryParams?.access_token;
-      const refresh_token = parsedUrl.queryParams?.refresh_token;
-      if (
-        typeof access_token === "string" &&
-        typeof refresh_token === "string"
-      ) {
-        void loginWithToken({ access_token, refresh_token, type: parsedUrl.queryParams?.type });
-      }
-      listener(transformedUrl);
-    };
-    const subscription = Linking.addEventListener("url", onReceiveURL);
-    return () => {
-      subscription.remove();
-    };
-  };
 
   if (isLoading) {
     return (

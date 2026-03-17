@@ -103,6 +103,7 @@ export default function UserProvider({ children }: { children: React.ReactNode }
   }, [authUser]);
 
   const fetchUser = async (email: string): Promise<User> => {
+    console.log("Fetching user profile for email:", email);
     const data = await fetchUserProfile(email);
     // Change the db's id to uuid
     data.uuid = data.id;
@@ -113,13 +114,13 @@ export default function UserProvider({ children }: { children: React.ReactNode }
 
   const updateUser = async (id: string, payload: Partial<User>): Promise<User> => {
     const data = await updateUserProfile(id, payload);
-    fetchUser(authUser!.email);
+    await fetchUser(authUser!.email);
     return data;
   };
 
   const uploadUserPic = async (name: string, avatar: Blob): Promise<void> => {
     await uploadProfilePic(name, avatar);
-    fetchUser(authUser!.email);
+    await fetchUser(authUser!.email);
   }
 
   return (

@@ -78,6 +78,7 @@ export default function CustomTextInput({
       >
         {leftIconName && (
           <Ionicons
+            testID="left-icon"
             name={leftIconName}
             size={20}
             color="white"
@@ -109,6 +110,7 @@ export default function CustomTextInput({
         />
         {value.length > 0 && (
           <TouchableOpacity
+            testID="clear-button"
             onPress={() => onChangeText("")}
             style={[
               styles.eyeIcon,
@@ -121,6 +123,7 @@ export default function CustomTextInput({
         )}
         {onTogglePassword && (
           <TouchableOpacity
+            testID="toggle-password"
             onPress={onTogglePassword}
             style={[styles.eyeIcon, eyeIconStyle]}
           >

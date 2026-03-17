@@ -1,0 +1,24 @@
+appId: com.jasmine02.shalom
+---
+- extendedWaitUntil:
+    visible:
+      text: 'Login to your Account'
+    timeout: 30000
+
+# Open register screen and submit empty form
+- tapOn: 'Sign Up'
+- waitForAnimationToEnd
+- assertVisible: 'Create Your Account'
+- tapOn: 'Sign Up'
+
+# Android alert should show required fields message
+- assertVisible: 'Please fill in all fields'
+- tapOn: 'OK'
+
+# Return to login via hardware back button (avoids system nav bar overlap)
+- pressKey: Back
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: 'Login to your Account'
+    timeout: 20000
+- assertVisible: 'Login to your Account'

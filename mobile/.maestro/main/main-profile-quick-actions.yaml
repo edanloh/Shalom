@@ -1,0 +1,62 @@
+appId: com.jasmine02.shalom
+---
+- extendedWaitUntil:
+    visible: 'Login to your Account'
+    timeout: 30000
+
+# Authenticate with CI-provided credentials.
+- tapOn:
+    text: 'Email'
+- inputText: ${MAESTRO_TEST_EMAIL}
+- hideKeyboard
+
+- tapOn:
+    text: 'Password'
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- hideKeyboard
+
+- tapOn:
+    text: 'Sign In'
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible: 'My Courses'
+    timeout: 30000
+
+# Navigate to profile first in case the app lands on a different tab.
+- tapOn:
+    point: '88%, 88%' # Profile tab
+- extendedWaitUntil:
+    visible: 'Profile'
+    timeout: 20000
+
+# Verify quick-action pages can be opened and closed.
+- tapOn:
+    point: '17%, 48%' # Points History quick-action card (leftmost of 3)
+- extendedWaitUntil:
+    visible: 'Points History'
+    timeout: 20000
+- assertVisible: 'Points History'
+- pressKey: Back
+- extendedWaitUntil:
+    visible: 'Profile'
+    timeout: 20000
+
+- tapOn:
+    point: '50%, 48%' # Learning Goal quick-action card (center)
+- extendedWaitUntil:
+    visible: 'Learning Goals'
+    timeout: 20000
+- assertVisible: 'Learning Goals'
+- pressKey: Back
+- extendedWaitUntil:
+    visible: 'Profile'
+    timeout: 20000
+
+- tapOn:
+    point: '83%, 48%' # Certificates quick-action card (rightmost of 3)
+- extendedWaitUntil:
+    visible: 'Certificates'
+    timeout: 20000
+- assertVisible: 'Certificates'

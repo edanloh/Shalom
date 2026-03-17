@@ -50,24 +50,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   const loginWithToken = async ({ access_token, refresh_token, type }: Tokens & { type?: string }) => {
-    console.log('[DeepLink] loginWithToken called', {
-      access_token,
-      refresh_token,
-    });
     setIsLoading(true);
-    const signIn = async () => {
-      await supabase.auth.setSession({
-        access_token,
-        refresh_token,
-      });
-      return await supabase.auth.refreshSession();
-    };
-
     const {
       data: { user: supabaseUser, session: supabaseSession },
-    } = await signIn();
-
-    console.log('[DeepLink] Supabase user after setSession:', supabaseUser);
+    } = await supabase.auth.setSession({ access_token, refresh_token });
     if (type === 'recovery') {
       setIsResettingPassword(true);
       setUser({
@@ -78,6 +64,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         last_login: supabaseUser?.last_sign_in_at || '',
         auth_provider: supabaseUser?.app_metadata?.provider || 'email',
       });
+      setIsLoading(false);
     } else {
       // Google login
       setUser({
@@ -210,7 +197,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       // Use a custom redirect URI for Expo (must be whitelisted in Supabase dashboard)
       const redirectTo = makeRedirectUri();
-
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -218,37 +204,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           skipBrowserRedirect: true,
         },
       });
-
       if (error) throw error;
-
       // Open the returned URL in a browser for the user to complete Google login
+      console.log('Opening browser for Google OAuth with URL:', data?.url);
       if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectTo
-        );
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
         if (result.type === 'success' && result.url) {
-          // Parse the URL fragment for access_token, refresh_token, etc.
-          const url = result.url;
-          const params = Linking.parse(url);
-          // After redirect, Supabase should handle session automatically if storage is set up
-          // Fetch the session from Supabase
-          const { data: sessionData } = await supabase.auth.getSession();
-          setSession(sessionData.session);
-          const supabaseUser = sessionData.session?.user;
-          setUser(
-            supabaseUser
-              ? {
-                  id: supabaseUser.id,
-                  email: supabaseUser.email || '',
-                  name: supabaseUser.user_metadata?.name || '',
-                  joined_at: supabaseUser.created_at || '',
-                  last_login: supabaseUser.last_sign_in_at || '',
-                  auth_provider:
-                    supabaseUser.app_metadata?.provider || 'google',
-                }
-              : null
-          );
+          console.log("OAuth result:", result);
+          // Parse the fragment after '#'
+          const fragment = result.url.split('#')[1];
+          const params = new URLSearchParams(fragment);
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          if (access_token && refresh_token) {
+            await loginWithToken({ access_token, refresh_token, type: 'google' });
+          } else {
+            throw new Error('Tokens not found in OAuth result');
+          }
         } else {
           throw new Error('Google sign-in cancelled or failed');
         }

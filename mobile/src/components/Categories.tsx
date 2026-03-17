@@ -27,6 +27,7 @@ const Categories = () => {
       </View>
 
       <FlatList
+        testID="categories-list"
         data={categories}
         key={numColumns}
         keyExtractor={(item) => item.name}

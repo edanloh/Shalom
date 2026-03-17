@@ -137,7 +137,7 @@ function TabNavigator() {
         headerShown: false,
         tabBarShowLabel: true,
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 10,
           marginTop: 7,
         },
         tabBarBackground: () => (
