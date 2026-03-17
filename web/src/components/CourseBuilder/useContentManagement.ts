@@ -6,11 +6,13 @@ export const useContentManagement = () => {
   const {
     modules,
     setModules,
+    setHasUnsavedChanges,
     showToast,
     setSelectedItem,
   } = useCourseBuilder();
 
   const { updateContentNumbering } = useDragAndDrop();
+  const markUnsaved = () => setHasUnsavedChanges(true);
 
   // Module functions
   const addModule = () => {
@@ -26,6 +28,7 @@ export const useContentManagement = () => {
       quizzes: [],
     };
     setModules([...modules, newModule]);
+    markUnsaved();
     
     // Auto-select the newly created module
     setSelectedItem({ type: 'module', id: newModuleId });
@@ -55,6 +58,7 @@ export const useContentManagement = () => {
       title: module.title.replace(/^Module \d+:/, `Module ${index + 1}:`),
     }));
     setModules(updatedModules);
+    markUnsaved();
   };
 
   const updateModule = (moduleId: string, updates: Partial<Module>) => {
@@ -63,6 +67,7 @@ export const useContentManagement = () => {
         m.id === moduleId ? { ...m, ...updates } : m
       )
     );
+    markUnsaved();
   };
 
   // Lesson functions
@@ -108,6 +113,7 @@ export const useContentManagement = () => {
     // Update numbering after adding
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    markUnsaved();
     
     // Auto-select the newly created lesson
     setSelectedItem({ type: 'lesson', id: newLessonId });
@@ -129,6 +135,7 @@ export const useContentManagement = () => {
     );
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    markUnsaved();
   };
 
   const updateLesson = (moduleId: string, lessonId: string, updates: Partial<Lesson>) => {
@@ -151,6 +158,7 @@ export const useContentManagement = () => {
       
       return updatedModules;
     });
+    markUnsaved();
   };
 
   // Quiz functions
@@ -199,6 +207,7 @@ export const useContentManagement = () => {
     // Update numbering after adding
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    markUnsaved();
     
     // Auto-select the newly created quiz
     setSelectedItem({ type: 'quiz', id: newQuizId });
@@ -220,6 +229,7 @@ export const useContentManagement = () => {
     );
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    markUnsaved();
   };
 
   const updateQuiz = (moduleId: string, quizId: string, updates: Partial<Quiz>) => {
@@ -240,6 +250,7 @@ export const useContentManagement = () => {
     }
     
     setModules(updatedModules);
+    markUnsaved();
   };
 
   // Question functions
@@ -275,6 +286,7 @@ export const useContentManagement = () => {
         return m;
       })
     );
+    markUnsaved();
   };
 
   const deleteQuestion = (moduleId: string, quizId: string, questionId: string) => {
@@ -297,6 +309,7 @@ export const useContentManagement = () => {
         return m;
       })
     );
+    markUnsaved();
   };
 
   const updateQuestion = (moduleId: string, quizId: string, questionId: string, field: string, value: any) => {
@@ -321,6 +334,7 @@ export const useContentManagement = () => {
         return m;
       }),
     );
+    markUnsaved();
   };
 
   const addOption = (moduleId: string, quizId: string, questionId: string) => {
@@ -345,6 +359,7 @@ export const useContentManagement = () => {
         };
       }),
     );
+    markUnsaved();
   };
 
   const removeOption = (moduleId: string, quizId: string, questionId: string, index: number) => {
@@ -388,6 +403,7 @@ export const useContentManagement = () => {
         };
       }),
     );
+    markUnsaved();
   };
 
   return {
