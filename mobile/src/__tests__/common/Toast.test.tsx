@@ -1,6 +1,6 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
-import { DeviceEventEmitter } from 'react-native';
+import { act, render } from '@testing-library/react-native';
+import { Animated, DeviceEventEmitter } from 'react-native';
 import ToastHost, {
   showToast,
   TOAST_CHANNEL,
@@ -10,6 +10,18 @@ import ToastHost, {
 jest.useFakeTimers();
 
 describe('ToastHost', () => {
+  beforeEach(() => {
+    jest.spyOn(Animated, 'timing').mockReturnValue({ start: jest.fn() } as any);
+    jest.spyOn(Animated, 'parallel').mockImplementation(() => ({
+      start: (callback?: () => void) => callback?.(),
+    }) as any);
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.restoreAllMocks();
+  });
+
   describe('Rendering', () => {
     it('should render without crashing', () => {
       const { toJSON } = render(<ToastHost />);
@@ -19,6 +31,56 @@ describe('ToastHost', () => {
     it('should not display anything initially', () => {
       const { queryByText } = render(<ToastHost />);
       expect(queryByText('Test Message')).toBeNull();
+    });
+
+    it('renders the toast title and message when an event is emitted', () => {
+      const { getByText } = render(<ToastHost />);
+
+      act(() => {
+        showToast({
+          title: 'Success',
+          message: 'Changes saved',
+          type: 'success',
+        });
+      });
+
+      expect(getByText('Success')).toBeTruthy();
+      expect(getByText('Changes saved')).toBeTruthy();
+    });
+
+    it('hides the active toast after its duration elapses', () => {
+      const { getByText, queryByText } = render(<ToastHost />);
+
+      act(() => {
+        showToast({ message: 'Temporary toast', durationMs: 500 });
+      });
+
+      expect(getByText('Temporary toast')).toBeTruthy();
+
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+
+      expect(queryByText('Temporary toast')).toBeNull();
+    });
+
+    it('shows queued toasts one after another', () => {
+      const { getByText, queryByText } = render(<ToastHost />);
+
+      act(() => {
+        showToast({ message: 'First toast', durationMs: 300 });
+        showToast({ message: 'Second toast', durationMs: 300 });
+      });
+
+      expect(getByText('First toast')).toBeTruthy();
+      expect(queryByText('Second toast')).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+
+      expect(getByText('Second toast')).toBeTruthy();
+      expect(queryByText('First toast')).toBeNull();
     });
   });
 
@@ -178,12 +240,18 @@ describe('ToastHost', () => {
       emitSpy.mockRestore();
     });
   });
-
   describe('Event Listener', () => {
     it('should clean up listener on unmount', () => {
-      const { unmount } = render(<ToastHost />);
+      const remove = jest.fn();
+      const addListenerSpy = jest
+        .spyOn(DeviceEventEmitter, 'addListener')
+        .mockReturnValue({ remove } as any);
 
-      expect(() => unmount()).not.toThrow();
+      const { unmount } = render(<ToastHost />);
+      unmount();
+
+      expect(remove).toHaveBeenCalled();
+      addListenerSpy.mockRestore();
     });
   });
 });

@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { StatsCard } from './StatsCard';
 import { TrendingUp } from 'lucide-react';
+import { Colors } from '../constants';
 
 describe('StatsCard Component', () => {
   it('renders with title and value', () => {
@@ -50,5 +51,71 @@ describe('StatsCard Component', () => {
     );
 
     expect(container.querySelector('.custom-class')).toBeInTheDocument();
+  });
+
+  it('does not render a trend element when trend is not provided', () => {
+    render(<StatsCard title="No Trend" value="42" icon={TrendingUp} />);
+
+    expect(screen.queryByText('+12%')).not.toBeInTheDocument();
+  });
+
+  it('applies the default variant styles', () => {
+    const { container } = render(
+      <StatsCard title="Default" value="10" icon={TrendingUp} />,
+    );
+
+    expect(container.firstChild).toHaveStyle({
+      borderColor: Colors.cardBorder,
+    });
+  });
+
+  it('applies the accent variant styles', () => {
+    const { container } = render(
+      <StatsCard title="Accent" value="10" icon={TrendingUp} variant="accent" />,
+    );
+
+    expect(container.firstChild).toHaveStyle({
+      boxShadow: `0 8px 32px ${Colors.yellow}30`,
+    });
+  });
+
+  it('applies the warning variant styles', () => {
+    const { container } = render(
+      <StatsCard title="Warning" value="10" icon={TrendingUp} variant="warning" />,
+    );
+
+    expect(container.firstChild).toHaveStyle({
+      boxShadow: `0 8px 32px ${Colors.red}30`,
+    });
+  });
+
+  it('applies the secondary variant styles', () => {
+    const { container } = render(
+      <StatsCard
+        title="Secondary"
+        value="10"
+        icon={TrendingUp}
+        variant="secondary"
+      />,
+    );
+
+    expect(container.firstChild).toHaveStyle({
+      boxShadow: `0 8px 32px ${Colors.purple300}30`,
+    });
+  });
+
+  it('applies the streakFire variant styles', () => {
+    const { container } = render(
+      <StatsCard
+        title="Streak"
+        value="10"
+        icon={TrendingUp}
+        variant="streakFire"
+      />,
+    );
+
+    expect(container.firstChild).toHaveStyle({
+      borderColor: Colors.streakFire,
+    });
   });
 });
