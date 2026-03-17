@@ -1,46 +1,53 @@
-import { useState, useEffect, useCallback, ReactNode } from 'react';
-import { AuthContext } from './AuthContextStore';
-
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import * as WebBrowser from 'expo-web-browser';
+import { API_BASE_URL } from 'react-native-dotenv';
 import { supabase } from '@/lib/supabase';
-import {
-  registerCheck,
-  fetchUserProfile,
-  approveInstructor as ApproveInstructor,
-} from '@/services/userService';
+import { Session } from '@supabase/supabase-js';
+import { User, AuthContextType } from '@/types';
+import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
 
-interface SupabaseUser {
-  id: string;
-  email: string;
-  [key: string]: any;
-  name: string;
-  auth_provider: string;
+WebBrowser.maybeCompleteAuthSession();
+
+export interface AuthTokens {
+  access_token: string;
+  id_token?: string;
+  refresh_token?: string;
 }
 
-export interface AuthContextType {
-  authUser: SupabaseUser | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (
-    email: string,
-    password: string,
-  ) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
-  changePassword: (
-    email: string,
-    oldPassword: string,
-    newPassword: string,
-  ) => Promise<void>;
-  register: (
-    email: string,
-    password: string,
-    name: string,
-  ) => Promise<{ success: boolean; error?: string }>;
-  approveInstructor: (uuid: string) => Promise<any>;
-}
+export type Tokens = {
+  access_token: string;
+  refresh_token: string;
+};
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [authUser, setAuthUser] = useState<SupabaseUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const bypassAuth = process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true';
+  const bypassUserId =
+    process.env.EXPO_PUBLIC_BYPASS_USER_ID || '';
+  const bypassEmail =
+    process.env.EXPO_PUBLIC_BYPASS_USER_EMAIL || 'shalomfyp@gmail.com';
+
+  // Set the below to skip auth during development
+  // const [user, setUser] = useState<User | null>({
+  //   id: "550e8400-e29b-41d4-a716-446655440101",
+  //   email: "shalomfyp@gmail.com",
+  //   username: "shalomfyp",
+  //   name: "Shalom FYP",
+  //   role: "learner",
+  //   avatar:
+  //     "https://ui-avatars.com/api/?name=Shalom+FYP&size=50&background=6366F1&color=fff",
+  //   bio: "Learning enthusiast exploring various courses",
+  //   location: "Singapore",
+  //   phone: "+65 9123 4567",
+  //   authProvider: "google",
+  // });
+  // const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   const loginWithToken = async ({ access_token, refresh_token, type }: Tokens & { type?: string }) => {
     setIsLoading(true);
@@ -80,132 +87,105 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   //   }
   // }, [session, user]);
   useEffect(() => {
-    const getSession = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase.auth.getUser();
-        if (error) {
-          setAuthUser(null);
-        } else if (data?.user) {
-          await validateAndSetAuthorizedUser(data.user);
-        } else {
-          setAuthUser(null);
-        }
-      } catch (err) {
-        setAuthUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    getSession();
-    // Listen for auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        const syncAuthState = async () => {
-          setIsLoading(true);
-          try {
-            if (session?.user) {
-              await validateAndSetAuthorizedUser(session.user);
-            } else {
-              setAuthUser(null);
-            }
-          } finally {
-            setIsLoading(false);
-          }
-        };
-        void syncAuthState();
-      },
-    );
-    return () => {
-      listener?.subscription.unsubscribe();
-    };
-  }, [validateAndSetAuthorizedUser]);
+    if (!bypassAuth) return;
+    if (!bypassUserId) {
+      console.warn("EXPO_PUBLIC_BYPASS_AUTH is enabled but EXPO_PUBLIC_BYPASS_USER_ID is missing.");
+      return;
+    }
+    setUser({
+      id: bypassUserId,
+      email: bypassEmail,
+      username: 'shalomfyp',
+      name: 'Shalom FYP',
+      role: 'learner',
+      avatar:
+        'https://ui-avatars.com/api/?name=Shalom+FYP&size=50&background=6366F1&color=fff',
+      bio: 'Learning enthusiast exploring various courses',
+      location: 'Singapore',
+      phone: '+65 9123 4567',
+      authProvider: 'dev',
+    });
+    setSession({} as Session);
+  }, [bypassAuth, bypassEmail, bypassUserId]);
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-      if (data?.user) {
-        return await validateAndSetAuthorizedUser(data.user);
-      }
-      setAuthUser(null);
-      return {
-        success: false,
-        error: 'Login failed. Please try again.',
-      };
-    } catch (error) {
-      throw error;
-    } finally {
-      setIsLoading(false);
+    if (bypassAuth) {
+      return { success: true, error: undefined };
     }
-  };
-
-  const approveInstructor = async (id: string) => {
-    const sessionResponse = await supabase.auth.getSession();
-    const accessToken = sessionResponse.data.session?.access_token;
-    const response = await ApproveInstructor(id, accessToken);
-    return response;
-  };
-
-  const logout = async () => {
-    setIsLoading(true);
-    await supabase.auth.signOut();
-    setAuthUser(null);
-    setIsLoading(false);
-    window.location.href = '/login';
-  };
-
-  const changePassword = async (
-    email: string,
-    oldPassword: string,
-    newPassword: string,
-  ) => {
-    setIsLoading(true);
-    try {
-      // Step 1: Re-authenticate user with current password to verify it's correct
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password: oldPassword,
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+    if (!error) {
+      setSession(data.session);
+      setUser({
+        id: data.user.id,
+        email: data.user.email || '',
+        name: data.user.user_metadata?.first_name,
+        joined_at: data.user.created_at || '',
+        last_login: data.user.last_sign_in_at || '',
+        auth_provider: data.user.app_metadata?.provider || 'email',
       });
-      if (signInError) {
-        throw new Error('Invalid current password');
-      }
-
-      // Step 2: Update to new password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (updateError) throw updateError;
-    } finally {
-      setIsLoading(false);
+      setIsResettingPassword(false);
     }
+    return {
+      success: !error,
+      error: error?.message,
+    };
   };
 
   const register = async (email: string, password: string, name: string) => {
-    setIsLoading(true);
+    if (bypassAuth) {
+      return { success: true, error: undefined };
+    }
     const { data, error } = await supabase.auth.signUp({
       email: email,
       password: password,
       options: {
         data: {
           first_name: name,
-          name: name,
-          role: 'instructor',
         },
       },
     });
-    if (error) throw error;
-    if (data?.user) {
-      const auth_user = {
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.user_metadata.name || '',
-        auth_provider: data.user.app_metadata.provider,
-        ...data.user,
+    return {
+      success: data.session != null && data.user != null,
+      error:
+        error?.message ||
+        (data.session == null || data.user == null
+          ? 'Registration failed'
+          : undefined),
+    };
+  };
+
+  const logout = async () => {
+    if (bypassAuth) {
+      return;
+    }
+    supabase.auth.signOut();
+    setUser(null);
+  };
+
+  const requestResetPassword = async (email: string) => {
+    const resetPasswordURL = Linking.createURL('/ResetPassword');
+
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: resetPasswordURL,
+    });
+
+    return { data, error };
+  };
+
+  const resetPassword = async (newPassword: string) => {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (data) alert('Password updated successfully!');
+      if (error) alert('There was an error updating your password.');
+      if (!error) setIsResettingPassword(false);
+      return {
+        success: !error,
+        error: error?.message,
       };
     } finally {
       setIsLoading(false);
@@ -301,17 +281,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AuthContext.Provider
       value={{
-        authUser,
-        isAuthenticated: authUser != null,
+        user,
         isLoading,
+        session,
         login,
-        logout,
-        changePassword,
         register,
-        approveInstructor,
+        logout,
+        requestResetPassword,
+        resetPassword,
+        loginWithGoogle,
+        changePassword,
+        fetchEmail,
+        loginWithToken,
+        isResettingPassword,
+        setIsResettingPassword,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

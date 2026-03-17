@@ -62,7 +62,7 @@ const Notifications = () => {
   const getIcon = (type: string) => {
     const normalized = (type || "").toLowerCase();
     if (normalized.includes("achievement")) return <Award className="h-5 w-5 text-warning" />;
-    if (normalized.includes("assignment")) return <AlertCircle className="h-5 w-5 text-warning" />;
+    if (normalized.includes("quiz")) return <AlertCircle className="h-5 w-5 text-warning" />;
     if (normalized.includes("course")) return <CheckCircle className="h-5 w-5 text-success" />;
     if (normalized.includes("message")) return <Info className="h-5 w-5 text-accent" />;
     if (normalized.includes("reminder") || normalized.includes("streak") || normalized.includes("goal")) {

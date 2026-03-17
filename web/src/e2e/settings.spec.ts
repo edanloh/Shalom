@@ -390,7 +390,7 @@ test.describe('Settings page', () => {
 
       await expect(page.getByText('New student enrollments')).toBeVisible();
       await expect(
-        page.getByText('Assignment submissions', { exact: true }),
+        page.getByText('Quiz submissions', { exact: true }),
       ).toBeVisible();
       await expect(
         page.getByText('Student messages', { exact: true }),
@@ -405,7 +405,7 @@ test.describe('Settings page', () => {
         page.getByText('Get notified when students enroll in your courses'),
       ).toBeVisible();
       await expect(
-        page.getByText('Receive alerts for new assignment submissions'),
+        page.getByText('Receive alerts for new quiz submissions'),
       ).toBeVisible();
       await expect(
         page.getByText('Get notified of new student messages'),

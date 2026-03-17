@@ -45,12 +45,12 @@ function buildMockNotifications() {
     {
       id: 'notif-2',
       user_id: INSTRUCTOR_ID,
-      title: 'New Assignment Available',
+      title: 'New Quiz Available',
       message:
-        'Your instructor has posted a new assignment for Data Analysis Project',
-      type: 'assignment_new',
+        'Your instructor has posted a new quiz for Data Analysis Project',
+      type: 'quiz_new',
       is_read: false,
-      action_url: '/course/course-1/assignment/assign-1',
+      action_url: '/course/course-1/quiz/assign-1',
       icon_url: null,
       created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
     },
@@ -69,7 +69,7 @@ function buildMockNotifications() {
       id: 'notif-4',
       user_id: INSTRUCTOR_ID,
       title: 'Reminder: Upcoming Deadline',
-      message: 'Your assignment "Data Analysis Project" is due in 2 days',
+      message: 'Your quiz "Data Analysis Project" is due in 2 days',
       type: 'reminder_deadline',
       is_read: true,
       action_url: null,
@@ -256,7 +256,7 @@ test.describe('Notification page', () => {
 
     // Check all notifications are displayed
     await expect(page.getByText(/Course Enrollment Confirmed/)).toBeVisible();
-    await expect(page.getByText(/New Assignment Available/)).toBeVisible();
+    await expect(page.getByText(/New Quiz Available/)).toBeVisible();
     await expect(page.getByText(/Achievement Unlocked!/)).toBeVisible();
     await expect(page.getByText(/Reminder: Upcoming Deadline/)).toBeVisible();
     await expect(page.getByText(/Course Review Posted/)).toBeVisible();
@@ -270,7 +270,7 @@ test.describe('Notification page', () => {
 
     // Should show unread notifications (3 of them)
     await expect(page.getByText(/Course Enrollment Confirmed/)).toBeVisible();
-    await expect(page.getByText(/New Assignment Available/)).toBeVisible();
+    await expect(page.getByText(/New Quiz Available/)).toBeVisible();
     await expect(page.getByText(/Course Review Posted/)).toBeVisible();
 
     // Should NOT show read notifications
@@ -372,9 +372,9 @@ test.describe('Notification page', () => {
       page.getByText(/You have successfully enrolled in/),
     ).toBeVisible();
 
-    await expect(page.getByText(/New Assignment Available/)).toBeVisible();
+    await expect(page.getByText(/New Quiz Available/)).toBeVisible();
     await expect(
-      page.getByText(/Your instructor has posted a new assignment/),
+      page.getByText(/Your instructor has posted a new quiz/),
     ).toBeVisible();
 
     await expect(page.getByText(/Achievement Unlocked!/)).toBeVisible();

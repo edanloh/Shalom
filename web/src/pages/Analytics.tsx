@@ -1433,7 +1433,7 @@ const Analytics = () => {
                     <Card className="p-6 gradient-card border-border">
                       <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
                         <BookOpen className="h-5 w-5 text-primary" />
-                        Assignment Submissions
+                        Quiz Submissions
                         <SectionHelp
                           title="Submission workload"
                           items={[

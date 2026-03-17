@@ -290,7 +290,7 @@ async function setupQuizMocks(
       contentType: 'application/json',
       body: JSON.stringify({
         success: true,
-        message: 'Assignment graded with score: 90/100',
+        message: 'Quiz graded with score: 90/100',
       }),
     });
   });

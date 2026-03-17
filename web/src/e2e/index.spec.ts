@@ -100,8 +100,8 @@ function buildMockStats() {
         formatted_due: 'Tomorrow',
       },
       {
-        id: 'assignment_grading',
-        title: 'Assignments to grade',
+        id: 'quiz_grading',
+        title: 'Quizzes to grade',
         count: 3,
       },
     ],
@@ -297,7 +297,7 @@ test.describe('Index page', () => {
     await expect(
       page.locator('text=/Review draft module outline/'),
     ).toBeVisible();
-    await expect(page.locator('text=/Assignments to grade/')).toBeVisible();
+    await expect(page.locator('text=/Quizzes to grade/')).toBeVisible();
   });
 
   test('navigates to courses page from View All button', async ({ page }) => {
@@ -402,11 +402,11 @@ test.describe('Index page', () => {
   test('shows system task count badges', async ({ page }) => {
     await loginAndNavigateToIndex(page);
 
-    // Check for the assignment grading count
-    await expect(page.locator('text=/Assignments to grade/')).toBeVisible();
+    // Check for the quiz grading count
+    await expect(page.locator('text=/Quizzes to grade/')).toBeVisible();
     await expect(
       page
-        .getByRole('button', { name: /Assignments to grade 3/ })
+        .getByRole('button', { name: /Quizzes to grade 3/ })
         .getByText('3'),
     ).toBeVisible(); // count badge
   });
@@ -549,8 +549,8 @@ test.describe('Index page', () => {
         recent_activity: [],
         pending_tasks: [
           {
-            id: 'assignment_grading',
-            title: 'Assignments to grade',
+            id: 'quiz_grading',
+            title: 'Quizzes to grade',
             count: 0,
           },
         ],

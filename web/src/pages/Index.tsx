@@ -488,7 +488,7 @@ const Index = () => {
                   <div className="flex h-full min-h-0 flex-col gap-4">
                     {(() => {
                       const derivedTaskIds = new Set([
-                        "assignment_grading",
+                        "quiz_grading",
                         "unread_messages",
                       ]);
                       const derivedTasks = stats.pending_tasks.filter((task: any) =>
@@ -580,7 +580,7 @@ const Index = () => {
                               <div className="space-y-3">
                                 {derivedTasks.map((task: any) => {
                                   const systemTaskRoutes: Record<string, string> = {
-                                    assignment_grading: "/quiz",
+                                    quiz_grading: "/quiz",
                                     unread_messages: "/messages",
                                   };
                                   const route = systemTaskRoutes[task.id];
