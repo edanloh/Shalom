@@ -18,7 +18,7 @@ const ExpoSecureStoreAdapter = {
   setItem: (key: string, value: string) => {
     if (value.length > 2048) {
       console.warn(
-        'Value being stored in SecureStore is larger than 2048 bytes and it may not be stored successfully. In a future SDK version, this call may throw an error.'
+        'Value being stored in SecureStore is larger than 2048 bytes and it may not be stored successfully. In a future SDK version, this call may throw an error.',
       );
     }
     return setItemAsync(key, value);
@@ -42,11 +42,26 @@ const ExpoWebSecureStoreAdapter = {
 };
 
 const supabaseUrl =
-  process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  'https://cmtfxsntlfoxgcznanpe.supabase.co';
 const supabaseAnonKey =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  '';
 
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
+if (!process.env.EXPO_PUBLIC_SUPABASE_URL && !process.env.VITE_SUPABASE_URL) {
+  console.warn('Missing Supabase URL env; using built-in project URL.');
+}
+
+if (
+  !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY &&
+  !process.env.VITE_SUPABASE_ANON_KEY
+) {
+  console.warn('Missing Supabase anon key env');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage:
       Platform.OS === 'web'
