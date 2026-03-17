@@ -85,7 +85,7 @@ serve(async (req) => {
         );
       }
 
-      query = query.eq("instructor_name", String(scopedUser.name || "").trim());
+      query = query.eq("instructor_id", scopedInstructorId);
     }
 
     // Apply filters

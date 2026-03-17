@@ -9,7 +9,7 @@ export const QuickActions = () => {
   const actions = [
     { icon: Plus, label: "Create Course", variant: "default" as const, path: "/course-builder/new" },
     { icon: Users, label: "Students", variant: "outline" as const, path: "/students" },
-    { icon: ClipboardCheck, label: "Grade", variant: "outline" as const, path: "/assessments" },
+    { icon: ClipboardCheck, label: "Grade", variant: "outline" as const, path: "/quiz" },
     { icon: Award, label: "Badges", variant: "outline" as const, path: "/badges" },
   ];
 

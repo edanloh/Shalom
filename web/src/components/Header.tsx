@@ -122,16 +122,18 @@ export const Header = () => {
 
     return () => {
       isActive = false;
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel).catch(() => {
+        // Channel may be closing before websocket is fully established.
+      });
     };
-  }, [userId, location.pathname]);
+  }, [userId]);
 
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/" },
     { icon: BookOpen, label: "Courses", path: "/courses" },
     { icon: BarChart3, label: "Analytics", path: "/analytics" },
     { icon: Users, label: "Students", path: "/students" },
-    { icon: ClipboardCheck, label: "Assessments", path: "/assessments" },
+    { icon: ClipboardCheck, label: "Quiz", path: "/quiz" },
     { icon: MessageSquare, label: "Messages", path: "/messages" },
     { icon: Star, label: "Badges", path: "/badges" },
   ];

@@ -110,8 +110,8 @@ export default function CourseDetailScreen({
     if (totalModules === 0) return 0;
 
     // Count only modules that are marked as completed
-    const completedModules = courseContent.sections.filter(
-      (section) => section.module_is_completed === true,
+    const completedModules = courseContent.sections.filter((section) =>
+      moduleService.isSectionCompleted(section, courseContent.userProgress),
     ).length;
 
     // console.log("[CourseDetailScreen] Progress calculation:", {
@@ -125,8 +125,8 @@ export default function CourseDetailScreen({
 
   const getCompletedModulesCount = (): number => {
     if (!courseContent) return 0;
-    return courseContent.sections.filter(
-      (section) => section.module_is_completed,
+    return courseContent.sections.filter((section) =>
+      moduleService.isSectionCompleted(section, courseContent.userProgress),
     ).length;
   };
 
@@ -205,14 +205,20 @@ export default function CourseDetailScreen({
   };
 
   const renderModule = (section: CourseSection, index: number) => {
-    const isCompleted = section?.module_is_completed || false;
+    const isCompleted = moduleService.isSectionCompleted(
+      section,
+      courseContent?.userProgress,
+    );
     const completedAt = section?.module_completed_at;
 
     // Module is locked if it's not the first module and previous module is not completed
     const isLocked =
       index > 0 &&
       courseContent &&
-      !courseContent.sections[index - 1]?.module_is_completed;
+      !moduleService.isSectionCompleted(
+        courseContent.sections[index - 1],
+        courseContent.userProgress,
+      );
 
     const onOpen = () => {
       if (!isEnrolled) {
@@ -230,7 +236,13 @@ export default function CourseDetailScreen({
       // Check if this is not the first module and the previous module is not completed
       if (index > 0 && courseContent) {
         const previousModule = courseContent.sections[index - 1];
-        if (!previousModule?.module_is_completed) {
+        if (
+          previousModule &&
+          !moduleService.isSectionCompleted(
+            previousModule,
+            courseContent.userProgress,
+          )
+        ) {
           const previousModuleTitle =
             previousModule?.title || "the previous module";
           Alert.alert(

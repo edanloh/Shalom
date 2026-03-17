@@ -34,6 +34,27 @@ const ProgressBar = ({ percent }: { percent: number }) => {
   );
 };
 
+const getCategoryLabel = (course: Course | any) => {
+  const label =
+    course?.category ||
+    course?.category_name ||
+    course?.categoryName ||
+    course?.instructor?.category ||
+    "General";
+
+  const normalized = String(label).trim();
+  return normalized.length > 0 ? normalized : "General";
+};
+
+const getCategoryColor = (course: Course | any) => {
+  return (
+    course?.categoryColor ||
+    course?.category_color ||
+    Colors.categoryDefault ||
+    Colors.purple400
+  );
+};
+
 export default function MyCourses({ navigation }: any) {
   const { user } = useAuth();
   const { courses, loading, error, refreshing, refresh, retry } =
@@ -192,6 +213,8 @@ export default function MyCourses({ navigation }: any) {
           <View>
             {courses.map((item, index) => {
               const pct = Math.round(item.progress_percentage ?? 0);
+              const badgeColor = getCategoryColor(item);
+              const badgeLabel = getCategoryLabel(item);
               return (
                 <TouchableOpacity
                   key={String(item.id ?? `my-course-${index}-${item.title ?? "course"}`)}
@@ -208,14 +231,16 @@ export default function MyCourses({ navigation }: any) {
                       style={[
                         styles.categoryBadge,
                         {
-                          backgroundColor:
-                            item.categoryColor || Colors.purple400,
+                          backgroundColor: badgeColor,
                         },
                         styles.categoryBadgeTop,
                       ]}
                     >
-                      <Text style={styles.categoryText} numberOfLines={1}>
-                        {item.category}
+                      <Text
+                        style={styles.categoryText}
+                        numberOfLines={1}
+                      >
+                        {badgeLabel}
                       </Text>
                     </View>
 
@@ -321,20 +346,27 @@ const styles = StyleSheet.create({
   },
   categoryBadge: {
     backgroundColor: Colors.purple400,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 0,
+    borderRadius: 999,
     flexShrink: 1,
-    maxWidth: "72%",
+    maxWidth: "82%",
+    minHeight: 25,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
   },
   categoryBadgeTop: {
     alignSelf: "flex-start",
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.base,
   },
   categoryText: {
     color: Colors.white,
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16,
+    letterSpacing: 0.2,
+    textAlignVertical: "center",
   },
   heartBtn: {
     backgroundColor: "rgba(0,0,0,0.55)",

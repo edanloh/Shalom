@@ -38,6 +38,26 @@ export const OptionsEditor = ({
     return null;
   }
 
+  const getMultipleCorrectIndices = () => {
+    const rawAnswers = Array.isArray(currentQuestion.correctAnswer)
+      ? currentQuestion.correctAnswer
+      : [currentQuestion.correctAnswer];
+
+    const mapped = rawAnswers
+      .map((answer: any) => {
+        if (Number.isInteger(answer) && answer >= 0) return answer as number;
+        if (typeof answer === "string") {
+          return currentQuestion.options?.findIndex(
+            (opt: any) => String(opt).trim() === answer.trim(),
+          );
+        }
+        return -1;
+      })
+      .filter((idx: number) => Number.isInteger(idx) && idx >= 0);
+
+    return Array.from(new Set(mapped));
+  };
+
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -115,18 +135,12 @@ export const OptionsEditor = ({
                 name={`question-${currentQuestion.id}`}
                 checked={
                   currentQuestion.type === "multiple-correct"
-                    ? Array.isArray(currentQuestion.correctAnswer)
-                      ? currentQuestion.correctAnswer.includes(idx)
-                      : currentQuestion.correctAnswer === idx
+                    ? getMultipleCorrectIndices().includes(idx)
                     : currentQuestion.correctAnswer === idx
                 }
                 onChange={() => {
                   if (currentQuestion.type === "multiple-correct") {
-                    const currentAnswers = Array.isArray(
-                      currentQuestion.correctAnswer,
-                    )
-                      ? currentQuestion.correctAnswer
-                      : [currentQuestion.correctAnswer];
+                    const currentAnswers = getMultipleCorrectIndices();
                     const newAnswers = currentAnswers.includes(idx)
                       ? currentAnswers.filter((i) => i !== idx)
                       : [...currentAnswers, idx];

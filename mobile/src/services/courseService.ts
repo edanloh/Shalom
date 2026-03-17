@@ -430,6 +430,15 @@ export const clearCategoriesCache = async (): Promise<void> => {
 
 // Helper function to convert enrollment data to Course format
 const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
+  const normalizedCategory = String(
+    enrollment.category_name || (enrollment as any).category || "General",
+  ).trim() || "General";
+
+  const normalizedCategoryColor =
+    enrollment.category_color ||
+    (enrollment as any).categoryColor ||
+    Colors.categoryDefault;
+
   // Primary: Use section counts if available (preferred method)
   const totalSections = enrollment.total_sections || 0;
   const completedSections = enrollment.completed_sections || 0;
@@ -478,16 +487,16 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
       id: `instructor-${enrollment.instructor_name.replace(/\s+/g, '-').toLowerCase()}`,
       name: enrollment.instructor_name,
       avatar: enrollment.instructor_avatar || generateAvatar(enrollment.instructor_name),
-      category: enrollment.category_name,
+      category: normalizedCategory,
       rating: Number(enrollment.instructor_rating) || 0,
-      bio: `Expert ${enrollment.category_name} instructor`,
+      bio: `Expert ${normalizedCategory} instructor`,
     },
     progress_percentage: enrollment.progress_percentage,
     duration: `${enrollment.duration_hours}h`,
     rating: Number(enrollment.rating) || 0,
     image: enrollment.thumbnail_url,
-    category: enrollment.category_name,
-    categoryColor: enrollment.category_color || Colors.categoryDefault,
+    category: normalizedCategory,
+    categoryColor: normalizedCategoryColor,
     modules: progressTotal,
     tags: enrollment.tags || [],
     prerequisites: [],

@@ -57,7 +57,7 @@ export const QuizHeader = ({
           onChange={(e) =>
             updateQuiz(moduleId, quiz.id, { baseTitle: e.target.value })
           }
-          placeholder="Enter quiz title (e.g., 'Module 1 Assessment')"
+          placeholder="Enter quiz title (e.g., 'Module 1 Quiz')"
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
         />
         {showValidationErrors && quizTitleEmpty && (
@@ -78,7 +78,10 @@ export const QuizHeader = ({
               value={quiz?.passingScore || 70}
               onChange={(e) =>
                 updateQuiz(moduleId, quiz.id, {
-                  passingScore: parseInt(e.target.value) || 70,
+                  passingScore:
+                    e.target.value === ""
+                      ? 70
+                      : Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)),
                 })
               }
               min="0"

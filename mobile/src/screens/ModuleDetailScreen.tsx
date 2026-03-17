@@ -226,7 +226,9 @@ const ModuleDetailScreen = () => {
       const itemIndex = currentSection.items.findIndex((i) => i.id === item.id);
       if (itemIndex > 0) {
         const previousItems = currentSection.items.slice(0, itemIndex);
-        const incompletePrevious = previousItems.filter((i) => !i.is_completed);
+          const incompletePrevious = previousItems.filter(
+            (i) => !moduleService.isItemCompleted(i, courseContent?.userProgress),
+          );
 
         if (incompletePrevious.length > 0) {
           await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -289,7 +291,10 @@ const ModuleDetailScreen = () => {
   const canGoToNextSection = (): boolean => {
     if (!getNextSection()) return false;
     // Can only go to next section if current module is completed
-    return (currentSection as any)?.module_is_completed === true;
+    return moduleService.isSectionCompleted(
+      currentSection as CourseSection,
+      courseContent?.userProgress,
+    );
   };
 
   const getPreviousSection = (): CourseSection | null => {
@@ -305,8 +310,10 @@ const ModuleDetailScreen = () => {
     const nextSection = getNextSection();
     if (nextSection) {
       // Check if current section is completed
-      const isCurrentModuleCompleted = (currentSection as any)
-        ?.module_is_completed;
+      const isCurrentModuleCompleted = moduleService.isSectionCompleted(
+        currentSection as CourseSection,
+        courseContent?.userProgress,
+      );
       if (!isCurrentModuleCompleted) {
         Alert.alert(
           "Complete Current Module First",
@@ -328,7 +335,10 @@ const ModuleDetailScreen = () => {
 
   const renderItem = (item: ModuleItem, index: number) => {
     const progress = getItemProgress(item.id, item.type);
-    const isCompleted = item.is_completed;
+    const isCompleted = moduleService.isItemCompleted(
+      item,
+      courseContent?.userProgress,
+    );
 
     // Check if item is locked (previous items not completed)
     const isLocked = currentSection?.items
@@ -338,7 +348,9 @@ const ModuleDetailScreen = () => {
           );
           if (itemIndex > 0) {
             const previousItems = currentSection.items.slice(0, itemIndex);
-            return previousItems.some((i) => !i.is_completed);
+            return previousItems.some(
+              (i) => !moduleService.isItemCompleted(i, courseContent?.userProgress),
+            );
           }
           return false;
         })()

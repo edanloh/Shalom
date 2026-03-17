@@ -953,6 +953,12 @@ export const CourseBuilderProvider = ({
             errors.push(`❌ ${questionIdentifier}: Question text is required.`);
           }
 
+          // Points must be at least 1
+          const points = Number(question.points);
+          if (Number.isNaN(points) || points < 1) {
+            errors.push(`❌ ${questionIdentifier}: Points must be at least 1.`);
+          }
+
           // Validate based on question type
           if (
             question.type === "multiple-choice" ||
@@ -963,6 +969,22 @@ export const CourseBuilderProvider = ({
             const options = question.options || [];
             const hasOptions = options.length > 0;
             const nonEmptyOptions = options.filter((opt) => String(opt).trim() !== "");
+            const resolveAnswerIndex = (answer: any): number => {
+              if (Number.isInteger(answer)) return answer;
+              if (typeof answer === "string") {
+                return options.findIndex(
+                  (opt: any) => String(opt).trim() === answer.trim(),
+                );
+              }
+              return -1;
+            };
+            const resolveAnswerIndices = (answer: any): number[] => {
+              const raw = Array.isArray(answer) ? answer : [answer];
+              const mapped = raw
+                .map((item: any) => resolveAnswerIndex(item))
+                .filter((idx: number) => Number.isInteger(idx) && idx >= 0);
+              return Array.from(new Set(mapped));
+            };
 
             if (!hasOptions || nonEmptyOptions.length === 0) {
               errors.push(
@@ -983,8 +1005,7 @@ export const CourseBuilderProvider = ({
             // For multiple-correct, ensure at least one answer is selected
             if (
               question.type === "multiple-correct" &&
-              Array.isArray(question.correctAnswer) &&
-              question.correctAnswer.length === 0
+              resolveAnswerIndices(question.correctAnswer).length === 0
             ) {
               errors.push(
                 `❌ ${questionIdentifier}: Must select at least one correct answer.`,
@@ -994,21 +1015,32 @@ export const CourseBuilderProvider = ({
             // Validate correct answer index(es) for multiple-choice / multiple-correct
             if (
               question.type === "multiple-choice" &&
-              typeof question.correctAnswer === "number" &&
               options.length > 0 &&
-              (question.correctAnswer < 0 || question.correctAnswer >= options.length)
+              (() => {
+                const idx = resolveAnswerIndex(question.correctAnswer);
+                return idx < 0 || idx >= options.length;
+              })()
             ) {
               errors.push(
                 `❌ ${questionIdentifier}: Correct answer must be a valid option.`,
               );
             }
 
+            if (question.type === "multiple-choice" && options.length > 0) {
+              const idx = resolveAnswerIndex(question.correctAnswer);
+              if (idx >= 0 && !String(options[idx] ?? "").trim()) {
+                errors.push(
+                  `❌ ${questionIdentifier}: Correct answer points to an empty option.`,
+                );
+              }
+            }
+
             if (
               question.type === "multiple-correct" &&
-              Array.isArray(question.correctAnswer) &&
               options.length > 0
             ) {
-              const invalidIndex = question.correctAnswer.some(
+              const normalizedAnswers = resolveAnswerIndices(question.correctAnswer);
+              const invalidIndex = normalizedAnswers.some(
                 (idx: number) => idx < 0 || idx >= options.length,
               );
               if (invalidIndex) {
@@ -1016,6 +1048,42 @@ export const CourseBuilderProvider = ({
                   `❌ ${questionIdentifier}: One or more correct answers are invalid.`,
                 );
               }
+
+              const hasEmptySelectedOption = normalizedAnswers.some(
+                (idx: number) => !String(options[idx] ?? "").trim(),
+              );
+              if (hasEmptySelectedOption) {
+                errors.push(
+                  `❌ ${questionIdentifier}: A correct answer points to an empty option.`,
+                );
+              }
+            }
+          }
+
+          if (question.type === "short-answer") {
+            if (!question.sampleAnswer || !question.sampleAnswer.trim()) {
+              errors.push(
+                `❌ ${questionIdentifier}: Explanation/Sample Answer is required for short-answer questions.`,
+              );
+            }
+          }
+
+          if (question.type === "matching") {
+            const pairs = Array.isArray(question.matchingPairs)
+              ? question.matchingPairs
+              : [];
+            if (pairs.length === 0) {
+              errors.push(
+                `❌ ${questionIdentifier}: At least one matching pair is required.`,
+              );
+            }
+            const hasIncompletePair = pairs.some(
+              (pair: any) => !pair?.left?.trim() || !pair?.right?.trim(),
+            );
+            if (hasIncompletePair) {
+              errors.push(
+                `❌ ${questionIdentifier}: All matching pairs must have both left and right items filled.`,
+              );
             }
           }
         });
@@ -1149,24 +1217,38 @@ export const CourseBuilderProvider = ({
             // Prepare correctAnswer for database storage
             // Save actual option values (not indices) so options can be scrambled on mobile
             let correctAnswerForDb: string | string[] | number[];
+            const options = q.options || [];
+            const resolveAnswerIndex = (answer: any): number => {
+              if (Number.isInteger(answer)) return answer;
+              if (typeof answer === "string") {
+                return options.findIndex(
+                  (opt: any) => String(opt).trim() === answer.trim(),
+                );
+              }
+              return -1;
+            };
 
             if (q.type === "multiple-choice" || q.type === "multiple_choice") {
               // Single answer: store the actual option text
-              const answerIndex = typeof q.correctAnswer === "number" ? q.correctAnswer : 0;
-              correctAnswerForDb = q.options[answerIndex] || "";
+              const answerIndex = resolveAnswerIndex(q.correctAnswer);
+              correctAnswerForDb = answerIndex >= 0 ? options[answerIndex] || "" : "";
             } else if (q.type === "true-false") {
               // True/False: store the actual option text ("True" or "False")
               const answerIndex = q.correctAnswer === 0 ? 0 : 1;
-              correctAnswerForDb = q.options[answerIndex] || "True";
+              correctAnswerForDb = options[answerIndex] || "True";
             } else if (q.type === "multiple-correct") {
               // Multiple answers: store array of actual option texts
-              if (Array.isArray(q.correctAnswer)) {
-                correctAnswerForDb = q.correctAnswer
-                  .filter((idx: any) => typeof idx === "number" && idx >= 0 && idx < q.options.length)
-                  .map((idx: number) => q.options[idx]);
-              } else {
-                correctAnswerForDb = [];
-              }
+              const rawAnswers = Array.isArray(q.correctAnswer)
+                ? q.correctAnswer
+                : [q.correctAnswer];
+              const answerIndices = Array.from(
+                new Set(
+                  rawAnswers
+                    .map((ans: any) => resolveAnswerIndex(ans))
+                    .filter((idx: number) => idx >= 0 && idx < options.length),
+                ),
+              );
+              correctAnswerForDb = answerIndices.map((idx: number) => options[idx]);
             } else {
               // For other types (short-answer, matching), store as-is
               correctAnswerForDb = String(q.correctAnswer || "");
