@@ -61,7 +61,7 @@ function progressFrom(course: Course): number {
 
 export default function CoursesScreen({ navigation }: any) {
   const {
-    courses = [],
+    myCourses = [],
     recommendedCourses = [],
     loading,
     recommendedLoading,
@@ -69,18 +69,25 @@ export default function CoursesScreen({ navigation }: any) {
     refreshRecommended,
     wishlist = [],
     toggleWishlist,
-  } = useCourses();
+    recordRecommendationEvent,
+} = useCourses();
+
+  const PAGE_SIZE = 24;
 
   const wishIds = useMemo(() => new Set(wishlist.map((c) => c.id)), [wishlist]);
   const isWishlisted = (c: Course) => wishIds.has(c.id);
-  const { enrolledCourses = [], user: profileUser } = useUser();
-  const recommendationUserId = profileUser?.uuid;
+  const { enrolledCourses = [] } = useUser();
 
   // UI state
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [catalogCourses, setCatalogCourses] = useState<Course[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogLoadingMore, setCatalogLoadingMore] = useState(false);
+  const [catalogHasMore, setCatalogHasMore] = useState(true);
+  const [catalogOffset, setCatalogOffset] = useState(0);
 
   // Fetch categories from API
   const fetchCategories = useCallback(async () => {
@@ -99,6 +106,49 @@ export default function CoursesScreen({ navigation }: any) {
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  const loadCatalogPage = useCallback(
+    async ({ reset = false, offset }: { reset?: boolean; offset?: number } = {}) => {
+      const startOffset = reset ? 0 : (offset ?? catalogOffset);
+      if (!reset && (catalogLoading || catalogLoadingMore || !catalogHasMore)) return;
+
+      if (reset) {
+        setCatalogLoading(true);
+      } else {
+        setCatalogLoadingMore(true);
+      }
+
+      try {
+        const result = await courseService.getPublishedCoursesPage({
+          limit: PAGE_SIZE,
+          offset: startOffset,
+          sortBy: "updated_at",
+          sortOrder: "desc",
+        });
+
+        setCatalogCourses((prev) => {
+          if (reset) return result.courses;
+          const existing = new Set(prev.map((course) => course.id));
+          return [...prev, ...result.courses.filter((course) => !existing.has(course.id))];
+        });
+        setCatalogOffset(startOffset + result.courses.length);
+        setCatalogHasMore(result.pagination.hasMore);
+      } catch (error) {
+        console.error("Error loading course catalog:", error);
+      } finally {
+        if (reset) {
+          setCatalogLoading(false);
+        } else {
+          setCatalogLoadingMore(false);
+        }
+      }
+    },
+    [catalogHasMore, catalogLoading, catalogLoadingMore, catalogOffset, PAGE_SIZE]
+  );
+
+  useEffect(() => {
+    loadCatalogPage({ reset: true });
+  }, []);
 
   // Build category chips with "All" option
   const categoryChips: string[] = useMemo(() => {
@@ -121,25 +171,25 @@ export default function CoursesScreen({ navigation }: any) {
   const enrolledIds = new Set<string>(enrolledCourses as string[]);
 
   const jumpBackIn = useMemo(
-    () => courses.filter((c) => enrolledIds.has(c.id)),
-    [courses, enrolledIds],
+    () => myCourses.filter((c) => enrolledIds.has(c.id)),
+    [myCourses, enrolledIds],
   );
 
   const recommended = useMemo(() => {
     if (query) return [];
     if (recommendedCourses.length) return recommendedCourses;
-    return courses.filter((c) => !enrolledIds.has(c.id)).slice(0, 10);
-  }, [courses, enrolledIds, query, recommendedCourses]);
+    return catalogCourses.filter((c) => !enrolledIds.has(c.id)).slice(0, 10);
+  }, [catalogCourses, enrolledIds, query, recommendedCourses]);
 
   const popular = useMemo(() => {
     // Not enrolled, filtered by category and query
-    let base = courses.filter((c) => !enrolledIds.has(c.id));
+    let base = catalogCourses.filter((c) => !enrolledIds.has(c.id));
     if (selectedCategory !== "All") {
       base = base.filter((c) => c.category === selectedCategory);
     }
     base = searchLocal(query, base);
     return base;
-  }, [courses, enrolledIds, selectedCategory, query]);
+  }, [catalogCourses, enrolledIds, selectedCategory, query]);
 
   // ---- small UI bits ----
   const MetaRow = ({
@@ -175,27 +225,12 @@ export default function CoursesScreen({ navigation }: any) {
 
   const handleRecommendedCourseClick = useCallback(
     (course: Course) => {
-      if (recommendationUserId) {
-        courseService
-          .recordRecommendationEvent({
-            userId: recommendationUserId,
-            courseId: course.id,
-            eventType: "click",
-            requestId: course.recommendationRequestId,
-            context: {
-              placement: "courses_recommended",
-              isRecommendationSurface: true,
-              modelVersion: course.recommendationModelVersion,
-              requestId: course.recommendationRequestId,
-            },
-          })
-          .catch((err) =>
-            console.warn("Failed to record courses rec click", err)
-          );
-      }
+      recordRecommendationEvent(course.id, 'click', 'courses_recommended')
+        .then(() => refreshRecommended?.().catch(() => {}))
+        .catch((err) => console.warn("Failed to record courses rec click", err));
       navigation.navigate("CourseDetail", { courseId: course.id });
     },
-    [navigation, recommendationUserId]
+    [navigation, recordRecommendationEvent, refreshRecommended]
   );
 
   const onRefresh = useCallback(async () => {
@@ -206,11 +241,12 @@ export default function CoursesScreen({ navigation }: any) {
         refreshCourses?.(),
         refreshRecommended?.(),
         fetchCategories(),
+        loadCatalogPage({ reset: true }),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refreshCourses, refreshRecommended, fetchCategories]);
+  }, [refreshCourses, refreshRecommended, fetchCategories, loadCatalogPage]);
 
   const BadgeHeartRow = ({ item }: { item: Course }) => (
     <View style={styles.badgeRow}>
@@ -247,12 +283,9 @@ export default function CoursesScreen({ navigation }: any) {
     trackRecommendation?: boolean;
     placement?: string;
   }) => {
-    const rankLabel =
-      item.recommendationRank || item.recommendationScore
-        ? `#${item.recommendationRank ?? "?"} • ${Number(
-            item.recommendationScore ?? 0,
-          ).toFixed(1)}`
-        : null;
+    const rankLabel = Number.isFinite(item.recommendationRank)
+      ? `#${item.recommendationRank}`
+      : null;
     const reason = formatPrimaryRecommendationReason(
       item.recommendationPrimaryTag
     );
@@ -261,23 +294,9 @@ export default function CoursesScreen({ navigation }: any) {
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => {
-          if (trackRecommendation && recommendationUserId) {
-            courseService
-              .recordRecommendationEvent({
-                userId: recommendationUserId,
-                courseId: item.id,
-                eventType: "click",
-                requestId: item.recommendationRequestId,
-                context: {
-                  placement,
-                  isRecommendationSurface: true,
-                  modelVersion: item.recommendationModelVersion,
-                  requestId: item.recommendationRequestId,
-                },
-              })
-              .catch((err) =>
-                console.warn("Failed to record courses rec click", err)
-              );
+          if (trackRecommendation) {
+            recordRecommendationEvent(item.id, 'click', placement)
+              .catch((err) => console.warn("Failed to record courses rec click", err));
           }
           navigation.navigate("CourseDetail", { courseId: item.id });
         }}
@@ -321,21 +340,10 @@ export default function CoursesScreen({ navigation }: any) {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => {
-        if (recommendationUserId) {
-          courseService
-            .recordRecommendationEvent({
-              userId: recommendationUserId,
-              courseId: item.id,
-              eventType: "click",
-              context: {
-                placement: "courses_popular",
-                isRecommendationSurface: false,
-              },
-            })
-            .catch((err) =>
-              console.warn("Failed to record popular course click", err)
-            );
-        }
+        // Popular courses aren't personalised so no score_breakdown, but
+        // still record via context for consistency
+        recordRecommendationEvent(item.id, 'click', 'courses_popular')
+          .catch((err) => console.warn("Failed to record popular course click", err));
         navigation.navigate("CourseDetail", { courseId: item.id });
       }}
       style={styles.gCard}
@@ -382,34 +390,21 @@ export default function CoursesScreen({ navigation }: any) {
 
   useEffect(() => {
     if (query) return;
-    if (!recommendationUserId || recommended.length === 0) return;
-    const firstRecommendation = recommended[0];
+    if (recommended.length === 0) return;
 
     const impressionKey = [
-      recommendationUserId,
-      firstRecommendation?.recommendationRequestId || "no_request_id",
+      recommended[0]?.recommendationRequestId || "no_request_id",
       ...recommended.map((c) => c.id),
     ].join("|");
     if (lastRecommendedImpressionKey.current === impressionKey) return;
     lastRecommendedImpressionKey.current = impressionKey;
 
-    courseService
-      .recordRecommendationEvent({
-        userId: recommendationUserId,
-        eventType: "impression",
-        requestId: firstRecommendation.recommendationRequestId,
-        context: {
-          placement: "courses_recommended",
-          isRecommendationSurface: true,
-          courseIds: recommended.map((c) => c.id),
-          modelVersion: firstRecommendation.recommendationModelVersion,
-          requestId: firstRecommendation.recommendationRequestId,
-        },
-      })
-      .catch((err) =>
-        console.warn("Failed to record courses rec impression", err)
-      );
-  }, [query, recommended, recommendationUserId]);
+    // Fire per-course impressions via context so score_breakdown is attached
+    recommended.forEach((course) => {
+      recordRecommendationEvent(course.id, 'impression', 'courses_recommended')
+        .catch(() => {});
+    });
+  }, [query, recommended, recordRecommendationEvent]);
 
   return (
     <Screen
@@ -532,6 +527,7 @@ export default function CoursesScreen({ navigation }: any) {
                       course={item}
                       variant="compact"
                       showInstructor={false}
+                      showRecommendationReason={true}
                       onPress={handleRecommendedCourseClick}
                     />
                   )}
@@ -555,7 +551,7 @@ export default function CoursesScreen({ navigation }: any) {
           <Text style={[TextStyles.h4, { marginVertical: Spacing.sm }]}>
             Popular Courses
           </Text>
-          {loading || refreshing ? (
+          {catalogLoading || loading || refreshing ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.purple400} />
               <Text style={styles.loadingText}>Loading popular courses…</Text>
@@ -579,6 +575,21 @@ export default function CoursesScreen({ navigation }: any) {
               subtext="Pull down to refresh."
             />
           )}
+          {catalogHasMore ? (
+            <View style={styles.paginationFooter}>
+              {catalogLoadingMore ? (
+                <ActivityIndicator size="small" color={Colors.purple400} />
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => loadCatalogPage({ offset: catalogOffset })}
+                  style={styles.loadMoreButton}
+                >
+                  <Text style={styles.loadMoreButtonText}>Load more courses</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
           <View style={{ height: 120 }} />
         </View>
       </ScrollView>
@@ -654,6 +665,27 @@ const styles = StyleSheet.create({
     fontSize: TextStyles.body.fontSize,
     color: Colors.textSecondary,
     marginTop: Spacing.md,
+  },
+  paginationFooter: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+  },
+  loadMoreButton: {
+    minWidth: 180,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.purple400,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadMoreButtonText: {
+    color: Colors.white,
+    fontFamily: TextStyles.body.fontFamily,
+    fontSize: TextStyles.body.fontSize,
+    fontWeight: "600",
   },
 
   emptyWrap: {

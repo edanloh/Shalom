@@ -9,6 +9,7 @@ node_modules/
 .expo-shared/
 dist/
 web-build/
+.expo/devices.json
 
 # Environment variables
 .env

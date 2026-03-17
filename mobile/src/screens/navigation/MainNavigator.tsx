@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BottomTabBar, createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -17,6 +17,7 @@ import * as Screens from "../index";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotification } from "@/contexts/NotificationContext";
+import { useMessages } from "@/contexts/MessageContext";
 import type { BottomTabNavParamList, MainStackParamList } from "@/types/navigation";
 import { ADMIN_EMAIL, Colors } from "@/constants";
 import { BlurView } from "expo-blur";
@@ -33,8 +34,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TAB_ROUTES = ["Home", "Courses", "Notifications", "Messages", "Profile"];
 
 function TabNavigator() {
-  const { user } = useAuth();
   const { inAppNotifications } = useNotification();
+  const { hasUnreadMessages } = useMessages();
   const activeTabIndex = useSharedValue(0);
   const tabBarTranslateY = useSharedValue(0);
   const hasUnread = inAppNotifications.some((item) => !item.read);
@@ -123,6 +124,9 @@ function TabNavigator() {
                 color={focused ? Colors.secondary : Colors.white}
               />
               {route.name === "Notifications" && hasUnread ? (
+                <View style={styles.unreadDot} />
+              ) : null}
+              {route.name === "Messages" && hasUnreadMessages ? (
                 <View style={styles.unreadDot} />
               ) : null}
             </View>

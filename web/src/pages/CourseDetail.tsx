@@ -38,10 +38,17 @@ import {
   MessageSquare,
   Loader2,
   AlertCircle,
+  MoreVertical,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { courseService, Course, Module, Review, Student } from "@/services";
 import moduleService from "@/services/moduleService";
 import { useUser } from '@/contexts/useUser';
@@ -1116,6 +1123,103 @@ const CourseDetail = () => {
                                 />
                               ))}
                             </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  className="h-8 w-8"
+                                  disabled={reviewActionId === String(review.id)}
+                                >
+                                  {reviewActionId === String(review.id) ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <MoreVertical className="h-4 w-4" />
+                                  )}
+                                  <span className="sr-only">Review actions</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44">
+                                {review.reviewStatus !== "hidden" ? (
+                                  <DropdownMenuItem
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      openReviewActionDialog(review, "hide");
+                                    }}
+                                  >
+                                    Hide
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      openReviewActionDialog(review, "unhide");
+                                    }}
+                                  >
+                                    Unhide
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    openReviewActionDialog(review, "flag");
+                                  }}
+                                >
+                                  Flag
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    openReviewActionDialog(review, "resolve");
+                                  }}
+                                >
+                                  Resolve
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    openReviewActionDialog(review, "acknowledge");
+                                  }}
+                                >
+                                  Acknowledge
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    openReviewActionDialog(review, "reply");
+                                  }}
+                                >
+                                  Reply
+                                </DropdownMenuItem>
+                                {review.isPinned ? (
+                                  <DropdownMenuItem
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      openReviewActionDialog(review, "unpin");
+                                    }}
+                                  >
+                                    Unpin
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      openReviewActionDialog(review, "pin");
+                                    }}
+                                  >
+                                    Pin
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                         <p className="text-muted-foreground mb-3">
@@ -1156,110 +1260,6 @@ const CourseDetail = () => {
                             ) : null}
                           </div>
                         )}
-                        <div className="flex flex-wrap gap-2">
-                          {review.reviewStatus !== "hidden" ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openReviewActionDialog(review, "hide")}
-                              disabled={reviewActionId === String(review.id)}
-                            >
-                              {reviewActionId === String(review.id) ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Hide"
-                              )}
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openReviewActionDialog(review, "unhide")}
-                              disabled={reviewActionId === String(review.id)}
-                            >
-                              {reviewActionId === String(review.id) ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Unhide"
-                              )}
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openReviewActionDialog(review, "flag")}
-                            disabled={reviewActionId === String(review.id)}
-                          >
-                            {reviewActionId === String(review.id) ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Flag"
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openReviewActionDialog(review, "resolve")}
-                            disabled={reviewActionId === String(review.id)}
-                          >
-                            {reviewActionId === String(review.id) ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Resolve"
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openReviewActionDialog(review, "acknowledge")}
-                            disabled={reviewActionId === String(review.id)}
-                          >
-                            {reviewActionId === String(review.id) ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Acknowledge"
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openReviewActionDialog(review, "reply")}
-                            disabled={reviewActionId === String(review.id)}
-                          >
-                            {reviewActionId === String(review.id) ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Reply"
-                            )}
-                          </Button>
-                          {review.isPinned ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openReviewActionDialog(review, "unpin")}
-                              disabled={reviewActionId === String(review.id)}
-                            >
-                              {reviewActionId === String(review.id) ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Unpin"
-                              )}
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openReviewActionDialog(review, "pin")}
-                              disabled={reviewActionId === String(review.id)}
-                            >
-                              {reviewActionId === String(review.id) ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Pin"
-                              )}
-                            </Button>
-                          )}
-                        </div>
                       </div>
                     ))}
                     {!reviewsLoading && reviews.length === 0 && (

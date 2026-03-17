@@ -16,6 +16,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUser } from '@/contexts/useUser';
 import { notificationService } from "@/services";
+import { supabase } from "@/lib/supabase";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,7 @@ export const Header = () => {
   const { logout } = useAuth();
   const { user } = useUser();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState(null);
 
   useEffect(() => {
@@ -62,6 +64,65 @@ export const Header = () => {
 
     return () => {
       isActive = false;
+    };
+  }, [userId, location.pathname]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadUnreadMessageCount = async () => {
+      if (!userId) {
+        if (isActive) setUnreadMessageCount(0);
+        return;
+      }
+
+      const { data, error } = await supabase.rpc(
+        "get_direct_message_conversations",
+        { user_id: userId },
+      );
+
+      if (error) {
+        console.error("Failed to load unread message count:", error);
+        if (isActive) setUnreadMessageCount(0);
+        return;
+      }
+
+      const totalUnread = ((data as Array<{ unread_messages?: number }> | null) || [])
+        .reduce((sum, convo) => sum + Number(convo.unread_messages || 0), 0);
+
+      if (isActive) {
+        setUnreadMessageCount(totalUnread);
+      }
+    };
+
+    loadUnreadMessageCount();
+
+    if (!userId) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const channel = supabase
+      .channel("header-unread-messages")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "direct_messages" },
+        (payload) => {
+          const message = payload.new || payload.old;
+          if (
+            message &&
+            (message.sender_id === userId || message.recipient_id === userId)
+          ) {
+            loadUnreadMessageCount();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      isActive = false;
+      supabase.removeChannel(channel);
     };
   }, [userId, location.pathname]);
 
@@ -140,10 +201,15 @@ export const Header = () => {
                   variant={isActive ? "default" : "ghost"}
                   size="sm"
                   onClick={() => navigate(item.path)}
-                  className="gap-2"
+                  className="gap-2 relative"
                 >
                   <Icon className="h-4 w-4" />
                   <span className="inline">{item.label}</span>
+                  {item.path === "/messages" && unreadMessageCount > 0 ? (
+                    <span className="absolute -top-2 -right-2 h-5 min-w-5 rounded-full bg-accent text-xs flex items-center justify-center text-accent-foreground font-semibold px-1">
+                      {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
+                    </span>
+                  ) : null}
                 </Button>
               );
             })}

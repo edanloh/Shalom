@@ -31,7 +31,14 @@ import MatchingQuestion from "@/components/MatchingQuestion";
 import { useCourseNavigation } from "@/hooks";
 
 type QuizDetail = QuizDetailResponse["data"];
-type QuizResult = SubmitQuizResponse["data"];
+type QuizResult = SubmitQuizResponse["data"] & {
+  graded_answers?: Record<string, {
+    pointsAwarded: number;
+    maxPoints: number;
+    feedback?: string | null;
+    gradedAt: string;
+  }>;
+};
 
 type QuizScreenNavigationProp = StackNavigationProp<
   MainStackParamList,
@@ -63,6 +70,7 @@ const QuizScreen = () => {
   const [reviewMode, setReviewMode] = useState(false);
   const [attemptsBlocked, setAttemptsBlocked] = useState(false);
   const [practiceMode, setPracticeMode] = useState(false); // For practicing after attempts exhausted
+  const [gradingPending, setGradingPending] = useState(false); // For short-answer quizzes awaiting grading
 
   // Matching question states
   const [matchingState, setMatchingState] = useState<
@@ -118,7 +126,6 @@ const QuizScreen = () => {
       setError(null);
 
       const data = await quizService.getQuizDetail(courseId, quizId, userId);
-
       // Scramble options for all questions
       const scrambledData = {
         ...data,
@@ -165,13 +172,25 @@ const QuizScreen = () => {
       const buildResultFromAttempt = (
         attempt: any,
         passedOverride?: boolean,
-      ) => {
+      ) => {              
         const totalQuestions =
           Number(attempt.total_questions) || data.questions.length || 0;
         const correctAnswers =
           Number(attempt.correct_answers) ||
           Math.round((attempt.score / 100) * totalQuestions);
         const answersMap = attempt.answers || {};
+        
+        // Parse graded_answers if it's a JSON string
+        let gradedAnswersData = attempt.graded_answers;
+        if (typeof gradedAnswersData === 'string') {
+          try {
+            gradedAnswersData = JSON.parse(gradedAnswersData);
+          } catch (e) {
+            console.error('Failed to parse graded_answers:', e);
+            gradedAnswersData = undefined;
+          }
+        }
+                
         const gradedAnswers = data.questions
           .map((question) => {
             const selected = answersMap[question.id];
@@ -214,6 +233,7 @@ const QuizScreen = () => {
           attemptNumber: attempt.attempt_number,
           attemptsRemaining,
           answers: gradedAnswers,
+          graded_answers: gradedAnswersData,
         });
       };
 
@@ -224,6 +244,21 @@ const QuizScreen = () => {
           : quizService.getLatestAttempt(attempts);
         
         if (latestAttempt) {
+          // Check if quiz has short-answer questions and grades are not released
+          const hasShortAnswer = data.questions.some(
+            (q) => q.question_type === 'short-answer'
+          );
+          const gradesReleased = latestAttempt.grades_released !== false;
+          
+          if (hasShortAnswer && !gradesReleased) {
+            // Show pending grading screen
+            setSelectedAnswers(new Map(Object.entries(latestAttempt.answers || {})));
+            setGradingPending(true);
+            setShowResults(false);
+            setTimerActive(false);
+            return;
+          }
+                    
           buildResultFromAttempt(latestAttempt, isPassed);
           setAttemptsRemainingDisplay(attemptsRemaining);
           setShowResults(true);
@@ -534,14 +569,6 @@ const QuizScreen = () => {
         timeTakenMinutes,
       });
 
-      console.log("📥 Backend quiz result:", {
-        score: result.score,
-        isPassed: result.isPassed,
-        attemptsRemaining: result.attemptsRemaining,
-        attemptNumber: result.attemptNumber,
-        willBlockAttempts: result.attemptsRemaining === 0 && !result.isPassed
-      });
-
       setQuizResult(result);
       // Update attempts remaining display after submission
       if (result.attemptsRemaining !== undefined && result.attemptsRemaining !== null) {
@@ -549,7 +576,19 @@ const QuizScreen = () => {
         // Update attemptsBlocked based on new attempts remaining
         setAttemptsBlocked(result.attemptsRemaining === 0 && !result.isPassed);
       }
-      setShowResults(true);
+      
+      // Check if quiz has short-answer questions
+      const hasShortAnswer = quizDetail.questions.some(
+        (q) => q.question_type === 'short-answer'
+      );
+      
+      if (hasShortAnswer) {
+        // Show pending grading screen instead of results
+        setGradingPending(true);
+        setShowResults(false);
+      } else {
+        setShowResults(true);
+      }
 
       // Award credits for passing quizzes
       if (result.isPassed && userId) {
@@ -655,6 +694,21 @@ const QuizScreen = () => {
   const handleRetry = () => {
     if (!quizDetail) return;
 
+    // Check if quiz has short-answer questions - if so, don't allow retry
+    const hasShortAnswer = quizDetail.questions.some(
+      (q: any) => q.question_type === 'short-answer'
+    );
+    
+    if (hasShortAnswer) {
+      // For short-answer quizzes, only allow review (not retry)
+      Alert.alert(
+        "Retry Not Available",
+        "This quiz contains short-answer questions requiring manual grading. You can review your answers but cannot retake the quiz.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
     // Enable practice mode if:
     // 1. User passed the quiz (no need to record another attempt)
     // 2. User failed and has no attempts remaining (practice mode)
@@ -708,45 +762,27 @@ const QuizScreen = () => {
       isLastItem,
     });
 
+    // Check if quiz has short-answer questions requiring manual grading
+    const hasShortAnswer = quizDetail?.questions.some(
+      (q: any) => q.question_type === 'short-answer'
+    ) || false;
+
     // Mark as complete and auto-navigate if:
-    // 1. Quiz is passed (and not in practice mode), OR
-    // 2. All attempts are exhausted (even if failed, and not in practice mode)
-    // Additional safeguard: Don't complete if failed and still has attempts
+    // 1. Quiz has short-answer questions (manual grading - no strict checks needed), OR
+    // 2. Quiz is passed (and not in practice mode), OR
+    // 3. All attempts are exhausted (even if failed, and not in practice mode)
+    // Additional safeguard: Don't complete if failed and still has attempts (unless manual grading)
     const hasFailed = quizResult && !quizResult.isPassed;
     const hasAttemptsRemaining = attemptsRemainingDisplay !== null && attemptsRemainingDisplay > 0;
     
-    const canComplete = ((quizResult && quizResult.isPassed) || attemptsBlocked) && 
+    const canComplete = hasShortAnswer || // Allow completion for manual grading quizzes
+                        (((quizResult && quizResult.isPassed) || attemptsBlocked) && 
                         !practiceMode &&
-                        !(hasFailed && hasAttemptsRemaining);
-
-    console.log("🔍 Completion check:", {
-      isPassed: quizResult?.isPassed,
-      attemptsBlocked,
-      practiceMode,
-      attemptsRemainingDisplay,
-      hasFailed,
-      hasAttemptsRemaining,
-      canComplete,
-    });
+                        !(hasFailed && hasAttemptsRemaining));
 
     if (canComplete) {
-      console.log("🎯 Quiz can be completed! Checking next item...", {
-        isPassed: quizResult?.isPassed,
-        attemptsBlocked,
-        currentQuizId: quizId,
-        currentSectionId: sectionId,
-        isLastItem,
-        nextItemInModule,
-      });
-
       // Extra safety check - make sure nextItemInModule AND nextItemInModule.item exist
       if (nextItemInModule && nextItemInModule.item) {
-        console.log("✅ Next item found:", {
-          id: nextItemInModule.item.id,
-          type: nextItemInModule.item.type,
-          title: nextItemInModule.item.title,
-          sectionId: nextItemInModule.sectionId,
-        });
 
         // Navigate to next item (video, quiz, or document)
         if (nextItemInModule.item.type === "video") {
@@ -783,7 +819,6 @@ const QuizScreen = () => {
       }
     } else {
       // Quiz not passed and still has attempts - cannot complete yet
-      console.log("⚠️ Cannot complete - quiz not passed and attempts remaining");
       Alert.alert(
         "Cannot Complete Yet",
         "You need to pass this quiz or use all attempts before proceeding.",
@@ -846,25 +881,118 @@ const QuizScreen = () => {
     );
   }
 
+  // Pending Grading Screen - for short-answer quizzes
+  if (gradingPending) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.resultsHeader}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="close" size={28} color={Colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.resultsHeaderTitle}>Quiz Submitted</Text>
+          <View style={{ width: 28 }} />
+        </View>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.resultsScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Result Section */}
+          <View style={styles.resultSection}>
+            <View style={styles.resultContainer}>
+              <Image
+                source={Images.quizSuccess}
+                style={styles.resultImage}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Score Display */}
+            <View style={styles.scoreSection}>
+              <Text style={styles.scoreTitle}>Quiz Submitted</Text>
+              <Text style={styles.scoreSubtext}>
+                Your answers are being reviewed by your instructor.
+              </Text>
+              
+              <View style={styles.attemptsContainer}>
+                <Ionicons name="time-outline" size={18} color={Colors.purple400} />
+                <Text style={styles.attemptsText}>
+                  Awaiting manual grading
+                </Text>
+              </View>
+              
+              <Text style={[styles.scoreSubtext, { marginTop: 12, fontSize: 14, lineHeight: 20 }]}>
+                You'll be notified once your instructor has finished grading all questions. Your final score will be available then.
+              </Text>
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.resultActions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={32} color={Colors.white} />
+              <Text style={styles.actionButtonText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleComplete}
+            >
+              <Image
+                source={Images.quizComplete}
+                style={styles.actionButtonIcon}
+                resizeMode="contain"
+              />
+              <Text style={styles.actionButtonText}>Complete</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   if (showResults && quizResult) {
     const isPassed = quizResult.isPassed;
     const scorePercentage = quizResult.score;
 
-    console.log("🎨 Rendering results screen:", {
-      isPassed,
-      attemptsBlocked,
-      practiceMode,
-      showCompleteButton: isPassed || attemptsBlocked,
-      attemptsRemainingDisplay
-    });
-
     // Check if this is the first time passing the quiz
     const isFirstPass = isPassed && quizResult.attemptNumber === 1;
 
-    // Calculate passing mark in questions
-    const passingMarkQuestions = quizDetail
-      ? Math.ceil((quizDetail.passing_score / 100) * quizResult.totalQuestions)
-      : 0;
+    // Calculate actual points from graded_answers if available
+    let totalPointsEarned = quizResult.correctAnswers || 0;
+    let totalPointsPossible = quizResult.totalQuestions || 0;    
+    
+    if (quizResult.graded_answers && Object.keys(quizResult.graded_answers).length > 0 && quizDetail) {
+      // When we have graded_answers, calculate points for each question type
+      totalPointsEarned = 0;
+      totalPointsPossible = 0;
+      
+      quizDetail.questions.forEach((question) => {
+        if (quizResult.graded_answers && question.id in quizResult.graded_answers) {
+          // Short answer question with manual grading
+          const graded = quizResult.graded_answers[question.id];
+          totalPointsEarned += graded.pointsAwarded;
+          totalPointsPossible += graded.maxPoints;
+        } else {
+          // Auto-graded question (MCQ, true/false, etc.) - 1 point each
+          const answer = quizResult.answers.find(a => a.questionId === question.id);
+          const points = answer?.isCorrect ? 1 : 0;
+          totalPointsEarned += points;
+          totalPointsPossible += 1;
+        }
+      });
+    }
+    
+    console.log("📊 Points calculation:", {
+      totalPointsEarned,
+      totalPointsPossible,
+      scorePercentage,
+      hasGradedAnswers: !!quizResult.graded_answers,
+      gradedAnswersCount: quizResult.graded_answers ? Object.keys(quizResult.graded_answers).length : 0,
+    });
 
     return (
       <SafeAreaView style={styles.container}>
@@ -897,14 +1025,17 @@ const QuizScreen = () => {
             <View style={styles.scoreSection}>
               <Text style={styles.scoreTitle}>Your Score</Text>
               <Text style={styles.scoreValue}>
-                {quizResult.correctAnswers}/{quizResult.totalQuestions}
+                {scorePercentage.toFixed(2)}%
+              </Text>
+              <Text style={[styles.scoreSubtext, { fontSize: 16, marginTop: 4 }]}>
+                ({totalPointsEarned.toFixed(2)}/{totalPointsPossible.toFixed(2)} points)
               </Text>
 
               {/* Show points only on first pass (not in practice mode) */}
               {isFirstPass && !practiceMode && (
                 <View style={styles.pointsContainer}>
                   <Text style={styles.pointsText}>
-                    +{quizResult.correctAnswers * 10} Points
+                    +{Math.round(totalPointsEarned * 10)} Points
                   </Text>
                 </View>
               )}
@@ -912,8 +1043,7 @@ const QuizScreen = () => {
               {/* Show passing mark for failed attempts */}
               {!isPassed && (
                 <Text style={styles.passingMarkText}>
-                  Passing Mark: {passingMarkQuestions}/
-                  {quizResult.totalQuestions}
+                  Passing Score: {quizDetail?.passing_score || 70}%
                 </Text>
               )}
 
@@ -923,7 +1053,7 @@ const QuizScreen = () => {
                   <Ionicons 
                     name={attemptsRemainingDisplay > 0 ? "refresh-circle" : "alert-circle"} 
                     size={18} 
-                    color={attemptsRemainingDisplay > 0 ? Colors.purple400 : Colors.error} 
+                    color={attemptsRemainingDisplay > 0 ? Colors.purple400 : Colors.red} 
                   />
                   <Text style={[
                     styles.attemptsText,
@@ -988,66 +1118,79 @@ const QuizScreen = () => {
               )}
 
               <View style={styles.resultActions}>
-                {!isPassed && !attemptsBlocked ? (
-                  // Failed with attempts remaining: Show Retry + Review + Back
-                  <>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handleRetry}
-                    >
-                      <Image
-                        source={Images.quizRetry}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Retry</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handleReview}
-                    >
-                      <Image
-                        source={Images.quizReview}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Review</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => navigation.goBack()}
-                    >
-                      <Ionicons name="arrow-back" size={32} color={Colors.white} />
-                      <Text style={styles.actionButtonText}>Back</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  // Passed OR Failed with no attempts: Show Retry (no attempt) + Review + Complete
-                  <>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handleRetry}
-                    >
-                      <Image
-                        source={Images.quizRetry}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Retry</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handleReview}
-                    >
-                      <Image
-                        source={Images.quizReview}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Review</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
+                {(() => {
+                  // Check if quiz has short-answer questions
+                  const hasShortAnswer = quizDetail.questions.some(
+                    (q: any) => q.question_type === 'short-answer'
+                  );
+
+                  if (!isPassed && !attemptsBlocked) {
+                    // Failed with attempts remaining: Show Retry (unless short-answer) + Review + Back
+                    return (
+                      <>
+                        {!hasShortAnswer && (
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={handleRetry}
+                          >
+                            <Image
+                              source={Images.quizRetry}
+                              style={styles.actionButtonIcon}
+                              resizeMode="contain"
+                            />
+                            <Text style={styles.actionButtonText}>Retry</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={handleReview}
+                        >
+                          <Image
+                            source={Images.quizReview}
+                            style={styles.actionButtonIcon}
+                            resizeMode="contain"
+                          />
+                          <Text style={styles.actionButtonText}>Review</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={() => navigation.goBack()}
+                        >
+                          <Ionicons name="arrow-back" size={32} color={Colors.white} />
+                          <Text style={styles.actionButtonText}>Back</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  } else {
+                    // Passed OR Failed with no attempts: Show Retry (no attempt, unless short-answer) + Review + Complete
+                    return (
+                      <>
+                        {!hasShortAnswer && (
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={handleRetry}
+                          >
+                            <Image
+                              source={Images.quizRetry}
+                              style={styles.actionButtonIcon}
+                              resizeMode="contain"
+                            />
+                            <Text style={styles.actionButtonText}>Retry</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={handleReview}
+                        >
+                          <Image
+                            source={Images.quizReview}
+                            style={styles.actionButtonIcon}
+                            resizeMode="contain"
+                          />
+                          <Text style={styles.actionButtonText}>Review</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.actionButton}
                       onPress={handleComplete}
                     >
                       <Image
@@ -1058,7 +1201,9 @@ const QuizScreen = () => {
                       <Text style={styles.actionButtonText}>Complete</Text>
                     </TouchableOpacity>
                   </>
-                )}
+                    );
+                  }
+                })()}
               </View>
             </>
           )}
@@ -1178,6 +1323,12 @@ const QuizScreen = () => {
             )}
           </Text>
         )}
+        {/* Short Answer Quiz Notice */}
+        {!reviewMode && quizDetail?.questions.some((q: any) => q.question_type === 'short-answer') && (
+          <Text style={styles.shortAnswerNotice}>
+            ⚠️ This quiz requires manual grading. Only 1 attempt allowed.
+          </Text>
+        )}
         <View style={styles.progressHeaderRow}>
           <Text style={styles.progressLabel}>
             {reviewMode ? "Review Mode - " : ""}Question{" "}
@@ -1231,6 +1382,61 @@ const QuizScreen = () => {
         <Text style={styles.modernQuestionText}>
           {currentQuestion.question_text}
         </Text>
+
+        {/* Points Earned Display in Review Mode */}
+        {(() => {
+          if (reviewMode) {
+            console.log('🔍 Review mode - checking for graded answers:', {
+              currentQuestionId: currentQuestion.id,
+              hasQuizResult: !!quizResult,
+              hasGradedAnswers: !!quizResult?.graded_answers,
+              gradedAnswersKeys: quizResult?.graded_answers ? Object.keys(quizResult.graded_answers) : [],
+              isInGradedAnswers: quizResult?.graded_answers ? currentQuestion.id in quizResult.graded_answers : false,
+            });
+          }
+          return null;
+        })()}
+        {reviewMode && quizResult?.graded_answers && currentQuestion.id in quizResult.graded_answers && (
+          <View style={{
+            marginTop: 12,
+            padding: 10,
+            backgroundColor: Colors.purple850 + '40',
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: Colors.purple400 + '30',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <Text style={{ color: Colors.purple200, fontSize: 13, fontWeight: '600' }}>
+              Points Earned:
+            </Text>
+            <Text style={{ 
+              color: Colors.white, 
+              fontSize: 16, 
+              fontWeight: 'bold'
+            }}>
+              {quizResult.graded_answers[currentQuestion.id].pointsAwarded.toFixed(2)}/{quizResult.graded_answers[currentQuestion.id].maxPoints.toFixed(2)}
+            </Text>
+          </View>
+        )}
+        {reviewMode && quizResult?.graded_answers && currentQuestion.id in quizResult.graded_answers && quizResult.graded_answers[currentQuestion.id].feedback && (
+          <View style={{
+            marginTop: 8,
+            padding: 10,
+            backgroundColor: Colors.blue + '20',
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: Colors.blue + '40'
+          }}>
+            <Text style={{ color: Colors.blue, fontSize: 12, fontWeight: '600', marginBottom: 4 }}>
+              Instructor Feedback:
+            </Text>
+            <Text style={{ color: Colors.gray200, fontSize: 13, lineHeight: 18 }}>
+              {quizResult.graded_answers[currentQuestion.id].feedback}
+            </Text>
+          </View>
+        )}
 
         {/* Question Type Indicator */}
         {currentQuestion.question_type === "multiple-correct" && (
@@ -1587,6 +1793,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "right",
   },
+  shortAnswerNotice: {
+    marginBottom: 6,
+    marginTop: 2,
+    fontSize: 11,
+    color: Colors.yellow,
+    fontWeight: "600",
+    textAlign: "right",
+    fontStyle: "italic",
+  },
   questionNavRow: {
     flexDirection: "row",
     justifyContent: "center",
@@ -1875,7 +2090,7 @@ const styles = StyleSheet.create({
     color: Colors.purple400,
   },
   attemptsTextError: {
-    color: Colors.error,
+    color: Colors.red,
   },
   scoreSubtext: {
     fontSize: 20,

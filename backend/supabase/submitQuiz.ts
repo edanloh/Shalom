@@ -107,6 +107,7 @@ const getLocalDateString = (date: Date, timeZone: string) => {
 type QuizQuestion = {
   id: string;
   question: string;
+  question_type: string;
   correct_answer: string;
   points: number | null;
 };
@@ -489,7 +490,7 @@ serve(async (req) => {
     // ========================================
     const { data: questions, error: questionsError } = await supabaseClient
       .from('quiz_questions')
-      .select('id, question, correct_answer, points')
+      .select('id, question, question_type, correct_answer, points')
       .eq('quiz_id', quizId);
 
     if (questionsError) throw questionsError;
@@ -497,6 +498,10 @@ serve(async (req) => {
     const questionsMap = new Map(
       (questions as QuizQuestion[] | null || []).map((row) => [row.id, row])
     );
+    
+    // Check if quiz contains any short-answer questions (support both 'short-answer' and legacy 'text')
+    const hasShortAnswer = questions?.some(q => q.question_type === 'short-answer' || q.question_type === 'text') || false;
+    console.log(`📝 Quiz contains short-answer questions: ${hasShortAnswer}`);
 
     // ========================================
     // 3. Grade answers
@@ -504,6 +509,8 @@ serve(async (req) => {
     let correctCount = 0;
     let totalPoints = 0;
     const gradedAnswers = [];
+    let autoGradableCount = 0; // Questions that can be auto-graded
+    let shortAnswerCount = 0;   // Questions requiring manual grading
 
     console.log('\n🎯 Starting answer grading...');
 
@@ -516,7 +523,23 @@ serve(async (req) => {
         continue;
       }
       
+      // Skip auto-grading for short-answer questions (support both 'short-answer' and legacy 'text')
+      if (question.question_type === 'short-answer' || question.question_type === 'text') {
+        console.log(`\n📝 Question ${questionId} is ${question.question_type} - skipping auto-grade`);
+        shortAnswerCount++;
+        gradedAnswers.push({
+          questionId,
+          isCorrect: null, // Not graded yet
+          correctAnswer: null, // Don't reveal answer to student
+          requiresManualGrading: true
+        });
+        continue;
+      }
+      
+      autoGradableCount++;
+      
       console.log(`\n📝 Grading question ${questionId}:`);
+      console.log(`   Question type: ${question.question_type}`);
       console.log(`   User answer:`, userAnswer);
       console.log(`   User answer type:`, Array.isArray(userAnswer) ? 'array' : typeof userAnswer);
       console.log(`   Correct answer:`, question.correct_answer);
@@ -541,7 +564,25 @@ serve(async (req) => {
       console.log(`   User answer array:`, userAnswerArray);
       console.log(`   Correct answer array:`, correctAnswerArray);
       
-      if (userAnswerArray && correctAnswerArray) {
+      // Handle matching questions specifically (arrays of {left, right} pairs)
+      if (question.question_type === 'matching' && userAnswerArray && correctAnswerArray) {
+        console.log(`   Grading matching question...`);
+        
+        // Check if counts match first
+        if (userAnswerArray.length !== correctAnswerArray.length) {
+          console.log(`   ❌ Pair count mismatch: ${userAnswerArray.length} vs ${correctAnswerArray.length}`);
+          isCorrect = false;
+        } else {
+          // Check if all user pairs match correct pairs (by value, not position)
+          const allPairsCorrect = userAnswerArray.every((userPair: any) => {
+            return correctAnswerArray.some((correctPair: any) => 
+              userPair.left === correctPair.left && userPair.right === correctPair.right
+            );
+          });
+          isCorrect = allPairsCorrect;
+          console.log(`   All pairs match correct answers: ${isCorrect}`);
+        }
+      } else if (userAnswerArray && correctAnswerArray) {
         // Multiple-correct: Compare sorted arrays
         const userSorted = JSON.stringify([...userAnswerArray].sort());
         const correctSorted = JSON.stringify([...correctAnswerArray].sort());
@@ -570,12 +611,32 @@ serve(async (req) => {
     }
 
     const totalQuestions = questions?.length || 0;
-    console.log(`\n📊 Final score: ${correctCount}/${totalQuestions} correct`);
+    console.log(`\n📊 Grading Summary:`);
+    console.log(`   Total questions: ${totalQuestions}`);
+    console.log(`   Auto-graded: ${autoGradableCount} (${correctCount} correct)`);
+    console.log(`   Short-answer (pending): ${shortAnswerCount}`);
 
-    const score = totalQuestions > 0 
-      ? Math.round((correctCount / totalQuestions) * 100) 
-      : 0;
-    const isPassed = score >= quiz.passing_score;
+    // Calculate score based only on auto-graded questions
+    // If quiz has short-answer, score will be partial until manual grading
+    let score = 0;
+    let isPassed = false;
+    
+    if (hasShortAnswer) {
+      // Partial score - only from auto-graded questions
+      score = autoGradableCount > 0 
+        ? Math.round((correctCount / autoGradableCount) * 100) 
+        : 0;
+      // Cannot determine pass/fail until manual grading completes
+      isPassed = false;
+      console.log(`   ⏳ Partial score: ${score}% (waiting for manual grading of ${shortAnswerCount} questions)`);
+    } else {
+      // Full auto-grade
+      score = totalQuestions > 0 
+        ? Math.round((correctCount / totalQuestions) * 100) 
+        : 0;
+      isPassed = score >= quiz.passing_score;
+      console.log(`   ✅ Final score: ${score}% (${isPassed ? 'PASSED' : 'FAILED'})`);
+    }
     const attemptNumber = (previousAttempts || 0) + 1;
     let previousPasses = 0;
     if (isPassed) {
@@ -608,11 +669,14 @@ serve(async (req) => {
         is_passed: isPassed,
         time_taken_minutes: timeTakenMinutes || null,
         answers: answersJson,
+        grades_released: !hasShortAnswer, // Hide grades if short-answer questions present
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString()
       });
 
     if (insertError) throw insertError;
+    
+    console.log(`💾 Quiz attempt saved (grades_released: ${!hasShortAnswer})`);
 
     const now = new Date();
     await updateDailyMinutes(supabaseClient, userId, Number(timeTakenMinutes || 0), now);

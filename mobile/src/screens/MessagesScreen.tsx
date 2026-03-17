@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Screen from '../components/common/Screen';
 import { Colors, Spacing, TextStyles, Shadows } from '../constants';
 import { useUser } from '../contexts/UserContext';
+import { useMessages } from '@/contexts/MessageContext';
 import { supabase } from '@/lib/supabase';
 import externalStyles from '@styles/styles';
 import { ImageWithFallback } from '../components/common';
@@ -44,6 +45,7 @@ type Message = {
 
 export default function MessagesScreen() {
   const { user } = useUser();
+  const { refreshUnreadMessages } = useMessages();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
@@ -162,6 +164,7 @@ export default function MessagesScreen() {
         }),
       );
       setConversations(enrichedConvos);
+      refreshUnreadMessages();
     }
   };
 
@@ -242,7 +245,9 @@ export default function MessagesScreen() {
     });
     if (error) {
       console.error('Failed to mark messages as read:', error);
+      return;
     }
+    refreshUnreadMessages();
   };
 
   // Render avatar (first letter fallback)

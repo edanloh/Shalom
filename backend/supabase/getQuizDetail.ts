@@ -143,7 +143,9 @@ serve(async (req) => {
             time_taken_minutes,
             is_passed,
             answers,
-            completed_at
+            completed_at,
+            grades_released,
+            graded_answers
           `)
           .eq('user_id', userId)
           .eq('quiz_id', quizId)

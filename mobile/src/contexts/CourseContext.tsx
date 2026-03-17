@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Course } from '../types';
 import courseService from '../services/courseService';
 import { useUser } from './UserContext';
@@ -35,6 +35,15 @@ interface CourseContextType {
   refreshWishlist: () => Promise<void>;
   toggleWishlist: (course: Course) => Promise<void>;
   isWishlisted: (courseId: string) => boolean;
+
+  // Recommendation event tracking
+  // Call this whenever the user clicks, dismisses, or starts a recommended course.
+  // It automatically attaches the score_breakdown so evaluate.py can use real data.
+  recordRecommendationEvent: (
+    courseId: string,
+    eventType: 'click' | 'dismiss' | 'start' | 'enroll' | 'complete' | 'wishlist' | 'save' | 'impression' | 'view',
+    placement?: string,
+  ) => Promise<void>;
 }
 
 const CourseContext = createContext<CourseContextType | undefined>(undefined);
@@ -55,6 +64,10 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   const [wishlist, setWishlist] = useState<Course[]>([]);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [wishlistError, setWishlistError] = useState<string | null>(null);
+
+  // Stores score_breakdown + requestId + rank keyed by course_id.
+  // Using a ref (not state) because it doesn't affect rendering.
+  const recommendationMetaRef = useRef<Map<string, { score_breakdown: Record<string, number>; requestId: string | null; modelVersion: string | null; rank: number | null }>>(new Map());
 
   const { user: profileUser } = useUser();
   const dbUserId = profileUser?.uuid;
@@ -111,14 +124,86 @@ export default function CourseProvider({ children }: { children: React.ReactNode
 
   const loadRecommendedCourses = async () => {
     if (recommendedLoading) return;
+    await courseService.clearRecommendationCache(dbUserId);
     
     setRecommendedLoading(true);
     setRecommendedError(null);
     
     try {
-      console.log('CourseContext: Loading recommended courses...');
-      const recommendedData = await courseService.getRecommendedCourses(dbUserId);
-      setRecommendedCourses(recommendedData);
+      // getRecommendedCourses now returns { courses, meta } — see courseService patch
+      const result = await courseService.getRecommendedCourses(dbUserId);
+      const coursesData: Course[] = Array.isArray(result) ? result : result.courses ?? [];
+      const meta = Array.isArray(result) ? null : result.meta;
+
+      setRecommendedCourses(coursesData);
+
+      // ── Populate the score_breakdown lookup map ──────────────────────────
+      // Key the map off course.id from coursesData, NOT off raw API rec objects.
+      // courseService.getRecommendedCourses already attaches score_breakdown to
+      // each Course using the same ID produced by convertAWSCourseToAppCourse,
+      // so lookups in recordRecommendationEvent will always match.
+      //
+      // Previous approach keyed off rec.course?.id / rec.id (raw API fields).
+      // That caused silent mismatches when the API returns `courseid` instead of
+      // `id`, leaving every event with score_breakdown: null in Supabase.
+      const requestId = meta?.request_id ?? null;
+      const modelVersion = meta?.model_version ?? null;
+      const newMap = new Map<string, {
+        score_breakdown: Record<string, number>;
+        requestId: string | null;
+        modelVersion: string | null;
+        rank: number | null;
+      }>();
+      for (const course of coursesData) {
+        const breakdown = (course as any).score_breakdown as Record<string, number> | null;
+        if (course.id && breakdown) {
+          // Prefer meta-level requestId/modelVersion (same for all courses in one request).
+          // Fall back to per-course fields that courseService attaches from the raw rec object
+          // in case meta is missing or the response came from a cached/partial path.
+          const courseAny = course as any;
+          newMap.set(course.id, {
+            score_breakdown: breakdown,
+            requestId: requestId ?? courseAny.recommendationRequestId ?? null,
+            modelVersion: modelVersion ?? courseAny.recommendationModelVersion ?? null,
+            // rank: position in the recommendation list — logged with impression events
+            // so train_reranker.py can apply inverse propensity scoring (IPS).
+            rank: typeof courseAny.recommendationRank === 'number' ? courseAny.recommendationRank : null,
+          });
+        }
+      }
+      if (__DEV__) {
+        const missing = coursesData.filter(c => !(c as any).score_breakdown).length;
+        if (missing > 0) {
+          console.warn(
+            `CourseContext: ${missing}/${coursesData.length} recommended courses have no score_breakdown.` +
+            ` Impression events for those courses will log null breakdown.` +
+            ` Check that getRecommendations returns score_breakdown on every candidate.`
+          );
+        }
+      }
+      recommendationMetaRef.current = newMap;
+
+      // ── Post impression events ───────────────────────────────────────────
+      if (dbUserId && coursesData.length > 0) {
+        const impressionPromises = coursesData.map(course => {
+          const recMeta = recommendationMetaRef.current.get(course.id);
+          return courseService.postRecommendationEvent({
+            userId: dbUserId,
+            courseId: course.id,
+            eventType: 'impression',
+            placement: 'home',
+            context: {
+              requestId: recMeta?.requestId ?? null,
+              modelVersion: recMeta?.modelVersion ?? null,
+              score_breakdown: recMeta?.score_breakdown ?? null,
+              // rank is required by train_reranker.py for position-bias correction (IPS).
+              // Without it, IPS falls back to uniform weights silently.
+              rank: recMeta?.rank ?? null,
+            },
+          }).catch(() => {});
+        });
+        await Promise.allSettled(impressionPromises);
+      }
     } catch (err) {
       console.error('CourseContext: Error loading recommended courses:', err);
       setRecommendedError(err instanceof Error ? err.message : 'Failed to load recommended courses');
@@ -128,6 +213,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   };
 
   const refreshCourses = async () => {
+    await courseService.clearCoursesCache();
     await loadCourses();
   };
 
@@ -246,6 +332,29 @@ export default function CourseProvider({ children }: { children: React.ReactNode
     }
   };
 
+  // Posts any recommendation event with score_breakdown automatically attached.
+  // Use this everywhere instead of calling postRecommendationEvent directly.
+  const recordRecommendationEvent = async (
+    courseId: string,
+    eventType: 'click' | 'dismiss' | 'start' | 'enroll' | 'complete' | 'wishlist' | 'save' | 'impression' | 'view',
+    placement = 'home',
+  ) => {
+    if (!dbUserId) return;
+    const recMeta = recommendationMetaRef.current.get(courseId);
+    await courseService.postRecommendationEvent({
+      userId: dbUserId,
+      courseId,
+      eventType,
+      placement,
+      context: {
+        requestId: recMeta?.requestId ?? null,
+        modelVersion: recMeta?.modelVersion ?? null,
+        score_breakdown: recMeta?.score_breakdown ?? null,
+        rank: recMeta?.rank ?? null,
+      },
+    }).catch(() => {}); // silent — don't break user flow over a tracking call
+  };
+
   return (
     <CourseContext.Provider value={{
       courses,
@@ -273,6 +382,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
       refreshWishlist,
       toggleWishlist,
       isWishlisted,
+      recordRecommendationEvent,
 
     }}>
       {children}

@@ -65,8 +65,15 @@ interface BackendQuizDetailResponse {
       correct_answers?: number;
       time_taken_minutes?: number | null;
       is_passed: boolean;
-      answers?: Record<string, string> | null;
+      answers?: Record<string, string> | string | null;
       completed_at: string;
+      grades_released?: boolean;
+      graded_answers?: Record<string, {
+        pointsAwarded: number;
+        maxPoints: number;
+        feedback?: string | null;
+        gradedAt: string;
+      }> | string;
     }>;
   };
 }
@@ -100,6 +107,13 @@ export interface QuizDetailResponse {
       is_passed: boolean;
       answers?: Record<string, string> | null;
       completed_at: string;
+      grades_released?: boolean;
+      graded_answers?: Record<string, {
+        pointsAwarded: number;
+        maxPoints: number;
+        feedback?: string | null;
+        gradedAt: string;
+      }>;
     }>;
   };
 }
@@ -211,10 +225,54 @@ class QuizService {
         throw new Error(backendResponse.message || 'Failed to fetch quiz details');
       }
 
+      console.log('🔥 RAW BACKEND RESPONSE:', {
+        hasUserAttempts: !!backendResponse.data.userAttempts,
+        attemptsCount: backendResponse.data.userAttempts?.length || 0,
+        firstAttemptRaw: backendResponse.data.userAttempts?.[0] || null,
+      });
+
       // Transform backend response to frontend format
       const transformedData: QuizDetailResponse['data'] = {
         ...backendResponse.data,
         questions: backendResponse.data.questions.map(q => this.transformQuestion(q)),
+        userAttempts: backendResponse.data.userAttempts.map(attempt => {
+          // Parse graded_answers if it's a JSON string
+          let graded_answers = attempt.graded_answers;
+          if (typeof graded_answers === 'string') {
+            try {
+              graded_answers = JSON.parse(graded_answers);
+              console.log('✅ Parsed graded_answers:', graded_answers);
+            } catch (e) {
+              console.error('Failed to parse graded_answers:', e);
+              graded_answers = undefined;
+            }
+          }
+          
+          // Parse answers if it's a JSON string
+          let answers = attempt.answers;
+          if (typeof answers === 'string') {
+            try {
+              answers = JSON.parse(answers);
+              console.log('✅ Parsed answers:', answers);
+            } catch (e) {
+              console.error('Failed to parse answers:', e);
+              answers = {};
+            }
+          }
+          
+          console.log('🔍 Attempt data:', {
+            attempt_number: attempt.attempt_number,
+            score: attempt.score,
+            graded_answers: graded_answers,
+            grades_released: attempt.grades_released,
+          });
+          
+          return {
+            ...attempt,
+            graded_answers,
+            answers,
+          };
+        }),
       };
 
       return transformedData;
