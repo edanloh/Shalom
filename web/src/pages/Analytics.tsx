@@ -1439,12 +1439,12 @@ const Analytics = () => {
                           items={[
                             {
                               label: "Pending",
-                              formula: "submitted not graded",
+                              formula: "quiz attempts awaiting grade release",
                               className: "text-warning",
                             },
                             {
                               label: "Graded",
-                              formula: "marked as graded",
+                              formula: "quiz attempts with grades released",
                               className: "text-primary",
                             },
                           ]}

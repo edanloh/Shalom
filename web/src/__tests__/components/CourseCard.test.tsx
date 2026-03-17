@@ -2,11 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { CourseCard } from '@/components/CourseCard';
+import { DEFAULT_COURSE_THUMBNAIL } from '@/constants/images';
 
 // Mock the services and hooks
 const mockDuplicateCourse = vi.fn();
 const mockToast = vi.fn();
 const mockNavigate = vi.fn();
+
+type MockDropdownMenuItemProps = {
+  children: React.ReactNode;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  disabled?: boolean;
+};
 
 vi.mock('@/services/courseService', () => ({
   courseService: {
@@ -24,7 +31,7 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DropdownMenuItem: ({ children, onClick, disabled }: any) => (
+  DropdownMenuItem: ({ children, onClick, disabled }: MockDropdownMenuItemProps) => (
     <button type="button" onClick={onClick} disabled={disabled}>
       {children}
     </button>

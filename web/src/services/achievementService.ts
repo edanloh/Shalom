@@ -12,6 +12,7 @@ export type AchievementRecord = {
   color: string | null;
   is_active: boolean;
   created_at: string;
+  created_by?: string | null;
   scope_type?: "global" | "instructor" | "course" | null;
   scope_id?: string | null;
   earnedBy?: number;
