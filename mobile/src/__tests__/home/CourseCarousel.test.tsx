@@ -97,4 +97,49 @@ describe('CourseCarousel', () => {
     fireEvent.press(getAllByLabelText('Add to wishlist')[0]);
     expect(onToggleWishlist).toHaveBeenCalledWith(courses[0]);
   });
+
+  it('renders a filled wishlist state when the course is already wishlisted', () => {
+    const { getAllByLabelText, getAllByText } = render(
+      <CourseCarousel
+        courses={courses}
+        isWishlisted={(courseId) => courseId === 'c1'}
+      />,
+    );
+
+    expect(getAllByLabelText('Remove from wishlist')[0]).toBeTruthy();
+    expect(getAllByText('heart')[0]).toBeTruthy();
+  });
+
+  it('renders fallback values for missing progress, instructor, duration, and rating', () => {
+    const sparseCourse: any = {
+      id: 'c3',
+      title: 'Sparse Course',
+      description: 'Fallback details',
+      image: 'https://example.com/3.jpg',
+      category: 'Misc',
+      categoryColor: '#333333',
+    };
+
+    const { getByText } = render(<CourseCarousel courses={[sparseCourse]} />);
+
+    expect(getByText('0%')).toBeTruthy();
+    expect(getByText('Instructor')).toBeTruthy();
+    expect(getByText('14h')).toBeTruthy();
+    expect(getByText('0')).toBeTruthy();
+  });
+
+  it('renders the limited pagination branch when there are more than ten courses', () => {
+    const manyCourses = Array.from({ length: 11 }, (_, index) => ({
+      ...courses[index % courses.length],
+      id: `course-${index}`,
+      title: `Course ${index + 1}`,
+    }));
+
+    const { getByText } = render(
+      <CourseCarousel courses={manyCourses as any} />,
+    );
+
+    expect(getByText('Course 1')).toBeTruthy();
+    expect(getByText('Course 11')).toBeTruthy();
+  });
 });

@@ -36,7 +36,6 @@ import {
   updateAchievement,
   uploadAchievementIcon,
 } from "@/services/achievementService";
-import { useAuth } from '@/contexts/useAuth';
 import { useUser } from "@/contexts/useUser";
 import { courseService } from "@/services";
 
@@ -53,13 +52,13 @@ interface BadgeItem {
   color?: string | null;
   scopeType?: "global" | "instructor" | "course";
   scopeId?: string | null;
+  createdBy?: string | null;
+  isSystem?: boolean;
 }
 
 const BadgeManagement = () => {
   const { toast } = useToast();
-  const { authUser } = useAuth();
   const { user: profileUser } = useUser();
-  const instructorId = authUser?.id ?? "";
   const instructorDbId = profileUser?.uuid ?? "";
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -140,17 +139,19 @@ const BadgeManagement = () => {
     color: record.color ?? null,
     scopeType: (record.scope_type as any) ?? "global",
     scopeId: record.scope_id ?? null,
+    createdBy: record.created_by ?? null,
+    isSystem: !record.created_by || record.scope_type === "global",
   });
 
   const loadBadges = async () => {
-    if (!instructorId) {
+    if (!instructorDbId) {
       setBadges([]);
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     try {
-      const response = await listAchievements(instructorId, { type: "badge" });
+      const response = await listAchievements(instructorDbId);
       const items = response.items.map(mapBadge);
       setBadges(items);
     } catch (error) {
@@ -167,7 +168,7 @@ const BadgeManagement = () => {
 
   useEffect(() => {
     loadBadges();
-  }, [instructorId]);
+  }, [instructorDbId]);
 
   useEffect(() => {
     const loadInstructorCourses = async () => {
@@ -201,7 +202,7 @@ const BadgeManagement = () => {
   };
 
   const handleCreateBadge = async () => {
-    if (!instructorId) {
+    if (!instructorDbId) {
       toast({
         title: "Missing account context",
         description: "Please sign in again and retry.",
@@ -265,7 +266,7 @@ const BadgeManagement = () => {
         iconValue = upload?.url || upload?.publicUrl || upload?.path || "award";
       }
 
-      const created = await createAchievement(instructorId, {
+      const created = await createAchievement(instructorDbId, {
         name: newBadgeName,
         description: newBadgeDescription,
         icon: iconValue,
@@ -318,13 +319,13 @@ const BadgeManagement = () => {
   };
 
   const toggleBadgeStatus = async (badgeId: string) => {
-    if (!instructorId) return;
+    if (!instructorDbId) return;
     const badge = badges.find((item) => item.id === badgeId);
     if (!badge) return;
     const nextActive = !badge.active;
     setBadges(badges.map(b => (b.id === badgeId ? { ...b, active: nextActive } : b)));
     try {
-      await updateAchievement(instructorId, { id: badgeId, isActive: nextActive });
+      await updateAchievement(instructorDbId, { id: badgeId, isActive: nextActive });
       toast({
         title: "Badge Status Updated",
         description: "Badge status has been changed",
@@ -341,11 +342,11 @@ const BadgeManagement = () => {
   };
 
   const deleteBadge = async (badgeId: string) => {
-    if (!instructorId) return;
+    if (!instructorDbId) return;
     const prev = badges;
     setBadges(badges.filter(badge => badge.id !== badgeId));
     try {
-      await deleteAchievement(instructorId, badgeId);
+      await deleteAchievement(instructorDbId, badgeId);
       toast({
         title: "Badge Deleted",
         description: "Badge has been removed successfully",
@@ -605,8 +606,14 @@ const BadgeManagement = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {paginatedBadges.map((badge) => {
                 const IconComponent = getIconComponent(badge.icon);
+                const isReadOnly = !!badge.isSystem;
                 return (
-                  <div key={badge.id} className="gradient-card border border-border rounded-xl p-6 hover-lift">
+                  <div
+                    key={badge.id}
+                    className={`gradient-card border border-border rounded-xl p-6 ${
+                      isReadOnly ? "opacity-75 saturate-75" : "hover-lift"
+                    }`}
+                  >
                     <div className="flex items-start justify-between mb-4">
                       <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center overflow-hidden">
                         {isIconUrl(badge.icon) ? (
@@ -615,19 +622,22 @@ const BadgeManagement = () => {
                           <IconComponent className="h-8 w-8 text-warning" />
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={badge.active}
-                          onCheckedChange={() => toggleBadgeStatus(badge.id)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteTarget(badge)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
+                      {!isReadOnly && (
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={badge.active}
+                            onCheckedChange={() => toggleBadgeStatus(badge.id)}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteTarget(badge)}
+                            title="Delete badge"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     <h3 className="text-xl font-semibold mb-2">{badge.name}</h3>
@@ -656,7 +666,17 @@ const BadgeManagement = () => {
                       <Badge className={badge.active ? "status-badge-published" : "status-badge-unpublished"}>
                         {badge.active ? "ACTIVE" : "INACTIVE"}
                       </Badge>
+                      {isReadOnly && (
+                        <Badge variant="secondary">
+                          SYSTEM
+                        </Badge>
+                      )}
                     </div>
+                    {isReadOnly && (
+                      <p className="text-xs text-muted-foreground mt-3">
+                        This is a system badge. It is visible here but cannot be edited or deleted.
+                      </p>
+                    )}
                   </div>
                 );
               })}
