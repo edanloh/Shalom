@@ -52,7 +52,7 @@ vi.mock('@/utils/avatar', () => ({
   getAvatarUri: (url: string) => url || 'https://default-avatar.jpg',
 }));
 
-vi.mock('./ui/dropdown-menu', () => ({
+vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -95,6 +95,7 @@ describe('Header', () => {
     });
     mockGetNotifications.mockResolvedValue([]);
     mockRpc.mockResolvedValue({ data: [], error: null });
+    mockRemoveChannel.mockResolvedValue(undefined);
     mockChannel.mockClear();
     mockChannelOn.mockClear();
     mockSubscribe.mockClear();

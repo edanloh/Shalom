@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { StatsCard } from '@/components/StatsCard';
+import { Colors } from '@/constants/Colors';
 import { TrendingUp } from 'lucide-react';
-import { Colors } from '../constants';
 
 describe('StatsCard Component', () => {
   it('renders with title and value', () => {

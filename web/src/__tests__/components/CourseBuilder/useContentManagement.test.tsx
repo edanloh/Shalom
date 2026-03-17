@@ -165,7 +165,9 @@ describe('useContentManagement', () => {
     result.current.removeOption('m1', 'q1', 'qq1', 1);
 
     expect(setModules).toHaveBeenCalledTimes(1);
-    const updated = setModules.mock.calls[0][0];
+    const updater = setModules.mock.calls[0][0];
+    expect(typeof updater).toBe('function');
+    const updated = updater(structuredClone(baseModules));
     const question = updated[0].quizzes[0].questions[0];
 
     expect(question.options).toEqual(['A', 'C']);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useCategories } from '@/hooks/useCategories';
 import categoryService from '@/services/categoryService';
 
@@ -64,7 +64,9 @@ describe('useCategories', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    await result.current.refetch();
+    await act(async () => {
+      await result.current.refetch();
+    });
 
     expect(categoryService.getAllCategories).toHaveBeenCalledTimes(2);
   });
