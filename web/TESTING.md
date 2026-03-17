@@ -101,7 +101,7 @@ npm run test:e2e:journeys:ui     # Open in UI mode
 **Implemented workflows**:
 - ✅ `instructor-course-lifecycle.spec.ts` - Course creation → editing → publishing → analytics
 - ✅ `student-learning-journey.spec.ts` - Instructor student monitoring (students page → courses → analytics)
-- ✅ `assessment-grading-workflow.spec.ts` - Instructor assessment center navigation → quiz oversight → analytics
+- ✅ `Quiz-grading-workflow.spec.ts` - Instructor Quiz center navigation → quiz oversight → analytics
 
 **Planned workflows**:
 - ⏳ Communication flow (messages & notifications)
@@ -249,7 +249,7 @@ web/
 │   └── integration/            # Workflow + integration E2E tests
 │       ├── instructor-course-lifecycle.spec.ts
 │       ├── student-learning-journey.spec.ts
-│       ├── assessment-grading-workflow.spec.ts
+│       ├── Quiz-grading-workflow.spec.ts
 │       ├── README.md           # Setup instructions
 │       ├── setup.ts            # Database utilities
 │       └── enrollment-flow.spec.ts
@@ -447,7 +447,7 @@ npx playwright install  # Install browser binaries
 
 ### Workflow E2E Tests
 - ✅ Status: **3/6 critical workflows implemented**
-- ✅ Implemented: Instructor lifecycle, student journey, assessment grading
+- ✅ Implemented: Instructor lifecycle, student journey, Quiz grading
 - ⏳ Planned: Communication flow, badge earning, admin management
 - ✅ Run on: Every pull request
 
@@ -569,7 +569,7 @@ e2e/
 ├── integration/                  # Workflow + integration tests (NEW)
 │   ├── instructor-course-lifecycle.spec.ts
 │   ├── student-learning-journey.spec.ts
-│   ├── assessment-grading-workflow.spec.ts
+│   ├── Quiz-grading-workflow.spec.ts
 │   ├── course-crud.spec.ts
 │   ├── enrollment-flow.spec.ts
 │   ├── progress-tracking.spec.ts
@@ -611,11 +611,11 @@ e2e/
 - Tests progress persistence across sessions
 - Tests resume functionality after logout/login
 
-### Assessment & Grading Workflow
-**File**: `e2e/integration/assessment-grading-workflow.spec.ts`
+### Quiz & Grading Workflow
+**File**: `e2e/integration/Quiz-grading-workflow.spec.ts`
 
 **Tests**:
-- Complete assessment lifecycle (creation to grading)
+- Complete Quiz lifecycle (creation to grading)
 - Quiz retakes and score tracking
 - Quiz timeout and auto-submission
 
@@ -1002,7 +1002,7 @@ test.describe('Accessibility Tests', () => {
 
 ### Week 1: Foundation
 - ✅ Create workflow tests under `e2e/integration/`
-- ✅ Implement 3 core workflow tests (instructor, student, assessment)
+- ✅ Implement 3 core workflow tests (instructor, student, Quiz)
 - ✅ Document gaps and create improvement plan
 
 ### Week 2: Integration Testing
@@ -1143,7 +1143,7 @@ jobs:
 5. **Add accessibility tests** - To ensure application is usable by everyone
 
 **Immediate next steps**:
-✅ 3 workflow tests created (instructor, student, assessment)  
+✅ 3 workflow tests created (instructor, student, Quiz)  
 ⏳ Set up integration test infrastructure  
 ⏳ Run first integration test with real database
 

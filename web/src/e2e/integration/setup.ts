@@ -134,7 +134,7 @@ export async function cleanupTestData() {
     await testSupabase
       .from('courses')
       .delete()
-      .like('title', 'E2E Test%,Test Course%,Assessment Test%,Retake Quiz%');
+      .like('title', 'E2E Test%,Test Course%,Quiz Test%,Retake Quiz%');
     
     // 12. Users (root level)
     await testSupabase

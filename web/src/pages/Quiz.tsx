@@ -625,7 +625,7 @@ const Quiz = () => {
       <main className="container mx-auto px-6 py-8 space-y-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Assessment Center</h1>
+            <h1 className="text-3xl font-bold text-foreground">Quiz Center</h1>
             <p className="text-muted-foreground">Grade submissions across all courses or filter by course/module</p>
           </div>
         </div>

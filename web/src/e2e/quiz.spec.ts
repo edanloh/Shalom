@@ -339,7 +339,7 @@ async function loginThenNavigateToQuiz(
 
   await page.goto('/quiz', { waitUntil: 'domcontentloaded' });
   await expect(
-    page.getByRole('heading', { name: 'Assessment Center' }),
+    page.getByRole('heading', { name: 'Quiz Center' }),
   ).toBeVisible();
 }
 

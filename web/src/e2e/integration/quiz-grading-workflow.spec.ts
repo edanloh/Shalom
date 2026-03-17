@@ -2,12 +2,12 @@ import { test, expect, Page } from '@playwright/test';
 import { setupAllWorkflowMocks } from './mocks';
 
 /**
- * INSTRUCTOR-SIDE ASSESSMENT & GRADING WORKFLOW TEST
+ * INSTRUCTOR-SIDE Quiz & GRADING WORKFLOW TEST
  *
  * NOTE: Students use the MOBILE app — not the web application.
  * The web app is for instructors and admins only.
  *
- * These tests validate the complete instructor assessment workflow:
+ * These tests validate the complete instructor Quiz workflow:
  *   Login → Access Quiz → Create/Review Quizzes → View Analytics
  */
 
@@ -20,9 +20,9 @@ async function loginAsInstructor(page: Page) {
   await page.waitForURL('/', { timeout: 15000 });
 }
 
-test.describe('Assessment & Grading Workflow - Instructor Web @journey', () => {
+test.describe('Quiz & Grading Workflow - Instructor Web @journey', () => {
 
-  test('should complete instructor assessment workflow with analytics verification', async ({ page }) => {
+  test('should complete instructor Quiz workflow with analytics verification', async ({ page }) => {
     // NOTE: Both instructor and student perspectives are covered here.
     // Instructor manages quizzes on the web; students take them on mobile.
     // This test validates the instructor-side of the full workflow.
@@ -31,11 +31,11 @@ test.describe('Assessment & Grading Workflow - Instructor Web @journey', () => {
     await loginAsInstructor(page);
     await expect(page).toHaveURL('/');
 
-    // ====== INSTRUCTOR: ACCESS ASSESSMENT TOOLS ======
+    // ====== INSTRUCTOR: ACCESS Quiz TOOLS ======
     await page.goto('/quiz');
     await page.waitForLoadState('domcontentloaded');
     await expect(
-      page.getByRole('heading', { name: 'Assessment Center' })
+      page.getByRole('heading', { name: 'Quiz Center' })
     ).toBeVisible({ timeout: 5000 });
 
     // ====== INSTRUCTOR: VIEW ANALYTICS (student progress visible here) ======
@@ -46,15 +46,15 @@ test.describe('Assessment & Grading Workflow - Instructor Web @journey', () => {
     ).toBeVisible({ timeout: 5000 });
   });
 
-  test('should navigate assessment creation workflow', async ({ page }) => {
+  test('should navigate Quiz creation workflow', async ({ page }) => {
     await loginAsInstructor(page);
 
     // Navigate to quiz page
     await page.goto('/quiz');
     await page.waitForLoadState('domcontentloaded');
 
-    // Verify assessment page loaded
-    await expect(page.getByRole('heading', { name: /Assessment/i })).toBeVisible({ timeout: 3000 });
+    // Verify Quiz page loaded
+    await expect(page.getByRole('heading', { name: /Quiz/i })).toBeVisible({ timeout: 3000 });
 
     // Check for course selection (from existing E2E patterns)
     await expect(page.getByRole('button', { name: /Browse Courses|Select/i }).first()).toBeVisible({ timeout: 3000 });
@@ -69,7 +69,7 @@ test.describe('Assessment & Grading Workflow - Instructor Web @journey', () => {
     await page.goto('/quiz');
     await page.waitForLoadState('domcontentloaded');
     await expect(
-      page.getByRole('heading', { name: 'Assessment Center' })
+      page.getByRole('heading', { name: 'Quiz Center' })
     ).toBeVisible({ timeout: 5000 });
 
     // Instructor navigates to analytics to review student quiz results

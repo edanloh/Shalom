@@ -81,14 +81,14 @@ test.describe('Instructor Student Monitoring Journey - Complete Workflow @journe
     ).toBeVisible({ timeout: 5000 });
   });
 
-  test('should access assessment center for quiz management', async ({ page }) => {
-    // Instructors create and manage quizzes via the Assessment Center.
+  test('should access Quiz center for quiz management', async ({ page }) => {
+    // Instructors create and manage quizzes via the Quiz Center.
     await loginAsInstructor(page);
 
     await page.goto('/quiz');
     await page.waitForLoadState('domcontentloaded');
     await expect(
-      page.getByRole('heading', { name: 'Assessment Center' })
+      page.getByRole('heading', { name: 'Quiz Center' })
     ).toBeVisible({ timeout: 5000 });
   });
 });

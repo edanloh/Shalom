@@ -470,23 +470,23 @@ test.describe('CourseBuilder – new course', () => {
     await loginThenNavigateToCourseBuilder(page, 'new');
 
     await page.getByRole('button', { name: 'Add New Module' }).click();
-    await page.getByPlaceholder('Enter module title').fill('Assessment');
+    await page.getByPlaceholder('Enter module title').fill('Quiz');
     await page.getByRole('button', { name: '+ Quiz' }).click();
 
     await expect(page.getByText('1 quizzes')).toBeVisible();
     await expect(
-      page.getByPlaceholder("Enter quiz title (e.g., 'Module 1 Assessment')"),
+      page.getByPlaceholder("Enter quiz title (e.g., 'Module 1 Quiz')"),
     ).toBeVisible();
     await expect(page.getByPlaceholder('Enter question text')).toBeVisible();
 
     await page
-      .getByPlaceholder("Enter quiz title (e.g., 'Module 1 Assessment')")
-      .fill('Module 1 Assessment');
+      .getByPlaceholder("Enter quiz title (e.g., 'Module 1 Quiz')")
+      .fill('Module 1 Quiz');
     await page
       .getByPlaceholder('Enter question text')
       .fill('What does SQL stand for?');
 
-    await expect(page.locator('body')).toContainText('Module 1 Assessment');
+    await expect(page.locator('body')).toContainText('Module 1 Quiz');
     await expect(page.locator('body')).toContainText(
       'What does SQL stand for?',
     );

@@ -57,7 +57,7 @@ export const QuizHeader = ({
           onChange={(e) =>
             updateQuiz(moduleId, quiz.id, { baseTitle: e.target.value })
           }
-          placeholder="Enter quiz title (e.g., 'Module 1 Assessment')"
+          placeholder="Enter quiz title (e.g., 'Module 1 Quiz')"
           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
         />
         {showValidationErrors && quizTitleEmpty && (
