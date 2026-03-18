@@ -17,6 +17,7 @@ interface QuestionAttempt {
   maxPoints: number;
   feedback: string | null;
   isCorrect: boolean | null;
+  explanation: string | null;
   options?: any[];
 }
 
@@ -268,6 +269,7 @@ serve(async (req) => {
         maxPoints: question.points || 10,
         feedback,
         isCorrect,
+        explanation: question.explanation || null,
         options: questionOptions,
       };
     });

@@ -176,6 +176,7 @@
   
   .status-badge-draft {
     @apply bg-warning text-warning-foreground;
+    color: white;
   }
   
   .status-badge-unpublished {

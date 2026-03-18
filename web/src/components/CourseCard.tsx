@@ -30,9 +30,9 @@ interface CourseCardProps {
   enrolledCount: number;
   rating: number;
   totalRatings: number;
-  modules: number;  // This is what courseService returns (from total_sections)
-  lessons: number;  // This is what courseService returns (from total_videos)
-  status: "published" | "draft" | "archived";
+  modules: number;  
+  lessons: number; 
+  status: "published" | "draft";
   onCourseUpdated?: (duplicatedCourseId?: string) => void;
 }
 
@@ -57,7 +57,6 @@ export const CourseCard = ({
   const statusColors = {
     published: "status-badge-published",
     draft: "status-badge-draft",
-    archived: "bg-muted text-muted-foreground",
   };
 
   const handleEdit = () => {
@@ -119,10 +118,12 @@ export const CourseCard = ({
             target.src = DEFAULT_COURSE_THUMBNAIL;
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
-        <Badge className={`absolute top-4 left-4 ${statusColors[status]}`}>
+        <div className="absolute inset-0" />
+        
+        <Badge variant="plain" className={`absolute top-4 left-4 ${statusColors[status]}`}>
           {status.toUpperCase()}
         </Badge>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <Button

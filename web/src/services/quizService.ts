@@ -157,6 +157,7 @@ export interface QuestionAttemptDetail {
   maxPoints: number;
   feedback: string | null;
   isCorrect: boolean | null;
+  explanation: string | null;
   options?: any[];
 }
 
