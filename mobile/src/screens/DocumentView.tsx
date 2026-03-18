@@ -84,7 +84,7 @@ const DOCUMENT_VIEWERS = [
 const DocumentView = () => {
   const route = useRoute();
   const navigation = useNavigation<DocumentViewNavigationProp>();
-  const { documentId, courseId, sectionId, userId, documentType } = route.params as any;
+  const { documentId, courseId, sectionId, userId, documentType, sourceScreen } = route.params as any;
 
   const [loading, setLoading] = useState(true);
   const [documentDetail, setDocumentDetail] = useState<any>(null);
@@ -144,6 +144,24 @@ const DocumentView = () => {
       refetchNavigation();
     }, [])
   );
+
+  const navigateBackToModuleDetail = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    const resolvedSectionId = documentDetail?.section?.id || sectionId;
+    if (resolvedSectionId) {
+      navigation.navigate("ModuleDetail", {
+        courseId,
+        sectionId: resolvedSectionId,
+        userId,
+        sourceScreen,
+      } as any);
+      return;
+    }
+    navigation.navigate("CourseDetail", { courseId, sourceScreen } as any);
+  };
 
   const fetchCourseSections = async () => {
     try {
@@ -218,7 +236,7 @@ const DocumentView = () => {
         [
           {
             text: "Go Back",
-            onPress: () => navigation.goBack(),
+            onPress: navigateBackToModuleDetail,
           },
         ],
         { cancelable: false }
@@ -433,6 +451,7 @@ const DocumentView = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          sourceScreen,
           fromDocumentId: documentId,
           documentCompleted: true,
         } as any);
@@ -442,6 +461,7 @@ const DocumentView = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          sourceScreen,
           fromDocumentId: documentId,
           documentCompleted: true,
         } as any);
@@ -451,6 +471,7 @@ const DocumentView = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          sourceScreen,
           documentType: nextItemInModule.item.type,
           fromDocumentId: documentId,
           documentCompleted: true,
@@ -467,6 +488,7 @@ const DocumentView = () => {
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          sourceScreen,
         });
       } else if (prevItemInModule.item.type === "quiz") {
         navigation.replace("QuizScreen", {
@@ -474,6 +496,7 @@ const DocumentView = () => {
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          sourceScreen,
         });
       } else if (["pdf", "document", "ppt"].includes(prevItemInModule.item.type)) {
         navigation.replace("DocumentView", {
@@ -481,6 +504,7 @@ const DocumentView = () => {
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          sourceScreen,
           documentType: prevItemInModule.item.type,
         });
       }
@@ -553,6 +577,7 @@ const DocumentView = () => {
         navigation={navigation}
         headerLeftIcon="chevron-back"
         customEdges={["top", "bottom"]}
+        onHeaderLeftPress={navigateBackToModuleDetail}
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.purple400} />
@@ -569,6 +594,7 @@ const DocumentView = () => {
         navigation={navigation}
         headerLeftIcon="chevron-back"
         customEdges={["top", "bottom"]}
+        onHeaderLeftPress={navigateBackToModuleDetail}
       >
         <View style={styles.errorContainer}>
           <Ionicons
@@ -598,17 +624,7 @@ const DocumentView = () => {
       navigation={navigation}
       headerLeftIcon="chevron-back"
       customEdges={["top", "bottom"]}
-      onHeaderLeftPress={() => {
-        if (navigation.canGoBack()) {
-          navigation.goBack();
-          return;
-        }
-        navigation.navigate("ModuleDetail", {
-          courseId,
-          sectionId,
-          userId,
-        } as any);
-      }}
+      onHeaderLeftPress={navigateBackToModuleDetail}
     >
       {/* Document Viewer */}
       <View style={styles.pdfContainer}>

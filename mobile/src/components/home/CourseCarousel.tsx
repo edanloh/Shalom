@@ -89,7 +89,7 @@ export default function CourseCarousel({
               inputRange={inputRange}
               cardWidth={CARD_WIDTH}
               onPress={() =>
-                navigation.navigate("CourseDetail", { courseId: course.id })
+                navigation.navigate("CourseDetail", { courseId: course.id, sourceScreen: "Home" })
               }
               onToggleWishlist={onToggleWishlist}
               isWishlisted={isWishlisted}

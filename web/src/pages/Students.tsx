@@ -426,7 +426,6 @@ const Students = () => {
   }
 
   const handleDisableUser = async (email: string, enable: boolean) => {
-    console.log(selectedStudent)
     const sessionResponse = await supabase.auth.getSession();
     const accessToken = sessionResponse.data.session?.access_token;
     try {

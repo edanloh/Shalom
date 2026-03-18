@@ -260,13 +260,8 @@ export const CourseBuilderProvider = ({
     const fetchCourseData = async () => {
       if (!courseId || courseId === "new") {
         // No courseId or 'new' means we're creating a new course, keep empty state
-        console.log(
-          "CourseBuilder: Creating new course (no courseId or courseId=new)",
-        );
         return;
       }
-
-      console.log("CourseBuilder: Loading course data for courseId:", courseId);
       setIsLoadingCourse(true);
 
       try {
@@ -281,8 +276,6 @@ export const CourseBuilderProvider = ({
           adminId,
         );
 
-        console.log("CourseBuilder: Course data loaded:", courseBuilderData);
-
         // Set course basic info
         setCourseName(courseBuilderData.courseName);
         setCourseDescription(courseBuilderData.courseDescription);
@@ -293,27 +286,10 @@ export const CourseBuilderProvider = ({
         // Set category
         setCourseCategory(courseBuilderData.courseCategory);
         setOriginalCourseCategory(courseBuilderData.courseCategory); // Save for revert
-        console.log("Loaded category:", courseBuilderData.courseCategory);
 
         // Set modules with all transformations already applied
         setModules(courseBuilderData.modules);
-
-        console.log(
-          "CourseBuilder: Quiz questions check:",
-          courseBuilderData.modules.map((m) => ({
-            moduleTitle: m.title,
-            quizzes: m.quizzes.map((q) => ({
-              quizTitle: q.title,
-              questionsCount: q.questions?.length || 0,
-              questions: q.questions,
-            })),
-          })),
-        );
-
-        console.log(
-          "CourseBuilder: Course data loaded with numbering:",
-          courseBuilderData.modules,
-        );
+     
       } catch (error) {
         console.error("CourseBuilder: Error fetching course data:", error);
       } finally {
@@ -385,11 +361,9 @@ export const CourseBuilderProvider = ({
     };
     const getStudents = async () => {
       const studentsData = await courseService.getCourseStudents(currentCourseId);
-      console.log('Enrolled students fetched for notifications:', studentsData);
       setEnrolledStudents(studentsData);
       const data = await courseService.getAllStudents();
       setAllStudents(data.students);
-      console.log('All students fetched for notifications:', data.students);
     };
     initializeOrderValues();
     getStudents();
@@ -453,11 +427,6 @@ export const CourseBuilderProvider = ({
     let hasErrors = false;
     let uploadedCourseThumbnailUrl = courseThumbnailUrl;
 
-    console.log(
-      "[uploadAllPendingFiles] Starting with courseThumbnailUrl:",
-      courseThumbnailUrl,
-    );
-
     // Upload course thumbnail if it's a local file
     if (courseThumbnailUrl?.startsWith("[LOCAL_FILE:")) {
       const courseThumbnailFile = (window as any).__courseThumbnailFile;
@@ -469,10 +438,6 @@ export const CourseBuilderProvider = ({
             console.error("Course thumbnail upload failed:", error);
             hasErrors = true;
           } else {
-            console.log(
-              "[uploadAllPendingFiles] Uploaded course thumbnail to:",
-              url,
-            );
             uploadedCourseThumbnailUrl = url;
             setCourseThumbnailUrl(url);
           }
@@ -481,12 +446,7 @@ export const CourseBuilderProvider = ({
           hasErrors = true;
         }
       }
-    } else {
-      console.log(
-        "[uploadAllPendingFiles] Course thumbnail is a URL, using directly:",
-        uploadedCourseThumbnailUrl,
-      );
-    }
+    } 
 
     // Upload all lesson files
     for (
@@ -693,28 +653,14 @@ export const CourseBuilderProvider = ({
    * Process all pending category changes before saving the course
    */
   const processCategoryChanges = async () => {
-    console.log(
-      "[processCategoryChanges] Starting with:",
-      pendingCategoryChanges,
-    );
-
     let finalCategoryId = courseCategory;
 
     // Step 1: Handle deleted categories FIRST
     for (const deletedCategoryId of pendingCategoryChanges.deleted) {
-      console.log(
-        "[processCategoryChanges] Processing deleted category:",
-        deletedCategoryId,
-      );
-
       // If this course uses the deleted category, it will be set to General by backend
       // But we need to delete the category first
       try {
         await categoryService.deleteCategory(deletedCategoryId);
-        console.log(
-          "[processCategoryChanges] Category deleted, courses reassigned to General by backend",
-        );
-
         // If this course was using deleted category, we need to find General's ID
         if (courseCategory === deletedCategoryId) {
           const allCategories = await categoryService.getAllCategories();
@@ -743,24 +689,14 @@ export const CourseBuilderProvider = ({
 
     // Step 2: Handle created categories
     for (const newCat of pendingCategoryChanges.created) {
-      console.log("[processCategoryChanges] Creating new category:", newCat);
-
       try {
         const createdCategory = await categoryService.createCategory(
           newCat.name,
           newCat.color,
         );
 
-        console.log(
-          "[processCategoryChanges] Category created with ID:",
-          createdCategory.id,
-        );
-
         // If this course uses the temp ID, update to real ID
         if (courseCategory === newCat.tempId) {
-          console.log(
-            "[processCategoryChanges] Updating course category from temp ID to real ID",
-          );
           finalCategoryId = createdCategory.id;
           setCourseCategory(createdCategory.id);
         }
@@ -777,14 +713,6 @@ export const CourseBuilderProvider = ({
 
     // Step 3: Handle updated categories
     for (const updatedCat of pendingCategoryChanges.updated) {
-      console.log("[processCategoryChanges] Updating category:", updatedCat);
-      console.log("[processCategoryChanges] updatedCat.id:", updatedCat.id);
-      console.log("[processCategoryChanges] updatedCat.name:", updatedCat.name);
-      console.log(
-        "[processCategoryChanges] updatedCat.color:",
-        updatedCat.color,
-      );
-
       try {
         // Make sure you're passing the VALUES, not the object
         await categoryService.updateCategory(
@@ -792,7 +720,6 @@ export const CourseBuilderProvider = ({
           updatedCat.name, // string (NOT object)
           updatedCat.color, // string (NOT object)
         );
-        console.log("[processCategoryChanges] Category updated successfully");
       } catch (error) {
         console.error(
           "[processCategoryChanges] Error updating category:",
@@ -809,10 +736,6 @@ export const CourseBuilderProvider = ({
 
     // Update original category to new value
     setOriginalCourseCategory(finalCategoryId);
-
-    console.log(
-      "[processCategoryChanges] All category changes processed successfully",
-    );
     return finalCategoryId;
   };
 
@@ -820,11 +743,6 @@ export const CourseBuilderProvider = ({
    * Revert all category changes and restore original state
    */
   const revertCategoryChanges = () => {
-    console.log(
-      "[revertCategoryChanges] Reverting to original category:",
-      originalCourseCategory,
-    );
-
     // Restore original category
     setCourseCategory(originalCourseCategory);
 
@@ -847,12 +765,15 @@ export const CourseBuilderProvider = ({
       errors.push("❌ Course title must be at least 3 characters");
     }
 
-    // 2. Course description required
-    const courseDesc = courseDescription?.trim() || "";
-    if (!courseDesc) {
+    // 2. Course description required (normalize rich-text markup to plain text)
+    const courseDescRaw = courseDescription || "";
+    const courseDescPlain = courseDescRaw
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!courseDescPlain) {
       errors.push("❌ Course description is required");
-    } else if (courseDesc.length < 10) {
-      errors.push("❌ Course description must be at least 10 characters");
     }
 
     // 3. Course must have at least one module
@@ -904,17 +825,17 @@ export const CourseBuilderProvider = ({
                 `Please add a video URL or upload a video file.`,
             );
           }
-        } else if (lesson.type === "pdf") {
-          // PDF lessons must have a resource URL or uploaded file
-          const hasPDF =
+        } else {
+          // Document lessons (PDF/DOCX/PPTX) must have a resource URL or uploaded file
+          const hasDocument =
             lesson.resourceUrl &&
             lesson.resourceUrl.trim() !== "" &&
             lesson.resourceUrl !== "[LOCAL_FILE: ]";
 
-          if (!hasPDF) {
+          if (!hasDocument) {
             errors.push(
-              `❌ ${lessonIdentifier}: PDF document is required. ` +
-                `Please add a PDF URL or upload a PDF file.`,
+              `❌ ${lessonIdentifier}: Document is required. ` +
+                `Please add a resource URL or upload a file (PDF, DOCX, PPTX supported).`,
             );
           }
         }
@@ -926,7 +847,7 @@ export const CourseBuilderProvider = ({
         const quizTitle = (quiz.baseTitle || quiz.title || "")
           .replace(/^Quiz \d+\.\d+:\s*/, "")
           .trim();
-        const quizIdentifier = `Quiz ${moduleNumber}.${quizNumber} "${quizTitle}"`;
+        const quizIdentifier = `Quiz ${moduleNumber}.${quizNumber} ${quizTitle}`;
 
         if (!quizTitle) {
           errors.push(`❌ Quiz ${moduleNumber}.${quizNumber}: Title is required.`);
@@ -1111,21 +1032,15 @@ export const CourseBuilderProvider = ({
       };
     }
 
-    console.log("[saveCourse] ✓ Validation passed!");
     setShowValidationErrors(false);
 
     // Continue with existing save logic...
     setIsSaving(true);
     try {
       // Step 0 - Process category changes FIRST
-      console.log("[saveCourse] Processing category changes...");
       let finalCategoryId;
       try {
         finalCategoryId = await processCategoryChanges();
-        console.log(
-          "[saveCourse] Category changes processed, final category ID:",
-          finalCategoryId,
-        );
       } catch (error) {
         console.error("[saveCourse] Category processing failed:", error);
         showModal({
@@ -1148,7 +1063,6 @@ export const CourseBuilderProvider = ({
       }
 
       // Step 1: Upload all pending files first
-      console.log("Uploading pending files...");
       const { uploadedModules, uploadedCourseThumbnailUrl, hasErrors } =
         await uploadAllPendingFiles();
 
@@ -1272,8 +1186,6 @@ export const CourseBuilderProvider = ({
 
       // Step 1: Create or update the course WITH full module structure
       if (!courseExistsInDb) {
-        console.log("Creating new course with modules:", courseName);
-
         // Use courseService.createCourseWithModules which calls /createCourse endpoint
         const courseData = {
           courseId: currentCourseId && currentCourseId !== "new" ? currentCourseId : undefined, // Pass pre-generated ID if exists
@@ -1299,7 +1211,6 @@ export const CourseBuilderProvider = ({
 
         setCurrentCourseId(finalCourseId);
         setCourseExistsInDb(true);
-        console.log("Course created with ID:", finalCourseId);
 
         // Update URL to reflect the new course ID (so subsequent saves use UPDATE)
         if (typeof window !== "undefined") {
@@ -1310,7 +1221,6 @@ export const CourseBuilderProvider = ({
           );
         }
       } else {
-        console.log("Updating course with modules:", currentCourseId);
         const updateData = {
           title: courseName,
           description: courseDescription,
@@ -1321,7 +1231,6 @@ export const CourseBuilderProvider = ({
           outcomes: courseOutcomes.map((outcome) => outcome.trim()).filter(Boolean),
         };
 
-        console.log("check course category:", courseCategory);
 
         await courseService.updateCourseWithModules(
           currentCourseId,

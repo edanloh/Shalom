@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,122 @@ import { supabase } from "@/lib/supabase";
 type TabId = "grading" | "variations" | "library";
 type VarViewMode = "all" | "graded" | "ungraded";
 type GradingSortBy = "pending" | "oldest";
+
+type VariationRowProps = {
+  question: QuestionGrading;
+  variation: AnswerVariation;
+  vIndex: number;
+  withGrading: boolean;
+  isSubmittingGrade: boolean;
+  state: { points: string; feedback: string };
+  updateGradingState: (
+    qId: string,
+    vId: string,
+    field: "points" | "feedback",
+    value: string,
+  ) => void;
+  onGrade: (points: string, feedback: string) => void;
+};
+
+const VariationRow = ({
+  question,
+  variation,
+  vIndex,
+  withGrading,
+  isSubmittingGrade,
+  state,
+  updateGradingState,
+  onGrade,
+}: VariationRowProps) => {
+  const [pointsInput, setPointsInput] = useState(state.points ?? "");
+  const [feedbackInput, setFeedbackInput] = useState(state.feedback ?? "");
+  const feedbackRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const resizeFeedback = () => {
+    const el = feedbackRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  useEffect(() => {
+    setPointsInput(state.points ?? "");
+    setFeedbackInput(state.feedback ?? "");
+  }, [state.points, state.feedback, question.questionId, variation.variationId]);
+
+  useEffect(() => {
+    resizeFeedback();
+  }, [feedbackInput]);
+
+  return (
+    <div className={`px-4 py-3 border-b border-border last:border-0 ${variation.isGraded
+      ? "bg-green-50/30 dark:bg-green-950/10"
+      : "bg-amber-50/30 dark:bg-amber-950/10"}`}>
+      <div className="flex items-start gap-3">
+        <span className="text-xs font-mono text-muted-foreground pt-1 min-w-[20px]">V{vIndex + 1}</span>
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className={`px-3 py-2 rounded-lg text-sm border ${variation.isGraded
+            ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100"
+            : "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100"}`}>
+            {variation.answerText}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className="text-xs">{variation.studentCount} student{variation.studentCount !== 1 ? "s" : ""}</Badge>
+            {variation.isGraded
+              ? <Badge className="bg-green-600 text-xs gap-1"><CheckCircle className="h-3 w-3" />{variation.gradedPoints} / {question.maxPoints} pts</Badge>
+              : <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">Ungraded</Badge>}
+          </div>
+          {withGrading && (
+            <div className="flex flex-nowrap gap-2 items-center pt-1">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">Points (/{question.maxPoints})</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max={question.maxPoints}
+                  value={pointsInput}
+                  onChange={(e) => setPointsInput(e.target.value)}
+                  onBlur={() => updateGradingState(question.questionId, variation.variationId, "points", pointsInput)}
+                  className="w-20 h-8 text-sm text-center font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+              <div className="flex-1 min-w-0 flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">Feedback</Label>
+                <Textarea
+                  ref={feedbackRef}
+                  value={feedbackInput}
+                  onChange={(e) => setFeedbackInput(e.target.value)}
+                  onInput={resizeFeedback}
+                  onBlur={() => updateGradingState(question.questionId, variation.variationId, "feedback", feedbackInput)}
+                  placeholder="Feedback sent to students..."
+                  rows={1}
+                  className="text-sm resize-none min-h-[2rem] py-1 flex-1 overflow-hidden"
+                />
+              </div>
+              <Button
+                size="sm"
+                disabled={isSubmittingGrade || !String(pointsInput ?? "").trim()}
+                onClick={() => onGrade(pointsInput, feedbackInput)}
+                className="h-8 flex-shrink-0 gap-1"
+              >
+                {isSubmittingGrade ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                Grade
+              </Button>
+            </div>
+          )}
+          <details className="text-xs text-muted-foreground">
+            <summary className="cursor-pointer hover:text-foreground list-none flex items-center gap-1 select-none">
+              <ChevronDown className="h-3 w-3" />Show {variation.studentCount} student{variation.studentCount !== 1 ? "s" : ""}
+            </summary>
+            <div className="mt-1 ml-3 space-y-0.5">
+              {variation.students.map((s) => <div key={s.attemptId}>· {s.studentName}</div>)}
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Quiz = () => {
   // ── Navigation ────────────────────────────────────────────────────────────────
@@ -178,11 +294,25 @@ const Quiz = () => {
 
   const updateGradingState = (qId: string, vId: string, field: "points" | "feedback", value: string) => {
     const key = getGradingKey(qId, vId);
-    setGradingState((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+    setGradingState((prev) => {
+      const existing = prev[key] || { points: "", feedback: "" };
+      return {
+        ...prev,
+        [key]: {
+          points: existing.points ?? "",
+          feedback: existing.feedback ?? "",
+          [field]: value,
+        },
+      };
+    });
   };
 
-  const handleGradeVariation = async (question: QuestionGrading, variation: AnswerVariation) => {
-    const state = getVariationGradingState(question, variation);
+  const handleGradeVariation = async (
+    question: QuestionGrading,
+    variation: AnswerVariation,
+    overrideState?: { points: string; feedback: string },
+  ) => {
+    const state = overrideState || getVariationGradingState(question, variation);
     const key = getGradingKey(question.questionId, variation.variationId);
     if (!state?.points) {
       toast({ title: "Points required", description: "Please enter points to award.", variant: "destructive" });
@@ -371,65 +501,6 @@ const Quiz = () => {
     <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
   );
 
-  const VariationRow = ({ question, variation, vIndex, withGrading }: {
-    question: QuestionGrading; variation: AnswerVariation; vIndex: number; withGrading: boolean;
-  }) => {
-    const state = getVariationGradingState(question, variation);
-    return (
-      <div className={`px-4 py-3 border-b border-border last:border-0 ${variation.isGraded
-        ? "bg-green-50/30 dark:bg-green-950/10"
-        : "bg-amber-50/30 dark:bg-amber-950/10"}`}>
-        <div className="flex items-start gap-3">
-          <span className="text-xs font-mono text-muted-foreground pt-1 min-w-[20px]">V{vIndex + 1}</span>
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className={`px-3 py-2 rounded-lg text-sm border ${variation.isGraded
-              ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100"
-              : "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100"}`}>
-              {variation.answerText}
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="text-xs">{variation.studentCount} student{variation.studentCount !== 1 ? "s" : ""}</Badge>
-              {variation.isGraded
-                ? <Badge className="bg-green-600 text-xs gap-1"><CheckCircle className="h-3 w-3" />{variation.gradedPoints} / {question.maxPoints} pts</Badge>
-                : <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">Ungraded</Badge>}
-            </div>
-            {withGrading && (
-              <div className="flex gap-2 items-end pt-1">
-                <div className="w-24 flex-shrink-0">
-                  <Label className="text-xs text-muted-foreground">Points (/{question.maxPoints})</Label>
-                  <Input type="number" min="0" max={question.maxPoints} step="0.5"
-                    value={state.points}
-                    onChange={(e) => updateGradingState(question.questionId, variation.variationId, "points", e.target.value)}
-                    className="text-center font-semibold mt-1 h-8 text-sm" />
-                </div>
-                <div className="flex-1">
-                  <Label className="text-xs text-muted-foreground">Feedback (optional)</Label>
-                  <Textarea value={state.feedback}
-                    onChange={(e) => updateGradingState(question.questionId, variation.variationId, "feedback", e.target.value)}
-                    placeholder="Feedback sent to students…" rows={1} className="text-sm resize-none mt-1 min-h-0 h-8 py-1" />
-                </div>
-                <Button size="sm" disabled={isSubmittingGrade || !state.points}
-                  onClick={() => handleGradeVariation(question, variation)}
-                  className="h-8 flex-shrink-0 gap-1">
-                  {isSubmittingGrade ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
-                  Grade
-                </Button>
-              </div>
-            )}
-            <details className="text-xs text-muted-foreground">
-              <summary className="cursor-pointer hover:text-foreground list-none flex items-center gap-1 select-none">
-                <ChevronDown className="h-3 w-3" />Show {variation.studentCount} student{variation.studentCount !== 1 ? "s" : ""}
-              </summary>
-              <div className="mt-1 ml-3 space-y-0.5">
-                {variation.students.map((s) => <div key={s.attemptId}>· {s.studentName}</div>)}
-              </div>
-            </details>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
@@ -586,7 +657,19 @@ const Quiz = () => {
                                             </div>
                                           )}
                                           {pendingVars.map((v: AnswerVariation, vi: number) => (
-                                            <VariationRow key={v.variationId} question={question} variation={v} vIndex={vi} withGrading />
+                                            <VariationRow
+                                              key={v.variationId}
+                                              question={question}
+                                              variation={v}
+                                              vIndex={vi}
+                                              withGrading
+                                              isSubmittingGrade={isSubmittingGrade}
+                                              state={getVariationGradingState(question, v)}
+                                              updateGradingState={updateGradingState}
+                                              onGrade={(points, feedback) =>
+                                                handleGradeVariation(question, v, { points, feedback })
+                                              }
+                                            />
                                           ))}
                                         </div>
                                       )}
@@ -736,7 +819,17 @@ const Quiz = () => {
                                                     </div>
                                                   )}
                                                   {question.variations.map((v: AnswerVariation, vi: number) => (
-                                                    <VariationRow key={v.variationId} question={question} variation={v} vIndex={vi} withGrading={false} />
+                                                    <VariationRow
+                                                      key={v.variationId}
+                                                      question={question}
+                                                      variation={v}
+                                                      vIndex={vi}
+                                                      withGrading={false}
+                                                      isSubmittingGrade={isSubmittingGrade}
+                                                      state={getVariationGradingState(question, v)}
+                                                      updateGradingState={updateGradingState}
+                                                      onGrade={() => undefined}
+                                                    />
                                                   ))}
                                                 </div>
                                               )}

@@ -1,12 +1,15 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
+export type CourseDetailSourceScreen = "Home" | "Courses" | "MyCourses";
+
 export type MainStackParamList = {
   MainTabs: NavigatorScreenParams<BottomTabNavParamList>;
-  CourseDetail: { courseId: string };
+  CourseDetail: { courseId: string; sourceScreen?: CourseDetailSourceScreen };
   ModuleDetail: {
     courseId: string;
     sectionId: string;
     userId?: string;
+    sourceScreen?: CourseDetailSourceScreen;
     videoCompleted?: boolean;
     quizCompleted?: boolean;
     documentCompleted?: boolean; // Covers PDF, DOCX, PPTX
@@ -15,9 +18,9 @@ export type MainStackParamList = {
     completedDocumentId?: string; // Covers all document types
     timestamp?: number;
   };
-  LessonPlayer: { videoId: string; courseId: string; sectionId?: string; userId?: string };
-  QuizScreen: { quizId: string; courseId: string; sectionId?: string; userId?: string };
-  DocumentView: { documentId: string; courseId: string; sectionId?: string; userId?: string; documentType?: 'pdf' | 'document' | 'ppt' };
+  LessonPlayer: { videoId: string; courseId: string; sectionId?: string; userId?: string; sourceScreen?: CourseDetailSourceScreen };
+  QuizScreen: { quizId: string; courseId: string; sectionId?: string; userId?: string; sourceScreen?: CourseDetailSourceScreen };
+  DocumentView: { documentId: string; courseId: string; sectionId?: string; userId?: string; sourceScreen?: CourseDetailSourceScreen; documentType?: 'pdf' | 'document' | 'ppt' };
   LeaveReview: { courseId: string };
   Settings: undefined;
   EditProfile: undefined;

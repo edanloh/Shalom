@@ -211,25 +211,12 @@ const LessonEditor = ({
             <input
               type="text"
               value={(() => {
-                const seconds = lesson?.durationSeconds || 0;
+                const seconds = hasVideo ? (lesson?.durationSeconds || 0) : 0;
                 const hours = Math.floor(seconds / 3600);
                 const minutes = Math.floor((seconds % 3600) / 60);
                 const secs = seconds % 60;
                 return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
               })()}
-              onChange={(e) => {
-                const value = e.target.value;
-                const parts = value.split(":");
-                if (parts.length === 3) {
-                  const hours = parseInt(parts[0]) || 0;
-                  const minutes = parseInt(parts[1]) || 0;
-                  const secs = parseInt(parts[2]) || 0;
-                  const totalSeconds = hours * 3600 + minutes * 60 + secs;
-                  updateLesson(module.id, lesson.id, {
-                    durationSeconds: totalSeconds,
-                  });
-                }
-              }}
               style={{
                 backgroundColor: Colors.textInputBg,
                 borderColor: Colors.gray600,
@@ -237,7 +224,9 @@ const LessonEditor = ({
               }}
               className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
               placeholder="00:00:00"
+              readOnly
               disabled={isFetchingDuration}
+              title="Duration is auto-populated from the uploaded video"
             />
           </div>
         )}
@@ -304,10 +293,10 @@ const getQuestionErrors = (question: any): string[] => {
       errors.push("Correct answer points to an empty option");
     }
 
-    // At least one non-empty option
-    const hasOptions = options.some((opt: any) => String(opt).trim());
-    if (!hasOptions) {
-      errors.push("At least one option is required");
+    // At least two non-empty options
+    const nonEmptyOptionCount = options.filter((opt: any) => String(opt).trim()).length;
+    if (nonEmptyOptionCount < 2) {
+      errors.push("At least two options required");
     }
   }
 
@@ -325,10 +314,10 @@ const getQuestionErrors = (question: any): string[] => {
         break;
       }
     }
-    // At least one non-empty option
-    const hasOptions = options.some((opt: any) => String(opt).trim());
-    if (!hasOptions) {
-      errors.push("At least one option is required");
+    // At least two non-empty options
+    const nonEmptyOptionCount = options.filter((opt: any) => String(opt).trim()).length;
+    if (nonEmptyOptionCount < 2) {
+      errors.push("At least two options required");
     }
   }
 

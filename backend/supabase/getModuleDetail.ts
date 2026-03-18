@@ -177,6 +177,24 @@ serve(async (req) => {
     console.log('Fetched resources count:', resources?.length || 0);
     console.log('Lessons data:', lessons);
 
+    const quizIds = (quizzes || []).map((q: any) => q.id);
+    let shortAnswerQuizIds = new Set<string>();
+    if (quizIds.length > 0) {
+      const { data: shortAnswerRows, error: shortAnswerError } = await supabaseClient
+        .from('quiz_questions')
+        .select('quiz_id, question_type')
+        .in('quiz_id', quizIds)
+        .in('question_type', ['short-answer', 'text']);
+
+      if (shortAnswerError) {
+        console.error('Short-answer quiz detection error:', shortAnswerError);
+      } else {
+        shortAnswerQuizIds = new Set(
+          (shortAnswerRows || []).map((row: any) => row.quiz_id),
+        );
+      }
+    }
+
     // ========================================
     // 3. Fetch user progress if userId provided
     // ========================================
@@ -231,10 +249,11 @@ serve(async (req) => {
                 score,
                 is_passed,
                 attempt_number,
+                grades_released,
                 completed_at
               `)
               .eq('user_id', userId)
-              .in('quiz_id', quizIds)
+              .in('quiz_id', (quizzes || []).map((q: any) => q.id))
               .order('quiz_id', { ascending: true })
               .order('attempt_number', { ascending: false }),
             
@@ -366,19 +385,34 @@ serve(async (req) => {
           const latestAttempt = userProgress?.quizAttempts?.find(
             (qa: any) => qa.quiz_id === q.id
           );
+          const hasAttempt = Boolean(latestAttempt);
+          const hasShortAnswer = shortAnswerQuizIds.has(q.id);
+
+          const maxAttemptsRaw = q.max_attempts;
+          const normalizedMaxAttempts =
+            maxAttemptsRaw === null || maxAttemptsRaw === undefined
+              ? null
+              : Number(maxAttemptsRaw);
           
           // Quiz is completed if:
           // 1. User has passed, OR
           // 2. User has exhausted all attempts (even if failed)
+          // 3. Quiz contains short-answer and user has submitted at least once
           const isPassed = latestAttempt?.is_passed === true;
-          const hasExhaustedAttempts = latestAttempt && 
-                                       latestAttempt.attempt_number >= (q.max_attempts || 3);
-          const isCompleted = isPassed || hasExhaustedAttempts || false;
+          const hasExhaustedAttempts =
+            hasAttempt &&
+            normalizedMaxAttempts !== null &&
+            Number.isFinite(normalizedMaxAttempts) &&
+            normalizedMaxAttempts > 0 &&
+            latestAttempt.attempt_number >= normalizedMaxAttempts;
+          const isCompleted = isPassed || hasExhaustedAttempts || (hasShortAnswer && hasAttempt);
           
           console.log(`📝 Quiz ${q.title} (${q.id}):`, {
             isPassed,
+            hasShortAnswer,
+            hasAttempt,
             attemptNumber: latestAttempt?.attempt_number,
-            maxAttempts: q.max_attempts || 3,
+            maxAttempts: normalizedMaxAttempts,
             hasExhaustedAttempts,
             isCompleted
           });
@@ -386,6 +420,7 @@ serve(async (req) => {
           return {
             ...q,
             type: "quiz",
+            has_short_answer: hasShortAnswer,
             is_completed: isCompleted
           };
         });

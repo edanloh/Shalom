@@ -187,11 +187,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             return numA - numB;
           });
 
-          console.log(
-            "Slide files found:",
-            slideFilePaths.length,
-            slideFilePaths,
-          );
 
           const slidePreviews: string[] = [];
 
@@ -215,7 +210,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     ? slideTexts.join("\n")
                     : `[Slide ${i + 1}]`;
 
-                console.log(`Slide ${i + 1}:`, slideContent);
                 slidePreviews.push(slideContent);
               }
             } catch (err) {

@@ -48,7 +48,7 @@ type QuizScreenNavigationProp = StackNavigationProp<
 const QuizScreen = () => {
   const route = useRoute();
   const navigation = useNavigation<QuizScreenNavigationProp>();
-  const { quizId, courseId, sectionId, userId } = route.params as any;
+  const { quizId, courseId, sectionId, userId, sourceScreen } = route.params as any;
 
   const [loading, setLoading] = useState(true);
   const [quizDetail, setQuizDetail] = useState<QuizDetail | null>(null);
@@ -95,6 +95,35 @@ const QuizScreen = () => {
   useEffect(() => {
     fetchQuizDetail();
   }, [quizId]);
+
+  const navigateBackToModuleDetail = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    const resolvedSectionId = (quizDetail as any)?.section?.id || sectionId;
+    const hasShortAnswerQuestions =
+      quizDetail?.questions?.some((q: any) => q.question_type === "short-answer") ||
+      false;
+    const shouldMarkCompleted = hasShortAnswerQuestions && (gradingPending || !!quizResult);
+    if (resolvedSectionId) {
+      navigation.navigate("ModuleDetail", {
+        courseId,
+        sectionId: resolvedSectionId,
+        userId,
+        sourceScreen,
+        ...(shouldMarkCompleted
+          ? {
+              quizCompleted: true,
+              completedQuizId: quizId,
+              timestamp: Date.now(),
+            }
+          : {}),
+      } as any);
+      return;
+    }
+    navigation.navigate("CourseDetail", { courseId, sourceScreen } as any);
+  };
 
   useEffect(() => {
     // Timer countdown - only runs when timer is active and not in review/results mode
@@ -456,32 +485,98 @@ const QuizScreen = () => {
       setTimerActive(false);
       setSubmitting(true);
 
-      // Calculate results locally
-      const answersArray = quizService.convertAnswersToArray(selectedAnswers);
+      // Calculate results locally using per-question selected values
       let correctCount = 0;
-      const gradedAnswers = quizDetail.questions.map((question, idx) => {
-        const userAnswer = answersArray[idx];
+      const gradedAnswers = quizDetail.questions.map((question) => {
+        const userAnswer = selectedAnswers.get(question.id);
         const correctAnswer = question.correct_answer || "";
         
         // Compare answers based on question type
         let isCorrect = false;
         if (question.question_type === "multiple-correct") {
-          // For multiple-correct, compare arrays
-          const userAnswerArray = Array.isArray(userAnswer) ? userAnswer : [];
-          const correctAnswerArray = Array.isArray(correctAnswer) 
-            ? correctAnswer 
-            : (typeof correctAnswer === 'string' && correctAnswer.startsWith('[')
-                ? JSON.parse(correctAnswer)
-                : [correctAnswer]);
-          
-          // Sort and compare
-          isCorrect = JSON.stringify(userAnswerArray.sort()) === JSON.stringify(correctAnswerArray.sort());
+          // For multiple-correct, compare normalized arrays of selected option text
+          const userAnswerArray = Array.isArray(userAnswer)
+            ? userAnswer
+            : typeof userAnswer === "string"
+              ? (() => {
+                  try {
+                    const parsed = JSON.parse(userAnswer);
+                    return Array.isArray(parsed) ? parsed : [userAnswer];
+                  } catch {
+                    return [userAnswer];
+                  }
+                })()
+              : [];
+
+          const correctAnswerArray = Array.isArray(correctAnswer)
+            ? correctAnswer
+            : typeof correctAnswer === "string"
+              ? (() => {
+                  try {
+                    const parsed = JSON.parse(correctAnswer);
+                    return Array.isArray(parsed) ? parsed : [correctAnswer];
+                  } catch {
+                    return [correctAnswer];
+                  }
+                })()
+              : [];
+
+          const normalizedUser = userAnswerArray
+            .map((v) => String(v).trim())
+            .filter(Boolean)
+            .sort();
+          const normalizedCorrect = correctAnswerArray
+            .map((v) => String(v).trim())
+            .filter(Boolean)
+            .sort();
+
+          isCorrect =
+            normalizedUser.length === normalizedCorrect.length &&
+            JSON.stringify(normalizedUser) === JSON.stringify(normalizedCorrect);
         } else if (question.question_type === "matching") {
-          // For matching, compare JSON objects
-          isCorrect = JSON.stringify(userAnswer) === JSON.stringify(correctAnswer);
+          // For matching, compare normalized left->right mappings
+          const toPairArray = (value: any): Array<{ left: string; right: string }> => {
+            if (Array.isArray(value)) return value as Array<{ left: string; right: string }>;
+            if (typeof value === "string") {
+              try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed)
+                  ? (parsed as Array<{ left: string; right: string }>)
+                  : [];
+              } catch {
+                return [];
+              }
+            }
+            return [];
+          };
+
+          const normalizePairs = (pairs: Array<{ left: string; right: string }>) =>
+            pairs
+              .map((p) => `${String(p.left).trim()}=>${String(p.right).trim()}`)
+              .sort();
+
+          const normalizedUser = normalizePairs(toPairArray(userAnswer));
+          const normalizedCorrect = normalizePairs(toPairArray(correctAnswer));
+          isCorrect = JSON.stringify(normalizedUser) === JSON.stringify(normalizedCorrect);
         } else {
-          // For single answer questions
-          isCorrect = String(userAnswer).trim() === String(correctAnswer).trim();
+          // For single answer questions, support both answer text and index-style correct_answer
+          const selectedValue = Array.isArray(userAnswer)
+            ? String(userAnswer[0] ?? "").trim()
+            : String(userAnswer ?? "").trim();
+
+          let normalizedCorrect = String(correctAnswer ?? "").trim();
+          const parsedIndex = Number(normalizedCorrect);
+          if (
+            Number.isInteger(parsedIndex) &&
+            parsedIndex >= 0 &&
+            parsedIndex < (question.options?.length || 0)
+          ) {
+            normalizedCorrect = String(
+              question.options?.[parsedIndex]?.option_text ?? normalizedCorrect,
+            ).trim();
+          }
+
+          isCorrect = selectedValue === normalizedCorrect;
         }
         
         if (isCorrect) correctCount++;
@@ -583,9 +678,11 @@ const QuizScreen = () => {
       );
       
       if (hasShortAnswer) {
-        // Show pending grading screen instead of results
+        // Keep students on pending screen until grading is released.
+        // Completion for short-answer quizzes is handled when they leave this screen.
         setGradingPending(true);
         setShowResults(false);
+        return;
       } else {
         setShowResults(true);
       }
@@ -751,6 +848,62 @@ const QuizScreen = () => {
     setReviewMode(false);
     setShowResults(true);
   };
+
+  const navigateAfterCompletion = () => {
+    // Extra safety check - make sure nextItemInModule AND nextItemInModule.item exist
+    if (nextItemInModule && nextItemInModule.item) {
+      // Navigate to next item (video, quiz, or document)
+      if (nextItemInModule.item.type === "video") {
+        navigation.replace("LessonPlayer", {
+          videoId: nextItemInModule.item.id,
+          courseId,
+          sectionId: nextItemInModule.sectionId,
+          userId,
+        });
+      } else if (nextItemInModule.item.type === "quiz") {
+        navigation.replace("QuizScreen", {
+          quizId: nextItemInModule.item.id,
+          courseId,
+          sectionId: nextItemInModule.sectionId,
+          userId,
+        });
+      } else if (
+        ["pdf", "document", "ppt"].includes(nextItemInModule.item.type)
+      ) {
+        navigation.replace("DocumentView", {
+          documentId: nextItemInModule.item.id,
+          courseId,
+          sectionId: nextItemInModule.sectionId,
+          userId,
+          documentType: nextItemInModule.item.type,
+        });
+      }
+      return;
+    }
+
+    if (isLastItem) {
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: "MainTabs", params: { screen: "Home" } as any },
+          {
+            name: "CourseDetail",
+            params: { courseId, sourceScreen, quizCompleted: true, quizId } as any,
+          },
+        ],
+      });
+      return;
+    }
+
+    // Default: Navigate back with state to refresh CourseDetail
+    navigation.navigate("CourseDetail", {
+      courseId,
+      sourceScreen,
+      quizCompleted: true,
+      quizId,
+    } as any);
+  };
+
   const handleComplete = () => {
     console.log("🎯 handleComplete called:", {
       isPassed: quizResult?.isPassed,
@@ -769,54 +922,19 @@ const QuizScreen = () => {
 
     // Mark as complete and auto-navigate if:
     // 1. Quiz has short-answer questions (manual grading - no strict checks needed), OR
-    // 2. Quiz is passed (and not in practice mode), OR
-    // 3. All attempts are exhausted (even if failed, and not in practice mode)
+    // 2. Quiz is passed (including practice-mode attempts), OR
+    // 3. All attempts are exhausted (even if failed)
     // Additional safeguard: Don't complete if failed and still has attempts (unless manual grading)
     const hasFailed = quizResult && !quizResult.isPassed;
     const hasAttemptsRemaining = attemptsRemainingDisplay !== null && attemptsRemainingDisplay > 0;
     
     const canComplete = hasShortAnswer || // Allow completion for manual grading quizzes
-                        (((quizResult && quizResult.isPassed) || attemptsBlocked) && 
-                        !practiceMode &&
+              (((quizResult && quizResult.isPassed) || attemptsBlocked) &&
                         !(hasFailed && hasAttemptsRemaining));
 
     if (canComplete) {
-      // Extra safety check - make sure nextItemInModule AND nextItemInModule.item exist
-      if (nextItemInModule && nextItemInModule.item) {
-
-        // Navigate to next item (video, quiz, or document)
-        if (nextItemInModule.item.type === "video") {
-          navigation.replace("LessonPlayer", {
-            videoId: nextItemInModule.item.id,
-            courseId,
-            sectionId: nextItemInModule.sectionId,
-            userId,
-          });
-        } else if (nextItemInModule.item.type === "quiz") {
-          navigation.replace("QuizScreen", {
-            quizId: nextItemInModule.item.id,
-            courseId,
-            sectionId: nextItemInModule.sectionId,
-            userId,
-          });
-        } else if (
-          ["pdf", "document", "ppt"].includes(nextItemInModule.item.type)
-        ) {
-          navigation.replace("DocumentView", {
-            documentId: nextItemInModule.item.id,
-            courseId,
-            sectionId: nextItemInModule.sectionId,
-            userId,
-            documentType: nextItemInModule.item.type,
-          });
-        }
-        return;
-      } else {
-        console.log(
-          "⚠️ No valid next item - nextItemInModule:",
-          nextItemInModule,
-        );
-      }
+      navigateAfterCompletion();
+      return;
     } else {
       // Quiz not passed and still has attempts - cannot complete yet
       Alert.alert(
@@ -826,27 +944,6 @@ const QuizScreen = () => {
       );
       return;
     }
-
-    if (isLastItem) {
-      navigation.reset({
-        index: 1,
-        routes: [
-          { name: "MainTabs", params: { screen: "Home" } as any },
-          {
-            name: "CourseDetail",
-            params: { courseId, quizCompleted: true, quizId } as any,
-          },
-        ],
-      });
-      return;
-    }
-
-    // Default: Navigate back with state to refresh CourseDetail
-    navigation.navigate("CourseDetail", {
-      courseId,
-      quizCompleted: true,
-      quizId,
-    } as any);
   };
 
   const formatTime = (seconds: number) => {
@@ -886,7 +983,7 @@ const QuizScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.resultsHeader}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity onPress={navigateBackToModuleDetail}>
             <Ionicons name="close" size={28} color={Colors.white} />
           </TouchableOpacity>
           <Text style={styles.resultsHeaderTitle}>Quiz Submitted</Text>
@@ -932,7 +1029,7 @@ const QuizScreen = () => {
           <View style={styles.resultActions}>
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => navigation.goBack()}
+              onPress={navigateBackToModuleDetail}
             >
               <Ionicons name="arrow-back" size={32} color={Colors.white} />
               <Text style={styles.actionButtonText}>Back</Text>
@@ -997,7 +1094,7 @@ const QuizScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.resultsHeader}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity onPress={navigateBackToModuleDetail}>
             <Ionicons name="close" size={28} color={Colors.white} />
           </TouchableOpacity>
           <Text style={styles.resultsHeaderTitle}>
@@ -1030,15 +1127,6 @@ const QuizScreen = () => {
               <Text style={[styles.scoreSubtext, { fontSize: 16, marginTop: 4 }]}>
                 ({totalPointsEarned.toFixed(2)}/{totalPointsPossible.toFixed(2)} points)
               </Text>
-
-              {/* Show points only on first pass (not in practice mode) */}
-              {isFirstPass && !practiceMode && (
-                <View style={styles.pointsContainer}>
-                  <Text style={styles.pointsText}>
-                    +{Math.round(totalPointsEarned * 10)} Points
-                  </Text>
-                </View>
-              )}
 
               {/* Show passing mark for failed attempts */}
               {!isPassed && (
@@ -1125,7 +1213,7 @@ const QuizScreen = () => {
                   );
 
                   if (!isPassed && !attemptsBlocked) {
-                    // Failed with attempts remaining: Show Retry (unless short-answer) + Review + Back
+                    // Failed with attempts remaining: Show Retry (unless short-answer) + Back only
                     return (
                       <>
                         {!hasShortAnswer && (
@@ -1143,18 +1231,7 @@ const QuizScreen = () => {
                         )}
                         <TouchableOpacity
                           style={styles.actionButton}
-                          onPress={handleReview}
-                        >
-                          <Image
-                            source={Images.quizReview}
-                            style={styles.actionButtonIcon}
-                            resizeMode="contain"
-                          />
-                          <Text style={styles.actionButtonText}>Review</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.actionButton}
-                          onPress={() => navigation.goBack()}
+                          onPress={navigateBackToModuleDetail}
                         >
                           <Ionicons name="arrow-back" size={32} color={Colors.white} />
                           <Text style={styles.actionButtonText}>Back</Text>
@@ -1288,7 +1365,7 @@ const QuizScreen = () => {
             {
               text: "Exit",
               style: "destructive",
-              onPress: () => navigation.goBack(),
+              onPress: navigateBackToModuleDetail,
             },
           ],
         );

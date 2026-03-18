@@ -106,7 +106,6 @@ export const useVideoUpload = (updateLesson: any, moduleId: string, lessonId: st
               updateLesson(moduleId, lessonId, { 
                 durationSeconds: duration 
               });
-              console.log(`Auto-fetched duration: ${duration} seconds`);
             }
             // Clean up
             event.target.destroy();
@@ -206,7 +205,6 @@ export const useVideoUpload = (updateLesson: any, moduleId: string, lessonId: st
         const duration = Math.round(video.duration);
         if (duration > 0) {
           updateLesson(moduleId, lessonId, { durationSeconds: duration });
-          console.log(`Auto-fetched duration from file: ${duration} seconds`);
         }
         URL.revokeObjectURL(video.src);
       };

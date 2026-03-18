@@ -96,6 +96,7 @@ export const useContentManagement = () => {
           status: "draft",
           content: "",
           videoUrl: lessonType === 'video' ? "" : undefined,
+          durationSeconds: lessonType === 'video' ? 0 : undefined,
           resourceUrl: lessonType !== 'video' ? "" : undefined,
           resourceType: resourceSubType,
           isDownloadable: lessonType !== 'video' ? true : undefined,

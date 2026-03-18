@@ -50,7 +50,7 @@ const getYouTubeVideoId = (url: string): string | null => {
 const LessonPlayer = () => {
   const route = useRoute();
   const navigation = useNavigation<LessonPlayerNavigationProp>();
-  const { videoId, courseId, sectionId, userId } = route.params as any;
+  const { videoId, courseId, sectionId, userId, sourceScreen } = route.params as any;
 
   const youtubePlayerRef = useRef<any>(null);
   const videoViewRef = useRef<any>(null);
@@ -99,6 +99,24 @@ const LessonPlayer = () => {
       saveProgress();
     };
   }, [videoId]);
+
+  const navigateBackToModuleDetail = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    const resolvedSectionId = videoDetail?.section?.id || sectionId;
+    if (resolvedSectionId) {
+      navigation.navigate("ModuleDetail", {
+        courseId,
+        sectionId: resolvedSectionId,
+        userId,
+        sourceScreen,
+      } as any);
+      return;
+    }
+    navigation.navigate("CourseDetail", { courseId, sourceScreen } as any);
+  };
 
   useEffect(() => {
     if (isPlaying) {
@@ -196,13 +214,13 @@ const LessonPlayer = () => {
         {
           text: "Go Back",
           onPress: () => {
-            navigation.goBack();
+            navigateBackToModuleDetail();
           },
         },
         {
           text: "Go to Course",
           onPress: () => {
-            navigation.navigate("CourseDetail", { courseId });
+            navigation.navigate("CourseDetail", { courseId, sourceScreen } as any);
           },
           style: "cancel",
         },
@@ -449,6 +467,7 @@ const LessonPlayer = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          sourceScreen,
         });
       } else if (nextItemInModule.item.type === 'quiz') {
         navigation.replace("QuizScreen", {
@@ -456,6 +475,7 @@ const LessonPlayer = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          sourceScreen,
         });
       } else if (['pdf', 'document', 'ppt'].includes(nextItemInModule.item.type)) {
         navigation.replace("DocumentView", {
@@ -463,6 +483,7 @@ const LessonPlayer = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          sourceScreen,
           documentType: nextItemInModule.item.type,
         });
       }
@@ -479,6 +500,7 @@ const LessonPlayer = () => {
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          sourceScreen,
         });
       } else if (prevItemInModule.item.type === 'quiz') {
         navigation.replace("QuizScreen", {
@@ -486,6 +508,7 @@ const LessonPlayer = () => {
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          sourceScreen,
         });
       } else if (['pdf', 'document', 'ppt'].includes(prevItemInModule.item.type)) {
         navigation.replace("DocumentView", {
@@ -493,6 +516,7 @@ const LessonPlayer = () => {
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          sourceScreen,
           documentType: prevItemInModule.item.type,
         });
       }
@@ -672,7 +696,7 @@ const LessonPlayer = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.errorButton, styles.goBackButton]}
-              onPress={() => navigation.goBack()}
+              onPress={navigateBackToModuleDetail}
             >
               <Text style={styles.errorButtonText}>Go Back</Text>
             </TouchableOpacity>
@@ -691,13 +715,7 @@ const LessonPlayer = () => {
       customEdges={["top", "bottom"]}
       onHeaderLeftPress={() => {
         saveProgress();
-        if (navigation.canGoBack()) {
-          navigation.goBack();
-          return;
-        }
-        navigation.navigate("CourseDetail", {
-          courseId,
-        } as any);
+        navigateBackToModuleDetail();
       }}
     >
       {/* Video Player */}

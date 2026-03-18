@@ -157,7 +157,7 @@ export default function MyCourses({ navigation }: any) {
                     onPress={() => {
                       // Log as profile signal only — not a recommendation success event
                       recordRecommendationEvent(item.id, 'click', 'my_courses').catch(() => {});
-                      navigation.navigate("CourseDetail", { courseId: item.id });
+                      navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "MyCourses" });
                     }}
                   >
                     <View style={styles.cwThumbWrapper}>
@@ -222,7 +222,7 @@ export default function MyCourses({ navigation }: any) {
                   onPress={() => {
                     // Log as profile signal only — not a recommendation success event
                     recordRecommendationEvent(item.id, 'click', 'my_courses').catch(() => {});
-                    navigation.navigate("CourseDetail", { courseId: item.id });
+                    navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "MyCourses" });
                   }}
                   style={styles.ipCard}
                 >

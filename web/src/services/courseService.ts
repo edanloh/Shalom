@@ -777,7 +777,6 @@ class CourseService {
    */
   async getCourseBuilderData(courseId: string, adminId: string): Promise<CourseBuilderData> {
     try {
-      console.log("CourseService: Fetching course builder data for courseId:", courseId);
 
       const response = await apiService.get<any>(ENDPOINTS.COURSE_BY_ID_INSTRUCTOR(adminId, courseId), {});
 
@@ -787,8 +786,6 @@ class CourseService {
 
       const course = response.data.course;
       const sections = response.data.sections || [];
-
-      console.log("CourseService: Course and modules loaded:", { course, sections });
 
       // Transform sections to moduleDetails format
       const moduleDetails = sections.map((section: any) => {
@@ -848,8 +845,6 @@ class CourseService {
           quizzes,
         };
       });
-
-      console.log("CourseService: Modules transformed:", moduleDetails);
 
       // Transform to CourseBuilder format
       const transformedModules: CourseBuilderModule[] = moduleDetails.map((module) => ({
@@ -1032,8 +1027,6 @@ class CourseService {
         }),
       }));
 
-      console.log("CourseService: Transformed modules:", transformedModules);
-
       // Apply numbering to all lessons and quizzes (Lesson X.Y, Quiz X.Y format)
       const numberedModules = transformedModules.map((module, moduleIndex) => ({
         ...module,
@@ -1091,16 +1084,9 @@ class CourseService {
       
       const response = await apiService.get<any>(ENDPOINTS.COURSE_BY_ID_INSTRUCTOR(adminId, courseId), {});
 
-      console.log('CourseService: API Response:', response);
-      console.log('CourseService: Response data:', response?.data);
-      console.log('CourseService: Sections:', response?.data?.sections);
-      console.log('CourseService: Sections length:', response?.data?.sections?.length || 0);
-      
       if (response?.data?.sections) {
-        console.log('CourseService: Course sections retrieved:', response.data.sections.length);
         return response.data.sections;
       } else {
-        console.log('CourseService: No sections found in response');
         return [];
       }
     } catch (error) {

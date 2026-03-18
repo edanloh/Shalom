@@ -74,7 +74,7 @@ export const OptionsEditor = ({
           currentQuestion.options.filter((opt: any) => String(opt).trim())
             .length === 0) && (
           <p className="text-xs text-red-400">
-            At least one option is required.
+            At least two options required.
           </p>
         )}
 

@@ -38,7 +38,7 @@ type CourseContent = ModuleDetailResponse["data"];
 const ModuleDetailScreen = () => {
   const route = useRoute();
   const navigation = useNavigation<ModuleDetailNavigationProp>();
-  const { courseId, sectionId, userId } = route.params as any;
+  const { courseId, sectionId, userId, sourceScreen } = route.params as any;
   const [isEnrolled, setIsEnrolled] = useState(false);
 
   const [moduleDetail, setModuleDetail] = useState<any>(null);
@@ -123,6 +123,14 @@ const ModuleDetailScreen = () => {
     }, [courseId, userId, route.params]),
   );
 
+  const navigateBackToCourseDetail = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate("CourseDetail", { courseId, sourceScreen } as any);
+  };
+
   const fetchCourseContent = async () => {
     try {
       setLoading(true);
@@ -135,11 +143,60 @@ const ModuleDetailScreen = () => {
 
       // Add timestamp to bust any potential caching
       const data = await moduleService.getModuleDetail(courseId, userId);
+
+      const params = route.params as any;
+      const completedQuizId =
+        params?.quizCompleted && (params?.completedQuizId || params?.quizId)
+          ? (params?.completedQuizId || params?.quizId)
+          : null;
+
+      let normalizedData = data;
+      if (completedQuizId) {
+        // Optimistically mark submitted short-answer quiz as completed in UI
+        // so learners see immediate module/progress updates before grading release.
+        const sections = (data.sections || []).map((section: any) => ({
+          ...section,
+          items: (section.items || []).map((item: any) =>
+            item.type === "quiz" && item.id === completedQuizId
+              ? { ...item, is_completed: true }
+              : item,
+          ),
+        }));
+
+        const existingAttempts = data.userProgress?.quizAttempts || [];
+        const hasSyntheticOrPassedAttempt = existingAttempts.some(
+          (qa: any) => qa.quiz_id === completedQuizId && qa.is_passed,
+        );
+
+        const optimisticAttempts = hasSyntheticOrPassedAttempt
+          ? existingAttempts
+          : [
+              {
+                quiz_id: completedQuizId,
+                score: 0,
+                is_passed: true,
+                attempt_number: 999,
+                completed_at: new Date().toISOString(),
+              },
+              ...existingAttempts,
+            ];
+
+        normalizedData = {
+          ...data,
+          sections,
+          userProgress: data.userProgress
+            ? {
+                ...data.userProgress,
+                quizAttempts: optimisticAttempts,
+              }
+            : data.userProgress,
+        } as any;
+      }
       
       console.log("📦 Course content fetched:", {
-        sectionsCount: data.sections.length,
+        sectionsCount: normalizedData.sections.length,
         currentSectionId: sectionId,
-        sections: data.sections.map((s: any) => ({
+        sections: normalizedData.sections.map((s: any) => ({
           id: s.id,
           title: s.title,
           itemsCount: s.items?.length || 0,
@@ -154,17 +211,17 @@ const ModuleDetailScreen = () => {
         }))
       });
       
-      setCourseContent(data);
+      setCourseContent(normalizedData);
 
       // If we have a current section, try to maintain it, otherwise use sectionId or first section
       const section = currentSection
-        ? moduleService.getSectionById(data.sections, currentSection.id) ||
+        ? moduleService.getSectionById(normalizedData.sections, currentSection.id) ||
           (sectionId
-            ? moduleService.getSectionById(data.sections, sectionId)
-            : data.sections[0])
+            ? moduleService.getSectionById(normalizedData.sections, sectionId)
+            : normalizedData.sections[0])
         : sectionId
-          ? moduleService.getSectionById(data.sections, sectionId)
-          : data.sections[0];
+          ? moduleService.getSectionById(normalizedData.sections, sectionId)
+          : normalizedData.sections[0];
 
       setCurrentSection(section);
 
@@ -255,6 +312,7 @@ const ModuleDetailScreen = () => {
         courseId,
         sectionId: currentSection?.id,
         userId,
+        sourceScreen,
       });
     } else if (item.type === "quiz") {
       navigation.navigate("QuizScreen", {
@@ -262,6 +320,7 @@ const ModuleDetailScreen = () => {
         courseId,
         sectionId: currentSection?.id,
         userId,
+        sourceScreen,
       });
     } else if (["pdf", "document", "ppt"].includes(item.type)) {
       navigation.navigate("DocumentView", {
@@ -269,6 +328,7 @@ const ModuleDetailScreen = () => {
         courseId,
         sectionId: currentSection?.id,
         userId,
+        sourceScreen,
         documentType: item.type,
       });
     }
@@ -516,7 +576,7 @@ const ModuleDetailScreen = () => {
       navigation={navigation}
       headerLeftIcon="chevron-back"
       customEdges={["top", "bottom"]}
-      onHeaderLeftPress={() => navigation.goBack()}
+      onHeaderLeftPress={navigateBackToCourseDetail}
     >
       {/* Section Info */}
       <View style={styles.sectionCard}>

@@ -228,7 +228,7 @@ export default function CoursesScreen({ navigation }: any) {
       recordRecommendationEvent(course.id, 'click', 'courses_recommended')
         .then(() => refreshRecommended?.().catch(() => {}))
         .catch((err) => console.warn("Failed to record courses rec click", err));
-      navigation.navigate("CourseDetail", { courseId: course.id });
+      navigation.navigate("CourseDetail", { courseId: course.id, sourceScreen: "Courses" });
     },
     [navigation, recordRecommendationEvent, refreshRecommended]
   );
@@ -298,7 +298,7 @@ export default function CoursesScreen({ navigation }: any) {
             recordRecommendationEvent(item.id, 'click', placement)
               .catch((err) => console.warn("Failed to record courses rec click", err));
           }
-          navigation.navigate("CourseDetail", { courseId: item.id });
+          navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "Courses" });
         }}
         style={styles.hCard}
       >
@@ -344,7 +344,7 @@ export default function CoursesScreen({ navigation }: any) {
         // still record via context for consistency
         recordRecommendationEvent(item.id, 'click', 'courses_popular')
           .catch((err) => console.warn("Failed to record popular course click", err));
-        navigation.navigate("CourseDetail", { courseId: item.id });
+        navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "Courses" });
       }}
       style={styles.gCard}
     >

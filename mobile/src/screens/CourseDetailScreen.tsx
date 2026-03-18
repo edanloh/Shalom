@@ -50,7 +50,7 @@ export default function CourseDetailScreen({
   navigation,
   route,
 }: StackScreenProps<MainStackParamList, "CourseDetail">) {
-  const { courseId } = route.params;
+  const { courseId, sourceScreen } = route.params;
   const [courseDetail, setCourseDetail] =
     useState<ProcessedCourseDetail | null>(null);
   const [courseContent, setCourseContent] = useState<CourseContent | null>(
@@ -78,7 +78,6 @@ export default function CourseDetailScreen({
         loadCourseDetail();
           notificationService.getCourseNotifications(courseId).then(data => {
           // Group by notification ID to avoid duplicates
-          console.log('[CourseDetailScreen] fetched notifications:', data);
           const uniqueNotifications = Array.from(new Map(data.map(item => [item.type, item])).values());
           setNotifications(uniqueNotifications);
         }).catch(err => {
@@ -114,12 +113,6 @@ export default function CourseDetailScreen({
       moduleService.isSectionCompleted(section, courseContent.userProgress),
     ).length;
 
-    // console.log("[CourseDetailScreen] Progress calculation:", {
-    //   completedModules,
-    //   totalModules,
-    //   percentage: Math.round((completedModules / totalModules) * 100),
-    // });
-
     return Math.round((completedModules / totalModules) * 100);
   };
 
@@ -140,10 +133,6 @@ export default function CourseDetailScreen({
         courseDetailService.getCourseDetail(courseId),
         moduleService.getModuleDetail(courseId, effectiveUserId),
       ]);
-      console.log("[CourseDetailScreen] Loaded course detail and content:", {
-        detail,
-        moduleData,
-      });
       setCourseDetail(detail);
       setCourseContent(moduleData);
     } catch (err) {
@@ -258,6 +247,7 @@ export default function CourseDetailScreen({
         courseId: route.params.courseId,
         sectionId: section.id,
         userId: userId ?? "",
+        sourceScreen,
       });
     };
 
@@ -476,6 +466,7 @@ export default function CourseDetailScreen({
                     courseId: courseId,
                     sectionId: firstSection.id,
                     userId: userId,
+                    sourceScreen,
                   });
                 }
               }
@@ -486,12 +477,6 @@ export default function CourseDetailScreen({
       );
     } catch (e: any) {
       const status = e?.statusCode ?? e?.response?.status;
-      console.log("[Enroll] error", {
-        status,
-        code: e?.code,
-        msg: e?.message,
-        details: e?.details,
-      });
       Alert.alert(
         `Enrollment failed ${status ? `(${status})` : ""}`,
         e?.details?.message || e?.message || "Try again.",
@@ -525,6 +510,29 @@ export default function CourseDetailScreen({
     );
   }
 
+  const handleBackFromCourseDetail = () => {
+    if (sourceScreen === "MyCourses") {
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate("MyCourses");
+      }
+      return;
+    }
+
+    if (sourceScreen === "Home" || sourceScreen === "Courses") {
+      navigation.replace("MainTabs", { screen: sourceScreen } as any);
+      return;
+    }
+
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.replace("MainTabs", { screen: "Courses" } as any);
+  };
+
   return (
     <Screen
       title=""
@@ -536,7 +544,7 @@ export default function CourseDetailScreen({
       {/* Header */}
       <View style={styles.header}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={handleBackFromCourseDetail}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
@@ -852,6 +860,22 @@ export default function CourseDetailScreen({
           />
         )}
       </View>
+
+      {/* Enrollment Loading Overlay */}
+      <Modal
+        visible={isEnrolling}
+        animationType="fade"
+        transparent={true}
+        statusBarTranslucent
+      >
+        <View style={styles.enrollmentOverlay}>
+          <View style={styles.enrollmentModal}>
+            <ActivityIndicator size="large" color={Colors.purple400} />
+            <Text style={styles.enrollmentLoadingText}>Processing Enrollment...</Text>
+            <Text style={styles.enrollmentSubText}>Please wait while we complete your enrollment</Text>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -1362,5 +1386,38 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     lineHeight: 20,
+  },
+  enrollmentOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  enrollmentModal: {
+    backgroundColor: Colors.textInputBg,
+    borderRadius: 16,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    alignItems: "center",
+    minWidth: 280,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  enrollmentLoadingText: {
+    marginTop: Spacing.lg,
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+    textAlign: "center",
+  },
+  enrollmentSubText: {
+    marginTop: Spacing.sm,
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 18,
   },
 });

@@ -696,44 +696,125 @@ serve(async (req) => {
     }
 
     // ========================================
-    // 5. Update course progress if quiz passed
+    // 5. Update course progress after any quiz submission
     // ========================================
-    if (isPassed) {
-      // Get course completion stats
-      const { data: videoStats } = await supabaseClient
-        .from('course_videos')
-        .select('id')
-        .eq('course_id', quiz.course_id);
+    {
+      const [{ data: videoStats }, { data: quizStats }, { data: resourceStats }] = await Promise.all([
+        supabaseClient
+          .from('course_videos')
+          .select('id')
+          .eq('course_id', quiz.course_id),
+        supabaseClient
+          .from('course_quizzes')
+          .select('id,max_attempts')
+          .eq('course_id', quiz.course_id),
+        supabaseClient
+          .from('course_resources')
+          .select('id')
+          .eq('course_id', quiz.course_id)
+          .in('resource_type', ['pdf', 'document', 'ppt']),
+      ]);
 
-      const { data: quizStats } = await supabaseClient
-        .from('course_quizzes')
-        .select('id')
-        .eq('course_id', quiz.course_id);
+      const quizIds = (quizStats || []).map((q: any) => q.id);
+      const videoIds = (videoStats || []).map((v: any) => v.id);
+      const resourceIds = (resourceStats || []).map((r: any) => r.id);
 
-      const { data: completedVideos } = await supabaseClient
-        .from('user_video_progress')
-        .select('video_id')
-        .eq('user_id', userId)
-        .eq('is_completed', true)
-        .in('video_id', (videoStats || []).map((v: any) => v.id));
+      const [
+        { data: completedVideos },
+        { data: completedResources },
+        { data: attempts },
+        { data: shortAnswerRows },
+      ] = await Promise.all([
+        videoIds.length > 0
+          ? supabaseClient
+              .from('user_video_progress')
+              .select('video_id')
+              .eq('user_id', userId)
+              .eq('is_completed', true)
+              .in('video_id', videoIds)
+          : Promise.resolve({ data: [] }),
+        resourceIds.length > 0
+          ? supabaseClient
+              .from('resource_progress')
+              .select('resource_id')
+              .eq('user_id', userId)
+              .eq('is_completed', true)
+              .in('resource_id', resourceIds)
+          : Promise.resolve({ data: [] }),
+        quizIds.length > 0
+          ? supabaseClient
+              .from('quiz_attempts')
+              .select('quiz_id,is_passed,attempt_number')
+              .eq('user_id', userId)
+              .in('quiz_id', quizIds)
+              .order('quiz_id', { ascending: true })
+              .order('attempt_number', { ascending: false })
+          : Promise.resolve({ data: [] }),
+        quizIds.length > 0
+          ? supabaseClient
+              .from('quiz_questions')
+              .select('quiz_id')
+              .in('quiz_id', quizIds)
+              .in('question_type', ['short-answer', 'text'])
+          : Promise.resolve({ data: [] }),
+      ]);
 
-      const { data: passedQuizzes } = await supabaseClient
-        .from('quiz_attempts')
-        .select('quiz_id')
-        .eq('user_id', userId)
-        .eq('is_passed', true)
-        .in('quiz_id', (quizStats || []).map((q: any) => q.id));
+      const shortAnswerQuizIds = new Set((shortAnswerRows || []).map((row: any) => row.quiz_id));
+      const maxAttemptsByQuizId = new Map(
+        (quizStats || []).map((q: any) => [q.id, q.max_attempts]),
+      );
 
-      const totalItems = (videoStats?.length || 0) + (quizStats?.length || 0);
-      const completedItems = (completedVideos?.length || 0) + (new Set(passedQuizzes?.map((q: any) => q.quiz_id)).size || 0);
-      
-      const progressPercentage = totalItems > 0 
-        ? (completedItems / totalItems) * 100 
+      const latestAttemptByQuiz = new Map<string, any>();
+      for (const attempt of attempts || []) {
+        if (!latestAttemptByQuiz.has(attempt.quiz_id)) {
+          latestAttemptByQuiz.set(attempt.quiz_id, attempt);
+        }
+      }
+
+      const completedQuizIds = new Set<string>();
+      for (const quizIdValue of quizIds) {
+        const latestAttempt = latestAttemptByQuiz.get(quizIdValue);
+        if (!latestAttempt) {
+          continue;
+        }
+
+        const hasShortAnswerQuiz = shortAnswerQuizIds.has(quizIdValue);
+        if (hasShortAnswerQuiz) {
+          completedQuizIds.add(quizIdValue);
+          continue;
+        }
+
+        const maxAttemptsValue = maxAttemptsByQuizId.get(quizIdValue);
+        const normalizedMaxAttempts =
+          maxAttemptsValue === null || maxAttemptsValue === undefined
+            ? null
+            : Number(maxAttemptsValue);
+        const attemptsExhausted =
+          normalizedMaxAttempts !== null &&
+          Number.isFinite(normalizedMaxAttempts) &&
+          normalizedMaxAttempts > 0 &&
+          latestAttempt.attempt_number >= normalizedMaxAttempts;
+
+        if (latestAttempt.is_passed || attemptsExhausted) {
+          completedQuizIds.add(quizIdValue);
+        }
+      }
+
+      const totalItems =
+        (videoStats?.length || 0) +
+        (quizStats?.length || 0) +
+        (resourceStats?.length || 0);
+      const completedItems =
+        (new Set((completedVideos || []).map((v: any) => v.video_id)).size || 0) +
+        completedQuizIds.size +
+        (new Set((completedResources || []).map((r: any) => r.resource_id)).size || 0);
+
+      const progressPercentage = totalItems > 0
+        ? (completedItems / totalItems) * 100
         : 0;
 
       const isEnrollmentCompleted = progressPercentage >= 100;
 
-      // Update enrollment
       const { error: enrollmentError } = await supabaseClient
         .from('course_enrollments')
         .update({
@@ -741,7 +822,7 @@ serve(async (req) => {
           is_completed: isEnrollmentCompleted,
           completion_date: isEnrollmentCompleted ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
-          last_activity_at: new Date().toISOString()
+          last_activity_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
         .eq('course_id', quiz.course_id);
