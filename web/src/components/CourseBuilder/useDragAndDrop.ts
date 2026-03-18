@@ -14,9 +14,12 @@ export const useDragAndDrop = () => {
 
   // Update module numbering
   const updateModuleNumbering = (modulesList: Module[]) => {
+    const extractBaseModuleTitle = (title: string) =>
+      String(title || '').replace(/^Module\s+\d+\s*:\s*/i, '').trim();
+
     return modulesList.map((module, index) => ({
       ...module,
-      title: module.title.replace(/^Module \d+:/, `Module ${index + 1}:`),
+      title: `Module ${index + 1}: ${extractBaseModuleTitle(module.title)}`,
     }));
   };
 

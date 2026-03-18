@@ -11,23 +11,22 @@ export const useContentManagement = () => {
     setSelectedItem,
   } = useCourseBuilder();
 
-  const { updateContentNumbering } = useDragAndDrop();
+  const { updateContentNumbering, updateModuleNumbering } = useDragAndDrop();
   const markUnsaved = () => setHasUnsavedChanges(true);
 
   // Module functions
   const addModule = () => {
-    const moduleNumber = modules.length + 1;
     const newModuleId = `m${Date.now()}`;
     const newModule: Module = {
       id: newModuleId,
-      title: `Module ${moduleNumber}: `,
+      title: '',
       description: "",
       status: "published",
       expanded: true,
       lessons: [],
       quizzes: [],
     };
-    setModules([...modules, newModule]);
+    setModules(updateModuleNumbering([...modules, newModule]));
     markUnsaved();
     
     // Auto-select the newly created module
@@ -52,11 +51,9 @@ export const useContentManagement = () => {
       return current;
     });
 
-    let updatedModules = modules.filter((m) => m.id !== moduleId);
-    updatedModules = modules.filter(m => m.id !== moduleId).map((module, index) => ({
-      ...module,
-      title: module.title.replace(/^Module \d+:/, `Module ${index + 1}:`),
-    }));
+    const updatedModules = updateModuleNumbering(
+      modules.filter((m) => m.id !== moduleId)
+    );
     setModules(updatedModules);
     markUnsaved();
   };

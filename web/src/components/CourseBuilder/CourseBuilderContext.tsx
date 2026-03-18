@@ -1080,13 +1080,17 @@ export const CourseBuilderProvider = ({
 
       let finalCourseId = currentCourseId;
 
+      const getModuleBaseTitle = (title: string) =>
+        String(title || "").replace(/^Module\s+\d+\s*:\s*/i, "").trim();
+
       // Transform modules from CourseBuilder format to backend API format
       // Use uploadedModules which has the Supabase URLs instead of local file markers
       // IMPORTANT: Include IDs for existing items to preserve student progress
       // Extract baseTitle (user input) instead of full title with "Lesson X.Y:" prefix
       const transformedModules = uploadedModules.map((module, index) => ({
         id: module.id, // Preserve section ID for UPDATE (not INSERT)
-        title: module.title,
+        // Persist only the user title; module numbering prefix is display-only.
+        title: getModuleBaseTitle(module.title),
         description: module.description || "",
         order: index, // Add order index for each module
         lessons: module.lessons.map((lesson, lessonIndex) => ({

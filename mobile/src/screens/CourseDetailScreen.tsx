@@ -688,7 +688,6 @@ export default function CourseDetailScreen({
             <Text style={styles.instructorName}>
               {courseDetail.instructor.name}
             </Text>
-            <Text style={styles.instructorRole}>Data Science Expert</Text>
           </View>
         </View>
 

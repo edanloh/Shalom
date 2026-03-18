@@ -168,28 +168,69 @@ export default function CoursesScreen({ navigation }: any) {
   };
 
   // Partition lists
-  const enrolledIds = new Set<string>(enrolledCourses as string[]);
+  // Prefer backend-derived enrollments from myCourses and keep UserContext as fallback.
+  const enrolledIds = useMemo(() => {
+    const ids = new Set<string>();
 
-  const jumpBackIn = useMemo(
-    () => myCourses.filter((c) => enrolledIds.has(c.id)),
-    [myCourses, enrolledIds],
-  );
+    myCourses.forEach((course) => {
+      if (course?.id != null) ids.add(String(course.id));
+    });
+
+    (enrolledCourses as any[]).forEach((courseOrId) => {
+      if (courseOrId == null) return;
+      if (typeof courseOrId === "string" || typeof courseOrId === "number") {
+        ids.add(String(courseOrId));
+        return;
+      }
+      if (typeof courseOrId === "object" && (courseOrId as any).id != null) {
+        ids.add(String((courseOrId as any).id));
+      }
+    });
+
+    return ids;
+  }, [myCourses, enrolledCourses]);
+
+  const jumpBackIn = useMemo(() => {
+    const source = myCourses.length ? myCourses : catalogCourses;
+    return source.filter((c) => enrolledIds.has(String(c.id)));
+  }, [myCourses, catalogCourses, enrolledIds]);
 
   const recommended = useMemo(() => {
     if (query) return [];
-    if (recommendedCourses.length) return recommendedCourses;
-    return catalogCourses.filter((c) => !enrolledIds.has(c.id)).slice(0, 10);
+    if (recommendedCourses.length) {
+      return recommendedCourses.filter((c) => !enrolledIds.has(String(c.id)));
+    }
+    return catalogCourses.filter((c) => !enrolledIds.has(String(c.id))).slice(0, 10);
   }, [catalogCourses, enrolledIds, query, recommendedCourses]);
 
+  const allCoursesForResults = useMemo(() => {
+    const merged = [...catalogCourses, ...myCourses];
+    const deduped = new Map<string, Course>();
+    merged.forEach((course) => {
+      if (!course?.id) return;
+      deduped.set(String(course.id), course);
+    });
+    return Array.from(deduped.values());
+  }, [catalogCourses, myCourses]);
+
   const popular = useMemo(() => {
-    // Not enrolled, filtered by category and query
-    let base = catalogCourses.filter((c) => !enrolledIds.has(c.id));
+    // All courses (including enrolled), filtered by category and query
+    let base = allCoursesForResults;
     if (selectedCategory !== "All") {
       base = base.filter((c) => c.category === selectedCategory);
     }
     base = searchLocal(query, base);
     return base;
-  }, [catalogCourses, enrolledIds, selectedCategory, query]);
+  }, [allCoursesForResults, selectedCategory, query]);
+
+  const showDiscoverySections = selectedCategory === "All";
+
+  const handleSearchChange = (value: string) => {
+    setQuery(value);
+    if (value.trim() && selectedCategory !== "All") {
+      setSelectedCategory("All");
+    }
+  };
 
   // ---- small UI bits ----
   const MetaRow = ({
@@ -340,7 +381,7 @@ export default function CoursesScreen({ navigation }: any) {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => {
-        // Popular courses aren't personalised so no score_breakdown, but
+        // Courses aren't personalised so no score_breakdown, but
         // still record via context for consistency
         recordRecommendationEvent(item.id, 'click', 'courses_popular')
           .catch((err) => console.warn("Failed to record popular course click", err));
@@ -355,6 +396,11 @@ export default function CoursesScreen({ navigation }: any) {
           style={styles.gImage}
         />
         <BadgeHeartRow item={item} />
+        {enrolledIds.has(String(item.id)) && (
+          <View style={styles.enrolledBadge}>
+            <Text style={styles.enrolledBadgeText}>Enrolled</Text>
+          </View>
+        )}
       </View>
       <View style={[styles.catBadge, { backgroundColor: item.categoryColor }]}>
         <Text
@@ -444,7 +490,7 @@ export default function CoursesScreen({ navigation }: any) {
           <CustomTextInput
             placeholder="Search for courses"
             value={query}
-            onChangeText={setQuery}
+            onChangeText={handleSearchChange}
             autoCapitalize={"none"}
             leftIconName="search"
             returnKeyType="search"
@@ -485,7 +531,7 @@ export default function CoursesScreen({ navigation }: any) {
 
         <View style={styles.contentWrap}>
           {/* Jump Back In */}
-          {jumpBackIn.length > 0 && (
+          {showDiscoverySections && !query.trim() && jumpBackIn.length > 0 && (
             <>
               <Text style={[TextStyles.h4, { marginVertical: Spacing.sm }]}>
                 Jump Back In
@@ -505,7 +551,7 @@ export default function CoursesScreen({ navigation }: any) {
           )}
 
           {/* Recommended (not enrolled) */}
-          {!query && (
+          {showDiscoverySections && !query && (
             <>
               <Text style={[TextStyles.h4, { marginVertical: Spacing.sm }]}>
                 Recommended
@@ -547,14 +593,14 @@ export default function CoursesScreen({ navigation }: any) {
             </>
           )}
 
-          {/* Popular Courses (clean grid, not enrolled, category + query filtered) */}
+          {/* All Courses / Results (clean grid, not enrolled, category + query filtered) */}
           <Text style={[TextStyles.h4, { marginVertical: Spacing.sm }]}>
-            Popular Courses
+            {query.trim() || selectedCategory !== "All" ? "Results" : "All Courses"}
           </Text>
           {catalogLoading || loading || refreshing ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.purple400} />
-              <Text style={styles.loadingText}>Loading popular courses…</Text>
+              <Text style={styles.loadingText}>Loading courses…</Text>
             </View>
           ) : popular.length ? (
             <FlatList<Course>
@@ -775,6 +821,21 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 11,
     fontFamily: Typography.fontFamily.medium,
+  },
+  enrolledBadge: {
+    position: "absolute",
+    left: Spacing.sm,
+    top: Spacing.sm,
+    backgroundColor: "rgba(34,197,94,0.95)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  enrolledBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: TextStyles.body.fontFamily,
   },
 
   // Progress

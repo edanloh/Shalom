@@ -14,7 +14,7 @@ export const ModuleEditor = ({
   const module = modules.find((m: any) => m.id === selectedItem.id);
 
   // Extract the base title without "Module X:" prefix for editing
-  const baseTitle = module?.title?.replace(/^Module \d+:\s*/, "") || "";
+  const baseTitle = module?.title?.replace(/^Module\s+\d+\s*:\s*/i, "") || "";
   const isModuleTitleEmpty = !baseTitle.trim();
 
   return (
