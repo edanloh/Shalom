@@ -35,6 +35,20 @@ const MetaRow = ({ rating, modules }: { rating: number; modules?: number }) => (
   </View>
 );
 
+const getCourseProgressPercent = (course: Course): number => {
+  const candidates = [
+    (course as any)?.progress_percentage,
+    (course as any)?.progress?.percentage,
+  ];
+  for (const value of candidates) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return Math.max(0, Math.min(100, Math.round(numeric)));
+    }
+  }
+  return 0;
+};
+
 export default function CourseCard({
   course,
   onPress,
@@ -42,6 +56,7 @@ export default function CourseCard({
   showInstructor = false,
   showRecommendationReason = true,
 }: Props) {
+  const progressPercent = getCourseProgressPercent(course);
   const { wishlist = [], toggleWishlist } = useCourses();
   const isWishlisted = !!wishlist?.some((c) => c.id === course.id);
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -158,17 +173,12 @@ export default function CourseCard({
               <View
                 style={[
                   styles.progressFill,
-                  {
-                    width: `${Math.max(
-                      0,
-                      Math.min(100, course.progress?.percentage ?? 0),
-                    )}%`,
-                  },
+                  { width: `${progressPercent}%` },
                 ]}
               />
             </View>
             <Text style={styles.progressLabel}>
-              {Math.round(course.progress?.percentage ?? 0)}% complete
+              {progressPercent}% complete
             </Text>
           </View>
         ) : null}
