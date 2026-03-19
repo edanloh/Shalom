@@ -85,13 +85,13 @@ export const QuizHeader = ({
             </label>
             <input
               type={hasShortAnswerQuestions ? "text" : "number"}
-              value={hasShortAnswerQuestions ? "-" : (quiz?.passingScore || 70)}
+              value={hasShortAnswerQuestions ? "-" : (quiz?.passingScore || 0)}
               onChange={(e) =>
                 !hasShortAnswerQuestions &&
                 updateQuiz(moduleId, quiz.id, {
                   passingScore:
                     e.target.value === ""
-                      ? 70
+                      ? 0
                       : Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)),
                 })
               }

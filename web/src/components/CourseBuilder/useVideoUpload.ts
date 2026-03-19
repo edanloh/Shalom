@@ -17,6 +17,7 @@ export const useVideoUpload = (updateLesson: any, moduleId: string, lessonId: st
   const [videoInputType, setVideoInputType] = useState<'url' | 'upload'>('url');
   const [selectedThumbnailFile, setSelectedThumbnailFile] = useState<File | null>(null);
   const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
+  const lastFetchedHostedUrlRef = useRef<string | null>(null);
 
   // Restore file states from cache when lesson changes
   useEffect(() => {
@@ -64,6 +65,24 @@ export const useVideoUpload = (updateLesson: any, moduleId: string, lessonId: st
     }
     return null;
   };
+
+  const extractVimeoId = (url: string): string | null => {
+    const patterns = [
+      /vimeo\.com\/(?:video\/)?(\d+)/,
+      /player\.vimeo\.com\/video\/(\d+)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
+  const isYouTubeUrl = (url: string) => !!extractYouTubeId(url);
+  const isVimeoUrl = (url: string) => !!extractVimeoId(url);
 
   // Function to fetch video duration using YouTube IFrame Player API
   const fetchYouTubeDuration = async (videoUrl: string) => {
@@ -125,16 +144,74 @@ export const useVideoUpload = (updateLesson: any, moduleId: string, lessonId: st
     }
   };
 
+  const fetchVimeoDuration = async (videoUrl: string) => {
+    const vimeoId = extractVimeoId(videoUrl);
+    if (!vimeoId) return;
+
+    setIsFetchingDuration(true);
+    try {
+      const res = await fetch(
+        `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(videoUrl)}`,
+      );
+      if (!res.ok) throw new Error(`Vimeo oEmbed failed (${res.status})`);
+
+      const data = await res.json();
+      const duration = Math.round(Number(data?.duration || 0));
+      if (duration > 0) {
+        updateLesson(moduleId, lessonId, {
+          durationSeconds: duration,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching Vimeo duration:", error);
+    } finally {
+      setIsFetchingDuration(false);
+    }
+  };
+
+  const fetchHostedVideoDuration = async (videoUrl: string, force = false) => {
+    const normalizedUrl = String(videoUrl || "").trim();
+    if (!normalizedUrl || normalizedUrl.startsWith("[LOCAL_FILE:")) return;
+
+    if (!force && lastFetchedHostedUrlRef.current === normalizedUrl) return;
+
+    const looksLikeStaleSeconds =
+      Number.isFinite(Number(lesson?.durationSeconds)) && Number(lesson.durationSeconds) > 0 && Number(lesson.durationSeconds) < 30;
+
+    // If duration already looks healthy and this URL was not forced, skip extra calls.
+    if (!force && !looksLikeStaleSeconds && Number(lesson?.durationSeconds || 0) >= 30) {
+      lastFetchedHostedUrlRef.current = normalizedUrl;
+      return;
+    }
+
+    lastFetchedHostedUrlRef.current = normalizedUrl;
+
+    if (isYouTubeUrl(normalizedUrl)) {
+      await fetchYouTubeDuration(normalizedUrl);
+      return;
+    }
+
+    if (isVimeoUrl(normalizedUrl)) {
+      await fetchVimeoDuration(normalizedUrl);
+    }
+  };
+
   // Handle video URL change with auto-fetch attempt
   const handleVideoUrlChange = (url: string) => {
     updateLesson(moduleId, lessonId, { videoUrl: url });
-    
-    if (url && (url.includes('youtube.com') || url.includes('youtu.be'))) {
-      setTimeout(() => {
-        fetchYouTubeDuration(url);
-      }, 100);
-    }
+
+    setTimeout(() => {
+      void fetchHostedVideoDuration(url, true);
+    }, 100);
   };
+
+  // Initial-load correction: ensure hosted-video durations are accurate when editing existing courses.
+  useEffect(() => {
+    const url = String(lesson?.videoUrl || "").trim();
+    if (!url || url.startsWith("[LOCAL_FILE:")) return;
+
+    void fetchHostedVideoDuration(url);
+  }, [lesson?.videoUrl, lesson?.durationSeconds, moduleId, lessonId]);
 
   // Handle thumbnail file selection (preview only, no upload yet)
   const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -297,6 +374,7 @@ export const useVideoUpload = (updateLesson: any, moduleId: string, lessonId: st
     selectedVideoFile,
     uploadPendingFiles,
     extractYouTubeId,
+    extractVimeoId,
     handleVideoUrlChange,
     handleThumbnailFileChange,
     handleVideoFileChange,

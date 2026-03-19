@@ -175,7 +175,7 @@ jest.mock('../../screens/index', () => {
     UserProfile: screen('UserProfile Screen'),
     CourseDetailScreen: screen('CourseDetail Screen'),
     ModuleDetailScreen: screen('ModuleDetail Screen'),
-    LessonPlayer: screen('LessonPlayer Screen'),
+    VideoPlayer: screen('VideoPlayer Screen'),
     QuizScreen: screen('QuizScreen Screen'),
     Settings: screen('Settings Screen'),
     EditProfile: screen('EditProfile Screen'),

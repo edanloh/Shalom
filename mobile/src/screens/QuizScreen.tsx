@@ -29,6 +29,7 @@ import Screen from "@/components/common/Screen";
 import ActionButton from "@/components/ActionButton";
 import MatchingQuestion from "@/components/MatchingQuestion";
 import { useCourseNavigation } from "@/hooks";
+import { useCourses } from "@/contexts/CourseContext";
 
 type QuizDetail = QuizDetailResponse["data"];
 type QuizResult = SubmitQuizResponse["data"] & {
@@ -49,6 +50,7 @@ const QuizScreen = () => {
   const route = useRoute();
   const navigation = useNavigation<QuizScreenNavigationProp>();
   const { quizId, courseId, sectionId, userId, sourceScreen } = route.params as any;
+  const { refreshMyCourses } = useCourses();
 
   const [loading, setLoading] = useState(true);
   const [quizDetail, setQuizDetail] = useState<QuizDetail | null>(null);
@@ -850,11 +852,15 @@ const QuizScreen = () => {
   };
 
   const navigateAfterCompletion = () => {
+    void refreshMyCourses().catch((err) => {
+      console.warn("Failed to refresh My Courses after quiz completion", err);
+    });
+
     // Extra safety check - make sure nextItemInModule AND nextItemInModule.item exist
     if (nextItemInModule && nextItemInModule.item) {
       // Navigate to next item (video, quiz, or document)
       if (nextItemInModule.item.type === "video") {
-        navigation.replace("LessonPlayer", {
+        navigation.replace("VideoPlayer", {
           videoId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,

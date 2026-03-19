@@ -328,7 +328,7 @@ const ModuleDetailScreen = () => {
     });
 
     if (item.type === "video") {
-      navigation.navigate("LessonPlayer", {
+      navigation.navigate("VideoPlayer", {
         videoId: item.id,
         courseId,
         sectionId: currentSection?.id,

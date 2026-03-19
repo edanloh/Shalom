@@ -18,7 +18,7 @@ export type MainStackParamList = {
     completedDocumentId?: string; // Covers all document types
     timestamp?: number;
   };
-  LessonPlayer: { videoId: string; courseId: string; sectionId?: string; userId?: string; sourceScreen?: CourseDetailSourceScreen };
+  VideoPlayer: { videoId: string; courseId: string; sectionId?: string; userId?: string; sourceScreen?: CourseDetailSourceScreen };
   QuizScreen: { quizId: string; courseId: string; sectionId?: string; userId?: string; sourceScreen?: CourseDetailSourceScreen };
   DocumentView: { documentId: string; courseId: string; sectionId?: string; userId?: string; sourceScreen?: CourseDetailSourceScreen; documentType?: 'pdf' | 'document' | 'ppt' };
   LeaveReview: { courseId: string };

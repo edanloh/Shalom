@@ -35,6 +35,7 @@ interface VideoUploadProps {
   setLocalVideoPreviewUrl: (url: string) => void;
   isUploading: boolean;
   extractYouTubeId: (url: string) => string | null;
+  extractVimeoId: (url: string) => string | null;
   setValidationMessage: (message: { title: string; description: string }) => void;
   setShowValidationModal: (show: boolean) => void;
 }
@@ -55,6 +56,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
   setLocalVideoPreviewUrl,
   isUploading,
   extractYouTubeId,
+  extractVimeoId,
   setValidationMessage,
   setShowValidationModal,
 }) => {
@@ -227,7 +229,8 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
                   </button>
                 </div>
                 {(lesson.videoUrl.includes("youtube.com") ||
-                  lesson.videoUrl.includes("youtu.be")) && (
+                  lesson.videoUrl.includes("youtu.be") ||
+                  lesson.videoUrl.includes("vimeo.com")) && (
                   <p
                     style={{
                       color: Colors.textMuted,
@@ -235,7 +238,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
                       marginTop: "4px",
                     }}
                   >
-                    YouTube video detected - duration will be auto-fetched
+                    Hosted video detected (YouTube/Vimeo) - duration will be auto-fetched
                   </p>
                 )}
                 {/* Video Preview */}
@@ -283,6 +286,50 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
                       />
                     </div>
                   </div>
+                ) : extractVimeoId(lesson.videoUrl) ? (
+                  <div className="mt-4">
+                    <label
+                      style={{ color: Colors.textSecondary }}
+                      className="block text-sm font-medium mb-2"
+                    >
+                      Video Preview
+                    </label>
+                    <div
+                      className="rounded overflow-hidden"
+                      style={{
+                        backgroundColor: Colors.gray800,
+                        aspectRatio: "16/9",
+                        position: "relative",
+                      }}
+                    >
+                      <iframe
+                        key={lesson.videoUrl}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          height: "100%",
+                          border: "none",
+                        }}
+                        src={`https://player.vimeo.com/video/${extractVimeoId(lesson.videoUrl)}`}
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                        title="Vimeo video preview"
+                        onError={() => {
+                          if (!videoPreviewError) {
+                            setVideoPreviewError(true);
+                            setValidationMessage({
+                              title: "Video Preview Error",
+                              description:
+                                "The Vimeo preview cannot be loaded. Please ensure the Vimeo URL is valid and publicly accessible.",
+                            });
+                            setShowValidationModal(true);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
                 ) : lesson.videoUrl &&
                   lesson.videoUrl.trim() &&
                   lesson.videoUrl !== "[LOCAL_FILE: ]" ? (
@@ -317,7 +364,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
                             setValidationMessage({
                               title: "Video Cannot Be Loaded",
                               description:
-                                "The video file cannot be loaded properly. This could be due to an unsupported video format, a corrupted file, or network issues. Please ensure the video URL is accessible and in a standard format (MP4, WebM, or OGG), or consider hosting your video on YouTube and using the URL option instead.",
+                                "The video cannot be loaded as a direct media file. If this is a hosted URL, use a supported public YouTube or Vimeo link. For direct files, ensure the URL points to MP4, WebM, or OGG and is publicly accessible.",
                             });
                             setShowValidationModal(true);
                           }

@@ -223,8 +223,8 @@ export default function MainNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="LessonPlayer"
-        component={Screens.LessonPlayer}
+        name="VideoPlayer"
+        component={Screens.VideoPlayer}
         options={{ headerShown: false }}
       />
       <Stack.Screen

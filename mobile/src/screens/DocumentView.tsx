@@ -31,6 +31,7 @@ import { documentService } from "@/services/documentService";
 import { moduleService } from "@/services/moduleService";
 import { useCourseNavigation } from "@/hooks";
 import type { ModuleItem } from "@/services/moduleService";
+import { useCourses } from "@/contexts/CourseContext";
 
 type DocumentViewNavigationProp = StackNavigationProp<MainStackParamList, "DocumentView">;
 
@@ -85,6 +86,7 @@ const DocumentView = () => {
   const route = useRoute();
   const navigation = useNavigation<DocumentViewNavigationProp>();
   const { documentId, courseId, sectionId, userId, documentType, sourceScreen } = route.params as any;
+  const { refreshMyCourses } = useCourses();
 
   const [loading, setLoading] = useState(true);
   const [documentDetail, setDocumentDetail] = useState<any>(null);
@@ -403,6 +405,12 @@ const DocumentView = () => {
 
       setIsCompleted(true);
 
+      try {
+        await refreshMyCourses();
+      } catch (refreshErr) {
+        console.warn("Failed to refresh My Courses after document completion", refreshErr);
+      }
+
       if (documentDetail) {
         setDocumentDetail({
           ...documentDetail,
@@ -415,12 +423,6 @@ const DocumentView = () => {
       }
 
       await refetchNavigation();
-
-      navigation.setParams({
-        documentCompleted: true,
-        completedDocumentId: documentId,
-        timestamp: Date.now(),
-      } as any);
 
       Alert.alert("Success", "Lesson marked as completed!", [{ text: "OK" }]);
     } catch (error: any) {
@@ -446,7 +448,7 @@ const DocumentView = () => {
 
     if (nextItemInModule) {
       if (nextItemInModule.item.type === "video") {
-        navigation.replace("LessonPlayer", {
+        navigation.replace("VideoPlayer", {
           videoId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,
@@ -483,7 +485,7 @@ const DocumentView = () => {
   const handlePrevious = () => {
     if (prevItemInModule) {
       if (prevItemInModule.item.type === "video") {
-        navigation.replace("LessonPlayer", {
+        navigation.replace("VideoPlayer", {
           videoId: prevItemInModule.item.id,
           courseId,
           sectionId: prevItemInModule.sectionId,
@@ -917,6 +919,7 @@ const DocumentView = () => {
           </View>
         )}
         <Text style={styles.title}>{documentDetail.title}</Text>
+        <Text style={styles.description}>{documentDetail.description}</Text>
       </View>
 
       <ActionButton
@@ -1300,6 +1303,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.textPrimary,
     lineHeight: 24,
+  },
+  description: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    marginTop: Spacing.sm,
   },
   navigationContainer: {
     gap: Spacing.sm,

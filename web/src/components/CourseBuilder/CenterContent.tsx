@@ -67,6 +67,7 @@ const LessonEditor = ({
     selectedThumbnailFile,
     selectedVideoFile,
     extractYouTubeId,
+    extractVimeoId,
     handleVideoUrlChange,
     handleThumbnailFileChange: originalHandleThumbnailFileChange,
     handleVideoFileChange: originalHandleVideoFileChange,
@@ -185,6 +186,7 @@ const LessonEditor = ({
           setLocalVideoPreviewUrl={setLocalVideoPreviewUrl}
           isUploading={isUploading}
           extractYouTubeId={extractYouTubeId}
+          extractVimeoId={extractVimeoId}
           setValidationMessage={setValidationMessage}
           setShowValidationModal={setShowValidationModal}
         />
