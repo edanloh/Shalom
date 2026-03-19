@@ -789,8 +789,13 @@ class CourseService {
 
       // Transform sections to moduleDetails format
       const moduleDetails = sections.map((section: any) => {
+        const sectionItems = Array.isArray(section.items) ? section.items : [];
+        const fallbackItemOrder = new Map<string, number>(
+          sectionItems.map((item: any, index: number) => [String(item.id), index]),
+        );
+
         const lessons =
-          section.items
+          sectionItems
             ?.filter((item: any) =>
               ["video", "pdf", "document", "slides", "pptx", "docx", "ppt"].includes(
                 item.type,
@@ -813,11 +818,11 @@ class CourseService {
                   : "",
               duration_seconds: item.duration_seconds || 0,
               is_preview: item.is_preview || false,
-              order_index: item.order_index,
+              order_index: item.order_index ?? fallbackItemOrder.get(String(item.id)),
             })) || [];
 
         const quizzes =
-          section.items
+          sectionItems
             ?.filter((item: any) => item.type === "quiz")
             .map((quiz: any) => ({
               id: quiz.id,
@@ -825,6 +830,7 @@ class CourseService {
               description: quiz.description || "",
               passing_score: quiz.passing_score || 70,
               max_attempts: quiz.max_attempts === null ? null : quiz.max_attempts ?? 1,
+              order_index: quiz.order_index ?? fallbackItemOrder.get(String(quiz.id)),
               questions: (quiz.questions || []).map((q: any) => ({
                 id: q.id,
                 question_text: q.text || q.question_text,
@@ -1022,14 +1028,19 @@ class CourseService {
                 matchingPairs: matchingPairs,
               };
             }),
-            order: quiz.order_index || 0,
+            order: quiz.order_index,
           };
         }),
       }));
 
-      // Apply numbering to all lessons and quizzes (Lesson X.Y, Quiz X.Y format)
+      const extractBaseModuleTitle = (title: string) =>
+        String(title || "").replace(/^Module\s+\d+\s*:\s*/i, "").trim();
+
+      // Apply numbering to modules, lessons and quizzes on initial load
+      // so CourseBuilder sidebar matches add/reorder numbering behavior.
       const numberedModules = transformedModules.map((module, moduleIndex) => ({
         ...module,
+        title: `Module ${moduleIndex + 1}: ${extractBaseModuleTitle(module.title)}`,
         lessons: module.lessons.map((lesson, lessonIndex) => {
           const baseTitle =
             lesson.baseTitle ||

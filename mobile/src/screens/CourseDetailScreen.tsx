@@ -60,8 +60,6 @@ export default function CourseDetailScreen({
   const [error, setError] = useState<string | null>(null);
   const { user } = useUser();
   const userId = user?.uuid;
-  const fallbackUserId = process.env.EXPO_PUBLIC_DEFAULT_USER_ID;
-  const effectiveUserId = userId || fallbackUserId;
 
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
@@ -69,7 +67,7 @@ export default function CourseDetailScreen({
   const [showAllAnnouncements, setShowAllAnnouncements] = useState(false);
   
   // Wishlist functionality
-  const { toggleWishlist, isWishlisted } = useCourses();
+  const { toggleWishlist, isWishlisted, refreshMyCourses } = useCourses();
   const wishlisted = isWishlisted(courseId);
 
   useFocusEffect(
@@ -89,10 +87,13 @@ export default function CourseDetailScreen({
 
   useEffect(() => {
     (async () => {
-      if (!effectiveUserId) return;
+      if (!userId) {
+        setIsEnrolled(false);
+        return;
+      }
       try {
         const enrolled = await courseService.isUserEnrolledInCourse(
-          effectiveUserId,
+          userId,
           courseId,
         );
         setIsEnrolled(enrolled);
@@ -100,7 +101,7 @@ export default function CourseDetailScreen({
         console.log("Enroll status check failed:", e);
       }
     })();
-  }, [courseId, effectiveUserId]);
+  }, [courseId, userId]);
 
   const calculateCourseProgress = (): number => {
     if (!courseContent || !courseContent.sections) return 0;
@@ -123,15 +124,34 @@ export default function CourseDetailScreen({
     ).length;
   };
 
-  const loadCourseDetail = async () => {
+  const isSectionLocked = (section: CourseSection, index: number): boolean => {
+    if (!courseContent || index <= 0) return false;
+
+    // Reorder-safe rule: completed modules must remain accessible.
+    const isCompleted = moduleService.isSectionCompleted(
+      section,
+      courseContent.userProgress,
+    );
+    if (isCompleted) return false;
+
+    const previousSections = courseContent.sections.slice(0, index);
+    return previousSections.some(
+      (s) => !moduleService.isSectionCompleted(s, courseContent.userProgress),
+    );
+  };
+
+  const loadCourseDetail = async (options?: { background?: boolean }) => {
+    const isBackground = Boolean(options?.background);
     try {
-      setLoading(true);
+      if (!isBackground) {
+        setLoading(true);
+      }
       setError(null);
 
       // Fetch both course detail and module detail with user progress
       const [detail, moduleData] = await Promise.all([
         courseDetailService.getCourseDetail(courseId),
-        moduleService.getModuleDetail(courseId, effectiveUserId),
+        moduleService.getModuleDetail(courseId, userId),
       ]);
       setCourseDetail(detail);
       setCourseContent(moduleData);
@@ -139,7 +159,9 @@ export default function CourseDetailScreen({
       console.error("Failed to load course detail:", err);
       setError("Failed to load course details");
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      }
     }
   };
 
@@ -200,14 +222,8 @@ export default function CourseDetailScreen({
     );
     const completedAt = section?.module_completed_at;
 
-    // Module is locked if it's not the first module and previous module is not completed
-    const isLocked =
-      index > 0 &&
-      courseContent &&
-      !moduleService.isSectionCompleted(
-        courseContent.sections[index - 1],
-        courseContent.userProgress,
-      );
+    // Reorder-safe lock check: completed modules never become locked.
+    const isLocked = isSectionLocked(section, index);
 
     const onOpen = () => {
       if (!isEnrolled) {
@@ -222,25 +238,22 @@ export default function CourseDetailScreen({
         return;
       }
 
-      // Check if this is not the first module and the previous module is not completed
-      if (index > 0 && courseContent) {
-        const previousModule = courseContent.sections[index - 1];
-        if (
-          previousModule &&
-          !moduleService.isSectionCompleted(
-            previousModule,
-            courseContent.userProgress,
-          )
-        ) {
-          const previousModuleTitle =
-            previousModule?.title || "the previous module";
-          Alert.alert(
-            "Complete Previous Module First",
-            `Please complete "${previousModuleTitle}" before moving to this module.`,
-            [{ text: "OK", style: "default" }],
+      // Reorder-safe lock enforcement: gate only not-completed modules.
+      if (isSectionLocked(section, index) && courseContent) {
+        const previousIncompleteModule = courseContent.sections
+          .slice(0, index)
+          .find(
+            (s) =>
+              !moduleService.isSectionCompleted(s, courseContent.userProgress),
           );
-          return;
-        }
+        const previousModuleTitle =
+          previousIncompleteModule?.title || "the previous module";
+        Alert.alert(
+          "Complete Previous Module First",
+          `Please complete "${previousModuleTitle}" before moving to this module.`,
+          [{ text: "OK", style: "default" }],
+        );
+        return;
       }
 
       navigation.navigate("ModuleDetail", {
@@ -403,7 +416,7 @@ export default function CourseDetailScreen({
 
   const handleEnroll = async () => {
     if (isEnrolling) return;
-    if (!effectiveUserId) {
+    if (!userId) {
       Alert.alert("Sign in required", "Please sign in to enroll.");
       return;
     }
@@ -413,18 +426,29 @@ export default function CourseDetailScreen({
     try {
       setIsEnrolling(true);
       const { firstModuleId } = await courseService.enrollInCourse(
-        effectiveUserId,
+        userId,
         courseId,
       );
 
       // Mark as enrolled immediately so UI updates
       setIsEnrolled(true);
-      // Refresh detail in background to pick up any progress/enrollment metadata
-      loadCourseDetail?.();
+      // Release blocking overlay immediately after successful enrollment.
+      setIsEnrolling(false);
+
+      // Refresh shared "My Courses" context immediately so Home/MyCourses
+      // reflects the new enrollment as soon as user navigates back.
+      try {
+        await refreshMyCourses();
+      } catch (refreshErr) {
+        console.warn("Failed to refresh My Courses after enrollment", refreshErr);
+      }
+
+      // Refresh details in background without switching screen into full loading state.
+      void loadCourseDetail({ background: true });
 
       try {
         await creditService.recordCreditEvent({
-          userId: effectiveUserId,
+          userId,
           type: "course_enrolled",
           title: courseDetail?.title || "Enrolled in course",
           points: 20,
@@ -444,12 +468,6 @@ export default function CourseDetailScreen({
         });
       }
 
-      // Update enrolled state and reload course data
-      setIsEnrolled(true);
-
-      // Reload course detail to fetch updated progress
-      await loadCourseDetail();
-
       // Show success message
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
@@ -459,16 +477,13 @@ export default function CourseDetailScreen({
           {
             text: "Start Learning",
             onPress: () => {
-              if (firstModuleId && courseContent) {
-                const firstSection = courseContent.sections[0];
-                if (firstSection) {
-                  navigation.navigate("ModuleDetail", {
-                    courseId: courseId,
-                    sectionId: firstSection.id,
-                    userId: userId,
-                    sourceScreen,
-                  });
-                }
+              if (firstModuleId) {
+                navigation.navigate("ModuleDetail", {
+                  courseId: courseId,
+                  sectionId: firstModuleId,
+                  userId: userId,
+                  sourceScreen,
+                });
               }
             },
           },
@@ -482,6 +497,7 @@ export default function CourseDetailScreen({
         e?.details?.message || e?.message || "Try again.",
       );
     } finally {
+      // Safeguard in case the flow exits early.
       setIsEnrolling(false);
     }
   };
@@ -502,7 +518,7 @@ export default function CourseDetailScreen({
       <Screen title="" noHeader customEdges={["top", "bottom"]}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error || "Course not found"}</Text>
-          <Pressable style={styles.retryButton} onPress={loadCourseDetail}>
+          <Pressable style={styles.retryButton} onPress={() => void loadCourseDetail()}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </Pressable>
         </View>

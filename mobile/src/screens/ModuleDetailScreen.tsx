@@ -278,25 +278,46 @@ const ModuleDetailScreen = () => {
   const handleItemPress = async (item: ModuleItem) => {
     if (!(await requireEnrollment())) return;
 
-    // Check if all previous items are completed
-    if (currentSection?.items) {
-      const itemIndex = currentSection.items.findIndex((i) => i.id === item.id);
-      if (itemIndex > 0) {
-        const previousItems = currentSection.items.slice(0, itemIndex);
-          const incompletePrevious = previousItems.filter(
-            (i) => !moduleService.isItemCompleted(i, courseContent?.userProgress),
-          );
-
-        if (incompletePrevious.length > 0) {
-          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          Alert.alert(
-            "Complete Previous Items First",
-            `Please complete "${incompletePrevious[0].title}" before accessing this item.`,
-            [{ text: "OK", style: "default" }],
-          );
-          return;
-        }
+    const getItemLockState = (targetItem: ModuleItem) => {
+      if (!currentSection?.items) {
+        return { locked: false, firstIncomplete: null as ModuleItem | null };
       }
+
+      // Reorder-safe rule: completed items must remain accessible.
+      const isCompleted = moduleService.isItemCompleted(
+        targetItem,
+        courseContent?.userProgress,
+      );
+      if (isCompleted) {
+        return { locked: false, firstIncomplete: null as ModuleItem | null };
+      }
+
+      const itemIndex = currentSection.items.findIndex((i) => i.id === targetItem.id);
+      if (itemIndex <= 0) {
+        return { locked: false, firstIncomplete: null as ModuleItem | null };
+      }
+
+      const previousItems = currentSection.items.slice(0, itemIndex);
+      const firstIncomplete =
+        previousItems.find(
+          (i) => !moduleService.isItemCompleted(i, courseContent?.userProgress),
+        ) || null;
+
+      return {
+        locked: Boolean(firstIncomplete),
+        firstIncomplete,
+      };
+    };
+
+    const { locked, firstIncomplete } = getItemLockState(item);
+    if (locked && firstIncomplete) {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Alert.alert(
+        "Complete Previous Items First",
+        `Please complete "${firstIncomplete.title}" before accessing this item.`,
+        [{ text: "OK", style: "default" }],
+      );
+      return;
     }
 
     console.log("📍 Navigating to item:", {
@@ -400,9 +421,10 @@ const ModuleDetailScreen = () => {
       courseContent?.userProgress,
     );
 
-    // Check if item is locked (previous items not completed)
+    // Reorder-safe lock check: completed items never become locked.
     const isLocked = currentSection?.items
       ? (() => {
+          if (isCompleted) return false;
           const itemIndex = currentSection.items.findIndex(
             (i) => i.id === item.id,
           );

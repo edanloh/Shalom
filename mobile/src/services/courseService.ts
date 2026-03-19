@@ -452,15 +452,25 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
   const totalItems = totalVideos + totalQuizzes;
   const completedItems = completedVideos + passedQuizzes;
   
-  // Determine which data to use
+  // Determine which data to use.
+  // Keep this module-first to match CourseDetailScreen progress semantics.
   const hasSectionData = totalSections > 0;
   const progressTotal = hasSectionData ? totalSections : totalItems;
   const progressCompleted = hasSectionData ? completedSections : completedItems;
-  
-  // Calculate progress percentage
-  const calculatedPercentage = progressTotal > 0 
-    ? Math.round((progressCompleted / progressTotal) * 100) 
+
+  const numericEnrollmentPercentage = Number(enrollment.progress_percentage);
+  const fallbackEnrollmentPercentage = Number.isFinite(numericEnrollmentPercentage)
+    ? Math.max(0, Math.min(100, Math.round(numericEnrollmentPercentage)))
     : 0;
+
+  const calculatedPercentage = progressTotal > 0
+    ? Math.round((progressCompleted / progressTotal) * 100)
+    : fallbackEnrollmentPercentage;
+
+  // If backend marks completion explicitly, enforce 100% to prevent mixed UI states.
+  const effectiveProgressPercentage = enrollment.is_completed
+    ? 100
+    : calculatedPercentage;
   
   console.log(`[courseService] Converting enrollment for "${enrollment.title}":`, {
     hasSectionData,
@@ -491,7 +501,7 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
       rating: Number(enrollment.instructor_rating) || 0,
       bio: `Expert ${normalizedCategory} instructor`,
     },
-    progress_percentage: enrollment.progress_percentage,
+    progress_percentage: effectiveProgressPercentage,
     duration: `${enrollment.duration_hours}h`,
     rating: Number(enrollment.rating) || 0,
     image: enrollment.thumbnail_url,

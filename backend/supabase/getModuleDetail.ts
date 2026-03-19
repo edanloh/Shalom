@@ -453,11 +453,11 @@ serve(async (req) => {
           console.log(`   🎉 MODULE COMPLETE!`);
         }
         
-        // If module is marked as completed in DB, use that timestamp
-        // Otherwise use null (even if we calculated it's complete, we don't have the timestamp)
+        // Keep a stable completion timestamp from DB if available.
+        // If this is newly computed as completed, assign now and persist below.
         const storedProgress = userProgress?.moduleProgress?.get(section.id);
-        if (isModuleCompleted && storedProgress?.completed_at) {
-          moduleCompletedAt = storedProgress.completed_at;
+        if (isModuleCompleted) {
+          moduleCompletedAt = storedProgress?.completed_at || new Date().toISOString();
         }
       }
 
@@ -480,6 +480,56 @@ serve(async (req) => {
         module_completed_at: moduleCompletedAt
       };
     });
+
+    // ========================================
+    // 4.5. Sync computed module completion to DB
+    // ========================================
+    if (userId && sectionsWithContent.length > 0) {
+      try {
+        const existingModuleProgress = userProgress?.moduleProgress || new Map();
+
+        const progressRowsToUpsert = sectionsWithContent
+          .map((section: any) => {
+            const existing = existingModuleProgress.get(section.id);
+            const isCompleted = Boolean(section.module_is_completed);
+            const completedAt = isCompleted
+              ? existing?.completed_at || section.module_completed_at || new Date().toISOString()
+              : null;
+
+            const hasChanged =
+              !existing ||
+              Boolean(existing.is_completed) !== isCompleted ||
+              String(existing.completed_at || '') !== String(completedAt || '');
+
+            if (!hasChanged) return null;
+
+            return {
+              user_id: userId,
+              course_id: courseId,
+              section_id: section.id,
+              is_completed: isCompleted,
+              completed_at: completedAt,
+            };
+          })
+          .filter(Boolean);
+
+        if (progressRowsToUpsert.length > 0) {
+          const { error: syncModuleProgressError } = await supabaseClient
+            .from('user_module_progress')
+            .upsert(progressRowsToUpsert, {
+              onConflict: 'user_id,course_id,section_id',
+            });
+
+          if (syncModuleProgressError) {
+            console.error('Failed syncing user_module_progress from computed module states:', syncModuleProgressError);
+          } else {
+            console.log(`✅ Synced ${progressRowsToUpsert.length} module progress row(s) for user ${userId}`);
+          }
+        }
+      } catch (syncError) {
+        console.error('Error syncing computed module completion:', syncError);
+      }
+    }
 
     // ========================================
     // 5. Process reviews and calculate ratings
