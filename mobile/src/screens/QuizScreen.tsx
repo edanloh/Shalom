@@ -33,12 +33,15 @@ import { useCourses } from "@/contexts/CourseContext";
 
 type QuizDetail = QuizDetailResponse["data"];
 type QuizResult = SubmitQuizResponse["data"] & {
-  graded_answers?: Record<string, {
-    pointsAwarded: number;
-    maxPoints: number;
-    feedback?: string | null;
-    gradedAt: string;
-  }>;
+  graded_answers?: Record<
+    string,
+    {
+      pointsAwarded: number;
+      maxPoints: number;
+      feedback?: string | null;
+      gradedAt: string;
+    }
+  >;
 };
 
 type QuizScreenNavigationProp = StackNavigationProp<
@@ -49,7 +52,8 @@ type QuizScreenNavigationProp = StackNavigationProp<
 const QuizScreen = () => {
   const route = useRoute();
   const navigation = useNavigation<QuizScreenNavigationProp>();
-  const { quizId, courseId, sectionId, userId, sourceScreen } = route.params as any;
+  const { quizId, courseId, sectionId, userId, sourceScreen } =
+    route.params as any;
   const { refreshMyCourses } = useCourses();
 
   const [loading, setLoading] = useState(true);
@@ -105,9 +109,11 @@ const QuizScreen = () => {
     }
     const resolvedSectionId = (quizDetail as any)?.section?.id || sectionId;
     const hasShortAnswerQuestions =
-      quizDetail?.questions?.some((q: any) => q.question_type === "short-answer") ||
-      false;
-    const shouldMarkCompleted = hasShortAnswerQuestions && (gradingPending || !!quizResult);
+      quizDetail?.questions?.some(
+        (q: any) => q.question_type === "short-answer",
+      ) || false;
+    const shouldMarkCompleted =
+      hasShortAnswerQuestions && (gradingPending || !!quizResult);
     if (resolvedSectionId) {
       navigation.navigate("ModuleDetail", {
         courseId,
@@ -127,29 +133,29 @@ const QuizScreen = () => {
     navigation.navigate("CourseDetail", { courseId, sourceScreen } as any);
   };
 
-  useEffect(() => {
-    // Timer countdown - only runs when timer is active and not in review/results mode
-    if (
-      timerActive &&
-      timeRemaining !== null &&
-      timeRemaining > 0 &&
-      !showResults &&
-      !reviewMode
-    ) {
-      const timer = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev === null || prev <= 1) {
-            setTimerActive(false);
-            handleSubmitQuiz(); // Auto-submit when time runs out
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+  // useEffect(() => {
+  //   // Timer countdown - only runs when timer is active and not in review/results mode
+  //   if (
+  //     timerActive &&
+  //     timeRemaining !== null &&
+  //     timeRemaining > 0 &&
+  //     !showResults &&
+  //     !reviewMode
+  //   ) {
+  //     const timer = setInterval(() => {
+  //       setTimeRemaining((prev) => {
+  //         if (prev === null || prev <= 1) {
+  //           setTimerActive(false);
+  //           handleSubmitQuiz(); // Auto-submit when time runs out
+  //           return 0;
+  //         }
+  //         return prev - 1;
+  //       });
+  //     }, 1000);
 
-      return () => clearInterval(timer);
-    }
-  }, [timerActive, timeRemaining, showResults, reviewMode]);
+  //     return () => clearInterval(timer);
+  //   }
+  // }, [timerActive, timeRemaining, showResults, reviewMode]);
 
   const fetchQuizDetail = async () => {
     try {
@@ -203,46 +209,59 @@ const QuizScreen = () => {
       const buildResultFromAttempt = (
         attempt: any,
         passedOverride?: boolean,
-      ) => {              
+      ) => {
         const totalQuestions =
           Number(attempt.total_questions) || data.questions.length || 0;
         const correctAnswers =
           Number(attempt.correct_answers) ||
           Math.round((attempt.score / 100) * totalQuestions);
         const answersMap = attempt.answers || {};
-        
+
         // Parse graded_answers if it's a JSON string
         let gradedAnswersData = attempt.graded_answers;
-        if (typeof gradedAnswersData === 'string') {
+        if (typeof gradedAnswersData === "string") {
           try {
             gradedAnswersData = JSON.parse(gradedAnswersData);
           } catch (e) {
-            console.error('Failed to parse graded_answers:', e);
+            console.error("Failed to parse graded_answers:", e);
             gradedAnswersData = undefined;
           }
         }
-                
+
         const gradedAnswers = data.questions
           .map((question) => {
             const selected = answersMap[question.id];
             if (!selected) return null;
             const correctAnswer = question.correct_answer || "";
-            
+
             // Properly compare answers based on question type
             let isCorrect = false;
             if (question.question_type === "multiple-correct") {
               // For multiple-correct, compare arrays
-              const selectedArray = Array.isArray(selected) ? selected : (typeof selected === 'string' && selected.startsWith('[') ? JSON.parse(selected) : [selected]);
-              const correctArray = Array.isArray(correctAnswer) ? correctAnswer : (typeof correctAnswer === 'string' && correctAnswer.startsWith('[') ? JSON.parse(correctAnswer) : [correctAnswer]);
-              isCorrect = JSON.stringify(selectedArray.sort()) === JSON.stringify(correctArray.sort());
+              const selectedArray = Array.isArray(selected)
+                ? selected
+                : typeof selected === "string" && selected.startsWith("[")
+                  ? JSON.parse(selected)
+                  : [selected];
+              const correctArray = Array.isArray(correctAnswer)
+                ? correctAnswer
+                : typeof correctAnswer === "string" &&
+                    correctAnswer.startsWith("[")
+                  ? JSON.parse(correctAnswer)
+                  : [correctAnswer];
+              isCorrect =
+                JSON.stringify(selectedArray.sort()) ===
+                JSON.stringify(correctArray.sort());
             } else if (question.question_type === "matching") {
               // For matching, compare JSON objects
-              isCorrect = JSON.stringify(selected) === JSON.stringify(correctAnswer);
+              isCorrect =
+                JSON.stringify(selected) === JSON.stringify(correctAnswer);
             } else {
               // For single answer questions
-              isCorrect = String(selected).trim() === String(correctAnswer).trim();
+              isCorrect =
+                String(selected).trim() === String(correctAnswer).trim();
             }
-            
+
             return {
               questionId: question.id,
               isCorrect,
@@ -270,26 +289,28 @@ const QuizScreen = () => {
 
       // If user has any attempts (passed or failed), show results screen
       if (attempts.length > 0) {
-        const latestAttempt = isPassed 
-          ? attempts.find((attempt) => attempt.is_passed) 
+        const latestAttempt = isPassed
+          ? attempts.find((attempt) => attempt.is_passed)
           : quizService.getLatestAttempt(attempts);
-        
+
         if (latestAttempt) {
           // Check if quiz has short-answer questions and grades are not released
           const hasShortAnswer = data.questions.some(
-            (q) => q.question_type === 'short-answer'
+            (q) => q.question_type === "short-answer",
           );
           const gradesReleased = latestAttempt.grades_released !== false;
-          
+
           if (hasShortAnswer && !gradesReleased) {
             // Show pending grading screen
-            setSelectedAnswers(new Map(Object.entries(latestAttempt.answers || {})));
+            setSelectedAnswers(
+              new Map(Object.entries(latestAttempt.answers || {})),
+            );
             setGradingPending(true);
             setShowResults(false);
             setTimerActive(false);
             return;
           }
-                    
+
           buildResultFromAttempt(latestAttempt, isPassed);
           setAttemptsRemainingDisplay(attemptsRemaining);
           setShowResults(true);
@@ -304,12 +325,12 @@ const QuizScreen = () => {
       setQuizStartTime(new Date());
 
       // Set timer if quiz has time limit
-      if (data.time_limit_minutes) {
-        const timeInSeconds = data.time_limit_minutes * 60;
-        setTimeRemaining(timeInSeconds);
-        setInitialTime(timeInSeconds);
-        setTimerActive(true);
-      }
+      // if (data.time_limit_minutes) {
+      //   const timeInSeconds = data.time_limit_minutes * 60;
+      //   setTimeRemaining(timeInSeconds);
+      //   setInitialTime(timeInSeconds);
+      //   setTimerActive(true);
+      // }
     } catch (err: any) {
       console.error("Error fetching quiz detail:", err);
       setError(err.message || "Failed to load quiz");
@@ -469,12 +490,15 @@ const QuizScreen = () => {
 
   const handleSubmitQuiz = async () => {
     if (!quizDetail) return;
-    
+
     // Check if we're in practice mode (attempts exhausted but user retrying)
     if (practiceMode) {
       // Practice mode: Calculate results locally without backend submission
       if (
-        !quizService.validateAnswers(selectedAnswers, quizDetail.questions.length)
+        !quizService.validateAnswers(
+          selectedAnswers,
+          quizDetail.questions.length,
+        )
       ) {
         Alert.alert(
           "Incomplete Quiz",
@@ -492,7 +516,7 @@ const QuizScreen = () => {
       const gradedAnswers = quizDetail.questions.map((question) => {
         const userAnswer = selectedAnswers.get(question.id);
         const correctAnswer = question.correct_answer || "";
-        
+
         // Compare answers based on question type
         let isCorrect = false;
         if (question.question_type === "multiple-correct") {
@@ -534,11 +558,15 @@ const QuizScreen = () => {
 
           isCorrect =
             normalizedUser.length === normalizedCorrect.length &&
-            JSON.stringify(normalizedUser) === JSON.stringify(normalizedCorrect);
+            JSON.stringify(normalizedUser) ===
+              JSON.stringify(normalizedCorrect);
         } else if (question.question_type === "matching") {
           // For matching, compare normalized left->right mappings
-          const toPairArray = (value: any): Array<{ left: string; right: string }> => {
-            if (Array.isArray(value)) return value as Array<{ left: string; right: string }>;
+          const toPairArray = (
+            value: any,
+          ): Array<{ left: string; right: string }> => {
+            if (Array.isArray(value))
+              return value as Array<{ left: string; right: string }>;
             if (typeof value === "string") {
               try {
                 const parsed = JSON.parse(value);
@@ -552,14 +580,18 @@ const QuizScreen = () => {
             return [];
           };
 
-          const normalizePairs = (pairs: Array<{ left: string; right: string }>) =>
+          const normalizePairs = (
+            pairs: Array<{ left: string; right: string }>,
+          ) =>
             pairs
               .map((p) => `${String(p.left).trim()}=>${String(p.right).trim()}`)
               .sort();
 
           const normalizedUser = normalizePairs(toPairArray(userAnswer));
           const normalizedCorrect = normalizePairs(toPairArray(correctAnswer));
-          isCorrect = JSON.stringify(normalizedUser) === JSON.stringify(normalizedCorrect);
+          isCorrect =
+            JSON.stringify(normalizedUser) ===
+            JSON.stringify(normalizedCorrect);
         } else {
           // For single answer questions, support both answer text and index-style correct_answer
           const selectedValue = Array.isArray(userAnswer)
@@ -580,9 +612,9 @@ const QuizScreen = () => {
 
           isCorrect = selectedValue === normalizedCorrect;
         }
-        
+
         if (isCorrect) correctCount++;
-        
+
         return {
           questionId: question.id,
           isCorrect,
@@ -611,7 +643,7 @@ const QuizScreen = () => {
         Alert.alert(
           "Practice Mode",
           "This is a practice attempt and was not recorded. Your previous attempts are still saved.",
-          [{ text: "OK" }]
+          [{ text: "OK" }],
         );
       }, 500);
 
@@ -668,17 +700,20 @@ const QuizScreen = () => {
 
       setQuizResult(result);
       // Update attempts remaining display after submission
-      if (result.attemptsRemaining !== undefined && result.attemptsRemaining !== null) {
+      if (
+        result.attemptsRemaining !== undefined &&
+        result.attemptsRemaining !== null
+      ) {
         setAttemptsRemainingDisplay(result.attemptsRemaining);
         // Update attemptsBlocked based on new attempts remaining
         setAttemptsBlocked(result.attemptsRemaining === 0 && !result.isPassed);
       }
-      
+
       // Check if quiz has short-answer questions
       const hasShortAnswer = quizDetail.questions.some(
-        (q) => q.question_type === 'short-answer'
+        (q) => q.question_type === "short-answer",
       );
-      
+
       if (hasShortAnswer) {
         // Keep students on pending screen until grading is released.
         // Completion for short-answer quizzes is handled when they leave this screen.
@@ -738,22 +773,35 @@ const QuizScreen = () => {
               const selected = answersMap[question.id];
               if (!selected) return null;
               const correctAnswer = question.correct_answer || "";
-              
+
               // Properly compare answers based on question type
               let isCorrect = false;
               if (question.question_type === "multiple-correct") {
                 // For multiple-correct, compare arrays
-                const selectedArray = Array.isArray(selected) ? selected : (typeof selected === 'string' && selected.startsWith('[') ? JSON.parse(selected) : [selected]);
-                const correctArray = Array.isArray(correctAnswer) ? correctAnswer : (typeof correctAnswer === 'string' && correctAnswer.startsWith('[') ? JSON.parse(correctAnswer) : [correctAnswer]);
-                isCorrect = JSON.stringify(selectedArray.sort()) === JSON.stringify(correctArray.sort());
+                const selectedArray = Array.isArray(selected)
+                  ? selected
+                  : typeof selected === "string" && selected.startsWith("[")
+                    ? JSON.parse(selected)
+                    : [selected];
+                const correctArray = Array.isArray(correctAnswer)
+                  ? correctAnswer
+                  : typeof correctAnswer === "string" &&
+                      correctAnswer.startsWith("[")
+                    ? JSON.parse(correctAnswer)
+                    : [correctAnswer];
+                isCorrect =
+                  JSON.stringify(selectedArray.sort()) ===
+                  JSON.stringify(correctArray.sort());
               } else if (question.question_type === "matching") {
                 // For matching, compare JSON objects
-                isCorrect = JSON.stringify(selected) === JSON.stringify(correctAnswer);
+                isCorrect =
+                  JSON.stringify(selected) === JSON.stringify(correctAnswer);
               } else {
                 // For single answer questions
-                isCorrect = String(selected).trim() === String(correctAnswer).trim();
+                isCorrect =
+                  String(selected).trim() === String(correctAnswer).trim();
               }
-              
+
               return {
                 questionId: question.id,
                 isCorrect,
@@ -795,15 +843,15 @@ const QuizScreen = () => {
 
     // Check if quiz has short-answer questions - if so, don't allow retry
     const hasShortAnswer = quizDetail.questions.some(
-      (q: any) => q.question_type === 'short-answer'
+      (q: any) => q.question_type === "short-answer",
     );
-    
+
     if (hasShortAnswer) {
       // For short-answer quizzes, only allow review (not retry)
       Alert.alert(
         "Retry Not Available",
         "This quiz contains short-answer questions requiring manual grading. You can review your answers but cannot retake the quiz.",
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
       return;
     }
@@ -812,7 +860,8 @@ const QuizScreen = () => {
     // 1. User passed the quiz (no need to record another attempt)
     // 2. User failed and has no attempts remaining (practice mode)
     // Disable practice mode if user failed and still has attempts (normal retry)
-    const shouldEnablePracticeMode = attemptsBlocked || (quizResult?.isPassed === true);
+    const shouldEnablePracticeMode =
+      attemptsBlocked || quizResult?.isPassed === true;
     setPracticeMode(shouldEnablePracticeMode);
 
     // Reset quiz state completely
@@ -828,12 +877,12 @@ const QuizScreen = () => {
     setQuizStartTime(new Date());
 
     // Reset and restart timer if quiz has time limit
-    if (quizDetail.time_limit_minutes) {
-      const timeInSeconds = quizDetail.time_limit_minutes * 60;
-      setTimeRemaining(timeInSeconds);
-      setInitialTime(timeInSeconds);
-      setTimerActive(true);
-    }
+    // if (quizDetail.time_limit_minutes) {
+    //   const timeInSeconds = quizDetail.time_limit_minutes * 60;
+    //   setTimeRemaining(timeInSeconds);
+    //   setInitialTime(timeInSeconds);
+    //   setTimerActive(true);
+    // }
 
     // Don't call fetchQuizDetail() - it would show results screen again
     // Just use the existing quizDetail data to start fresh
@@ -894,7 +943,12 @@ const QuizScreen = () => {
           { name: "MainTabs", params: { screen: "Home" } as any },
           {
             name: "CourseDetail",
-            params: { courseId, sourceScreen, quizCompleted: true, quizId } as any,
+            params: {
+              courseId,
+              sourceScreen,
+              quizCompleted: true,
+              quizId,
+            } as any,
           },
         ],
       });
@@ -922,9 +976,10 @@ const QuizScreen = () => {
     });
 
     // Check if quiz has short-answer questions requiring manual grading
-    const hasShortAnswer = quizDetail?.questions.some(
-      (q: any) => q.question_type === 'short-answer'
-    ) || false;
+    const hasShortAnswer =
+      quizDetail?.questions.some(
+        (q: any) => q.question_type === "short-answer",
+      ) || false;
 
     // Mark as complete and auto-navigate if:
     // 1. Quiz has short-answer questions (manual grading - no strict checks needed), OR
@@ -932,11 +987,14 @@ const QuizScreen = () => {
     // 3. All attempts are exhausted (even if failed)
     // Additional safeguard: Don't complete if failed and still has attempts (unless manual grading)
     const hasFailed = quizResult && !quizResult.isPassed;
-    const hasAttemptsRemaining = attemptsRemainingDisplay !== null && attemptsRemainingDisplay > 0;
-    
-    const canComplete = hasShortAnswer || // Allow completion for manual grading quizzes
-              (((quizResult && quizResult.isPassed) || attemptsBlocked) &&
-                        !(hasFailed && hasAttemptsRemaining));
+    const hasAttemptsRemaining =
+      attemptsRemainingDisplay !== null && attemptsRemainingDisplay > 0;
+
+    const canComplete =
+      practiceMode ||
+      hasShortAnswer ||
+      (((quizResult && quizResult.isPassed) || attemptsBlocked) &&
+        !(hasFailed && hasAttemptsRemaining));
 
     if (canComplete) {
       navigateAfterCompletion();
@@ -946,7 +1004,7 @@ const QuizScreen = () => {
       Alert.alert(
         "Cannot Complete Yet",
         "You need to pass this quiz or use all attempts before proceeding.",
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
       return;
     }
@@ -1017,16 +1075,24 @@ const QuizScreen = () => {
               <Text style={styles.scoreSubtext}>
                 Your answers are being reviewed by your instructor.
               </Text>
-              
+
               <View style={styles.attemptsContainer}>
-                <Ionicons name="time-outline" size={18} color={Colors.purple400} />
-                <Text style={styles.attemptsText}>
-                  Awaiting manual grading
-                </Text>
+                <Ionicons
+                  name="time-outline"
+                  size={18}
+                  color={Colors.purple400}
+                />
+                <Text style={styles.attemptsText}>Awaiting manual grading</Text>
               </View>
-              
-              <Text style={[styles.scoreSubtext, { marginTop: 12, fontSize: 14, lineHeight: 20 }]}>
-                You'll be notified once your instructor has finished grading all questions. Your final score will be available then.
+
+              <Text
+                style={[
+                  styles.scoreSubtext,
+                  { marginTop: 12, fontSize: 14, lineHeight: 20 },
+                ]}
+              >
+                You'll be notified once your instructor has finished grading all
+                questions. Your final score will be available then.
               </Text>
             </View>
           </View>
@@ -1066,35 +1132,46 @@ const QuizScreen = () => {
 
     // Calculate actual points from graded_answers if available
     let totalPointsEarned = quizResult.correctAnswers || 0;
-    let totalPointsPossible = quizResult.totalQuestions || 0;    
-    
-    if (quizResult.graded_answers && Object.keys(quizResult.graded_answers).length > 0 && quizDetail) {
+    let totalPointsPossible = quizResult.totalQuestions || 0;
+
+    if (
+      quizResult.graded_answers &&
+      Object.keys(quizResult.graded_answers).length > 0 &&
+      quizDetail
+    ) {
       // When we have graded_answers, calculate points for each question type
       totalPointsEarned = 0;
       totalPointsPossible = 0;
-      
+
       quizDetail.questions.forEach((question) => {
-        if (quizResult.graded_answers && question.id in quizResult.graded_answers) {
+        if (
+          quizResult.graded_answers &&
+          question.id in quizResult.graded_answers
+        ) {
           // Short answer question with manual grading
           const graded = quizResult.graded_answers[question.id];
           totalPointsEarned += graded.pointsAwarded;
           totalPointsPossible += graded.maxPoints;
         } else {
           // Auto-graded question (MCQ, true/false, etc.) - 1 point each
-          const answer = quizResult.answers.find(a => a.questionId === question.id);
+          const answer = quizResult.answers.find(
+            (a) => a.questionId === question.id,
+          );
           const points = answer?.isCorrect ? 1 : 0;
           totalPointsEarned += points;
           totalPointsPossible += 1;
         }
       });
     }
-    
+
     console.log("📊 Points calculation:", {
       totalPointsEarned,
       totalPointsPossible,
       scorePercentage,
       hasGradedAnswers: !!quizResult.graded_answers,
-      gradedAnswersCount: quizResult.graded_answers ? Object.keys(quizResult.graded_answers).length : 0,
+      gradedAnswersCount: quizResult.graded_answers
+        ? Object.keys(quizResult.graded_answers).length
+        : 0,
     });
 
     return (
@@ -1130,8 +1207,11 @@ const QuizScreen = () => {
               <Text style={styles.scoreValue}>
                 {scorePercentage.toFixed(2)}%
               </Text>
-              <Text style={[styles.scoreSubtext, { fontSize: 16, marginTop: 4 }]}>
-                ({totalPointsEarned.toFixed(2)}/{totalPointsPossible.toFixed(2)} points)
+              <Text
+                style={[styles.scoreSubtext, { fontSize: 16, marginTop: 4 }]}
+              >
+                ({totalPointsEarned.toFixed(2)}/{totalPointsPossible.toFixed(2)}{" "}
+                points)
               </Text>
 
               {/* Show passing mark for failed attempts */}
@@ -1142,23 +1222,36 @@ const QuizScreen = () => {
               )}
 
               {/* Show attempts remaining */}
-              {!practiceMode && attemptsRemainingDisplay !== null && (
-                <View style={styles.attemptsContainer}>
-                  <Ionicons 
-                    name={attemptsRemainingDisplay > 0 ? "refresh-circle" : "alert-circle"} 
-                    size={18} 
-                    color={attemptsRemainingDisplay > 0 ? Colors.purple400 : Colors.red} 
-                  />
-                  <Text style={[
-                    styles.attemptsText,
-                    attemptsRemainingDisplay === 0 && styles.attemptsTextError
-                  ]}>
-                    {attemptsRemainingDisplay > 0 
-                      ? `${attemptsRemainingDisplay} attempt${attemptsRemainingDisplay === 1 ? '' : 's'} remaining`
-                      : "No attempts remaining"}
-                  </Text>
-                </View>
-              )}
+              {!practiceMode &&
+                attemptsRemainingDisplay !== null &&
+                !isPassed && (
+                  <View style={styles.attemptsContainer}>
+                    <Ionicons
+                      name={
+                        attemptsRemainingDisplay > 0
+                          ? "refresh-circle"
+                          : "alert-circle"
+                      }
+                      size={18}
+                      color={
+                        attemptsRemainingDisplay > 0
+                          ? Colors.purple400
+                          : Colors.red
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.attemptsText,
+                        attemptsRemainingDisplay === 0 &&
+                          styles.attemptsTextError,
+                      ]}
+                    >
+                      {attemptsRemainingDisplay > 0
+                        ? `${attemptsRemainingDisplay} attempt${attemptsRemainingDisplay === 1 ? "" : "s"} remaining`
+                        : "No attempts remaining"}
+                    </Text>
+                  </View>
+                )}
 
               <Text style={styles.scoreSubtext}>
                 {isPassed
@@ -1201,11 +1294,13 @@ const QuizScreen = () => {
                 <View style={styles.completionInfoContainer}>
                   {isPassed ? (
                     <Text style={styles.completionInfoText}>
-                      ✅ Quiz passed! Click Complete to proceed to the next item.
+                      ✅ Quiz passed! Click Complete to proceed to the next
+                      item.
                     </Text>
                   ) : attemptsBlocked ? (
                     <Text style={styles.completionInfoText}>
-                      ⚠️ You've used all attempts. Click Complete to proceed to the next item.
+                      ⚠️ You've used all attempts. Click Complete to proceed to
+                      the next item.
                     </Text>
                   ) : null}
                 </View>
@@ -1215,10 +1310,10 @@ const QuizScreen = () => {
                 {(() => {
                   // Check if quiz has short-answer questions
                   const hasShortAnswer = quizDetail.questions.some(
-                    (q: any) => q.question_type === 'short-answer'
+                    (q: any) => q.question_type === "short-answer",
                   );
 
-                  if (!isPassed && !attemptsBlocked) {
+                  if (!isPassed && !attemptsBlocked && !practiceMode) {
                     // Failed with attempts remaining: Show Retry (unless short-answer) + Back only
                     return (
                       <>
@@ -1239,7 +1334,11 @@ const QuizScreen = () => {
                           style={styles.actionButton}
                           onPress={navigateBackToModuleDetail}
                         >
-                          <Ionicons name="arrow-back" size={32} color={Colors.white} />
+                          <Ionicons
+                            name="arrow-back"
+                            size={32}
+                            color={Colors.white}
+                          />
                           <Text style={styles.actionButtonText}>Back</Text>
                         </TouchableOpacity>
                       </>
@@ -1274,16 +1373,16 @@ const QuizScreen = () => {
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.actionButton}
-                      onPress={handleComplete}
-                    >
-                      <Image
-                        source={Images.quizComplete}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Complete</Text>
-                    </TouchableOpacity>
-                  </>
+                          onPress={handleComplete}
+                        >
+                          <Image
+                            source={Images.quizComplete}
+                            style={styles.actionButtonIcon}
+                            resizeMode="contain"
+                          />
+                          <Text style={styles.actionButtonText}>Complete</Text>
+                        </TouchableOpacity>
+                      </>
                     );
                   }
                 })()}
@@ -1378,14 +1477,14 @@ const QuizScreen = () => {
       }}
       headerRightComponent={
         <>
-          {timeRemaining !== null && timerActive && !reviewMode && (
+          {/* {timeRemaining !== null && timerActive && !reviewMode && (
             <View style={styles.modernTimer}>
               <Ionicons name="time-outline" size={18} color={Colors.yellow} />
               <Text style={styles.modernTimerText}>
                 {formatTime(timeRemaining)}
               </Text>
-            </View>
-          )}
+            </View> 
+          )}*/}
           {!timerActive && !reviewMode && <View style={{ width: 80 }} />}
         </>
       }
@@ -1395,7 +1494,9 @@ const QuizScreen = () => {
         {!reviewMode && quizDetail?.max_attempts !== undefined && (
           <Text style={styles.attemptsInline}>
             {practiceMode ? (
-              <Text style={{ color: Colors.yellow }}>Practice Mode (Not Recorded)</Text>
+              <Text style={{ color: Colors.yellow }}>
+                Practice Mode (Not Recorded)
+              </Text>
             ) : (
               <>
                 Attempts left:{" "}
@@ -1407,11 +1508,14 @@ const QuizScreen = () => {
           </Text>
         )}
         {/* Short Answer Quiz Notice */}
-        {!reviewMode && quizDetail?.questions.some((q: any) => q.question_type === 'short-answer') && (
-          <Text style={styles.shortAnswerNotice}>
-            ⚠️ This quiz requires manual grading. Only 1 attempt allowed.
-          </Text>
-        )}
+        {!reviewMode &&
+          quizDetail?.questions.some(
+            (q: any) => q.question_type === "short-answer",
+          ) && (
+            <Text style={styles.shortAnswerNotice}>
+              ⚠️ This quiz requires manual grading. Only 1 attempt allowed.
+            </Text>
+          )}
         <View style={styles.progressHeaderRow}>
           <Text style={styles.progressLabel}>
             {reviewMode ? "Review Mode - " : ""}Question{" "}
@@ -1469,57 +1573,93 @@ const QuizScreen = () => {
         {/* Points Earned Display in Review Mode */}
         {(() => {
           if (reviewMode) {
-            console.log('🔍 Review mode - checking for graded answers:', {
+            console.log("🔍 Review mode - checking for graded answers:", {
               currentQuestionId: currentQuestion.id,
               hasQuizResult: !!quizResult,
               hasGradedAnswers: !!quizResult?.graded_answers,
-              gradedAnswersKeys: quizResult?.graded_answers ? Object.keys(quizResult.graded_answers) : [],
-              isInGradedAnswers: quizResult?.graded_answers ? currentQuestion.id in quizResult.graded_answers : false,
+              gradedAnswersKeys: quizResult?.graded_answers
+                ? Object.keys(quizResult.graded_answers)
+                : [],
+              isInGradedAnswers: quizResult?.graded_answers
+                ? currentQuestion.id in quizResult.graded_answers
+                : false,
             });
           }
           return null;
         })()}
-        {reviewMode && quizResult?.graded_answers && currentQuestion.id in quizResult.graded_answers && (
-          <View style={{
-            marginTop: 12,
-            padding: 10,
-            backgroundColor: Colors.purple850 + '40',
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: Colors.purple400 + '30',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <Text style={{ color: Colors.purple200, fontSize: 13, fontWeight: '600' }}>
-              Points Earned:
-            </Text>
-            <Text style={{ 
-              color: Colors.white, 
-              fontSize: 16, 
-              fontWeight: 'bold'
-            }}>
-              {quizResult.graded_answers[currentQuestion.id].pointsAwarded.toFixed(2)}/{quizResult.graded_answers[currentQuestion.id].maxPoints.toFixed(2)}
-            </Text>
-          </View>
-        )}
-        {reviewMode && quizResult?.graded_answers && currentQuestion.id in quizResult.graded_answers && quizResult.graded_answers[currentQuestion.id].feedback && (
-          <View style={{
-            marginTop: 8,
-            padding: 10,
-            backgroundColor: Colors.blue + '20',
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: Colors.blue + '40'
-          }}>
-            <Text style={{ color: Colors.blue, fontSize: 12, fontWeight: '600', marginBottom: 4 }}>
-              Instructor Feedback:
-            </Text>
-            <Text style={{ color: Colors.gray200, fontSize: 13, lineHeight: 18 }}>
-              {quizResult.graded_answers[currentQuestion.id].feedback}
-            </Text>
-          </View>
-        )}
+        {reviewMode &&
+          quizResult?.graded_answers &&
+          currentQuestion.id in quizResult.graded_answers && (
+            <View
+              style={{
+                marginTop: 12,
+                padding: 10,
+                backgroundColor: Colors.purple850 + "40",
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: Colors.purple400 + "30",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Text
+                style={{
+                  color: Colors.purple200,
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
+              >
+                Points Earned:
+              </Text>
+              <Text
+                style={{
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: "bold",
+                }}
+              >
+                {quizResult.graded_answers[
+                  currentQuestion.id
+                ].pointsAwarded.toFixed(2)}
+                /
+                {quizResult.graded_answers[
+                  currentQuestion.id
+                ].maxPoints.toFixed(2)}
+              </Text>
+            </View>
+          )}
+        {reviewMode &&
+          quizResult?.graded_answers &&
+          currentQuestion.id in quizResult.graded_answers &&
+          quizResult.graded_answers[currentQuestion.id].feedback && (
+            <View
+              style={{
+                marginTop: 8,
+                padding: 10,
+                backgroundColor: Colors.blue + "20",
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: Colors.blue + "40",
+              }}
+            >
+              <Text
+                style={{
+                  color: Colors.blue,
+                  fontSize: 12,
+                  fontWeight: "600",
+                  marginBottom: 4,
+                }}
+              >
+                Instructor Feedback:
+              </Text>
+              <Text
+                style={{ color: Colors.gray200, fontSize: 13, lineHeight: 18 }}
+              >
+                {quizResult.graded_answers[currentQuestion.id].feedback}
+              </Text>
+            </View>
+          )}
 
         {/* Question Type Indicator */}
         {currentQuestion.question_type === "multiple-correct" && (
@@ -1603,7 +1743,7 @@ const QuizScreen = () => {
               <TouchableOpacity
                 key={String(
                   option.id ??
-                    `option-${index}-${option.option_text ?? "choice"}`
+                    `option-${index}-${option.option_text ?? "choice"}`,
                 )}
                 style={[
                   styles.modernOptionCard,
@@ -2070,7 +2210,7 @@ const styles = StyleSheet.create({
   explanationTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: Colors.purple400,
+    color: Colors.purple200,
     marginBottom: Spacing.sm,
   },
   explanationText: {
@@ -2103,7 +2243,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     opacity: 0.9,
     borderRadius: 24,
-    padding: Spacing.xl,
+    padding: Spacing.base,
     alignItems: "center",
     marginBottom: Spacing.xl,
     position: "relative",
@@ -2185,7 +2325,7 @@ const styles = StyleSheet.create({
   courseCompletionCard: {
     backgroundColor: Colors.textInputBg,
     marginBottom: Spacing.xl,
-    padding: Spacing.lg,
+    padding: Spacing.md,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: Colors.starGold + "40",
