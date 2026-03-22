@@ -326,6 +326,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     flexShrink: 1,
     maxWidth: "72%",
+    minHeight: 24,
   },
   categoryBadgeTop: {
     alignSelf: "flex-start",
@@ -350,7 +351,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     overflow: "hidden",
     minHeight: 110,
-    maxHeight: 160,
+    maxHeight: 200,
     ...Shadows.medium,
   },
   ipLeft: {

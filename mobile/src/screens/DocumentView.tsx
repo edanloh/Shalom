@@ -36,8 +36,49 @@ type DocumentViewNavigationProp = StackNavigationProp<MainStackParamList, "Docum
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
+const isHttpUrl = (url: string | undefined | null) => {
+  if (!url || typeof url !== "string") return false;
+  return /^(https?:\/\/)/i.test(url.trim());
+};
+
+const normalizeDocumentUrl = (rawUrl: string | undefined | null) => {
+  if (!rawUrl || typeof rawUrl !== "string") return undefined;
+  const cleaned = rawUrl.trim().replace(/\\s+/g, "%20");
+
+  if (!cleaned) return undefined;
+
+  if (/^(https?:\/\/|file:\/\/\/|content:\/\/\/)/i.test(cleaned)) {
+    try {
+      // URL constructor throws on some invalid patterns, so fallback to encodeURI
+      const parsed = new URL(cleaned);
+      return parsed.toString();
+    } catch {
+      try {
+        return encodeURI(cleaned);
+      } catch {
+        return cleaned;
+      }
+    }
+  }
+
+  return cleaned;
+};
+
+const getSafeViewerEncodedUrl = (docUrl: string) => {
+  try {
+    const decoded = decodeURI(docUrl);
+    return encodeURIComponent(decoded);
+  } catch {
+    try {
+      return encodeURIComponent(docUrl);
+    } catch {
+      return docUrl;
+    }
+  }
+};
+
 // Document Viewer fallback options - ordered by reliability
-// For PDF: Direct, PDF.js, Google Drive
+// For PDF: Direct, PDF.js, Recordless Office Online as last fallback
 // For DOCX/PPTX: Office Online, Google Drive
 const DOCUMENT_VIEWERS = [
   {
@@ -50,7 +91,7 @@ const DOCUMENT_VIEWERS = [
   {
     name: "Office Online",
     getUrl: (docUrl: string) =>
-      `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(docUrl)}`,
+      `https://view.officeapps.live.com/op/embed.aspx?src=${getSafeViewerEncodedUrl(docUrl)}`,
     description: "Microsoft Office viewer",
     timeout: 12000,
     supportedTypes: ['pdf', 'document', 'ppt'] as const,
@@ -58,7 +99,7 @@ const DOCUMENT_VIEWERS = [
   {
     name: "Mozilla PDF.js",
     getUrl: (docUrl: string) =>
-      `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(docUrl)}`,
+      `https://mozilla.github.io/pdf.js/web/viewer.html?file=${getSafeViewerEncodedUrl(docUrl)}`,
     description: "Open-source PDF viewer",
     timeout: 10000,
     supportedTypes: ['pdf'] as const,
@@ -66,7 +107,7 @@ const DOCUMENT_VIEWERS = [
   {
     name: "Google Drive Viewer",
     getUrl: (docUrl: string) =>
-      `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(docUrl)}`,
+      `https://drive.google.com/viewerng/viewer?embedded=true&url=${getSafeViewerEncodedUrl(docUrl)}`,
     description: "Google viewer",
     timeout: 10000,
     supportedTypes: ['pdf', 'document', 'ppt'] as const,
@@ -74,7 +115,7 @@ const DOCUMENT_VIEWERS = [
   {
     name: "PDF.js CDN",
     getUrl: (docUrl: string) =>
-      `https://cdnjs.cloudflare.com/ajax/libs/pdfjs-dist/3.11.174/web/viewer.html?file=${encodeURIComponent(docUrl)}`,
+      `https://cdnjs.cloudflare.com/ajax/libs/pdfjs-dist/3.11.174/web/viewer.html?file=${getSafeViewerEncodedUrl(docUrl)}`,
     description: "CDN-hosted PDF viewer",
     timeout: 10000,
     supportedTypes: ['pdf'] as const,
@@ -98,6 +139,20 @@ const DocumentView = () => {
     if (docType === "document") {
       return DOCUMENT_VIEWERS.filter((viewer) => viewer.name === "Office Online");
     }
+
+    if (docType === "pdf") {
+      const order = [
+        "Direct Document",
+        "Mozilla PDF.js",
+        "PDF.js CDN",
+        "Office Online",
+        "Google Drive Viewer",
+      ];
+      return order
+        .map((name) => DOCUMENT_VIEWERS.find((viewer) => viewer.name === name))
+        .filter((viewer): viewer is typeof DOCUMENT_VIEWERS[number] => Boolean(viewer));
+    }
+
     const filtered = DOCUMENT_VIEWERS.filter((viewer) =>
       viewer.supportedTypes.includes(docType as any)
     );
@@ -170,15 +225,24 @@ const DocumentView = () => {
       }
 
       if (foundDocument && foundSection) {
+        const rawDocumentUrl =
+          foundDocument.resource_url ||
+          foundDocument.resourceUrl ||
+          foundDocument.pdf_url ||
+          foundDocument.pdfUrl;
+
+        const normalizedUrl = normalizeDocumentUrl(rawDocumentUrl);
+        if (!normalizedUrl || !isHttpUrl(normalizedUrl)) {
+          throw new Error(
+            `Invalid or non-public document URL: ${String(rawDocumentUrl)}`
+          );
+        }
+
         setDocumentDetail({
           id: foundDocument.id,
           title: foundDocument.title,
           description: foundDocument.description || "",
-          resource_url:
-            foundDocument.resource_url ||
-            foundDocument.resourceUrl ||
-            foundDocument.pdf_url ||
-            foundDocument.pdfUrl,
+          resource_url: normalizedUrl,
           resource_type: foundDocument.resource_type || foundDocument.type,
           file_size_bytes: foundDocument.file_size_bytes,
           is_downloadable: foundDocument.is_downloadable,
@@ -298,14 +362,20 @@ const DocumentView = () => {
     console.log('📱 WebView loaded:', nativeEvent.url);
     
     // Check for error indicators in the page
-    const hasError = 
-      nativeEvent.title?.toLowerCase().includes('error') || 
-      nativeEvent.title?.toLowerCase().includes('not available') ||
-      nativeEvent.title?.toLowerCase().includes('failed') ||
-      nativeEvent.url?.includes('error');
+    const lowerTitle = nativeEvent.title?.toLowerCase() || '';
+  const lowerUrl = nativeEvent.url?.toLowerCase() || '';
+  const hasError = 
+      lowerTitle.includes('error') || 
+      lowerTitle.includes('not available') ||
+      lowerTitle.includes('failed') ||
+      lowerTitle.includes('file not found') ||
+      lowerTitle.includes('original file is not valid') ||
+      lowerUrl.includes('error') ||
+      lowerUrl.includes('file-not-found') ||
+      lowerUrl.includes('404');
     
     if (hasError) {
-      console.log('🚫 Detected error page');
+      console.log('🚫 Detected error page (file-not-found/status)');
       handleDocumentError();
     } else {
       // Give it a moment to fully render, then check via injected JS
@@ -618,8 +688,9 @@ const DocumentView = () => {
                   Unable to load document
                 </Text>
                 <Text style={styles.errorSubtext}>
-                  Tried {viewerAttempts.length} different viewer{viewerAttempts.length !== 1 ? 's' : ''}
+                  Tried {viewerAttempts.length} viewer{viewerAttempts.length !== 1 ? 's' : ''}
                 </Text>
+                <Text style={[styles.errorSubtext, { marginTop: 4 }]}>Please confirm URL is public and accessible from internet.</Text>
                 
                 <View style={styles.errorActions}>
                   <TouchableOpacity
@@ -701,6 +772,8 @@ const DocumentView = () => {
                           bodyText.includes('failed to load') ||
                           bodyText.includes('unable to load') ||
                           bodyText.includes('not supported') ||
+                          bodyText.includes('file not found') ||
+                          bodyText.includes('original file is not valid') ||
                           bodyText.includes('filenotfound') ||
                           bodyText.includes('error occurred') ||
                           (bodyText.includes('error') && bodyText.length < 200) ||

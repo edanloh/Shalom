@@ -57,10 +57,8 @@ interface BadgeItem {
 
 const BadgeManagement = () => {
   const { toast } = useToast();
-  const { authUser } = useAuth();
   const { user: profileUser } = useUser();
-  const instructorId = authUser?.id ?? "";
-  const instructorDbId = profileUser?.uuid ?? "";
+  const instructorId = profileUser?.uuid ?? "";
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newBadgeName, setNewBadgeName] = useState("");
@@ -171,12 +169,12 @@ const BadgeManagement = () => {
 
   useEffect(() => {
     const loadInstructorCourses = async () => {
-      if (!instructorDbId) {
+      if (!instructorId) {
         setInstructorCourses([]);
         return;
       }
       try {
-        const items = await courseService.getCourses({ instructorId: instructorDbId, limit: 200 });
+        const items = await courseService.getCourses({ instructorId: instructorId, limit: 200 });
         setInstructorCourses(items.map((c) => ({ id: c.id, title: c.title })));
       } catch (error) {
         console.error("Failed to load instructor courses for badge scope:", error);
@@ -184,7 +182,7 @@ const BadgeManagement = () => {
       }
     };
     loadInstructorCourses();
-  }, [instructorDbId]);
+  }, [instructorId]);
 
   const resetCreateForm = () => {
     setNewBadgeName("");
@@ -238,7 +236,7 @@ const BadgeManagement = () => {
       setShowValidationModal(true);
       return;
     }
-    if (newBadgeScopeType === "instructor" && !instructorDbId) {
+    if (newBadgeScopeType === "instructor" && !instructorId) {
       setShowCreateErrors(true);
       setValidationMessage({
         title: "Missing instructor profile",
@@ -277,7 +275,7 @@ const BadgeManagement = () => {
         points: parseInt(newBadgePoints, 10) || 100,
         isActive: true,
         scopeType: newBadgeScopeType,
-        scopeId: newBadgeScopeType === "course" ? newBadgeScopeCourseId : instructorDbId,
+        scopeId: newBadgeScopeType === "course" ? newBadgeScopeCourseId : instructorId,
       });
 
       if (created?.id) {
