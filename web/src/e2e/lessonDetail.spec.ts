@@ -215,8 +215,8 @@ async function loginThenNavigateToLesson(
   options?: Parameters<typeof setupLessonMocks>[1],
 ) {
   await setupLessonMocks(page, options);
-
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
   await page.getByPlaceholder('Email').fill(TEST_EMAIL);
   await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -384,23 +384,8 @@ test.describe('LessonDetail page', () => {
   });
 
   test('shows PDF file size for a PDF lesson', async ({ page }) => {
-    await setupLessonMocks(page, { lesson: mockPdfLesson });
-    await page.goto('/login', { waitUntil: 'domcontentloaded' });
-    await page.getByPlaceholder('Email').fill(TEST_EMAIL);
-    await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await page.waitForURL(/\/$/, {
-      timeout: 10000,
-      waitUntil: 'domcontentloaded',
-    });
-    await page.goto(
-      `/course/${COURSE_ID}/module/${MODULE_ID}/lesson/lesson-pdf`,
-      {
-        waitUntil: 'domcontentloaded',
-      },
-    );
-    await expect(page.locator('.animate-spin').first()).not.toBeVisible({
-      timeout: 10000,
+    await loginThenNavigateToLesson(page, 'lesson-pdf', {
+      lesson: mockPdfLesson,
     });
 
     // 2097152 bytes = 2.0 MB
@@ -410,23 +395,8 @@ test.describe('LessonDetail page', () => {
   test('shows Download Document button for a downloadable PDF lesson', async ({
     page,
   }) => {
-    await setupLessonMocks(page, { lesson: mockPdfLesson });
-    await page.goto('/login', { waitUntil: 'domcontentloaded' });
-    await page.getByPlaceholder('Email').fill(TEST_EMAIL);
-    await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await page.waitForURL(/\/$/, {
-      timeout: 10000,
-      waitUntil: 'domcontentloaded',
-    });
-    await page.goto(
-      `/course/${COURSE_ID}/module/${MODULE_ID}/lesson/lesson-pdf`,
-      {
-        waitUntil: 'domcontentloaded',
-      },
-    );
-    await expect(page.locator('.animate-spin').first()).not.toBeVisible({
-      timeout: 10000,
+    await loginThenNavigateToLesson(page, 'lesson-pdf', {
+      lesson: mockPdfLesson,
     });
 
     await expect(

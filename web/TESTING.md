@@ -6,7 +6,6 @@ This project uses multiple levels of testing to ensure quality:
 
 1. **Unit Tests** (Vitest) - Test individual components, hooks, services
 2. **Page E2E Tests** (Playwright) - Test individual pages in isolation
-3. **Workflow E2E Tests** (Playwright) - Test complete user journeys across pages
 4. **Integration Tests** (Playwright + Real Database) - Test database persistence
 
 ---
@@ -65,7 +64,6 @@ describe('MyComponent', () => {
 The E2E suite is organized into three categories using Playwright test tags:
 
 - **Page-level tests**: No tags (default)
-- **Workflow tests**: Tagged with `@journey`
 - **Integration tests**: Tagged with `@integration`
 
 This tag-based approach ensures cross-platform compatibility and makes it easy to run specific test categories.
@@ -87,28 +85,7 @@ npm run test:e2e:debug  # Debug mode
 - `courseBuilder.spec.ts` - Course creation form
 - `settings.spec.ts` - User settings and preferences
 
-#### 2. Workflow Tests (`e2e/integration/*-workflow.spec.ts` + `@journey` tag)
-Test complete user journeys across multiple pages.
-
-**Coverage**: 3 critical workflows implemented
-
-**Run**:
-```bash
-npm run test:e2e:journeys        # Run workflow tests (tagged @journey)
-npm run test:e2e:journeys:ui     # Open in UI mode
-```
-
-**Implemented workflows**:
-- ✅ `instructor-course-lifecycle.spec.ts` - Course creation → editing → publishing → analytics
-- ✅ `student-learning-journey.spec.ts` - Instructor student monitoring (students page → courses → analytics)
-- ✅ `Quiz-grading-workflow.spec.ts` - Instructor Quiz center navigation → quiz oversight → analytics
-
-**Planned workflows**:
-- ⏳ Communication flow (messages & notifications)
-- ⏳ Badge/achievement earning
-- ⏳ Admin user management
-
-#### 3. Integration Tests (`e2e/integration/*.spec.ts`)
+#### 2. Integration Tests (`e2e/integration/*.spec.ts`)
 Test with **real database** to verify persistence.
 
 **⚠️ Requires separate test database setup!**
@@ -129,7 +106,9 @@ npm run test:e2e:integration:ui     # Open in UI mode
 
 **Implemented tests**:
 - ✅ `enrollment-flow.spec.ts` - Enrollment persistence, duplicate prevention, concurrent operations
-
+- ✅ `instructor-course-lifecycle.spec.ts` - Course creation → editing → publishing → analytics
+- ✅ `student-learning-journey.spec.ts` - Instructor student monitoring (students page → courses → analytics)
+- ✅ `Quiz-grading-workflow.spec.ts` - Instructor Quiz center navigation → quiz oversight → analytics
 ---
 
 ## Running All Tests
@@ -143,7 +122,6 @@ npm run test:e2e:all
 
 # Run specific categories
 npm run test:e2e              # Page tests only
-npm run test:e2e:journeys     # Workflow tests only
 npm run test:e2e:integration  # Integration tests only (requires setup)
 ```
 
@@ -279,10 +257,6 @@ jobs:
   page-e2e-tests:
     # Run on EVERY pull request
     run: npm run test:e2e
-    
-  workflow-e2e-tests:
-    # Run on EVERY pull request (critical workflows)
-    run: npm run test:e2e:journeys
     
   integration-tests:
     # Run on PR to main/production ONLY
@@ -471,10 +445,6 @@ npm run test:run                # Run once
 npm run test:e2e                # All page tests
 npm run test:e2e:ui             # UI mode
 npm run test:e2e:debug          # Debug mode
-
-# Workflow E2E Tests
-npm run test:e2e:journeys       # All workflow tests
-npm run test:e2e:journeys:ui    # UI mode
 
 # Integration Tests (requires setup!)
 npm run test:e2e:integration    # All integration tests
@@ -1058,12 +1028,6 @@ jobs:
       - run: npm run test:e2e
     # Run on EVERY PR
     
-  workflow-e2e-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - run: npm run test:e2e:journeys
-    # Run on EVERY PR (critical workflows)
-    
   integration-tests:
     runs-on: ubuntu-latest
     needs: [unit-tests, page-e2e-tests]
@@ -1093,11 +1057,10 @@ jobs:
 {
   "scripts": {
     "test:e2e": "playwright test e2e/*.spec.ts",
-    "test:e2e:journeys": "playwright test --grep @journey",
     "test:e2e:integration": "playwright test e2e/integration/*.spec.ts",
     "test:e2e:performance": "playwright test e2e/performance/*.spec.ts --grep @performance",
     "test:e2e:a11y": "playwright test e2e/accessibility/*.spec.ts",
-    "test:e2e:all": "npm run test:e2e && npm run test:e2e:journeys && npm run test:e2e:integration"
+    "test:e2e:all": "npm run test:e2e && npm run test:e2e:integration"
   }
 }
 ```

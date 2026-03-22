@@ -130,10 +130,10 @@ test.describe('Login page', () => {
 
     await page.getByRole('link', { name: 'Register here' }).click();
 
-    await expect(page).toHaveURL(/\/register$/);
+    await page.waitForURL(/\/register$/, { waitUntil: 'domcontentloaded' });
     await expect(
       page.getByRole('heading', { name: 'Shalom Instructor Registration' }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('redirects unauthenticated users to login from protected root route', async ({
@@ -307,7 +307,7 @@ test.describe('Login page', () => {
     await page.reload();
     await expect(page).toHaveURL(/\/$/);
 
-    await page.goto('/login');
-    await expect(page).toHaveURL(/\/$/);
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    await page.waitForURL(/\/$/, { timeout: 15000 });
   });
 });

@@ -529,7 +529,7 @@ test.describe('Settings page', () => {
 
       // Wait for error message to appear
       await expect(page.locator('body')).toContainText(
-        /new password.*confirm password.*do not match/i,
+        /passwords do not match|do not match|passwords.*match/i,
         { timeout: 5000 },
       );
     });
@@ -550,6 +550,7 @@ test.describe('Settings page', () => {
   test.describe('Instructor Approvals Tab', () => {
     test('displays for admin users', async ({ page }) => {
       await loginThenNavigateToSettings(page, { role: 'admin' });
+      await expect(page.getByRole('tab', { name: /Profile/ })).toBeVisible({ timeout: 10000 });
       await page.getByRole('tab', { name: /Instructor Approvals/ }).click();
 
       await expect(

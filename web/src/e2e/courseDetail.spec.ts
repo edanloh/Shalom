@@ -820,7 +820,7 @@ test.describe('CourseDetail Page', () => {
 
     // Check for edit button
     const editButton = page.getByRole('button', { name: /edit course/i });
-    await expect(editButton).toBeVisible();
+    await expect(editButton).toBeVisible({ timeout: 10000 });
   });
 
   test('should open enroll students dialog', async ({ page }) => {

@@ -77,6 +77,7 @@ const QuizScreen = () => {
   const [attemptsBlocked, setAttemptsBlocked] = useState(false);
   const [practiceMode, setPracticeMode] = useState(false); // For practicing after attempts exhausted
   const [gradingPending, setGradingPending] = useState(false); // For short-answer quizzes awaiting grading
+  const [inputHeight, setInputHeight] = useState(100);
 
   // Matching question states
   const [matchingState, setMatchingState] = useState<
@@ -1590,19 +1591,7 @@ const QuizScreen = () => {
         {reviewMode &&
           quizResult?.graded_answers &&
           currentQuestion.id in quizResult.graded_answers && (
-            <View
-              style={{
-                marginTop: 12,
-                padding: 10,
-                backgroundColor: Colors.purple850 + "40",
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: Colors.purple400 + "30",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
+            <View style={styles.pointsEarnedContainer}>
               <Text
                 style={{
                   color: Colors.purple200,
@@ -1808,16 +1797,18 @@ const QuizScreen = () => {
           </Text>
           {!reviewMode && (
             <TextInput
-              style={styles.shortAnswerInput}
-              placeholder="Type your answer here..."
-              placeholderTextColor={Colors.textSecondary}
+              value={String(selectedAnswers.get(currentQuestion.id) ?? "")}
+              onChangeText={(text) => {
+                setSelectedAnswers((prev) => {
+                  const next = new Map(prev);
+                  next.set(currentQuestion.id, text);
+                  return next;
+                });
+              }}
               multiline
-              numberOfLines={4}
-              value={(selectedAnswers.get(currentQuestion.id) as string) || ""}
-              onChangeText={(text) =>
-                handleAnswerSelect(currentQuestion.id, text, false)
-              }
-              editable={!reviewMode}
+              textAlignVertical="top"
+              style={styles.shortAnswerInput}
+              placeholder="Type your answer here"
             />
           )}
           {reviewMode && (
@@ -1937,6 +1928,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.backgroundGray,
   },
   centerContainer: {
+    backgroundColor: Colors.backgroundGray,
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
@@ -1986,6 +1978,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: Spacing.sm,
     marginBottom: 6,
     gap: 8,
   },
@@ -2017,8 +2010,8 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   shortAnswerNotice: {
-    marginBottom: 6,
-    marginTop: 2,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
     fontSize: 11,
     color: Colors.yellow,
     fontWeight: "600",
@@ -2026,6 +2019,7 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   questionNavRow: {
+    marginTop: Spacing.sm,
     flexDirection: "row",
     justifyContent: "center",
     gap: 12,
@@ -2056,15 +2050,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modernQuestionCard: {
-    marginBottom: Spacing.lg,
+    height: "auto",
+    marginBottom: Spacing.md,
+    padding: 0,
   },
   questionImageContainer: {
     alignItems: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.base,
   },
   questionImagePlaceholder: {
     width: "100%",
-    height: 200,
+    height: "auto",
+    minHeight: 150,
     backgroundColor: "#1a1a2e",
     borderRadius: 16,
     justifyContent: "center",
@@ -2073,7 +2070,8 @@ const styles = StyleSheet.create({
   },
   questionImage: {
     width: "100%",
-    height: 200,
+    height: "auto",
+    minHeight: 150,
     borderRadius: 16,
     backgroundColor: "#1a1a2e",
   },
@@ -2083,6 +2081,17 @@ const styles = StyleSheet.create({
     color: Colors.white,
     lineHeight: 28,
     textAlign: "left",
+  },
+  pointsEarnedContainer: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: Colors.purple850 + "40",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.purple400 + "30",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   questionTypeHint: {
     fontSize: 13,
@@ -2159,6 +2168,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: 16,
     marginBottom: Spacing.md,
+    alignSelf: "stretch",
   },
   shortAnswerLabel: {
     fontSize: 15,
@@ -2172,10 +2182,12 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     fontSize: 16,
     color: Colors.textPrimary,
-    minHeight: 100,
     textAlignVertical: "top",
+
     borderWidth: 2,
     borderColor: Colors.gray600,
+
+    flexGrow: 1, // ✅ THIS fixes hidden text issue
   },
   shortAnswerReviewContainer: {
     marginTop: Spacing.md,

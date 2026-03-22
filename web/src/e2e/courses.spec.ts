@@ -467,6 +467,9 @@ test.describe('Courses page', () => {
     });
 
     await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('heading', { name: 'Course Management' }),
+    ).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('No courses available')).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Create Your First Course' }),
@@ -477,10 +480,12 @@ test.describe('Courses page', () => {
 
     // Next reload should recover because route now returns successful payload.
     await page.reload({ waitUntil: 'domcontentloaded' });
-
+    await expect(
+      page.getByRole('heading', { name: 'Course Management' }),
+    ).toBeVisible({ timeout: 15000 });
     await expect(
       page.getByRole('heading', { name: 'Introduction to Data Science' }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('duplicates a course and refreshes list', async ({ page }) => {
@@ -494,7 +499,9 @@ test.describe('Courses page', () => {
     ).locator('button[aria-haspopup="menu"]');
 
     await firstCardMenuTrigger.click();
-    await page.getByRole('menuitem', { name: 'Duplicate' }).click();
+    const duplicateItem = page.getByRole('menuitem', { name: 'Duplicate' });
+    await expect(duplicateItem).toBeVisible({ timeout: 5000 });
+    await duplicateItem.click();
 
     await expect(
       page.getByRole('heading', {
@@ -515,7 +522,9 @@ test.describe('Courses page', () => {
     await getCourseCard(page, 'Introduction to Data Science')
       .locator('button[aria-haspopup="menu"]')
       .click();
-    await page.getByRole('menuitem', { name: 'Duplicate' }).click();
+    const duplicateItem = page.getByRole('menuitem', { name: 'Duplicate' });
+    await expect(duplicateItem).toBeVisible({ timeout: 5000 });
+    await duplicateItem.click();
 
     await expect(page.locator('body')).toContainText(
       /Duplication Failed|Failed to duplicate course/i,

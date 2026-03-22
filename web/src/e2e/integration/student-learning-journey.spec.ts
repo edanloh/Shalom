@@ -36,53 +36,45 @@ async function loginAsInstructor(page: Page) {
   await page.waitForURL('/', { timeout: 15000 });
 }
 
-test.describe('Instructor Student Monitoring Journey - Complete Workflow @journey', () => {
+test.describe('Instructor Student Monitoring Journey - Complete Workflow @integration', () => {
   test('should complete instructor monitoring flow across students, courses, and analytics', async ({ page }) => {
-    // ====== STEP 1: LOGIN AS INSTRUCTOR ======
     await loginAsInstructor(page);
     await expect(page).toHaveURL('/');
 
-    // ====== STEP 2: NAVIGATE TO STUDENT MANAGEMENT ======
     await page.goto('/students');
     await page.waitForLoadState('domcontentloaded');
     await expect(
       page.getByRole('heading', { name: 'Student Management' })
     ).toBeVisible({ timeout: 5000 });
 
-    // ====== STEP 3: VIEW COURSE LIST ======
     await page.goto('/courses');
     await page.waitForLoadState('domcontentloaded');
     await expect(
       page.getByRole('heading', { name: /Course Management/i })
     ).toBeVisible({ timeout: 5000 });
 
-    // ====== STEP 4: VIEW ANALYTICS DASHBOARD ======
     await page.goto('/analytics');
     await page.waitForLoadState('domcontentloaded');
     await expect(
       page.getByRole('heading', { name: 'Analytics Dashboard' })
     ).toBeVisible({ timeout: 5000 });
 
-    // ====== STEP 5: RETURN TO DASHBOARD ======
     await page.goto('/');
     await expect(page).toHaveURL('/');
   });
 
   test('should open course builder and review module structure', async ({ page }) => {
-    // Instructors review course structure via the course builder.
     await loginAsInstructor(page);
 
-    await page.goto(`/course-builder/course-1`);
+    await page.goto('/course-builder/course-1');
     await page.waitForLoadState('domcontentloaded');
 
-    // Course builder renders module/lesson structure for course authoring
     await expect(
       page.getByRole('heading', { name: /Module|Lesson|Course/i }).first()
     ).toBeVisible({ timeout: 5000 });
   });
 
   test('should access Quiz center for quiz management', async ({ page }) => {
-    // Instructors create and manage quizzes via the Quiz Center.
     await loginAsInstructor(page);
 
     await page.goto('/quiz');

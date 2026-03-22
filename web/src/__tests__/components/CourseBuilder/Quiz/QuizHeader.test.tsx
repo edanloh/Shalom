@@ -192,11 +192,11 @@ describe('QuizHeader', () => {
       fireEvent.change(passingScoreInput, { target: { value: 'invalid' } });
 
       expect(mockUpdateQuiz).toHaveBeenCalledWith(mockModuleId, 'quiz-1', {
-        passingScore: 70,
+        passingScore: 0,
       });
     });
 
-    it('should default to 70 when passingScore is undefined', () => {
+    it('should default to 0 when passingScore is undefined', () => {
       const quizWithoutScore = { ...defaultQuiz, passingScore: undefined };
       render(
         <QuizHeader
@@ -211,7 +211,7 @@ describe('QuizHeader', () => {
         />
       );
 
-      const passingScoreInput = screen.getByDisplayValue('70');
+      const passingScoreInput = screen.getByDisplayValue('0');
       expect(passingScoreInput).toBeInTheDocument();
     });
 
@@ -496,7 +496,7 @@ describe('QuizHeader', () => {
       expect(
         screen.getByText(/This quiz contains short-answer questions/i)
       ).toBeInTheDocument();
-      expect(screen.getByText(/1 attempt/i)).toBeInTheDocument();
+      expect(screen.getByText(/Locked to 1 attempt/i)).toBeInTheDocument();
     });
 
     it('should not show notice when no short-answer questions', () => {

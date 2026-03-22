@@ -15,9 +15,11 @@ vi.mock('@/components/CourseBuilder/useDragAndDrop', () => ({
 
 describe('useContentManagement', () => {
   const setModules = vi.fn();
+  const setHasUnsavedChanges = vi.fn();
   const setSelectedItem = vi.fn();
   const showToast = vi.fn();
   const updateContentNumbering = vi.fn((value) => value);
+  const updateModuleNumbering = vi.fn((value) => value);
 
   const baseModules = [
     {
@@ -76,11 +78,13 @@ describe('useContentManagement', () => {
 
     mockUseDragAndDrop.mockReturnValue({
       updateContentNumbering,
+      updateModuleNumbering,
     });
 
     mockUseCourseBuilder.mockReturnValue({
       modules: structuredClone(baseModules),
       setModules,
+      setHasUnsavedChanges,
       showToast,
       setSelectedItem,
     });
@@ -98,10 +102,11 @@ describe('useContentManagement', () => {
     expect(nextModules).toHaveLength(3);
     expect(nextModules[2]).toMatchObject({
       id: 'm12345',
-      title: 'Module 3: ',
+      title: '',
       lessons: [],
       quizzes: [],
     });
+    expect(setHasUnsavedChanges).toHaveBeenCalledWith(true);
     expect(setSelectedItem).toHaveBeenCalledWith({
       type: 'module',
       id: 'm12345',
@@ -117,7 +122,8 @@ describe('useContentManagement', () => {
     const nextModules = setModules.mock.calls[0][0];
     expect(nextModules).toHaveLength(1);
     expect(nextModules[0].id).toBe('m2');
-    expect(nextModules[0].title).toBe('Module 1: Advanced');
+    expect(nextModules[0].title).toBe('Module 2: Advanced');
+    expect(setHasUnsavedChanges).toHaveBeenCalledWith(true);
   });
 
   it('addLesson normalizes document subtype and marks selected lesson', () => {
@@ -138,6 +144,7 @@ describe('useContentManagement', () => {
       resourceUrl: '',
       isDownloadable: true,
     });
+    expect(setHasUnsavedChanges).toHaveBeenCalledWith(true);
     expect(setSelectedItem).toHaveBeenCalledWith({
       type: 'lesson',
       id: 'l999',
@@ -157,6 +164,7 @@ describe('useContentManagement', () => {
     const lesson = updated[0].lessons.find((l: any) => l.id === 'l1');
     expect(lesson.baseTitle).toBe('Updated title');
     expect(updateContentNumbering).toHaveBeenCalledTimes(1);
+    expect(setHasUnsavedChanges).toHaveBeenCalledWith(true);
   });
 
   it('removeOption adjusts single correctAnswer index when option before it is removed', () => {
@@ -172,5 +180,6 @@ describe('useContentManagement', () => {
 
     expect(question.options).toEqual(['A', 'C']);
     expect(question.correctAnswer).toBe(1);
+    expect(setHasUnsavedChanges).toHaveBeenCalledWith(true);
   });
 });

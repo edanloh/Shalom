@@ -42,7 +42,6 @@ const Students = () => {
   const [profileCache, setProfileCache] = useState<Record<string, any>>({});
   const [profileLoadingId, setProfileLoadingId] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

@@ -60,6 +60,7 @@ const QuizTaking = () => {
           description: "Missing required parameters",
           variant: "destructive",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -67,12 +68,9 @@ const QuizTaking = () => {
         user?.uuid ||
         (user as any)?.sub ||
         (user as any)?.["cognito:username"];
+
+      // Wait until user context is ready; this effect re-runs when user changes.
       if (!adminId) {
-        toast({
-          title: "Error",
-          description: "User not authenticated",
-          variant: "destructive",
-        });
         return;
       }
 
@@ -107,7 +105,7 @@ const QuizTaking = () => {
     };
 
     fetchQuizData();
-  }, [courseId, moduleId, quizId]);
+  }, [courseId, moduleId, quizId, user?.uuid, (user as any)?.sub, (user as any)?.["cognito:username"]]);
 
   if (isLoading || !quiz) {
     return (

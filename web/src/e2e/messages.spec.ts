@@ -318,6 +318,7 @@ async function loginAndOpenMessages(
   const mockState = await setupMessagesMocks(page, options);
 
   await page.goto('/login');
+  await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
   await page.getByPlaceholder('Email').fill(TEST_EMAIL);
   await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -453,6 +454,7 @@ test.describe('Messages page', () => {
     );
 
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
     await page.getByPlaceholder('Email').fill(TEST_EMAIL);
     await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'Sign In' }).click();
@@ -495,6 +497,7 @@ test.describe('Messages page', () => {
     );
 
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
     await page.getByPlaceholder('Email').fill(TEST_EMAIL);
     await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'Sign In' }).click();
@@ -533,6 +536,7 @@ test.describe('Messages page', () => {
     );
 
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
     await page.getByPlaceholder('Email').fill(TEST_EMAIL);
     await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'Sign In' }).click();
@@ -634,6 +638,7 @@ test.describe('Messages page', () => {
     );
 
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
     await page.getByPlaceholder('Email').fill(TEST_EMAIL);
     await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'Sign In' }).click();
@@ -682,6 +687,7 @@ test.describe('Messages page', () => {
     );
 
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
     await page.getByPlaceholder('Email').fill(TEST_EMAIL);
     await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'Sign In' }).click();
@@ -792,6 +798,7 @@ test.describe('Messages page', () => {
     );
 
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
     await page.getByPlaceholder('Email').fill(TEST_EMAIL);
     await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'Sign In' }).click();
@@ -883,6 +890,7 @@ test.describe('Messages page', () => {
     });
 
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
     await page.getByPlaceholder('Email').fill(TEST_EMAIL);
     await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'Sign In' }).click();

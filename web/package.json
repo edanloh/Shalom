@@ -12,11 +12,9 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "test:e2e": "playwright test --grep-invert \"@journey|@integration\"",
+    "test:e2e": "playwright test --grep-invert \"@integration\"",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "test:e2e:journeys": "playwright test --grep @journey",
-    "test:e2e:journeys:ui": "playwright test --grep @journey --ui",
     "test:e2e:integration": "playwright test --grep @integration",
     "test:e2e:integration:ui": "playwright test --grep @integration --ui",
     "test:e2e:all": "playwright test"

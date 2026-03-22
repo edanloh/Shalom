@@ -379,6 +379,7 @@ async function loginAndOpenCourseStudents(
   const mockState = await setupCourseStudentsMocks(page, options);
 
   await page.goto('/login');
+  await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
   await page.getByPlaceholder('Email').fill(TEST_EMAIL);
   await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -453,13 +454,11 @@ test.describe('CourseStudents page', () => {
     await loginAndOpenCourseStudents(page);
 
     const searchInput = page.getByPlaceholder('Search students...');
-    await searchInput.fill('Jane');
+    await searchInput.click();
+    await searchInput.pressSequentially('Jane', { delay: 50 });
 
-    // Jane should be visible
     await expect(page.getByText('Jane Smith')).toBeVisible();
     await expect(page.getByText('jane@example.com')).toBeVisible();
-
-    // Others should not be visible
     await expect(page.getByText('John Doe')).not.toBeVisible();
   });
 
@@ -467,7 +466,8 @@ test.describe('CourseStudents page', () => {
     await loginAndOpenCourseStudents(page);
 
     const searchInput = page.getByPlaceholder('Search students...');
-    await searchInput.fill('bob@example.com');
+    await searchInput.click();
+    await searchInput.pressSequentially('bob@example.com', { delay: 50 });
 
     await expect(page.getByText('Bob Johnson')).toBeVisible();
     await expect(page.getByText('John Doe')).not.toBeVisible();
@@ -535,10 +535,10 @@ test.describe('CourseStudents page', () => {
 
     await page.getByRole('button', { name: 'Enroll Students' }).click();
 
-    // Get search input inside dialog
     const dialog = page.getByRole('dialog');
     const searchInput = dialog.getByPlaceholder('Search available students...');
-    await searchInput.fill('Alice');
+    await searchInput.click();
+    await searchInput.pressSequentially('Alice', { delay: 50 });
 
     await expect(dialog.getByText('Alice Brown')).toBeVisible();
     await expect(dialog.getByText('Charlie Davis')).not.toBeVisible();
@@ -739,6 +739,7 @@ test.describe('CourseStudents page', () => {
     );
 
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
     await page.getByPlaceholder('Email').fill(TEST_EMAIL);
     await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'Sign In' }).click();
@@ -772,6 +773,7 @@ test.describe('CourseStudents page', () => {
     );
 
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 });
     await page.getByPlaceholder('Email').fill(TEST_EMAIL);
     await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'Sign In' }).click();

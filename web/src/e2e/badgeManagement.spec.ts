@@ -38,6 +38,7 @@ async function mockAuthAndBadgeManagementPage(page: Page) {
       color: null,
       scope_type: 'instructor',
       scope_id: 'instructor-1',
+      created_by: 'instructor-1',
       earnedBy: 12,
     },
     {

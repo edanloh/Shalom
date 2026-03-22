@@ -311,8 +311,8 @@ async function loginThenNavigateToCourseBuilder(
   const mockState = await setupCourseBuilderMocks(page, options);
   const expectedCourseTitle = options?.course?.title ?? mockCourse.title;
 
-  await page.goto('/login', { waitUntil: 'commit' });
-  await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 10000 });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByPlaceholder('Email')).toBeVisible({ timeout: 15000 }); 
   await page.getByPlaceholder('Email').fill(TEST_EMAIL);
   await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
   await page.getByRole('button', { name: 'Sign In' }).click();

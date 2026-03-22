@@ -274,16 +274,17 @@ test.describe('Students page', () => {
     await expect(page.getByText(/^Inactive$/)).toBeVisible();
   });
 
-  test('filters students by search query', async ({ page }) => {
-    await loginThenNavigateToStudents(page);
+test('filters students by search query', async ({ page }) => {
+  await loginThenNavigateToStudents(page);
+  
+  const searchInput = page.getByPlaceholder('Search students...');
+  await searchInput.click();
+  await searchInput.pressSequentially('jane@example.com', { delay: 50 });
 
-    const searchInput = page.getByPlaceholder('Search students...');
-    await searchInput.fill('jane@example.com');
-
-    await expect(page.getByText('Jane Smith')).toBeVisible();
-    await expect(page.getByText('John Doe')).not.toBeVisible();
-    await expect(page.getByText('Bob Johnson')).not.toBeVisible();
-  });
+  await expect(page.getByText('Jane Smith')).toBeVisible();
+  await expect(page.getByText('John Doe')).not.toBeVisible();
+  await expect(page.getByText('Bob Johnson')).not.toBeVisible();
+});
 
   test('shows empty state when search has no matches', async ({ page }) => {
     await loginThenNavigateToStudents(page);

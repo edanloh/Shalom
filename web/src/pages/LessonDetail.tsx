@@ -94,21 +94,18 @@ const LessonDetail = () => {
   const { user } = useUser();
 
   useEffect(() => {
-    if (courseId && lessonId) {
+    if (courseId && lessonId && user?.uuid) {
       // Reset state when lesson changes to ensure clean transitions
       setLesson(null);
       setError(null);
-      fetchLessonData();
+      fetchLessonData(user.uuid);
     }
-  }, [courseId, lessonId]);
+  }, [courseId, lessonId, user?.uuid]);
 
-  const fetchLessonData = async () => {
+  const fetchLessonData = async (userId: string) => {
     try {
       setLoading(true);
       setError(null);
-
-      // TODO: Get actual userId from auth context
-      const userId = user.uuid;
 
       // Call lesson service to get lesson details
       const lessonData = await lessonService.getLessonDetail(lessonId!, userId);

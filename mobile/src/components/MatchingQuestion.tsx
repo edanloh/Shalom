@@ -860,7 +860,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.09)",
     paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
