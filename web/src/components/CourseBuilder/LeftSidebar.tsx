@@ -285,15 +285,12 @@ const ModuleItem = ({
               ...module.quizzes.map((quiz: any) => ({ ...quiz, itemType: 'quiz' }))
             ];
             
-            // Sort by order field, fallback to original separate ordering
+            // Sort by explicit order first; items without order move to the end.
+            // This prevents first-load shuffling when some legacy items have no order.
             allContent.sort((a, b) => {
-              if (a.order !== undefined && b.order !== undefined) {
-                return a.order - b.order;
-              }
-              // Fallback: lessons first, then quizzes (preserve original behavior)
-              if (a.itemType !== b.itemType) {
-                return a.itemType === 'lesson' ? -1 : 1;
-              }
+              const orderA = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
+              const orderB = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
+              if (orderA !== orderB) return orderA - orderB;
               return 0;
             });
 

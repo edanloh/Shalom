@@ -3,6 +3,7 @@ export const Colors = {
   purple150: '#C9C6EC',
   purple200: '#EADDF6',
   purple300: '#9E9EBA',
+  purple350: '#766de8', 
   purple400: '#564BEB', // Primary Purple
   purple600: '#943FE4', // Secondary Purple
   purple850: '#3A339F', // Dark Purple
@@ -19,7 +20,8 @@ export const Colors = {
   yellow: '#EEC53D',    // Achievements, warnings
   green: '#49AC33',     // Success states
   red: '#ED1B1B',       // Errors, notifications
-  
+  darkGreen: '#49ac337a',    
+
   // Base Colors
   white: '#FFFFFF',
   black: '#000000',

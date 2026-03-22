@@ -55,16 +55,12 @@ const QuizTaking = () => {
   useEffect(() => {
     const fetchQuizData = async () => {
       if (!courseId || !moduleId || !quizId) {
-        console.log("❌ Missing required params:", {
-          courseId,
-          moduleId,
-          quizId,
-        });
         toast({
           title: "Error",
           description: "Missing required parameters",
           variant: "destructive",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -72,18 +68,14 @@ const QuizTaking = () => {
         user?.uuid ||
         (user as any)?.sub ||
         (user as any)?.["cognito:username"];
+
+      // Wait until user context is ready; this effect re-runs when user changes.
       if (!adminId) {
-        toast({
-          title: "Error",
-          description: "User not authenticated",
-          variant: "destructive",
-        });
         return;
       }
 
       try {
         setIsLoading(true);
-        console.log("🔄 Fetching quiz data...");
 
         const { quiz: quizData, sections } = await courseService.getQuizData(
           courseId,
@@ -99,8 +91,6 @@ const QuizTaking = () => {
           setTimeRemaining(quizData.timeLimit * 60);
         }
 
-        console.log("✅ Quiz data loaded:", quizData);
-        console.log("✅ Course sections loaded:", sections.length);
       } catch (error) {
         console.error("❌ Error fetching quiz data:", error);
         toast({
@@ -115,7 +105,7 @@ const QuizTaking = () => {
     };
 
     fetchQuizData();
-  }, [courseId, moduleId, quizId]);
+  }, [courseId, moduleId, quizId, user?.uuid, (user as any)?.sub, (user as any)?.["cognito:username"]]);
 
   if (isLoading || !quiz) {
     return (
@@ -133,14 +123,6 @@ const QuizTaking = () => {
 
   const currentQ = quiz.questions[currentQuestion];
   const progress = ((currentQuestion + 1) / quiz.totalQuestions) * 100;
-
-  // Debug current question
-  console.log("Current Question:", {
-    question: currentQ.question || currentQ.text,
-    correctAnswer: currentQ.correctAnswer,
-    correct_answer: currentQ.correct_answer,
-    options: currentQ.options,
-  });
 
   const findNextItemAcrossModules = (): {
     item: CourseSectionItem;
@@ -236,16 +218,6 @@ const QuizTaking = () => {
       if (result.data.isPassed) {
         // Find next item to navigate to
         const nextItem = findNextItemAcrossModules();
-        
-        console.log('🎯 Quiz passed! Finding next item...', {
-          currentQuizId: quizId,
-          currentModuleId: moduleId,
-          nextItem: nextItem ? {
-            id: nextItem.item.id,
-            type: nextItem.item.type,
-            title: nextItem.item.title
-          } : null
-        });
         
         if (nextItem) {
           // Navigate to next item (video or quiz)

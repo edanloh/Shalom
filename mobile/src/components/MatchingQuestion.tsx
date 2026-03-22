@@ -91,12 +91,19 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
 
 // Palette — vivid neon accents on deep navy
 const PALETTE = [
-  "#6EE7F7",
-  "#A78BFA",
   "#FB923C",
   "#34D399",
   "#F472B6",
   "#FBBF24",
+  "#60A5FA",
+  "#818CF8",
+  "#F87171",
+  "#4ADE80",
+  "#2DD4BF",
+  "#FCA5A5",
+  "#A3E635",
+  "#22D3EE",
+  "#E879F9",
 ];
 const lc = (i: number) => PALETTE[i % PALETTE.length];
 
@@ -117,12 +124,6 @@ function AnimatedLine({
   animValue: Animated.Value;
 }) {
   const len = Math.hypot(x2 - x1, y2 - y1);
-  // Animated.Value drives strokeDashoffset 0→len on mount
-  const offset = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [len, 0],
-  });
-  // Since react-native-svg doesn't accept Animated natively everywhere, we use a JS-driven approach:
   const [dashOffset, setDashOffset] = useState(len);
   useEffect(() => {
     const id = (animValue as any).addListener(
@@ -170,7 +171,7 @@ function AnimatedLine({
 interface PillProps {
   label: string;
   side: "left" | "right";
-  isActive: boolean; // selected, waiting for partner
+  isActive: boolean;
   isMatched: boolean;
   matchColor: string | null;
   onPress: () => void;
@@ -197,7 +198,6 @@ function Pill({
 
   useEffect(() => {
     if (isActive) {
-      // Pulsing scale while selected
       Animated.loop(
         Animated.sequence([
           Animated.timing(scale, {
@@ -232,7 +232,6 @@ function Pill({
     }
   }, [isActive]);
 
-  // Tap spring
   const handlePress = () => {
     Animated.sequence([
       Animated.timing(scale, {
@@ -247,15 +246,6 @@ function Pill({
     ]).start();
     onPress();
   };
-
-  const borderColor = glow.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["rgba(255,255,255,0.10)", "#A78BFA"],
-  });
-  const shadowOpacity = glow.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0.6],
-  });
 
   const activeBg = isActive ? "rgba(167,139,250,0.18)" : undefined;
   const matchedBg = isMatched && matchColor ? `${matchColor}1A` : undefined;
@@ -277,18 +267,17 @@ function Pill({
           isActive && { borderColor: "#A78BFA" },
         ]}
       >
-        {/* Neon border glow (simulated with inner shadow overlay) */}
         {isActive && (
           <View style={styles.activeGlowOverlay} pointerEvents="none" />
         )}
 
+        {/* KEY FIX: no numberOfLines, no ellipsizeMode, no flex:1 on Text */}
         <Text
           style={[
             styles.pillText,
             isActive && styles.pillTextActive,
             isMatched && { color: matchColor ?? Colors.white, opacity: 0.85 },
           ]}
-          numberOfLines={2}
         >
           {label}
         </Text>
@@ -341,20 +330,16 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
   const matchCount = matches.size;
   const total = leftItems.length;
 
-  // ── Selection state ──────────────────────────────────────────────────────────
-  const [selected, setSelected] = useState<string | null>(null); // left item
+  const [selected, setSelected] = useState<string | null>(null);
 
-  // ── Layout measuring ─────────────────────────────────────────────────────────
   const arenaRef = useRef<View>(null);
   const leftLayouts = useRef<(Point | null)[]>(leftItems.map(() => null));
   const rightLayouts = useRef<(Point | null)[]>(rightItems.map(() => null));
   const [tick, setTick] = useState(0);
   const bump = () => setTick((t) => t + 1);
 
-  // Maps from left item to its line animation value
   const lineAnims = useRef<Map<string, Animated.Value>>(new Map()).current;
 
-  // Measure a pill relative to the arena container
   const measurePill = useCallback(
     (ref: View | null, i: number, side: "left" | "right") => {
       if (!ref || !arenaRef.current) return;
@@ -363,7 +348,6 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
         (ref as any).measure(
           (_a: any, _b: any, w: number, h: number, pX: number, pY: number) => {
             if (pX == null) return;
-            // Connect from right edge of left box to left edge of right box
             const xPos = side === "left" ? pX - cPX + w : pX - cPX;
             const pt: Point = { x: xPos, y: pY - cPY + h / 2 };
             const arr = side === "left" ? leftLayouts : rightLayouts;
@@ -390,12 +374,9 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
     bump();
   }, [question.id]);
 
-  // ── Tap handlers ─────────────────────────────────────────────────────────────
-
   const handleLeftTap = useCallback(
     (item: string) => {
       if (matches.has(item)) {
-        // Clear match on tap of matched left pill
         onClearMatch(question.id, item);
         if (selected === item) setSelected(null);
       } else {
@@ -409,7 +390,6 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
     (item: string) => {
       if (!selected) return;
 
-      // Animate the new line in
       if (!lineAnims.has(selected)) {
         lineAnims.set(selected, new Animated.Value(0));
       }
@@ -422,7 +402,6 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
         friction: 8,
       }).start();
 
-      // Remove any occupant of this right slot
       matches.forEach((r, l) => {
         if (r === item) onClearMatch(question.id, l);
       });
@@ -433,7 +412,6 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
     [selected, matches, question.id, onMatch, onClearMatch],
   );
 
-  // ── SVG lines data ───────────────────────────────────────────────────────────
   const lines = useMemo(() => {
     let ci = 0;
     return Array.from(matches.entries())
@@ -446,7 +424,6 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
       .filter((x) => x.li !== -1 && x.ri !== -1);
   }, [matches, leftItems, rightItems, tick]);
 
-  // Progress
   const progressAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -483,9 +460,7 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
                   A
                 </Text>
               </View>
-              <Text style={styles.reviewText} numberOfLines={2}>
-                {pair.left}
-              </Text>
+              <Text style={styles.reviewText}>{pair.left}</Text>
             </View>
             <View style={styles.reviewArrow}>
               <View
@@ -507,9 +482,7 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
                 { borderColor: PALETTE[i % PALETTE.length] + "50" },
               ]}
             >
-              <Text style={styles.reviewText} numberOfLines={2}>
-                {pair.right}
-              </Text>
+              <Text style={styles.reviewText}>{pair.right}</Text>
               <View
                 style={[
                   styles.reviewBadge,
@@ -547,18 +520,20 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
       </View>
 
       {/* Progress bar */}
-      <View style={styles.progressBar}>
-        <Animated.View
-          style={[
-            styles.progressFill,
-            {
-              width: progressAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ["0%", "100%"],
-              }),
-            },
-          ]}
-        />
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          <Animated.View
+            style={[
+              styles.progressFill,
+              {
+                width: progressAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["0%", "100%"],
+                }),
+              },
+            ]}
+          />
+        </View>
         <Text style={styles.progressText}>
           {matchCount}/{total}
         </Text>
@@ -579,7 +554,7 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
           }, 80);
         }}
       >
-        {/* SVG overlay */}
+        {/* SVG overlay — sits over the whole arena including the center gap */}
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
           {lines.map((ln) => {
             const lp = leftLayouts.current[ln.li];
@@ -641,6 +616,9 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
           })}
         </View>
 
+        {/* Center gap — gives SVG lines visible space to draw through */}
+        <View style={styles.centerGap} pointerEvents="none" />
+
         {/* Right column */}
         <View style={styles.col}>
           {rightItems.map((item, i) => {
@@ -687,7 +665,6 @@ const MatchingQuestion: React.FC<MatchingQuestionProps> = ({
   );
 };
 
-// Ref arrays (outside component to avoid re-creation, reset on question.id change via effect)
 const leftPillViewRefs: React.MutableRefObject<(View | null)[]> = {
   current: [],
 };
@@ -696,7 +673,6 @@ const rightPillViewRefs: React.MutableRefObject<(View | null)[]> = {
 };
 
 // ─── RightPill ────────────────────────────────────────────────────────────────
-// Separate component so it can animate the "ready" state independently
 
 function RightPill({
   label,
@@ -741,10 +717,6 @@ function RightPill({
     onPress();
   };
 
-  const borderColor = glow.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["rgba(255,255,255,0.08)", "rgba(110,231,247,0.7)"],
-  });
   const bg =
     isMatched && matchColor
       ? matchColor + "1A"
@@ -763,19 +735,22 @@ function RightPill({
           styles.pill,
           styles.pillRight,
           { backgroundColor: bg, transform: [{ scale }] },
+          isReady && styles.pillRightReady,
           isMatched && matchColor && { borderColor: matchColor + "99" },
         ]}
       >
         {isReady && <View style={styles.readyPulse} pointerEvents="none" />}
+
+        {/* KEY FIX: no numberOfLines, no ellipsizeMode, no flex:1 on Text */}
         <Text
           style={[
             styles.pillText,
             isMatched && { color: matchColor ?? Colors.white, opacity: 0.8 },
           ]}
-          numberOfLines={2}
         >
           {label}
         </Text>
+
         {isReady && (
           <View style={styles.tapBadge}>
             <Text style={styles.tapBadgeText}>tap</Text>
@@ -788,9 +763,6 @@ function RightPill({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const PILL_W = 138;
-const PILL_H = 52;
-
 const styles = StyleSheet.create({
   wrapper: {
     backgroundColor: "#0D0C1E",
@@ -799,7 +771,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(167,139,250,0.18)",
     marginBottom: Spacing.md,
-    // Subtle inner glow
     shadowColor: "#A78BFA",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.08,
@@ -813,6 +784,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 10,
   },
   colTag: {
     fontSize: 11,
@@ -820,7 +792,7 @@ const styles = StyleSheet.create({
     color: "#A78BFA",
     letterSpacing: 2,
     textTransform: "uppercase",
-    width: PILL_W,
+    flex: 1,
     textAlign: "center",
   },
   instruction: {
@@ -832,20 +804,21 @@ const styles = StyleSheet.create({
   },
 
   // Progress
+  progressContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 20,
+  },
   progressBar: {
-    height: 5,
+    flex: 1,
+    height: 8,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 3,
     overflow: "hidden",
-    marginBottom: 20,
-    flexDirection: "row",
-    alignItems: "center",
   },
   progressFill: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
+    height: "100%",
     borderRadius: 3,
     backgroundColor: "#34D399",
     shadowColor: "#34D399",
@@ -854,41 +827,53 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   progressText: {
-    position: "absolute",
-    right: 0,
     fontSize: 10,
     fontWeight: "700",
-    color: "rgba(255,255,255,0.35)",
+    color: "rgba(255,255,255,0.6)",
   },
 
   // Arena
   arena: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 200,
+    alignItems: "flex-start",
+    // No gap here — spacing is handled by centerGap
   },
 
-  // Columns
-  col: { width: PILL_W, gap: 10 },
+  // Columns — flex: 2 gives each column ~42% width, center takes ~16%
+  col: {
+    flex: 2,
+    gap: 10,
+  },
 
-  // Pills
+  // Center spacer — explicit width so lines always have room
+  centerGap: {
+    flex: 1,
+    minWidth: 48,
+  },
+
+  // Pills — KEY FIXES:
+  // 1. Removed alignSelf: "flex-start" (was capping height to content minimum, fighting flex)
+  // 2. width: "100%" ensures it fills the column
   pill: {
-    width: PILL_W,
-    minHeight: PILL_H,
+    width: "100%",
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.09)",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    // Glass effect
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     backgroundColor: "rgba(255,255,255,0.04)",
   },
   pillRight: {
-    // slightly different tint
     backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  pillRightReady: {
+    // Removed paddingRight: 60 — the tap badge is absolutely positioned,
+    // so extra padding was squishing the text unnecessarily.
+    // Add a small extra right padding so text doesn't sit under the badge.
+    paddingRight: 44,
   },
   activeGlowOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -897,15 +882,27 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(167,139,250,0.6)",
   },
+
+  // KEY FIX for pillText:
+  // - Removed flex: 1, width: "100%", minWidth: 0, flexGrow: 1
+  //   Those caused the Text to try to fill a fixed space and then truncate.
+  // - flexShrink: 1 lets it shrink within the row (next to the clear icon)
+  // - flexWrap: "wrap" + no numberOfLines = unlimited lines, dynamic height
   pillText: {
-    flex: 1,
+    flexShrink: 1,
+    flexWrap: "wrap",
     fontSize: 12.5,
     color: "rgba(255,255,255,0.88)",
     lineHeight: 18,
     fontWeight: "500",
+    includeFontPadding: false,
   },
   pillTextActive: { color: "#E2D9FF", fontWeight: "600" },
-  clearBtn: { marginLeft: 2 },
+  clearBtn: {
+    alignSelf: "flex-start",
+    marginLeft: "auto",
+    paddingLeft: 6,
+  },
 
   // Ready indicator on right pills
   readyPulse: {
@@ -916,6 +913,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(110,231,247,0.05)",
   },
   tapBadge: {
+    position: "absolute",
+    right: 8,
+    top: 8,
     backgroundColor: "rgba(110,231,247,0.15)",
     borderRadius: 5,
     paddingHorizontal: 5,
@@ -987,6 +987,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.82)",
     lineHeight: 17,
+    flexWrap: "wrap",
   },
   reviewArrow: {
     flexDirection: "row",

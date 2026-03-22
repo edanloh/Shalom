@@ -89,7 +89,7 @@ export default function CourseCarousel({
               inputRange={inputRange}
               cardWidth={CARD_WIDTH}
               onPress={() =>
-                navigation.navigate("CourseDetail", { courseId: course.id })
+                navigation.navigate("CourseDetail", { courseId: course.id, sourceScreen: "Home" })
               }
               onToggleWishlist={onToggleWishlist}
               isWishlisted={isWishlisted}
@@ -133,6 +133,20 @@ interface CourseCardItemProps {
   isWishlisted?: (courseId: string) => boolean;
 }
 
+const getCourseProgressPercent = (course: Course): number => {
+  const candidates = [
+    (course as any)?.progress_percentage,
+    (course as any)?.progress?.percentage,
+  ];
+  for (const value of candidates) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return Math.max(0, Math.min(100, Math.round(numeric)));
+    }
+  }
+  return 0;
+};
+
 function CourseCardItem({
   course,
   index,
@@ -143,6 +157,7 @@ function CourseCardItem({
   onToggleWishlist,
   isWishlisted,
 }: CourseCardItemProps) {
+  const progressPercent = getCourseProgressPercent(course);
   const animatedStyle = useAnimatedStyle(() => {
     const scale = interpolate(
       scrollX.value,
@@ -205,13 +220,13 @@ function CourseCardItem({
               <View
                 style={[
                   styles.progressBarFill,
-                  { width: `${course.progress_percentage || 0}%` },
+                  { width: `${progressPercent}%` },
                 ]}
               />
             </View>
 
             <Text style={styles.progressText}>
-              {Math.round(Number(course.progress_percentage)) || 0}% {"\n"} Complete
+              {progressPercent}% {"\n"} Complete
             </Text>
           </View>
 
@@ -232,9 +247,7 @@ function CourseCardItem({
           {/* Stats */}
           <View style={styles.statsSection}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {Math.round(Number(course.progress_percentage)) || 0}%
-              </Text>
+              <Text style={styles.statValue}>{progressPercent}%</Text>
               <Text style={styles.statLabel}>Complete</Text>
             </View>
 
@@ -244,7 +257,9 @@ function CourseCardItem({
             </View>
 
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{course.rating || "4.5"}</Text>
+              <Text style={styles.statValue}>
+                {Number.isFinite(Number(course.rating)) ? course.rating : "0"}
+              </Text>
               <Text style={styles.statLabel}>Rating</Text>
             </View>
           </View>

@@ -70,7 +70,6 @@ const AutomatedPDFViewer: React.FC<AutomatedPDFViewerProps> = ({
         message.includes("frame-ancestors") ||
         message.includes("framing")
       ) {
-        console.log("🚫 Framing error detected in console");
         hasFramingErrorRef.current = true;
 
         if (successfulViewer === null && isLoading) {
@@ -107,12 +106,10 @@ const AutomatedPDFViewer: React.FC<AutomatedPDFViewerProps> = ({
     if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
 
     const currentViewer = PDF_VIEWERS[currentViewerIndex];
-    console.log(`🔄 Trying ${currentViewer.name}`);
 
     timeoutRef.current = setTimeout(() => {
       if (successfulViewer !== null) return;
 
-      console.log(`⏰ Timeout for ${currentViewer.name}`);
 
       if (currentViewerIndex < PDF_VIEWERS.length - 1) {
         setCurrentViewerIndex((prev) => prev + 1);
@@ -131,9 +128,6 @@ const AutomatedPDFViewer: React.FC<AutomatedPDFViewerProps> = ({
   const markSuccess = () => {
     if (successfulViewer !== null || hasFramingErrorRef.current) return;
 
-    console.log(
-      `✅ Successfully loaded with ${PDF_VIEWERS[currentViewerIndex].name}`,
-    );
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
 
@@ -155,7 +149,6 @@ const AutomatedPDFViewer: React.FC<AutomatedPDFViewerProps> = ({
       if (iframeDoc) {
         const body = iframeDoc.body;
         if (!body) {
-          console.log("⚠️ No body element");
           if (currentViewerIndex < PDF_VIEWERS.length - 1) {
             setCurrentViewerIndex((prev) => prev + 1);
           } else {
@@ -178,7 +171,6 @@ const AutomatedPDFViewer: React.FC<AutomatedPDFViewerProps> = ({
           bodyText.includes("not supported");
 
         if (hasErrorText) {
-          console.log("⚠️ Error text detected in iframe");
           if (currentViewerIndex < PDF_VIEWERS.length - 1) {
             setCurrentViewerIndex((prev) => prev + 1);
           } else {
@@ -196,10 +188,8 @@ const AutomatedPDFViewer: React.FC<AutomatedPDFViewerProps> = ({
           bodyText.length > 100;
 
         if (hasSuccessIndicators) {
-          console.log("✅ Success indicators found");
           markSuccess();
         } else {
-          console.log("⚠️ No success indicators");
           if (currentViewerIndex < PDF_VIEWERS.length - 1) {
             setCurrentViewerIndex((prev) => prev + 1);
           } else {
@@ -216,13 +206,9 @@ const AutomatedPDFViewer: React.FC<AutomatedPDFViewerProps> = ({
           if (hasFramingErrorRef.current || successfulViewer !== null) {
             return;
           }
-          console.log(
-            `✅ Cross-origin iframe loaded: ${PDF_VIEWERS[currentViewerIndex].name}`,
-          );
           markSuccess();
         }, 500);
       } else {
-        console.log("❌ Unexpected error:", error.message);
         if (currentViewerIndex < PDF_VIEWERS.length - 1) {
           setCurrentViewerIndex((prev) => prev + 1);
         } else {
@@ -236,7 +222,6 @@ const AutomatedPDFViewer: React.FC<AutomatedPDFViewerProps> = ({
   const handleIframeLoad = () => {
     if (successfulViewer !== null) return;
 
-    console.log(`📱 Iframe onLoad for ${PDF_VIEWERS[currentViewerIndex].name}`);
 
     // Wait for potential framing errors
     setTimeout(() => {

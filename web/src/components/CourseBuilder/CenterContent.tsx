@@ -67,6 +67,7 @@ const LessonEditor = ({
     selectedThumbnailFile,
     selectedVideoFile,
     extractYouTubeId,
+    extractVimeoId,
     handleVideoUrlChange,
     handleThumbnailFileChange: originalHandleThumbnailFileChange,
     handleVideoFileChange: originalHandleVideoFileChange,
@@ -185,6 +186,7 @@ const LessonEditor = ({
           setLocalVideoPreviewUrl={setLocalVideoPreviewUrl}
           isUploading={isUploading}
           extractYouTubeId={extractYouTubeId}
+          extractVimeoId={extractVimeoId}
           setValidationMessage={setValidationMessage}
           setShowValidationModal={setShowValidationModal}
         />
@@ -211,25 +213,12 @@ const LessonEditor = ({
             <input
               type="text"
               value={(() => {
-                const seconds = lesson?.durationSeconds || 0;
+                const seconds = hasVideo ? (lesson?.durationSeconds || 0) : 0;
                 const hours = Math.floor(seconds / 3600);
                 const minutes = Math.floor((seconds % 3600) / 60);
                 const secs = seconds % 60;
                 return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
               })()}
-              onChange={(e) => {
-                const value = e.target.value;
-                const parts = value.split(":");
-                if (parts.length === 3) {
-                  const hours = parseInt(parts[0]) || 0;
-                  const minutes = parseInt(parts[1]) || 0;
-                  const secs = parseInt(parts[2]) || 0;
-                  const totalSeconds = hours * 3600 + minutes * 60 + secs;
-                  updateLesson(module.id, lesson.id, {
-                    durationSeconds: totalSeconds,
-                  });
-                }
-              }}
               style={{
                 backgroundColor: Colors.textInputBg,
                 borderColor: Colors.gray600,
@@ -237,7 +226,9 @@ const LessonEditor = ({
               }}
               className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
               placeholder="00:00:00"
+              readOnly
               disabled={isFetchingDuration}
+              title="Duration is auto-populated from the uploaded video"
             />
           </div>
         )}
@@ -259,6 +250,25 @@ const LessonEditor = ({
 // Helper: Get errors for a single question
 const getQuestionErrors = (question: any): string[] => {
   const errors: string[] = [];
+  const options = Array.isArray(question.options) ? question.options : [];
+
+  const resolveAnswerIndex = (answer: any): number => {
+    if (Number.isInteger(answer)) return answer;
+    if (typeof answer === "string") {
+      return options.findIndex(
+        (opt: any) => String(opt).trim() === answer.trim(),
+      );
+    }
+    return -1;
+  };
+
+  const resolveAnswerIndices = (answer: any): number[] => {
+    const raw = Array.isArray(answer) ? answer : [answer];
+    const mapped = raw
+      .map((item: any) => resolveAnswerIndex(item))
+      .filter((idx: number) => Number.isInteger(idx) && idx >= 0);
+    return Array.from(new Set(mapped));
+  };
 
   if (!question.text?.trim()) {
     errors.push("Question text is required");
@@ -272,50 +282,44 @@ const getQuestionErrors = (question: any): string[] => {
 
   // Type-specific validation
   if (question.type === "multiple-choice") {
-    // Must have a correct answer selected
-    if (
-      question.correctAnswer === null ||
-      question.correctAnswer === undefined
-    ) {
+    const answerIndex = resolveAnswerIndex(question.correctAnswer);
+
+    // Must have a correct answer selected and resolvable to an option index
+    if (answerIndex < 0) {
       errors.push("Select a correct answer");
     }
+
     // The selected answer must point to a non-empty option
-    if (
-      question.correctAnswer !== null &&
-      question.correctAnswer !== undefined
-    ) {
-      const selectedOption = question.options?.[question.correctAnswer];
-      if (!selectedOption || !String(selectedOption).trim()) {
-        errors.push("Correct answer points to an empty option");
-      }
+    const selectedOption = options[answerIndex];
+    if (answerIndex >= 0 && (!selectedOption || !String(selectedOption).trim())) {
+      errors.push("Correct answer points to an empty option");
     }
-    // At least one non-empty option
-    const hasOptions = question.options?.some((opt: any) => String(opt).trim());
-    if (!hasOptions) {
-      errors.push("At least one option is required");
+
+    // At least two non-empty options
+    const nonEmptyOptionCount = options.filter((opt: any) => String(opt).trim()).length;
+    if (nonEmptyOptionCount < 2) {
+      errors.push("At least two options required");
     }
   }
 
   if (question.type === "multiple-correct") {
     // Must have at least one answer checked
-    const checkedAnswers = Array.isArray(question.correctAnswer)
-      ? question.correctAnswer
-      : [];
+    const checkedAnswers = resolveAnswerIndices(question.correctAnswer);
     if (checkedAnswers.length === 0) {
       errors.push("Select at least one correct answer");
     }
     // None of the checked answers should point to empty options
     for (const idx of checkedAnswers) {
-      const option = question.options?.[idx];
+      const option = options[idx];
       if (!option || !String(option).trim()) {
         errors.push("A correct answer points to an empty option");
         break;
       }
     }
-    // At least one non-empty option
-    const hasOptions = question.options?.some((opt: any) => String(opt).trim());
-    if (!hasOptions) {
-      errors.push("At least one option is required");
+    // At least two non-empty options
+    const nonEmptyOptionCount = options.filter((opt: any) => String(opt).trim()).length;
+    if (nonEmptyOptionCount < 2) {
+      errors.push("At least two options required");
     }
   }
 

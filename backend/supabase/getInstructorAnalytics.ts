@@ -547,7 +547,9 @@ serve(async (req) => {
 
       const { data: courseQuizScores } = await supabase
         .from("quiz_attempts")
-        .select("user_id,quiz_id,score,is_passed,attempt_number,completed_at,course_quizzes(course_id,section_id)")
+        .select(
+          "user_id,quiz_id,score,is_passed,attempt_number,completed_at,grades_released,course_quizzes!inner(course_id,section_id)"
+        )
         .eq("course_quizzes.course_id", activeCourseId)
         .gte("completed_at", start.toISOString());
 
@@ -561,8 +563,12 @@ serve(async (req) => {
               .in("section_id", sectionIds)
           : { data: [] };
 
+      const scopedQuizAttempts = (courseQuizScores || []).filter(
+        (row: any) => String(row?.course_quizzes?.course_id || "") === String(activeCourseId)
+      );
+
       const quizScores =
-        (courseQuizScores || [])
+        scopedQuizAttempts
           .map((row: any) => Number(row.score || 0))
           .filter((score: number) => Number.isFinite(score)) || [];
 
@@ -588,24 +594,16 @@ serve(async (req) => {
           .map((e) => e.user_id)
       );
 
-      const quizAttempts = courseQuizScores || [];
+      const quizAttempts = scopedQuizAttempts;
       const passedCount = quizAttempts.filter((row: any) => row.is_passed).length;
       const quizPassRate =
         quizAttempts.length > 0 ? (passedCount / quizAttempts.length) * 100 : 0;
-
-      const { count: pendingSubmissionsCount } = await supabase
-        .from("assignment_submissions")
-        .select("id, assignments!inner(course_id)", { count: "exact", head: true })
-        .eq("submission_status", "submitted")
-        .eq("assignments.course_id", activeCourseId)
-        .gte("created_at", start.toISOString());
-
-      const { count: gradedSubmissionsCount } = await supabase
-        .from("assignment_submissions")
-        .select("id, assignments!inner(course_id)", { count: "exact", head: true })
-        .eq("submission_status", "graded")
-        .eq("assignments.course_id", activeCourseId)
-        .gte("created_at", start.toISOString());
+      const pendingSubmissionsCount = quizAttempts.filter(
+        (row: any) => row.grades_released === false
+      ).length;
+      const gradedSubmissionsCount = quizAttempts.filter(
+        (row: any) => row.grades_released === true
+      ).length;
 
       const totalWatchMinutes = courseEnrollments.reduce(
         (sum, e) => sum + Number(e.total_watch_time_minutes || 0),

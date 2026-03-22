@@ -6,26 +6,28 @@ export const useContentManagement = () => {
   const {
     modules,
     setModules,
+    setHasUnsavedChanges,
     showToast,
     setSelectedItem,
   } = useCourseBuilder();
 
-  const { updateContentNumbering } = useDragAndDrop();
+  const { updateContentNumbering, updateModuleNumbering } = useDragAndDrop();
+  const markUnsaved = () => setHasUnsavedChanges(true);
 
   // Module functions
   const addModule = () => {
-    const moduleNumber = modules.length + 1;
     const newModuleId = `m${Date.now()}`;
     const newModule: Module = {
       id: newModuleId,
-      title: `Module ${moduleNumber}: `,
+      title: '',
       description: "",
       status: "published",
       expanded: true,
       lessons: [],
       quizzes: [],
     };
-    setModules([...modules, newModule]);
+    setModules(updateModuleNumbering([...modules, newModule]));
+    markUnsaved();
     
     // Auto-select the newly created module
     setSelectedItem({ type: 'module', id: newModuleId });
@@ -49,12 +51,11 @@ export const useContentManagement = () => {
       return current;
     });
 
-    let updatedModules = modules.filter((m) => m.id !== moduleId);
-    updatedModules = modules.filter(m => m.id !== moduleId).map((module, index) => ({
-      ...module,
-      title: module.title.replace(/^Module \d+:/, `Module ${index + 1}:`),
-    }));
+    const updatedModules = updateModuleNumbering(
+      modules.filter((m) => m.id !== moduleId)
+    );
     setModules(updatedModules);
+    markUnsaved();
   };
 
   const updateModule = (moduleId: string, updates: Partial<Module>) => {
@@ -63,6 +64,7 @@ export const useContentManagement = () => {
         m.id === moduleId ? { ...m, ...updates } : m
       )
     );
+    markUnsaved();
   };
 
   // Lesson functions
@@ -91,6 +93,7 @@ export const useContentManagement = () => {
           status: "draft",
           content: "",
           videoUrl: lessonType === 'video' ? "" : undefined,
+          durationSeconds: lessonType === 'video' ? 0 : undefined,
           resourceUrl: lessonType !== 'video' ? "" : undefined,
           resourceType: resourceSubType,
           isDownloadable: lessonType !== 'video' ? true : undefined,
@@ -108,6 +111,7 @@ export const useContentManagement = () => {
     // Update numbering after adding
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    markUnsaved();
     
     // Auto-select the newly created lesson
     setSelectedItem({ type: 'lesson', id: newLessonId });
@@ -129,6 +133,7 @@ export const useContentManagement = () => {
     );
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    markUnsaved();
   };
 
   const updateLesson = (moduleId: string, lessonId: string, updates: Partial<Lesson>) => {
@@ -151,6 +156,7 @@ export const useContentManagement = () => {
       
       return updatedModules;
     });
+    markUnsaved();
   };
 
   // Quiz functions
@@ -199,6 +205,7 @@ export const useContentManagement = () => {
     // Update numbering after adding
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    markUnsaved();
     
     // Auto-select the newly created quiz
     setSelectedItem({ type: 'quiz', id: newQuizId });
@@ -220,6 +227,7 @@ export const useContentManagement = () => {
     );
     updatedModules = updateContentNumbering(updatedModules);
     setModules(updatedModules);
+    markUnsaved();
   };
 
   const updateQuiz = (moduleId: string, quizId: string, updates: Partial<Quiz>) => {
@@ -240,6 +248,7 @@ export const useContentManagement = () => {
     }
     
     setModules(updatedModules);
+    markUnsaved();
   };
 
   // Question functions
@@ -275,6 +284,7 @@ export const useContentManagement = () => {
         return m;
       })
     );
+    markUnsaved();
   };
 
   const deleteQuestion = (moduleId: string, quizId: string, questionId: string) => {
@@ -297,11 +307,12 @@ export const useContentManagement = () => {
         return m;
       })
     );
+    markUnsaved();
   };
 
   const updateQuestion = (moduleId: string, quizId: string, questionId: string, field: string, value: any) => {
-    setModules(
-      modules.map((m) => {
+    setModules((prevModules) =>
+      prevModules.map((m) => {
         if (m.id === moduleId) {
           return {
             ...m,
@@ -319,80 +330,78 @@ export const useContentManagement = () => {
           };
         }
         return m;
-      })
+      }),
     );
+    markUnsaved();
   };
 
   const addOption = (moduleId: string, quizId: string, questionId: string) => {
-    updateQuestion(moduleId, quizId, questionId, "options", [
-      ...(modules.find(m => m.id === moduleId)?.quizzes.find(q => q.id === quizId)?.questions.find(qu => qu.id === questionId)?.options || []),
-      "New option",
-    ]);
+    setModules((prevModules) =>
+      prevModules.map((m) => {
+        if (m.id !== moduleId) return m;
+        return {
+          ...m,
+          quizzes: m.quizzes.map((q) => {
+            if (q.id !== quizId) return q;
+            return {
+              ...q,
+              questions: q.questions.map((qu) => {
+                if (qu.id !== questionId) return qu;
+                return {
+                  ...qu,
+                  options: [...(qu.options || []), "New option"],
+                };
+              }),
+            };
+          }),
+        };
+      }),
+    );
+    markUnsaved();
   };
 
   const removeOption = (moduleId: string, quizId: string, questionId: string, index: number) => {
-    const question = modules.find(m => m.id === moduleId)?.quizzes.find(q => q.id === quizId)?.questions.find(qu => qu.id === questionId);
-    if (question) {
-      // Remove the option at the specified index
-      const newOptions = question.options.filter((_, i) => i !== index);
-      
-      // Adjust correctAnswer index if needed
-      let newCorrectAnswer = question.correctAnswer;
-      
-      if (question.type === "multiple-choice" || question.type === "true-false") {
-        // Single answer - adjust if removed option was before the correct answer
-        if (typeof newCorrectAnswer === "number") {
-          if (index < newCorrectAnswer) {
-            // Removed option was before correct answer, shift index down
-            newCorrectAnswer = newCorrectAnswer - 1;
-          } else if (index === newCorrectAnswer) {
-            // Removed the correct answer option, reset to null
-            newCorrectAnswer = null;
-          }
-        }
-      } else if (question.type === "multiple-correct") {
-        // Multiple answers - adjust all indices
-        if (Array.isArray(newCorrectAnswer)) {
-          newCorrectAnswer = newCorrectAnswer
-            .map((ansIdx: number) => {
-              if (index < ansIdx) {
-                // Removed option was before this answer, shift index down
-                return ansIdx - 1;
-              } else if (index === ansIdx) {
-                // Removed this answer option, mark for removal
-                return -1;
-              }
-              return ansIdx;
-            })
-            .filter((idx: number) => idx >= 0); // Remove marked indices
-        }
-      }
-      
-      // Update both options and correctAnswer
-      setModules(
-        modules.map((m) => {
-          if (m.id === moduleId) {
+    setModules((prevModules) =>
+      prevModules.map((m) => {
+        if (m.id !== moduleId) return m;
+        return {
+          ...m,
+          quizzes: m.quizzes.map((q) => {
+            if (q.id !== quizId) return q;
             return {
-              ...m,
-              quizzes: m.quizzes.map((q) => {
-                if (q.id === quizId) {
-                  return {
-                    ...q,
-                    questions: q.questions.map((qu) =>
-                      qu.id === questionId
-                        ? { ...qu, options: newOptions, correctAnswer: newCorrectAnswer }
-                        : qu
-                    ),
-                  };
+              ...q,
+              questions: q.questions.map((qu) => {
+                if (qu.id !== questionId) return qu;
+
+                const newOptions = (qu.options || []).filter((_, i) => i !== index);
+                let newCorrectAnswer: any = qu.correctAnswer;
+
+                if (qu.type === "multiple-choice" || qu.type === "true-false") {
+                  if (typeof newCorrectAnswer === "number") {
+                    if (index < newCorrectAnswer) {
+                      newCorrectAnswer = newCorrectAnswer - 1;
+                    } else if (index === newCorrectAnswer) {
+                      newCorrectAnswer = null;
+                    }
+                  }
+                } else if (qu.type === "multiple-correct" && Array.isArray(newCorrectAnswer)) {
+                  newCorrectAnswer = newCorrectAnswer
+                    .map((ansIdx: number) => {
+                      if (index < ansIdx) return ansIdx - 1;
+                      if (index === ansIdx) return -1;
+                      return ansIdx;
+                    })
+                    .filter((idx: number) => idx >= 0);
                 }
-                return q;
+
+                return { ...qu, options: newOptions, correctAnswer: newCorrectAnswer };
               }),
             };
-          }
-          return m;
-        })
-      );
-    }
+          }),
+        };
+      }),
+    );
+    markUnsaved();
   };
 
   return {

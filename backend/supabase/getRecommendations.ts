@@ -26,6 +26,11 @@ const CANDIDATE_LONG_TAIL_POOL_LIMIT = Number(
 );
 const MAX_RESULTS = 6;
 const MIN_SCORE_FLOOR = Number(Deno.env.get("RECO_MIN_SCORE_FLOOR") ?? "1");
+const COLD_MIN_SCORE_FLOOR = (() => {
+  const parsed = Number(Deno.env.get("RECO_COLD_MIN_SCORE_FLOOR") ?? String(MIN_SCORE_FLOOR));
+  if (!Number.isFinite(parsed)) return MIN_SCORE_FLOOR;
+  return Math.max(parsed, MIN_SCORE_FLOOR);
+})();
 const PROFILE_DECAY_DAYS = Number(Deno.env.get("RECO_PROFILE_DECAY_DAYS") ?? "21");
 const NOVELTY_MIN_SLOTS = Number(Deno.env.get("RECO_NOVELTY_MIN_SLOTS") ?? "1");
 const RERANK_CATEGORY_PENALTY = Number(
@@ -70,7 +75,7 @@ const INSTRUCTOR_FATIGUE_PENALTY = Number(
   Deno.env.get("RECO_INSTRUCTOR_FATIGUE_PENALTY") ?? "1.2"
 );
 const MIN_USER_EVENTS_FOR_PERSONALIZATION = Number(
-  Deno.env.get("RECO_MIN_USER_EVENTS") ?? "3"
+  Deno.env.get("RECO_MIN_USER_EVENTS") ?? "1"
 );
 const MAX_PER_CATEGORY = Number(Deno.env.get("RECO_MAX_PER_CATEGORY") ?? "2");
 const MAX_PER_INSTRUCTOR = Number(Deno.env.get("RECO_MAX_PER_INSTRUCTOR") ?? "2");
@@ -92,6 +97,28 @@ const SPLIT_V2 = Number(Deno.env.get("RECO_SPLIT_V2") ?? "100");
 const SPLIT_V2A = Number(Deno.env.get("RECO_SPLIT_V2A") ?? "0");
 const SPLIT_V2B = Number(Deno.env.get("RECO_SPLIT_V2B") ?? "0");
 
+// ── Server-side ML traffic split ─────────────────────────────────────────────
+// Set RECO_SPLIT_ML=20 to redirect 20 % of users from this function to
+// getMLRecommendations. Uses the same deterministic hash bucket as the
+// mobile client so a given user always lands on the same path regardless
+// of which caller (mobile, web, API) hits this endpoint.
+// This is the complement to EXPO_PUBLIC_ML_SPLIT in courseService.ts:
+//   - Mobile callers are split client-side (avoids an extra hop).
+//   - All other callers (web, server-to-server, future clients) are split here.
+const SPLIT_ML = Number(Deno.env.get("RECO_SPLIT_ML") ?? "0");
+
+// ── Stale-profile decay ───────────────────────────────────────────────────────
+// If a user's last positive interaction was more than STALE_PROFILE_DAYS ago,
+// gradually reduce personalization weight and increase exploration so returning
+// users aren't stuck with a stale taste profile.
+const STALE_PROFILE_DAYS = Number(Deno.env.get("RECO_STALE_PROFILE_DAYS") ?? "30");
+
+// ── Semantic embeddings (pgvector) ────────────────────────────────────────────
+// Set RECO_EMBEDDINGS_ENABLED=true after running embed_courses.py and applying
+// add_embeddings.sql. When enabled, content_similarity_boost uses cosine
+// similarity via pgvector instead of Jaccard tag overlap.
+const EMBEDDINGS_ENABLED = (Deno.env.get("RECO_EMBEDDINGS_ENABLED") ?? "false") === "true";
+
 type RecommendationEvent = {
   course_id: string | null;
   event_type: string | null;
@@ -108,6 +135,7 @@ type CourseCandidate = {
   title?: string | null;
   description?: string | null;
   rating?: number | string | null;
+  total_ratings?: number | string | null;
   duration_hours?: number | null;
   thumbnail_url?: string | null;
   tags?: string[] | null;
@@ -278,6 +306,9 @@ const SCORING = {
   globalPopularity: readWeight("RECO_WEIGHT_GLOBAL_POPULARITY", 0.08),
   ignorePenalty: readWeight("RECO_WEIGHT_IGNORE_PENALTY", 0.5),
   dismissPenalty: readWeight("RECO_WEIGHT_DISMISS_PENALTY", 0.7),
+  contentSimilarityBoost: readWeight("RECO_WEIGHT_CONTENT_SIMILARITY_BOOST", 0.12), // CF-inspired nearest-neighbour
+  thompsonBonus: readWeight("RECO_WEIGHT_THOMPSON_BONUS", 0.10),          // exploration via UCB/Thompson
+  difficultyProgression: readWeight("RECO_WEIGHT_DIFFICULTY_PROGRESSION", 0.08), // learning path next-step boost
   // Cold-start path
   coldRating: readWeight("RECO_COLD_WEIGHT_RATING", 0.55),
   coldPopularity: readWeight("RECO_COLD_WEIGHT_POPULARITY", 0.3),
@@ -417,13 +448,22 @@ const aggregateBehavior = (
     if (type === "impression" || type === "view") {
       rec.impressions += 1;
     }
-    if (
-      type === "click" ||
-      type === "start" ||
-      type === "save" ||
-      type === "complete"
-    ) {
-      rec.positive += 1;
+    // Weight positive events by signal strength instead of flat +1.
+    // complete=5, enroll=4, start=3, save/wishlist=2, click=1.
+    // These weights feed user_ctr and user_recency in the score_breakdown
+    // which the ML re-ranker then learns from — so richer signals here
+    // directly improve ML model quality over time.
+    const POSITIVE_WEIGHTS: Record<string, number> = {
+      complete: 5,
+      enroll: 4,
+      start: 3,
+      save: 2,
+      wishlist: 2,
+      click: 1,
+    };
+    const positiveWeight = POSITIVE_WEIGHTS[type] ?? 0;
+    if (positiveWeight > 0) {
+      rec.positive += positiveWeight;
     }
     if (type === "dismiss") rec.dismissals += 1;
 
@@ -445,7 +485,9 @@ const aggregateBehavior = (
         type === "click" ||
         type === "start" ||
         type === "save" ||
-        type === "complete"
+        type === "complete" ||
+        type === "enroll" ||
+        type === "wishlist"
       ) {
         rec.lastPositiveTs = Math.max(rec.lastPositiveTs, ts);
       }
@@ -468,6 +510,51 @@ const normalizeMapByMax = (source: Map<string, number>): Map<string, number> => 
     out.set(key, value / max);
   }
   return out;
+};
+
+// ── Item-based CF helpers ─────────────────────────────────────────────────────
+// Builds a lightweight feature vector for a course used to compute similarity
+// between a candidate and courses the user has already enrolled in / interacted with.
+type CourseVector = { category: string; instructor: string; tags: Set<string> };
+
+const buildCourseVector = (course: {
+  category_id?: string | null;
+  instructor_id?: string | null;
+  tags?: string[] | null;
+  category?: CourseCategory | null;
+}): CourseVector => ({
+  category: course.category?.name ?? course.category_id ?? "uncategorized",
+  instructor: course.instructor_id ?? "unknown",
+  tags: new Set(
+    (Array.isArray(course.tags) ? course.tags : [])
+      .filter((t): t is string => typeof t === "string")
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0)
+  ),
+});
+
+// Returns a 0–1 similarity score between a candidate and the user's enrolled
+// course vectors using Jaccard tag similarity + category/instructor match.
+// Takes the max similarity across all enrolled courses (nearest-neighbour CF).
+const computeItemSimilarity = (
+  candidate: CourseVector,
+  enrolledVectors: CourseVector[]
+): number => {
+  if (enrolledVectors.length === 0) return 0;
+  let maxSim = 0;
+  for (const enrolled of enrolledVectors) {
+    const allTags = new Set([...candidate.tags, ...enrolled.tags]);
+    const intersection = [...candidate.tags].filter((t) => enrolled.tags.has(t)).length;
+    const tagJaccard = allTags.size > 0 ? intersection / allTags.size : 0;
+    const categoryMatch = candidate.category === enrolled.category ? 1 : 0;
+    const instructorMatch =
+      candidate.instructor === enrolled.instructor &&
+      candidate.instructor !== "unknown" ? 0.5 : 0;
+    // Weighted: tags 50%, category 35%, instructor 15%
+    const sim = tagJaccard * 0.5 + categoryMatch * 0.35 + instructorMatch * 0.15;
+    if (sim > maxSim) maxSim = sim;
+  }
+  return clamp(maxSim, 0, 1);
 };
 
 const pickPrimaryReasonTag = (
@@ -603,11 +690,53 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // ── Server-side ML redirect ────────────────────────────────────────────────
+  // If RECO_SPLIT_ML > 0 and this userId hashes into the ML bucket, forward
+  // the entire request to getMLRecommendations. The ML function calls back into
+  // this function internally to get scored candidates, so there's no recursion.
+  // We skip redirect when the caller is getMLRecommendations itself (detected
+  // via the _mlInternal flag) to prevent infinite loops.
+  if (SPLIT_ML > 0) {
+    const earlyUrl = new URL(req.url);
+    const isInternalCall = earlyUrl.searchParams.get("_mlInternal") === "1";
+    if (!isInternalCall) {
+      const earlyUserId = earlyUrl.searchParams.get("userId");
+      if (earlyUserId) {
+        let hash = 2166136261;
+        for (let i = 0; i < earlyUserId.length; i++) {
+          hash ^= earlyUserId.charCodeAt(i);
+          hash = Math.imul(hash, 16777619);
+        }
+        const bucket = Math.abs(hash >>> 0) % 100;
+        if (bucket < SPLIT_ML) {
+          const mlUrl = new URL(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/getMLRecommendations`
+          );
+          // Forward all original query params
+          earlyUrl.searchParams.forEach((v, k) => mlUrl.searchParams.set(k, v));
+          const mlResp = await fetch(mlUrl.toString(), {
+            headers: {
+              authorization: req.headers.get("authorization") ?? "",
+              apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+            },
+          });
+          // Return ML response directly, preserving CORS headers
+          const mlBody = await mlResp.text();
+          return new Response(mlBody, {
+            status: mlResp.status,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+  }
+
   try {
     const url = new URL(req.url);
     const userId = url.searchParams.get("userId");
     const algo = url.searchParams.get("algo");
     const learningGoal = url.searchParams.get("learningGoal");
+    const placement = url.searchParams.get("placement") ?? "home"; // new: track which UI surface requested recommendations
     const localHourParam = Number(url.searchParams.get("localHour"));
     const dayOfWeekParam = Number(url.searchParams.get("dayOfWeek"));
     const now = new Date();
@@ -617,6 +746,13 @@ serve(async (req) => {
     const dayOfWeek = Number.isFinite(dayOfWeekParam)
       ? clampInt(dayOfWeekParam, 0, 6)
       : now.getUTCDay();
+    // _maxResults: lets getMLRecommendations request a larger candidate pool
+    // for re-ranking. Capped at MAX_CANDIDATE_POOL so this can't be abused.
+    const maxResultsParam = Number(url.searchParams.get("_maxResults"));
+    const effectiveMaxResults =
+      Number.isFinite(maxResultsParam) && maxResultsParam > MAX_RESULTS
+        ? clampInt(maxResultsParam, MAX_RESULTS, MAX_CANDIDATE_POOL)
+        : MAX_RESULTS;
     const contextFactors = getContextFactors(learningGoal, localHour, dayOfWeek);
     const assigned = assignAlgoByTrafficSplit(userId);
     const selectedAlgo = (algo ?? assigned.algo).toLowerCase();
@@ -626,11 +762,12 @@ serve(async (req) => {
     const policy = experiment.policy;
     const requestId = crypto.randomUUID();
 
-    const courseSelect = `
+const courseSelect = `
       id,
       title,
       description,
       rating,
+      total_ratings,
       duration_hours,
       thumbnail_url,
       created_at,
@@ -652,7 +789,7 @@ serve(async (req) => {
       .select(courseSelect)
       .eq("is_published", true)
       .order("rating", { ascending: false, nullsFirst: false })
-      .limit(MAX_CANDIDATES);
+      .limit(MAX_CANDIDATE_POOL); // was MAX_CANDIDATES (20) — too small when pool target is MAX_CANDIDATE_POOL (60)
 
     if (coursesErr) throw coursesErr;
 
@@ -919,7 +1056,7 @@ serve(async (req) => {
       );
       if (
         inCurrentSession &&
-        (type === "click" || type === "save" || type === "start" || type === "complete")
+        (type === "click" || type === "save" || type === "start" || type === "complete" || type === "enroll" || type === "wishlist")
       ) {
         const course = candidateById.get(ev.course_id);
         if (!course) continue;
@@ -943,7 +1080,7 @@ serve(async (req) => {
             (recentInstructorImpressions.get(instructorKey) ?? 0) + 1
           );
         }
-        if (type === "click" || type === "save" || type === "start" || type === "complete") {
+        if (type === "click" || type === "save" || type === "start" || type === "complete" || type === "enroll" || type === "wishlist") {
           recentInstructorPositives.set(
             instructorKey,
             (recentInstructorPositives.get(instructorKey) ?? 0) + 1
@@ -970,6 +1107,8 @@ serve(async (req) => {
     const tagAffinityRaw = new Map<string, number>();
     const difficultyAffinityRaw = new Map<DifficultyLevel, number>();
     const uniqueUserCourseIds = Array.from(new Set(userEnrolledCourseIds));
+    const enrolledVectors: CourseVector[] = []; // for item-based CF similarity
+    const enrolledVectorIds = new Set<string>(); // dedupe by course id
 
     if (userId && uniqueUserCourseIds.length > 0) {
       const { data: enrolledCourses, error: enrolledCoursesErr } = await supabase
@@ -999,6 +1138,11 @@ serve(async (req) => {
           difficulty,
           (difficultyAffinityRaw.get(difficulty) ?? 0) + 1
         );
+        // Build vector for item-based CF
+        if (!enrolledVectorIds.has(course.id)) {
+          enrolledVectorIds.add(course.id);
+          enrolledVectors.push(buildCourseVector(course));
+        }
       }
     }
 
@@ -1014,7 +1158,7 @@ serve(async (req) => {
       const ageMs = ts > 0 ? Math.max(0, nowTs - ts) : 0;
       const decay = Math.exp(-ageMs / (1000 * 60 * 60 * 24 * PROFILE_DECAY_DAYS));
       const boost =
-        type === "click" || type === "start" || type === "save" || type === "complete"
+        type === "click" || type === "start" || type === "save" || type === "complete" || type === "enroll" || type === "wishlist"
           ? 2 * decay
           : type === "impression" || type === "view"
             ? 0.5 * decay
@@ -1038,6 +1182,18 @@ serve(async (req) => {
           difficulty,
           (difficultyAffinityRaw.get(difficulty) ?? 0) + boost
         );
+        // Extend CF vectors with strongly interacted courses (wishlist, click, enroll etc.)
+        // so content_similarity_boost reflects full preference history, not just enrollments.
+        // Dedupe by course id — correct, unlike tag-set-size comparison.
+        if (
+          type === "click" || type === "start" || type === "save" ||
+          type === "complete" || type === "enroll" || type === "wishlist"
+        ) {
+          if (!enrolledVectorIds.has(course.id)) {
+            enrolledVectorIds.add(course.id);
+            enrolledVectors.push(buildCourseVector(course));
+          }
+        }
       }
     }
     const categoryAffinityNorm = normalizeMapByMax(categoryAffinityRaw);
@@ -1047,6 +1203,37 @@ serve(async (req) => {
       Array.from(difficultyAffinityRaw.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ??
       "unknown";
     const sessionCategoryNorm = normalizeMapByMax(recentSessionCategoryRaw);
+
+    // ── Learning path: target the next difficulty step up ─────────────────────
+    // If the user's dominant completed-course level is beginner, we want to
+    // boost intermediate candidates; intermediate → advanced. This is applied
+    // as a separate difficultyProgression score alongside difficultyMatch so
+    // the model can learn the appropriate weight for both signals.
+    const DIFFICULTY_LADDER: DifficultyLevel[] = ["beginner", "intermediate", "advanced"];
+    const userLadderIdx = DIFFICULTY_LADDER.indexOf(difficultyPreference as DifficultyLevel);
+    // targetLevel is one rung above the user's current dominant level (capped at advanced)
+    const targetProgressionLevel: DifficultyLevel | null =
+      userLadderIdx >= 0
+        ? DIFFICULTY_LADDER[Math.min(userLadderIdx + 1, DIFFICULTY_LADDER.length - 1)]
+        : null;
+
+    // ── Stale profile: detect returning users ─────────────────────────────────
+    // Find the most recent positive interaction across all courses.
+    let lastActiveTs = 0;
+    for (const [, beh] of userBehavior.entries()) {
+      if (beh.lastPositiveTs > lastActiveTs) lastActiveTs = beh.lastPositiveTs;
+    }
+    const daysSinceActive =
+      lastActiveTs > 0 ? (nowTs - lastActiveTs) / (1000 * 60 * 60 * 24) : Infinity;
+    const isReturningUser = daysSinceActive > STALE_PROFILE_DAYS;
+    // Linearly decay personalization influence from 1.0 at threshold to 0.2 at 120 days
+    const affinityDecayMultiplier = isReturningUser
+      ? clamp(1.0 - (daysSinceActive - STALE_PROFILE_DAYS) / 90, 0.2, 1.0)
+      : 1.0;
+    // Mirror bonus: returning users get a proportional exploration boost
+    const returningExplorationBonus = isReturningUser
+      ? clamp((daysSinceActive - STALE_PROFILE_DAYS) / 90 * 0.5, 0, 0.5)
+      : 0;
 
     /* ------------------------------------------------------------------ */
     /* 5️⃣ Compute behavior scores and cold-start state */
@@ -1078,6 +1265,7 @@ serve(async (req) => {
 
       const dismissPenalty = Math.min(2, rec.dismissals * 0.4);
       const recentlyShownWithoutPositive =
+        rec.impressions >= 2 &&
         rec.lastImpressionTs > 0 &&
         rec.lastImpressionTs > rec.lastPositiveTs &&
         nowTs - rec.lastImpressionTs < suppressionWindowMs;
@@ -1113,10 +1301,74 @@ serve(async (req) => {
       globalCtrNorm.set(cid, ctr);
     }
 
+    // ── Thompson Sampling bonus (UCB approximation) ───────────────────────────
+    // For each course, sample from its estimated Beta(alpha, beta) distribution.
+    // High-uncertainty courses (few impressions) get an exploration bonus so the
+    // system doesn't permanently under-serve items that haven't been tried yet.
+    // Uses the closed-form UCB approximation: mean + sqrt(variance) instead of
+    // drawing a random sample, giving deterministic scores per request.
+    const thompsonBonusMap = new Map<string, number>();
+    for (const [courseId, rec] of globalBehavior.entries()) {
+      const n = rec.impressions + 3;              // smoothed denominator
+      // rec.positive is now a weighted sum (complete=5, enroll=4, …) so it can
+      // exceed n. Clamp ctr to [0,1] before computing variance to guarantee
+      // variance >= 0 and prevent sqrt(NaN) propagating into scores.
+      const ctr = clamp((rec.positive + 1) / n, 0, 1);
+      const variance = clamp((ctr * (1 - ctr)) / n, 0, 0.25); // 0.25 = max of Beta variance
+      thompsonBonusMap.set(courseId, clamp(ctr + Math.sqrt(variance), 0, 1));
+    }
+    // Default for courses with no impression history: moderate CTR + high variance
+    // → full exploration bonus (new courses surface naturally without special-casing)
+    const THOMPSON_DEFAULT = (() => {
+      const ctr = 1 / 3;
+      const variance = (ctr * (1 - ctr)) / 3;
+      return clamp(ctr + Math.sqrt(variance), 0, 1);
+    })();
+
+    // ── Semantic embedding similarity (pgvector) ─────────────────────────────
+    // Replaces Jaccard tag overlap in content_similarity_boost when embeddings
+    // are available. Set RECO_EMBEDDINGS_ENABLED=true after running embed_courses.py.
+    const embeddingSimilarityMap = new Map<string, number>();
+    if (EMBEDDINGS_ENABLED && uniqueUserCourseIds.length > 0 && courseIds.length > 0) {
+      try {
+        const { data: simRows, error: simErr } = await (supabase as any).rpc(
+          "get_embedding_similarity",
+          { enrolled_ids: uniqueUserCourseIds, candidate_ids: courseIds }
+        );
+        if (!simErr && Array.isArray(simRows)) {
+          for (const row of simRows) {
+            embeddingSimilarityMap.set(row.course_id, clamp(row.similarity ?? 0, 0, 1));
+          }
+        }
+      } catch {
+        // Silently fall back to Jaccard if RPC errors (e.g. no embeddings yet)
+      }
+    }
+
+    const positiveEventTypes = new Set([
+      "impression",
+      "view",
+      "click",
+      "save",
+      "start",
+      "complete",
+      "enroll",
+      "wishlist", // fix: was missing
+    ]);
+    const meaningfulUserEventCount = userEvents.reduce((count, ev) => {
+      const type = (ev.event_type ?? "").toLowerCase();
+      return count + (positiveEventTypes.has(type) ? 1 : 0);
+    }, 0);
+    const hasBehavioralSignal =
+      meaningfulUserEventCount >= Math.max(1, MIN_USER_EVENTS_FOR_PERSONALIZATION);
+
     const isColdStart =
       !userId ||
-      (userEvents.length < MIN_USER_EVENTS_FOR_PERSONALIZATION &&
-        userEnrolledCourseIds.length === 0);
+      (userEnrolledCourseIds.length === 0 && !hasBehavioralSignal);
+    const hasNoBehavioralProfile =
+      userEnrolledCourseIds.length === 0 &&
+      !hasBehavioralSignal;
+    const shouldApplyMinFloor = isColdStart || hasNoBehavioralProfile;
 
     const seenFilterMinImpressions = Math.max(1, SEEN_FILTER_MIN_IMPRESSIONS);
     const seenFilteredCandidates =
@@ -1151,25 +1403,39 @@ serve(async (req) => {
 
       const baseRating = Number(course.rating) || 0;
       const ratingNorm = clamp(baseRating / 5, 0, 1);
+      const totalRatings = Number(course.total_ratings ?? 0);
       const popularity = clamp(popularityNorm.get(course.id) ?? 0, 0, 1);
       const globalCtr = clamp(globalCtrNorm.get(course.id) ?? 0, 0, 1);
       const categoryKey =
         course.category?.name ?? course.category_id ?? "uncategorized";
-      const categoryAffinity = clamp(categoryAffinityNorm.get(categoryKey) ?? 0, 0, 1);
+
+      // Apply stale-profile affinity decay so returning users get more exploration
+      // and less "more of the same" from a taste profile that may be months out of date.
+      const categoryAffinity = clamp(
+        (categoryAffinityNorm.get(categoryKey) ?? 0) * affinityDecayMultiplier, 0, 1
+      );
       const instructorAffinity = clamp(
-        instructorAffinityNorm.get(course.instructor_id ?? "unknown_instructor") ?? 0,
-        0,
-        1
+        (instructorAffinityNorm.get(course.instructor_id ?? "unknown_instructor") ?? 0) * affinityDecayMultiplier,
+        0, 1
       );
       const courseTags = getCourseTags(course);
       const tagAffinity =
         courseTags.length > 0
           ? clamp(
-              courseTags.reduce((acc, tag) => Math.max(acc, tagAffinityNorm.get(tag) ?? 0), 0),
-              0,
-              1
+              courseTags.reduce((acc, tag) => Math.max(acc, tagAffinityNorm.get(tag) ?? 0), 0) *
+                affinityDecayMultiplier,
+              0, 1
             )
           : 0;
+
+      // Content similarity: use pgvector cosine similarity when embeddings are
+      // available, fall back to Jaccard tag overlap otherwise.
+      const candidateVector = buildCourseVector(course);
+      const contentSimilarityBoost = embeddingSimilarityMap.size > 0
+        ? clamp(embeddingSimilarityMap.get(course.id) ??
+            computeItemSimilarity(candidateVector, enrolledVectors), 0, 1)
+        : computeItemSimilarity(candidateVector, enrolledVectors);
+
       const difficultyLevel = inferDifficultyLevel(course);
       const difficultyMatch =
         difficultyPreference === "unknown" || difficultyLevel === "unknown"
@@ -1179,12 +1445,29 @@ serve(async (req) => {
             : difficultyPreference === difficultyLevel
               ? 1
               : 0.2;
+
+      // Learning path progression: reward candidates that are the appropriate next
+      // difficulty step up from the user's completed courses.
+      const difficultyProgression = (() => {
+        if (!targetProgressionLevel || difficultyLevel === "unknown") return 0.5;
+        if (difficultyLevel === targetProgressionLevel) return 1.0;
+        if (difficultyLevel === "mixed") return 0.6;
+        if (difficultyLevel === (difficultyPreference as DifficultyLevel)) return 0.4;
+        return 0.1; // wrong direction (e.g. beginner when user is already intermediate)
+      })();
+
+      // Thompson bonus: UCB-style exploration score. High for unseen courses,
+      // moderate for courses with a good but uncertain global CTR.
+      const thompsonBonus = thompsonBonusMap.get(course.id) ?? THOMPSON_DEFAULT;
       const freshness = getFreshnessScore(course, nowTs, FRESHNESS_HALF_LIFE_DAYS);
-      const qualityPenalty = getQualityPenalty(
-        ratingNorm,
-        QUALITY_MIN_RATING,
-        QUALITY_LOW_RATING_PENALTY
-      );
+      const qualityPenalty =
+        totalRatings > 0
+          ? getQualityPenalty(
+              ratingNorm,
+              QUALITY_MIN_RATING,
+              QUALITY_LOW_RATING_PENALTY
+            )
+          : 0;
       const sessionCategoryBoost =
         clamp(sessionCategoryNorm.get(categoryKey) ?? 0, 0, 1) *
         Math.max(0, SESSION_INTENT_BOOST) *
@@ -1213,14 +1496,16 @@ serve(async (req) => {
         globalCtr * 0.3 +
         ratingNorm * 0.1 * Math.max(0.1, contextFactors.rating) +
         (isNovel ? contextFactors.noveltyBonus : 0) +
-        contextFactors.explorationBias;
+        contextFactors.explorationBias +
+        returningExplorationBonus; // stale-profile: returning users see more variety
 
       if (isColdStart) {
         score =
           ratingNorm * 10 * scoring.coldRating * Math.max(0.1, contextFactors.rating) +
           popularity * 10 * scoring.coldPopularity * Math.max(0.1, contextFactors.popularity) +
           globalCtr * 10 * scoring.coldCtr +
-          freshness * 10 * scoring.freshness;
+          freshness * 10 * scoring.freshness +
+          thompsonBonus * 10 * scoring.thompsonBonus; // exploration for cold-start users too
 
       } else {
         score =
@@ -1231,12 +1516,14 @@ serve(async (req) => {
           instructorAffinity * 10 * scoring.instructorAffinity +
           tagAffinity * 10 * scoring.tagAffinity +
           difficultyMatch * 10 * scoring.difficultyMatch +
+          difficultyProgression * 10 * scoring.difficultyProgression + // learning path
           freshness * 10 * scoring.freshness +
-          popularity * 10 * scoring.globalPopularity * Math.max(0.1, contextFactors.popularity) -
+          popularity * 10 * scoring.globalPopularity * Math.max(0.1, contextFactors.popularity) +
+          contentSimilarityBoost * 10 * scoring.contentSimilarityBoost +
+          thompsonBonus * 10 * scoring.thompsonBonus -  // exploration bonus
           userBeh.ignoredPenalty * scoring.ignorePenalty -
           userBeh.dismissPenalty * scoring.dismissPenalty;
         score += sessionCategoryBoost;
-
       }
 
       score -= userBeh.suppressionPenalty;
@@ -1244,7 +1531,9 @@ serve(async (req) => {
       score -= qualityPenalty;
 
       score = clamp(score, 0, 10);
-      if (!userBeh.hardSuppressed) {
+      if (shouldApplyMinFloor) {
+        score = Math.max(score, clamp(COLD_MIN_SCORE_FLOOR, 0, 10));
+      } else if (!userBeh.hardSuppressed) {
         score = Math.max(score, clamp(MIN_SCORE_FLOOR, 0, 10));
       }
       const primaryReasonTag = isColdStart
@@ -1273,6 +1562,10 @@ serve(async (req) => {
             {
               key: "matches_your_level",
               value: difficultyMatch * 10 * scoring.difficultyMatch,
+            },
+            {
+              key: "similar_to_courses_you_took",
+              value: contentSimilarityBoost * 10 * scoring.contentSimilarityBoost,
             },
             {
               key: "based_on_this_session",
@@ -1310,6 +1603,9 @@ serve(async (req) => {
           overexposed_penalty: Number(userBeh.overexposedPenalty.toFixed(3)),
           instructor_fatigue_penalty: Number(instructorFatiguePenalty.toFixed(3)),
           quality_penalty: Number(qualityPenalty.toFixed(3)),
+          content_similarity_boost: Number((contentSimilarityBoost * 10).toFixed(3)),
+          thompson_bonus: Number((thompsonBonus * 10).toFixed(3)),        // UCB exploration signal
+          difficulty_progression: Number((difficultyProgression * 10).toFixed(3)), // learning path
         },
         course: {
           ...course,
@@ -1329,21 +1625,21 @@ serve(async (req) => {
     const explorationSlots = clampInt(
       policy.explorationSlots,
       0,
-      Math.max(0, MAX_RESULTS - 1)
+      Math.max(0, effectiveMaxResults - 1)
     );
     const seedSelected = rerankWithConstraints(
       sortedByScore,
-      MAX_RESULTS,
+      effectiveMaxResults,
       Math.max(1, policy.maxPerCategory),
       Math.max(1, policy.maxPerInstructor),
-      clampInt(NOVELTY_MIN_SLOTS, 0, MAX_RESULTS)
+      clampInt(NOVELTY_MIN_SLOTS, 0, effectiveMaxResults)
     );
     const diversityFallback =
       seedSelected.length > 0
         ? seedSelected
         : applyCategoryDiversity(
             sortedByScore,
-            MAX_RESULTS,
+            effectiveMaxResults,
             Math.max(1, policy.maxPerCategory),
             Math.max(1, policy.maxPerInstructor)
           );
@@ -1360,8 +1656,8 @@ serve(async (req) => {
       (item, index, arr) => arr.findIndex((x) => x.id === item.id) === index
     );
 
-    let rankedForOutput = deduped.sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS);
-    const noveltyTarget = clampInt(NOVELTY_MIN_SLOTS, 0, MAX_RESULTS);
+    let rankedForOutput = deduped.sort((a, b) => b.score - a.score).slice(0, effectiveMaxResults);
+    const noveltyTarget = clampInt(NOVELTY_MIN_SLOTS, 0, effectiveMaxResults);
     if (noveltyTarget > 0) {
       let noveltyCount = rankedForOutput.filter((item) => item.is_novel).length;
       if (noveltyCount < noveltyTarget) {
@@ -1422,13 +1718,15 @@ serve(async (req) => {
         session_window_hours: SESSION_WINDOW_HOURS,
         session_intent_boost: SESSION_INTENT_BOOST,
         instructor_fatigue_window_hours: INSTRUCTOR_FATIGUE_WINDOW_HOURS,
-        max_exposures_per_instructor_window: MAX_EXPOSURES_PER_INSTRUCTOR_WINDOW,
+        max_exposures_per_instructor_window:
+          MAX_EXPOSURES_PER_INSTRUCTOR_WINDOW,
         instructor_fatigue_penalty: INSTRUCTOR_FATIGUE_PENALTY,
         max_per_category: policy.maxPerCategory,
         max_per_instructor: policy.maxPerInstructor,
         exploration_slots: explorationSlots,
         max_exposures_per_course_7d: policy.maxExposuresPerCourse7d,
         suppression_cooldown_days: policy.suppressionCooldownDays,
+        cold_min_score_floor: COLD_MIN_SCORE_FLOOR,
       },
       filtering: {
         candidate_count_top_rated: topRatedCandidates.length,
@@ -1441,6 +1739,7 @@ serve(async (req) => {
       },
       context: {
         learning_goal: learningGoal,
+        placement,
         local_hour: localHour,
         day_of_week: dayOfWeek,
         factors: contextFactors,

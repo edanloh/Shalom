@@ -114,11 +114,8 @@ export const useCourseNavigation = (
         (item) => item.id === currentItemId && item.type === currentItemType
       );
 
-      console.log(`📍 Current item index: ${currentItemIndex}/${currentSection.items.length - 1}`);
-
       if (currentItemIndex !== -1 && currentItemIndex < currentSection.items.length - 1) {
         const nextItemInSection = currentSection.items[currentItemIndex + 1];
-        console.log(`✅ Found next item in same section: ${nextItemInSection.title} (${nextItemInSection.type})`);
         return {
           item: nextItemInSection,
           sectionId: currentSection.id,

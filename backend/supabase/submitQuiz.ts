@@ -107,6 +107,7 @@ const getLocalDateString = (date: Date, timeZone: string) => {
 type QuizQuestion = {
   id: string;
   question: string;
+  question_type: string;
   correct_answer: string;
   points: number | null;
 };
@@ -489,7 +490,7 @@ serve(async (req) => {
     // ========================================
     const { data: questions, error: questionsError } = await supabaseClient
       .from('quiz_questions')
-      .select('id, question, correct_answer, points')
+      .select('id, question, question_type, correct_answer, points')
       .eq('quiz_id', quizId);
 
     if (questionsError) throw questionsError;
@@ -497,6 +498,10 @@ serve(async (req) => {
     const questionsMap = new Map(
       (questions as QuizQuestion[] | null || []).map((row) => [row.id, row])
     );
+    
+    // Check if quiz contains any short-answer questions (support both 'short-answer' and legacy 'text')
+    const hasShortAnswer = questions?.some(q => q.question_type === 'short-answer' || q.question_type === 'text') || false;
+    console.log(`📝 Quiz contains short-answer questions: ${hasShortAnswer}`);
 
     // ========================================
     // 3. Grade answers
@@ -504,6 +509,8 @@ serve(async (req) => {
     let correctCount = 0;
     let totalPoints = 0;
     const gradedAnswers = [];
+    let autoGradableCount = 0; // Questions that can be auto-graded
+    let shortAnswerCount = 0;   // Questions requiring manual grading
 
     console.log('\n🎯 Starting answer grading...');
 
@@ -516,7 +523,23 @@ serve(async (req) => {
         continue;
       }
       
+      // Skip auto-grading for short-answer questions (support both 'short-answer' and legacy 'text')
+      if (question.question_type === 'short-answer' || question.question_type === 'text') {
+        console.log(`\n📝 Question ${questionId} is ${question.question_type} - skipping auto-grade`);
+        shortAnswerCount++;
+        gradedAnswers.push({
+          questionId,
+          isCorrect: null, // Not graded yet
+          correctAnswer: null, // Don't reveal answer to student
+          requiresManualGrading: true
+        });
+        continue;
+      }
+      
+      autoGradableCount++;
+      
       console.log(`\n📝 Grading question ${questionId}:`);
+      console.log(`   Question type: ${question.question_type}`);
       console.log(`   User answer:`, userAnswer);
       console.log(`   User answer type:`, Array.isArray(userAnswer) ? 'array' : typeof userAnswer);
       console.log(`   Correct answer:`, question.correct_answer);
@@ -541,7 +564,25 @@ serve(async (req) => {
       console.log(`   User answer array:`, userAnswerArray);
       console.log(`   Correct answer array:`, correctAnswerArray);
       
-      if (userAnswerArray && correctAnswerArray) {
+      // Handle matching questions specifically (arrays of {left, right} pairs)
+      if (question.question_type === 'matching' && userAnswerArray && correctAnswerArray) {
+        console.log(`   Grading matching question...`);
+        
+        // Check if counts match first
+        if (userAnswerArray.length !== correctAnswerArray.length) {
+          console.log(`   ❌ Pair count mismatch: ${userAnswerArray.length} vs ${correctAnswerArray.length}`);
+          isCorrect = false;
+        } else {
+          // Check if all user pairs match correct pairs (by value, not position)
+          const allPairsCorrect = userAnswerArray.every((userPair: any) => {
+            return correctAnswerArray.some((correctPair: any) => 
+              userPair.left === correctPair.left && userPair.right === correctPair.right
+            );
+          });
+          isCorrect = allPairsCorrect;
+          console.log(`   All pairs match correct answers: ${isCorrect}`);
+        }
+      } else if (userAnswerArray && correctAnswerArray) {
         // Multiple-correct: Compare sorted arrays
         const userSorted = JSON.stringify([...userAnswerArray].sort());
         const correctSorted = JSON.stringify([...correctAnswerArray].sort());
@@ -570,12 +611,32 @@ serve(async (req) => {
     }
 
     const totalQuestions = questions?.length || 0;
-    console.log(`\n📊 Final score: ${correctCount}/${totalQuestions} correct`);
+    console.log(`\n📊 Grading Summary:`);
+    console.log(`   Total questions: ${totalQuestions}`);
+    console.log(`   Auto-graded: ${autoGradableCount} (${correctCount} correct)`);
+    console.log(`   Short-answer (pending): ${shortAnswerCount}`);
 
-    const score = totalQuestions > 0 
-      ? Math.round((correctCount / totalQuestions) * 100) 
-      : 0;
-    const isPassed = score >= quiz.passing_score;
+    // Calculate score based only on auto-graded questions
+    // If quiz has short-answer, score will be partial until manual grading
+    let score = 0;
+    let isPassed = false;
+    
+    if (hasShortAnswer) {
+      // Partial score - only from auto-graded questions
+      score = autoGradableCount > 0 
+        ? Math.round((correctCount / autoGradableCount) * 100) 
+        : 0;
+      // Cannot determine pass/fail until manual grading completes
+      isPassed = false;
+      console.log(`   ⏳ Partial score: ${score}% (waiting for manual grading of ${shortAnswerCount} questions)`);
+    } else {
+      // Full auto-grade
+      score = totalQuestions > 0 
+        ? Math.round((correctCount / totalQuestions) * 100) 
+        : 0;
+      isPassed = score >= quiz.passing_score;
+      console.log(`   ✅ Final score: ${score}% (${isPassed ? 'PASSED' : 'FAILED'})`);
+    }
     const attemptNumber = (previousAttempts || 0) + 1;
     let previousPasses = 0;
     if (isPassed) {
@@ -608,11 +669,14 @@ serve(async (req) => {
         is_passed: isPassed,
         time_taken_minutes: timeTakenMinutes || null,
         answers: answersJson,
+        grades_released: !hasShortAnswer, // Hide grades if short-answer questions present
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString()
       });
 
     if (insertError) throw insertError;
+    
+    console.log(`💾 Quiz attempt saved (grades_released: ${!hasShortAnswer})`);
 
     const now = new Date();
     await updateDailyMinutes(supabaseClient, userId, Number(timeTakenMinutes || 0), now);
@@ -632,44 +696,125 @@ serve(async (req) => {
     }
 
     // ========================================
-    // 5. Update course progress if quiz passed
+    // 5. Update course progress after any quiz submission
     // ========================================
-    if (isPassed) {
-      // Get course completion stats
-      const { data: videoStats } = await supabaseClient
-        .from('course_videos')
-        .select('id')
-        .eq('course_id', quiz.course_id);
+    {
+      const [{ data: videoStats }, { data: quizStats }, { data: resourceStats }] = await Promise.all([
+        supabaseClient
+          .from('course_videos')
+          .select('id')
+          .eq('course_id', quiz.course_id),
+        supabaseClient
+          .from('course_quizzes')
+          .select('id,max_attempts')
+          .eq('course_id', quiz.course_id),
+        supabaseClient
+          .from('course_resources')
+          .select('id')
+          .eq('course_id', quiz.course_id)
+          .in('resource_type', ['pdf', 'document', 'ppt']),
+      ]);
 
-      const { data: quizStats } = await supabaseClient
-        .from('course_quizzes')
-        .select('id')
-        .eq('course_id', quiz.course_id);
+      const quizIds = (quizStats || []).map((q: any) => q.id);
+      const videoIds = (videoStats || []).map((v: any) => v.id);
+      const resourceIds = (resourceStats || []).map((r: any) => r.id);
 
-      const { data: completedVideos } = await supabaseClient
-        .from('user_video_progress')
-        .select('video_id')
-        .eq('user_id', userId)
-        .eq('is_completed', true)
-        .in('video_id', (videoStats || []).map((v: any) => v.id));
+      const [
+        { data: completedVideos },
+        { data: completedResources },
+        { data: attempts },
+        { data: shortAnswerRows },
+      ] = await Promise.all([
+        videoIds.length > 0
+          ? supabaseClient
+              .from('user_video_progress')
+              .select('video_id')
+              .eq('user_id', userId)
+              .eq('is_completed', true)
+              .in('video_id', videoIds)
+          : Promise.resolve({ data: [] }),
+        resourceIds.length > 0
+          ? supabaseClient
+              .from('resource_progress')
+              .select('resource_id')
+              .eq('user_id', userId)
+              .eq('is_completed', true)
+              .in('resource_id', resourceIds)
+          : Promise.resolve({ data: [] }),
+        quizIds.length > 0
+          ? supabaseClient
+              .from('quiz_attempts')
+              .select('quiz_id,is_passed,attempt_number')
+              .eq('user_id', userId)
+              .in('quiz_id', quizIds)
+              .order('quiz_id', { ascending: true })
+              .order('attempt_number', { ascending: false })
+          : Promise.resolve({ data: [] }),
+        quizIds.length > 0
+          ? supabaseClient
+              .from('quiz_questions')
+              .select('quiz_id')
+              .in('quiz_id', quizIds)
+              .in('question_type', ['short-answer', 'text'])
+          : Promise.resolve({ data: [] }),
+      ]);
 
-      const { data: passedQuizzes } = await supabaseClient
-        .from('quiz_attempts')
-        .select('quiz_id')
-        .eq('user_id', userId)
-        .eq('is_passed', true)
-        .in('quiz_id', (quizStats || []).map((q: any) => q.id));
+      const shortAnswerQuizIds = new Set((shortAnswerRows || []).map((row: any) => row.quiz_id));
+      const maxAttemptsByQuizId = new Map(
+        (quizStats || []).map((q: any) => [q.id, q.max_attempts]),
+      );
 
-      const totalItems = (videoStats?.length || 0) + (quizStats?.length || 0);
-      const completedItems = (completedVideos?.length || 0) + (new Set(passedQuizzes?.map((q: any) => q.quiz_id)).size || 0);
-      
-      const progressPercentage = totalItems > 0 
-        ? (completedItems / totalItems) * 100 
+      const latestAttemptByQuiz = new Map<string, any>();
+      for (const attempt of attempts || []) {
+        if (!latestAttemptByQuiz.has(attempt.quiz_id)) {
+          latestAttemptByQuiz.set(attempt.quiz_id, attempt);
+        }
+      }
+
+      const completedQuizIds = new Set<string>();
+      for (const quizIdValue of quizIds) {
+        const latestAttempt = latestAttemptByQuiz.get(quizIdValue);
+        if (!latestAttempt) {
+          continue;
+        }
+
+        const hasShortAnswerQuiz = shortAnswerQuizIds.has(quizIdValue);
+        if (hasShortAnswerQuiz) {
+          completedQuizIds.add(quizIdValue);
+          continue;
+        }
+
+        const maxAttemptsValue = maxAttemptsByQuizId.get(quizIdValue);
+        const normalizedMaxAttempts =
+          maxAttemptsValue === null || maxAttemptsValue === undefined
+            ? null
+            : Number(maxAttemptsValue);
+        const attemptsExhausted =
+          normalizedMaxAttempts !== null &&
+          Number.isFinite(normalizedMaxAttempts) &&
+          normalizedMaxAttempts > 0 &&
+          latestAttempt.attempt_number >= normalizedMaxAttempts;
+
+        if (latestAttempt.is_passed || attemptsExhausted) {
+          completedQuizIds.add(quizIdValue);
+        }
+      }
+
+      const totalItems =
+        (videoStats?.length || 0) +
+        (quizStats?.length || 0) +
+        (resourceStats?.length || 0);
+      const completedItems =
+        (new Set((completedVideos || []).map((v: any) => v.video_id)).size || 0) +
+        completedQuizIds.size +
+        (new Set((completedResources || []).map((r: any) => r.resource_id)).size || 0);
+
+      const progressPercentage = totalItems > 0
+        ? (completedItems / totalItems) * 100
         : 0;
 
       const isEnrollmentCompleted = progressPercentage >= 100;
 
-      // Update enrollment
       const { error: enrollmentError } = await supabaseClient
         .from('course_enrollments')
         .update({
@@ -677,7 +822,7 @@ serve(async (req) => {
           is_completed: isEnrollmentCompleted,
           completion_date: isEnrollmentCompleted ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
-          last_activity_at: new Date().toISOString()
+          last_activity_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
         .eq('course_id', quiz.course_id);

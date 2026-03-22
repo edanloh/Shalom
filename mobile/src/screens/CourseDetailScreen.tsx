@@ -50,7 +50,7 @@ export default function CourseDetailScreen({
   navigation,
   route,
 }: StackScreenProps<MainStackParamList, "CourseDetail">) {
-  const { courseId } = route.params;
+  const { courseId, sourceScreen } = route.params;
   const [courseDetail, setCourseDetail] =
     useState<ProcessedCourseDetail | null>(null);
   const [courseContent, setCourseContent] = useState<CourseContent | null>(
@@ -60,8 +60,6 @@ export default function CourseDetailScreen({
   const [error, setError] = useState<string | null>(null);
   const { user } = useUser();
   const userId = user?.uuid;
-  const fallbackUserId = process.env.EXPO_PUBLIC_DEFAULT_USER_ID;
-  const effectiveUserId = userId || fallbackUserId;
 
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
@@ -69,7 +67,7 @@ export default function CourseDetailScreen({
   const [showAllAnnouncements, setShowAllAnnouncements] = useState(false);
   
   // Wishlist functionality
-  const { toggleWishlist, isWishlisted } = useCourses();
+  const { toggleWishlist, isWishlisted, refreshMyCourses } = useCourses();
   const wishlisted = isWishlisted(courseId);
 
   useFocusEffect(
@@ -78,7 +76,6 @@ export default function CourseDetailScreen({
         loadCourseDetail();
           notificationService.getCourseNotifications(courseId).then(data => {
           // Group by notification ID to avoid duplicates
-          console.log('[CourseDetailScreen] fetched notifications:', data);
           const uniqueNotifications = Array.from(new Map(data.map(item => [item.type, item])).values());
           setNotifications(uniqueNotifications);
         }).catch(err => {
@@ -90,10 +87,13 @@ export default function CourseDetailScreen({
 
   useEffect(() => {
     (async () => {
-      if (!effectiveUserId) return;
+      if (!userId) {
+        setIsEnrolled(false);
+        return;
+      }
       try {
         const enrolled = await courseService.isUserEnrolledInCourse(
-          effectiveUserId,
+          userId,
           courseId,
         );
         setIsEnrolled(enrolled);
@@ -101,7 +101,7 @@ export default function CourseDetailScreen({
         console.log("Enroll status check failed:", e);
       }
     })();
-  }, [courseId, effectiveUserId]);
+  }, [courseId, userId]);
 
   const calculateCourseProgress = (): number => {
     if (!courseContent || !courseContent.sections) return 0;
@@ -110,47 +110,58 @@ export default function CourseDetailScreen({
     if (totalModules === 0) return 0;
 
     // Count only modules that are marked as completed
-    const completedModules = courseContent.sections.filter(
-      (section) => section.module_is_completed === true,
+    const completedModules = courseContent.sections.filter((section) =>
+      moduleService.isSectionCompleted(section, courseContent.userProgress),
     ).length;
-
-    // console.log("[CourseDetailScreen] Progress calculation:", {
-    //   completedModules,
-    //   totalModules,
-    //   percentage: Math.round((completedModules / totalModules) * 100),
-    // });
 
     return Math.round((completedModules / totalModules) * 100);
   };
 
   const getCompletedModulesCount = (): number => {
     if (!courseContent) return 0;
-    return courseContent.sections.filter(
-      (section) => section.module_is_completed,
+    return courseContent.sections.filter((section) =>
+      moduleService.isSectionCompleted(section, courseContent.userProgress),
     ).length;
   };
 
-  const loadCourseDetail = async () => {
+  const isSectionLocked = (section: CourseSection, index: number): boolean => {
+    if (!courseContent || index <= 0) return false;
+
+    // Reorder-safe rule: completed modules must remain accessible.
+    const isCompleted = moduleService.isSectionCompleted(
+      section,
+      courseContent.userProgress,
+    );
+    if (isCompleted) return false;
+
+    const previousSections = courseContent.sections.slice(0, index);
+    return previousSections.some(
+      (s) => !moduleService.isSectionCompleted(s, courseContent.userProgress),
+    );
+  };
+
+  const loadCourseDetail = async (options?: { background?: boolean }) => {
+    const isBackground = Boolean(options?.background);
     try {
-      setLoading(true);
+      if (!isBackground) {
+        setLoading(true);
+      }
       setError(null);
 
       // Fetch both course detail and module detail with user progress
       const [detail, moduleData] = await Promise.all([
         courseDetailService.getCourseDetail(courseId),
-        moduleService.getModuleDetail(courseId, effectiveUserId),
+        moduleService.getModuleDetail(courseId, userId),
       ]);
-      console.log("[CourseDetailScreen] Loaded course detail and content:", {
-        detail,
-        moduleData,
-      });
       setCourseDetail(detail);
       setCourseContent(moduleData);
     } catch (err) {
       console.error("Failed to load course detail:", err);
       setError("Failed to load course details");
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      }
     }
   };
 
@@ -205,14 +216,14 @@ export default function CourseDetailScreen({
   };
 
   const renderModule = (section: CourseSection, index: number) => {
-    const isCompleted = section?.module_is_completed || false;
+    const isCompleted = moduleService.isSectionCompleted(
+      section,
+      courseContent?.userProgress,
+    );
     const completedAt = section?.module_completed_at;
 
-    // Module is locked if it's not the first module and previous module is not completed
-    const isLocked =
-      index > 0 &&
-      courseContent &&
-      !courseContent.sections[index - 1]?.module_is_completed;
+    // Reorder-safe lock check: completed modules never become locked.
+    const isLocked = isSectionLocked(section, index);
 
     const onOpen = () => {
       if (!isEnrolled) {
@@ -227,25 +238,29 @@ export default function CourseDetailScreen({
         return;
       }
 
-      // Check if this is not the first module and the previous module is not completed
-      if (index > 0 && courseContent) {
-        const previousModule = courseContent.sections[index - 1];
-        if (!previousModule?.module_is_completed) {
-          const previousModuleTitle =
-            previousModule?.title || "the previous module";
-          Alert.alert(
-            "Complete Previous Module First",
-            `Please complete "${previousModuleTitle}" before moving to this module.`,
-            [{ text: "OK", style: "default" }],
+      // Reorder-safe lock enforcement: gate only not-completed modules.
+      if (isSectionLocked(section, index) && courseContent) {
+        const previousIncompleteModule = courseContent.sections
+          .slice(0, index)
+          .find(
+            (s) =>
+              !moduleService.isSectionCompleted(s, courseContent.userProgress),
           );
-          return;
-        }
+        const previousModuleTitle =
+          previousIncompleteModule?.title || "the previous module";
+        Alert.alert(
+          "Complete Previous Module First",
+          `Please complete "${previousModuleTitle}" before moving to this module.`,
+          [{ text: "OK", style: "default" }],
+        );
+        return;
       }
 
       navigation.navigate("ModuleDetail", {
         courseId: route.params.courseId,
         sectionId: section.id,
         userId: userId ?? "",
+        sourceScreen,
       });
     };
 
@@ -401,7 +416,7 @@ export default function CourseDetailScreen({
 
   const handleEnroll = async () => {
     if (isEnrolling) return;
-    if (!effectiveUserId) {
+    if (!userId) {
       Alert.alert("Sign in required", "Please sign in to enroll.");
       return;
     }
@@ -411,18 +426,29 @@ export default function CourseDetailScreen({
     try {
       setIsEnrolling(true);
       const { firstModuleId } = await courseService.enrollInCourse(
-        effectiveUserId,
+        userId,
         courseId,
       );
 
       // Mark as enrolled immediately so UI updates
       setIsEnrolled(true);
-      // Refresh detail in background to pick up any progress/enrollment metadata
-      loadCourseDetail?.();
+      // Release blocking overlay immediately after successful enrollment.
+      setIsEnrolling(false);
+
+      // Refresh shared "My Courses" context immediately so Home/MyCourses
+      // reflects the new enrollment as soon as user navigates back.
+      try {
+        await refreshMyCourses();
+      } catch (refreshErr) {
+        console.warn("Failed to refresh My Courses after enrollment", refreshErr);
+      }
+
+      // Refresh details in background without switching screen into full loading state.
+      void loadCourseDetail({ background: true });
 
       try {
         await creditService.recordCreditEvent({
-          userId: effectiveUserId,
+          userId,
           type: "course_enrolled",
           title: courseDetail?.title || "Enrolled in course",
           points: 20,
@@ -442,12 +468,6 @@ export default function CourseDetailScreen({
         });
       }
 
-      // Update enrolled state and reload course data
-      setIsEnrolled(true);
-
-      // Reload course detail to fetch updated progress
-      await loadCourseDetail();
-
       // Show success message
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
@@ -457,15 +477,13 @@ export default function CourseDetailScreen({
           {
             text: "Start Learning",
             onPress: () => {
-              if (firstModuleId && courseContent) {
-                const firstSection = courseContent.sections[0];
-                if (firstSection) {
-                  navigation.navigate("ModuleDetail", {
-                    courseId: courseId,
-                    sectionId: firstSection.id,
-                    userId: userId,
-                  });
-                }
+              if (firstModuleId) {
+                navigation.navigate("ModuleDetail", {
+                  courseId: courseId,
+                  sectionId: firstModuleId,
+                  userId: userId,
+                  sourceScreen,
+                });
               }
             },
           },
@@ -474,17 +492,12 @@ export default function CourseDetailScreen({
       );
     } catch (e: any) {
       const status = e?.statusCode ?? e?.response?.status;
-      console.log("[Enroll] error", {
-        status,
-        code: e?.code,
-        msg: e?.message,
-        details: e?.details,
-      });
       Alert.alert(
         `Enrollment failed ${status ? `(${status})` : ""}`,
         e?.details?.message || e?.message || "Try again.",
       );
     } finally {
+      // Safeguard in case the flow exits early.
       setIsEnrolling(false);
     }
   };
@@ -505,13 +518,36 @@ export default function CourseDetailScreen({
       <Screen title="" noHeader customEdges={["top", "bottom"]}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error || "Course not found"}</Text>
-          <Pressable style={styles.retryButton} onPress={loadCourseDetail}>
+          <Pressable style={styles.retryButton} onPress={() => void loadCourseDetail()}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </Pressable>
         </View>
       </Screen>
     );
   }
+
+  const handleBackFromCourseDetail = () => {
+    if (sourceScreen === "MyCourses") {
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate("MyCourses");
+      }
+      return;
+    }
+
+    if (sourceScreen === "Home" || sourceScreen === "Courses") {
+      navigation.replace("MainTabs", { screen: sourceScreen } as any);
+      return;
+    }
+
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.replace("MainTabs", { screen: "Courses" } as any);
+  };
 
   return (
     <Screen
@@ -524,7 +560,7 @@ export default function CourseDetailScreen({
       {/* Header */}
       <View style={styles.header}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={handleBackFromCourseDetail}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
@@ -668,7 +704,6 @@ export default function CourseDetailScreen({
             <Text style={styles.instructorName}>
               {courseDetail.instructor.name}
             </Text>
-            <Text style={styles.instructorRole}>Data Science Expert</Text>
           </View>
         </View>
 
@@ -840,6 +875,22 @@ export default function CourseDetailScreen({
           />
         )}
       </View>
+
+      {/* Enrollment Loading Overlay */}
+      <Modal
+        visible={isEnrolling}
+        animationType="fade"
+        transparent={true}
+        statusBarTranslucent
+      >
+        <View style={styles.enrollmentOverlay}>
+          <View style={styles.enrollmentModal}>
+            <ActivityIndicator size="large" color={Colors.purple400} />
+            <Text style={styles.enrollmentLoadingText}>Processing Enrollment...</Text>
+            <Text style={styles.enrollmentSubText}>Please wait while we complete your enrollment</Text>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -1350,5 +1401,38 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     lineHeight: 20,
+  },
+  enrollmentOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  enrollmentModal: {
+    backgroundColor: Colors.textInputBg,
+    borderRadius: 16,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    alignItems: "center",
+    minWidth: 280,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  enrollmentLoadingText: {
+    marginTop: Spacing.lg,
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+    textAlign: "center",
+  },
+  enrollmentSubText: {
+    marginTop: Spacing.sm,
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 18,
   },
 });

@@ -27,6 +27,7 @@ export interface ModuleItem {
   passing_score?: number;
   time_limit_minutes?: number;
   max_attempts?: number | null;
+  has_short_answer?: boolean;
 }
 
 // Course Section with Items
@@ -108,6 +109,24 @@ export interface ModuleDetailResponse {
 }
 
 class ModuleService {
+  private getQuizMaxAttempts(item: ModuleItem): number | null {
+    const rawValue =
+      (item as any).max_attempts ??
+      (item as any).maxAttempts ??
+      item.max_attempts;
+
+    if (rawValue === null || rawValue === undefined || rawValue === '') {
+      return null;
+    }
+
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return null;
+    }
+
+    return Math.floor(parsed);
+  }
+
   /**
    * Get course module content with sections, videos, quizzes, and user progress
    * Endpoint: GET /getModuleDetail/{courseId}?userId={userId}
@@ -129,7 +148,20 @@ class ModuleService {
         throw new Error(response.message || 'Failed to fetch module details');
       }
 
-      return response.data;
+      // Ensure deterministic ordering for lock/progress logic.
+      const normalizedSections = [...(response.data.sections || [])]
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((section) => ({
+          ...section,
+          items: [...(section.items || [])].sort(
+            (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0),
+          ),
+        }));
+
+      return {
+        ...response.data,
+        sections: normalizedSections,
+      };
     } catch (error) {
       console.error('Error fetching module details:', error);
       throw error;
@@ -156,7 +188,12 @@ class ModuleService {
     if (itemType === 'video') {
       return userProgress.videoProgress?.find(vp => vp.video_id === itemId);
     } else if (itemType === 'quiz') {
-      return userProgress.quizAttempts?.find(qa => qa.quiz_id === itemId);
+      const attemptsForQuiz =
+        userProgress.quizAttempts?.filter((qa) => qa.quiz_id === itemId) || [];
+      if (attemptsForQuiz.length === 0) return null;
+      return attemptsForQuiz.reduce((latest, current) =>
+        current.attempt_number > latest.attempt_number ? current : latest,
+      );
     } else if (itemType === 'pdf' || itemType === 'document' || itemType === 'ppt') {
       return null; // No granular progress tracking for documents
     }
@@ -168,10 +205,41 @@ class ModuleService {
    * Check if item is completed
    */
   isItemCompleted(item: ModuleItem, userProgress?: UserProgress): boolean {
-    // Use the is_completed property from the backend which already handles:
-    // - Videos: watched to completion
-    // - Quizzes: passed OR exhausted all attempts
-    // - Documents: viewed/completed
+    if (item.is_completed === true) {
+      return true;
+    }
+
+    // For quizzes, derive completion from attempts to avoid stale/incorrect flags.
+    // Rule: completed when passed OR all attempts exhausted OR short-answer was submitted.
+    if (item.type === 'quiz' && userProgress?.quizAttempts) {
+      const attemptsForQuiz = userProgress.quizAttempts.filter(
+        (qa) => qa.quiz_id === item.id,
+      );
+
+      if (attemptsForQuiz.length > 0) {
+        const hasShortAnswer = Boolean(
+          (item as any).has_short_answer ?? (item as any).hasShortAnswer,
+        );
+        if (hasShortAnswer) {
+          return true;
+        }
+
+        const latestAttempt = attemptsForQuiz.reduce((latest, current) =>
+          current.attempt_number > latest.attempt_number ? current : latest,
+        );
+
+        const hasPassed = attemptsForQuiz.some((qa) => qa.is_passed);
+        const maxAttempts = this.getQuizMaxAttempts(item);
+        const attemptsExhausted =
+          maxAttempts !== null && maxAttempts > 0
+            ? latestAttempt.attempt_number >= maxAttempts
+            : false;
+
+        return hasPassed || attemptsExhausted;
+      }
+    }
+
+    // Use backend completion state for non-quiz items and legacy fallback.
     if (item.is_completed !== undefined) {
       return item.is_completed;
     }
@@ -183,13 +251,38 @@ class ModuleService {
       const progress = userProgress.videoProgress?.find(vp => vp.video_id === item.id);
       return progress?.is_completed || false;
     } else if (item.type === 'quiz') {
-      const attempt = userProgress.quizAttempts?.find(qa => qa.quiz_id === item.id);
-      return attempt?.is_passed || false;
+      const attemptsForQuiz = userProgress.quizAttempts?.filter(
+        (qa) => qa.quiz_id === item.id,
+      ) || [];
+      if (attemptsForQuiz.length === 0) return false;
+
+      const latestAttempt = attemptsForQuiz.reduce((latest, current) =>
+        current.attempt_number > latest.attempt_number ? current : latest,
+      );
+      const maxAttempts = this.getQuizMaxAttempts(item);
+      const attemptsExhausted =
+        maxAttempts !== null && maxAttempts > 0
+          ? latestAttempt.attempt_number >= maxAttempts
+          : false;
+
+      return attemptsForQuiz.some((qa) => qa.is_passed) || attemptsExhausted;
     }
     else if (item.type === 'pdf' || item.type === 'document' || item.type === 'ppt') {
       return false;
     }
     return false;
+  }
+
+  /**
+   * Check if entire section is completed.
+   */
+  isSectionCompleted(section: CourseSection, userProgress?: UserProgress): boolean {
+    if (section.module_is_completed !== undefined) {
+      return section.module_is_completed;
+    }
+
+    if (!section.items || section.items.length === 0) return false;
+    return section.items.every((item) => this.isItemCompleted(item, userProgress));
   }
 
   /**

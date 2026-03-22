@@ -47,7 +47,7 @@ serve(async (req) => {
 
     let query = supabase
       .from("achievements")
-      .select("id, name, description, icon, type, criteria, points, color, is_active, created_at, scope_type, scope_id", {
+      .select("id, name, description, icon, type, criteria, points, color, is_active, created_at, scope_type, scope_id, created_by", {
         count: "exact",
       })
       .order("created_at", { ascending: false })
@@ -62,7 +62,9 @@ serve(async (req) => {
     }
 
     if (createdBy) {
-      query = query.eq("created_by", createdBy);
+      query = query.or(
+        `created_by.eq.${createdBy},and(scope_type.eq.global,created_by.is.null)`
+      );
     }
 
     const { data, error, count } = await query;

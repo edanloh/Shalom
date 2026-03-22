@@ -230,7 +230,7 @@ export interface CourseBuilderQuizQuestion {
   text: string;
   type: 'multiple-choice' | 'true-false' | 'multiple-correct';
   options: string[];
-  correctAnswer: number | number[];
+  correctAnswer: number | number[] | null;
   imageUrl?: string | null;
   points: number;
   sampleAnswer: string;
@@ -777,7 +777,6 @@ class CourseService {
    */
   async getCourseBuilderData(courseId: string, adminId: string): Promise<CourseBuilderData> {
     try {
-      console.log("CourseService: Fetching course builder data for courseId:", courseId);
 
       const response = await apiService.get<any>(ENDPOINTS.COURSE_BY_ID_INSTRUCTOR(adminId, courseId), {});
 
@@ -788,12 +787,15 @@ class CourseService {
       const course = response.data.course;
       const sections = response.data.sections || [];
 
-      console.log("CourseService: Course and modules loaded:", { course, sections });
-
       // Transform sections to moduleDetails format
       const moduleDetails = sections.map((section: any) => {
+        const sectionItems = Array.isArray(section.items) ? section.items : [];
+        const fallbackItemOrder = new Map<string, number>(
+          sectionItems.map((item: any, index: number) => [String(item.id), index]),
+        );
+
         const lessons =
-          section.items
+          sectionItems
             ?.filter((item: any) =>
               ["video", "pdf", "document", "slides", "pptx", "docx", "ppt"].includes(
                 item.type,
@@ -816,11 +818,11 @@ class CourseService {
                   : "",
               duration_seconds: item.duration_seconds || 0,
               is_preview: item.is_preview || false,
-              order_index: item.order_index,
+              order_index: item.order_index ?? fallbackItemOrder.get(String(item.id)),
             })) || [];
 
         const quizzes =
-          section.items
+          sectionItems
             ?.filter((item: any) => item.type === "quiz")
             .map((quiz: any) => ({
               id: quiz.id,
@@ -828,6 +830,7 @@ class CourseService {
               description: quiz.description || "",
               passing_score: quiz.passing_score || 70,
               max_attempts: quiz.max_attempts === null ? null : quiz.max_attempts ?? 1,
+              order_index: quiz.order_index ?? fallbackItemOrder.get(String(quiz.id)),
               questions: (quiz.questions || []).map((q: any) => ({
                 id: q.id,
                 question_text: q.text || q.question_text,
@@ -848,8 +851,6 @@ class CourseService {
           quizzes,
         };
       });
-
-      console.log("CourseService: Modules transformed:", moduleDetails);
 
       // Transform to CourseBuilder format
       const transformedModules: CourseBuilderModule[] = moduleDetails.map((module) => ({
@@ -911,8 +912,16 @@ class CourseService {
               }
 
               // Parse correctAnswer: Backend stores index as string, convert to number
-              let correctAnswer: number | number[];
-              const questionType = question.question_type || question.type || "multiple-choice";
+              let correctAnswer: number | number[] | null;
+              const rawQuestionType = question.question_type || question.type || "multiple-choice";
+              const questionType =
+                rawQuestionType === "mcq" || rawQuestionType === "multiple_choice"
+                  ? "multiple-choice"
+                  : rawQuestionType === "true_false"
+                    ? "true-false"
+                    : rawQuestionType === "short_answer"
+                      ? "short-answer"
+                      : rawQuestionType;
 
               if (questionType === "multiple-choice" || questionType === "multiple_choice") {
                 // Handle both old format (text values) and new format (numeric indices)
@@ -930,10 +939,10 @@ class CourseService {
                   } else {
                     // Not found as text, try parsing as numeric index (handles "0", "1", etc.)
                     const numericAnswer = parseInt(rawCorrectAnswer, 10);
-                    correctAnswer = !isNaN(numericAnswer) ? numericAnswer : 0;
+                    correctAnswer = !isNaN(numericAnswer) ? numericAnswer : null;
                   }
                 } else {
-                  correctAnswer = 0;
+                  correctAnswer = null;
                 }
               } else if (questionType === "true-false") {
                 // For true/false, backend stores index as string ("0" or "1")
@@ -956,29 +965,36 @@ class CourseService {
                 } else if (rawCorrectAnswer === false) {
                   correctAnswer = 1;
                 } else {
-                  correctAnswer = 0;
+                  correctAnswer = null;
                 }
               } else if (questionType === "multiple-correct") {
                 // Multiple correct answers - can be stored as:
                 // - NEW format: array of numeric indices [0, 1, 2]
                 // - OLD format: array of text values ["2", "4", "3"]
                 if (Array.isArray(rawCorrectAnswer)) {
-                  correctAnswer = rawCorrectAnswer.map((ans: any) => {
+                  const mappedAnswers = rawCorrectAnswer.map((ans: any) => {
                     if (typeof ans === "number") {
                       // NEW format: numeric index, use directly
                       return ans;
                     } else if (typeof ans === "string") {
                       // OLD format: text value, find in options array
                       const idx = options.findIndex((opt: string) => String(opt).trim() === String(ans).trim());
-                      return idx >= 0 ? idx : 0;
+                      return idx;
                     }
-                    return 0;
+                    return -1;
                   });
+                  correctAnswer = Array.from(
+                    new Set(
+                      mappedAnswers.filter(
+                        (idx: number) => Number.isInteger(idx) && idx >= 0 && idx < options.length,
+                      ),
+                    ),
+                  );
                 } else {
-                  correctAnswer = [0];
+                  correctAnswer = [];
                 }
               } else {
-                correctAnswer = 0;
+                correctAnswer = null;
               }
 
               // Parse matching pairs - for matching type, correct_answer contains the pairs
@@ -1012,16 +1028,19 @@ class CourseService {
                 matchingPairs: matchingPairs,
               };
             }),
-            order: quiz.order_index || 0,
+            order: quiz.order_index,
           };
         }),
       }));
 
-      console.log("CourseService: Transformed modules:", transformedModules);
+      const extractBaseModuleTitle = (title: string) =>
+        String(title || "").replace(/^Module\s+\d+\s*:\s*/i, "").trim();
 
-      // Apply numbering to all lessons and quizzes (Lesson X.Y, Quiz X.Y format)
+      // Apply numbering to modules, lessons and quizzes on initial load
+      // so CourseBuilder sidebar matches add/reorder numbering behavior.
       const numberedModules = transformedModules.map((module, moduleIndex) => ({
         ...module,
+        title: `Module ${moduleIndex + 1}: ${extractBaseModuleTitle(module.title)}`,
         lessons: module.lessons.map((lesson, lessonIndex) => {
           const baseTitle =
             lesson.baseTitle ||
@@ -1076,16 +1095,9 @@ class CourseService {
       
       const response = await apiService.get<any>(ENDPOINTS.COURSE_BY_ID_INSTRUCTOR(adminId, courseId), {});
 
-      console.log('CourseService: API Response:', response);
-      console.log('CourseService: Response data:', response?.data);
-      console.log('CourseService: Sections:', response?.data?.sections);
-      console.log('CourseService: Sections length:', response?.data?.sections?.length || 0);
-      
       if (response?.data?.sections) {
-        console.log('CourseService: Course sections retrieved:', response.data.sections.length);
         return response.data.sections;
       } else {
-        console.log('CourseService: No sections found in response');
         return [];
       }
     } catch (error) {

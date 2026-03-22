@@ -5,7 +5,7 @@ export { default as CourseDetailScreen } from "./CourseDetailScreen";
 export { default as AchievementsScreen } from "./AchievementsScreen";
 export { default as EditProfile } from "./EditProfile";
 export { default as LeaveReviewScreen } from "./LeaveReviewScreen";
-export { default as LessonPlayer } from "./LessonPlayer";
+export { default as VideoPlayer } from "./VideoPlayer";
 export { default as ModuleDetailScreen } from "./ModuleDetailScreen";
 export { default as MyCourses } from "./MyCourses";
 export { default as NotFoundScreen } from "./NotFoundScreen";

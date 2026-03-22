@@ -14,9 +14,12 @@ export const useDragAndDrop = () => {
 
   // Update module numbering
   const updateModuleNumbering = (modulesList: Module[]) => {
+    const extractBaseModuleTitle = (title: string) =>
+      String(title || '').replace(/^Module\s+\d+\s*:\s*/i, '').trim();
+
     return modulesList.map((module, index) => ({
       ...module,
-      title: module.title.replace(/^Module \d+:/, `Module ${index + 1}:`),
+      title: `Module ${index + 1}: ${extractBaseModuleTitle(module.title)}`,
     }));
   };
 
@@ -120,7 +123,6 @@ export const useDragAndDrop = () => {
   };
 
   const handleDragStart = (e: React.DragEvent, item: DraggedItem) => {
-    console.log('Drag started:', item);
     setDraggedItem(item);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", "");
@@ -176,13 +178,6 @@ export const useDragAndDrop = () => {
     const itemCenter = rect.top + rect.height / 2;
     const dropBelow = mouseY > itemCenter;
 
-    console.log('Drop operation:', {
-      draggedItem,
-      targetItem,
-      dropBelow,
-      draggedType: draggedItem.type,
-      targetType: targetItem.type,
-    });
 
     let updatedModules = [...modules];
     let moveSuccessful = false;
@@ -517,7 +512,6 @@ export const useDragAndDrop = () => {
     }
 
     if (moveSuccessful) {
-      console.log('Move successful, checking for duplicates...');
       const itemCounts = new Map();
       updatedModules.forEach(module => {
         module.lessons.forEach(lesson => {
@@ -530,7 +524,6 @@ export const useDragAndDrop = () => {
         });
       });
 
-      console.log('Item counts:', Object.fromEntries(itemCounts));
       const hasDuplicates = Array.from(itemCounts.values()).some(count => count > 1);
 
       if (!hasDuplicates) {

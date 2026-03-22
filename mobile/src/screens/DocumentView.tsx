@@ -31,6 +31,7 @@ import { documentService } from "@/services/documentService";
 import { moduleService } from "@/services/moduleService";
 import { useCourseNavigation } from "@/hooks";
 import type { ModuleItem } from "@/services/moduleService";
+import { useCourses } from "@/contexts/CourseContext";
 
 type DocumentViewNavigationProp = StackNavigationProp<MainStackParamList, "DocumentView">;
 
@@ -84,7 +85,8 @@ const DOCUMENT_VIEWERS = [
 const DocumentView = () => {
   const route = useRoute();
   const navigation = useNavigation<DocumentViewNavigationProp>();
-  const { documentId, courseId, sectionId, userId, documentType } = route.params as any;
+  const { documentId, courseId, sectionId, userId, documentType, sourceScreen } = route.params as any;
+  const { refreshMyCourses } = useCourses();
 
   const [loading, setLoading] = useState(true);
   const [documentDetail, setDocumentDetail] = useState<any>(null);
@@ -96,7 +98,10 @@ const DocumentView = () => {
   const docType = documentDetail?.resource_type || documentType || 'pdf';
   const supportedViewers = useMemo(() => {
     if (docType === "document") {
-      return DOCUMENT_VIEWERS.filter((viewer) => viewer.name === "Office Online");
+      return DOCUMENT_VIEWERS.filter(
+        (viewer) =>
+          viewer.name === "Office Online" || viewer.name === "Google Drive Viewer"
+      );
     }
     const filtered = DOCUMENT_VIEWERS.filter((viewer) =>
       viewer.supportedTypes.includes(docType as any)
@@ -141,6 +146,24 @@ const DocumentView = () => {
       refetchNavigation();
     }, [])
   );
+
+  const navigateBackToModuleDetail = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    const resolvedSectionId = documentDetail?.section?.id || sectionId;
+    if (resolvedSectionId) {
+      navigation.navigate("ModuleDetail", {
+        courseId,
+        sectionId: resolvedSectionId,
+        userId,
+        sourceScreen,
+      } as any);
+      return;
+    }
+    navigation.navigate("CourseDetail", { courseId, sourceScreen } as any);
+  };
 
   const fetchCourseSections = async () => {
     try {
@@ -215,7 +238,7 @@ const DocumentView = () => {
         [
           {
             text: "Go Back",
-            onPress: () => navigation.goBack(),
+            onPress: navigateBackToModuleDetail,
           },
         ],
         { cancelable: false }
@@ -239,12 +262,16 @@ const DocumentView = () => {
 
   // Automatically try next viewer on error
   const handleDocumentError = () => {
+    if (documentLoadError) return;
+
     console.log(`❌ Document Viewer error with ${supportedViewers[currentViewerIndex]?.name || 'viewer'}`);
     
     clearAllTimeouts();
     
     // Record this attempt
-    setViewerAttempts((prev) => [...prev, currentViewerIndex]);
+    setViewerAttempts((prev) =>
+      prev.includes(currentViewerIndex) ? prev : [...prev, currentViewerIndex]
+    );
 
     // Auto-advance to next viewer
     if (currentViewerIndex < supportedViewers.length - 1) {
@@ -272,7 +299,11 @@ const DocumentView = () => {
 
   // Start load timeout when viewer changes
   useEffect(() => {
-    if (documentDetail?.resource_url && !successfulViewer && currentViewerIndex < supportedViewers.length) {
+    if (
+      documentDetail?.resource_url &&
+      successfulViewer === null &&
+      currentViewerIndex < supportedViewers.length
+    ) {
       clearAllTimeouts();
       
       const currentViewer = supportedViewers[currentViewerIndex];
@@ -290,7 +321,24 @@ const DocumentView = () => {
     }
     
     return () => clearAllTimeouts();
-  }, [currentViewerIndex, documentDetail?.resource_url, supportedViewers]);
+  }, [
+    currentViewerIndex,
+    documentDetail?.resource_url,
+    supportedViewers,
+    successfulViewer,
+    isLoadingViewer,
+    documentLoadError,
+  ]);
+
+  // Reset viewer pipeline when a different document is opened.
+  useEffect(() => {
+    clearAllTimeouts();
+    setCurrentViewerIndex(0);
+    setViewerAttempts([]);
+    setDocumentLoadError(false);
+    setIsLoadingViewer(true);
+    setSuccessfulViewer(null);
+  }, [documentDetail?.id, docType]);
 
   // Handle WebView load events
   const handleWebViewLoad = (syntheticEvent: any) => {
@@ -316,9 +364,9 @@ const DocumentView = () => {
   };
 
   const handleWebViewLoadEnd = () => {
-    // Only mark as success if we haven't detected errors
-    if (!viewerAttempts.includes(currentViewerIndex)) {
-      // Will be confirmed by injected JavaScript check
+    // Some providers block JS bridge checks; treat load-end as success fallback.
+    if (successfulViewer === null && !viewerAttempts.includes(currentViewerIndex)) {
+      handleDocumentLoadSuccess();
     }
   };
 
@@ -357,6 +405,12 @@ const DocumentView = () => {
 
       setIsCompleted(true);
 
+      try {
+        await refreshMyCourses();
+      } catch (refreshErr) {
+        console.warn("Failed to refresh My Courses after document completion", refreshErr);
+      }
+
       if (documentDetail) {
         setDocumentDetail({
           ...documentDetail,
@@ -369,12 +423,6 @@ const DocumentView = () => {
       }
 
       await refetchNavigation();
-
-      navigation.setParams({
-        documentCompleted: true,
-        completedDocumentId: documentId,
-        timestamp: Date.now(),
-      } as any);
 
       Alert.alert("Success", "Lesson marked as completed!", [{ text: "OK" }]);
     } catch (error: any) {
@@ -400,11 +448,12 @@ const DocumentView = () => {
 
     if (nextItemInModule) {
       if (nextItemInModule.item.type === "video") {
-        navigation.replace("LessonPlayer", {
+        navigation.replace("VideoPlayer", {
           videoId: nextItemInModule.item.id,
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          sourceScreen,
           fromDocumentId: documentId,
           documentCompleted: true,
         } as any);
@@ -414,6 +463,7 @@ const DocumentView = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          sourceScreen,
           fromDocumentId: documentId,
           documentCompleted: true,
         } as any);
@@ -423,6 +473,7 @@ const DocumentView = () => {
           courseId,
           sectionId: nextItemInModule.sectionId,
           userId,
+          sourceScreen,
           documentType: nextItemInModule.item.type,
           fromDocumentId: documentId,
           documentCompleted: true,
@@ -434,11 +485,12 @@ const DocumentView = () => {
   const handlePrevious = () => {
     if (prevItemInModule) {
       if (prevItemInModule.item.type === "video") {
-        navigation.replace("LessonPlayer", {
+        navigation.replace("VideoPlayer", {
           videoId: prevItemInModule.item.id,
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          sourceScreen,
         });
       } else if (prevItemInModule.item.type === "quiz") {
         navigation.replace("QuizScreen", {
@@ -446,6 +498,7 @@ const DocumentView = () => {
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          sourceScreen,
         });
       } else if (["pdf", "document", "ppt"].includes(prevItemInModule.item.type)) {
         navigation.replace("DocumentView", {
@@ -453,6 +506,7 @@ const DocumentView = () => {
           courseId,
           sectionId: prevItemInModule.sectionId,
           userId,
+          sourceScreen,
           documentType: prevItemInModule.item.type,
         });
       }
@@ -525,6 +579,7 @@ const DocumentView = () => {
         navigation={navigation}
         headerLeftIcon="chevron-back"
         customEdges={["top", "bottom"]}
+        onHeaderLeftPress={navigateBackToModuleDetail}
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.purple400} />
@@ -541,6 +596,7 @@ const DocumentView = () => {
         navigation={navigation}
         headerLeftIcon="chevron-back"
         customEdges={["top", "bottom"]}
+        onHeaderLeftPress={navigateBackToModuleDetail}
       >
         <View style={styles.errorContainer}>
           <Ionicons
@@ -570,17 +626,7 @@ const DocumentView = () => {
       navigation={navigation}
       headerLeftIcon="chevron-back"
       customEdges={["top", "bottom"]}
-      onHeaderLeftPress={() => {
-        if (navigation.canGoBack()) {
-          navigation.goBack();
-          return;
-        }
-        navigation.navigate("ModuleDetail", {
-          courseId,
-          sectionId,
-          userId,
-        } as any);
-      }}
+      onHeaderLeftPress={navigateBackToModuleDetail}
     >
       {/* Document Viewer */}
       <View style={styles.pdfContainer}>
@@ -873,6 +919,7 @@ const DocumentView = () => {
           </View>
         )}
         <Text style={styles.title}>{documentDetail.title}</Text>
+        <Text style={styles.description}>{documentDetail.description}</Text>
       </View>
 
       <ActionButton
@@ -1256,6 +1303,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.textPrimary,
     lineHeight: 24,
+  },
+  description: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    marginTop: Spacing.sm,
   },
   navigationContainer: {
     gap: Spacing.sm,

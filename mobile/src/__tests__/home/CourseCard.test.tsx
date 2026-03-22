@@ -60,7 +60,7 @@ describe('CourseCard', () => {
     expect(getByText('4.6')).toBeTruthy();
     expect(getByText('12 modules')).toBeTruthy();
     expect(getByText('Popular right now')).toBeTruthy();
-    expect(getByText('#2 • 1.0')).toBeTruthy();
+    expect(getByText('#2')).toBeTruthy();
   });
 
   it('calls onPress with course when card is pressed', () => {

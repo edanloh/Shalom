@@ -260,13 +260,8 @@ export const CourseBuilderProvider = ({
     const fetchCourseData = async () => {
       if (!courseId || courseId === "new") {
         // No courseId or 'new' means we're creating a new course, keep empty state
-        console.log(
-          "CourseBuilder: Creating new course (no courseId or courseId=new)",
-        );
         return;
       }
-
-      console.log("CourseBuilder: Loading course data for courseId:", courseId);
       setIsLoadingCourse(true);
 
       try {
@@ -281,8 +276,6 @@ export const CourseBuilderProvider = ({
           adminId,
         );
 
-        console.log("CourseBuilder: Course data loaded:", courseBuilderData);
-
         // Set course basic info
         setCourseName(courseBuilderData.courseName);
         setCourseDescription(courseBuilderData.courseDescription);
@@ -293,27 +286,10 @@ export const CourseBuilderProvider = ({
         // Set category
         setCourseCategory(courseBuilderData.courseCategory);
         setOriginalCourseCategory(courseBuilderData.courseCategory); // Save for revert
-        console.log("Loaded category:", courseBuilderData.courseCategory);
 
         // Set modules with all transformations already applied
         setModules(courseBuilderData.modules);
-
-        console.log(
-          "CourseBuilder: Quiz questions check:",
-          courseBuilderData.modules.map((m) => ({
-            moduleTitle: m.title,
-            quizzes: m.quizzes.map((q) => ({
-              quizTitle: q.title,
-              questionsCount: q.questions?.length || 0,
-              questions: q.questions,
-            })),
-          })),
-        );
-
-        console.log(
-          "CourseBuilder: Course data loaded with numbering:",
-          courseBuilderData.modules,
-        );
+     
       } catch (error) {
         console.error("CourseBuilder: Error fetching course data:", error);
       } finally {
@@ -385,11 +361,9 @@ export const CourseBuilderProvider = ({
     };
     const getStudents = async () => {
       const studentsData = await courseService.getCourseStudents(currentCourseId);
-      console.log('Enrolled students fetched for notifications:', studentsData);
       setEnrolledStudents(studentsData);
       const data = await courseService.getAllStudents();
       setAllStudents(data.students);
-      console.log('All students fetched for notifications:', data.students);
     };
     initializeOrderValues();
     getStudents();
@@ -453,11 +427,6 @@ export const CourseBuilderProvider = ({
     let hasErrors = false;
     let uploadedCourseThumbnailUrl = courseThumbnailUrl;
 
-    console.log(
-      "[uploadAllPendingFiles] Starting with courseThumbnailUrl:",
-      courseThumbnailUrl,
-    );
-
     // Upload course thumbnail if it's a local file
     if (courseThumbnailUrl?.startsWith("[LOCAL_FILE:")) {
       const courseThumbnailFile = (window as any).__courseThumbnailFile;
@@ -469,10 +438,6 @@ export const CourseBuilderProvider = ({
             console.error("Course thumbnail upload failed:", error);
             hasErrors = true;
           } else {
-            console.log(
-              "[uploadAllPendingFiles] Uploaded course thumbnail to:",
-              url,
-            );
             uploadedCourseThumbnailUrl = url;
             setCourseThumbnailUrl(url);
           }
@@ -481,12 +446,7 @@ export const CourseBuilderProvider = ({
           hasErrors = true;
         }
       }
-    } else {
-      console.log(
-        "[uploadAllPendingFiles] Course thumbnail is a URL, using directly:",
-        uploadedCourseThumbnailUrl,
-      );
-    }
+    } 
 
     // Upload all lesson files
     for (
@@ -693,28 +653,14 @@ export const CourseBuilderProvider = ({
    * Process all pending category changes before saving the course
    */
   const processCategoryChanges = async () => {
-    console.log(
-      "[processCategoryChanges] Starting with:",
-      pendingCategoryChanges,
-    );
-
     let finalCategoryId = courseCategory;
 
     // Step 1: Handle deleted categories FIRST
     for (const deletedCategoryId of pendingCategoryChanges.deleted) {
-      console.log(
-        "[processCategoryChanges] Processing deleted category:",
-        deletedCategoryId,
-      );
-
       // If this course uses the deleted category, it will be set to General by backend
       // But we need to delete the category first
       try {
         await categoryService.deleteCategory(deletedCategoryId);
-        console.log(
-          "[processCategoryChanges] Category deleted, courses reassigned to General by backend",
-        );
-
         // If this course was using deleted category, we need to find General's ID
         if (courseCategory === deletedCategoryId) {
           const allCategories = await categoryService.getAllCategories();
@@ -743,24 +689,14 @@ export const CourseBuilderProvider = ({
 
     // Step 2: Handle created categories
     for (const newCat of pendingCategoryChanges.created) {
-      console.log("[processCategoryChanges] Creating new category:", newCat);
-
       try {
         const createdCategory = await categoryService.createCategory(
           newCat.name,
           newCat.color,
         );
 
-        console.log(
-          "[processCategoryChanges] Category created with ID:",
-          createdCategory.id,
-        );
-
         // If this course uses the temp ID, update to real ID
         if (courseCategory === newCat.tempId) {
-          console.log(
-            "[processCategoryChanges] Updating course category from temp ID to real ID",
-          );
           finalCategoryId = createdCategory.id;
           setCourseCategory(createdCategory.id);
         }
@@ -777,14 +713,6 @@ export const CourseBuilderProvider = ({
 
     // Step 3: Handle updated categories
     for (const updatedCat of pendingCategoryChanges.updated) {
-      console.log("[processCategoryChanges] Updating category:", updatedCat);
-      console.log("[processCategoryChanges] updatedCat.id:", updatedCat.id);
-      console.log("[processCategoryChanges] updatedCat.name:", updatedCat.name);
-      console.log(
-        "[processCategoryChanges] updatedCat.color:",
-        updatedCat.color,
-      );
-
       try {
         // Make sure you're passing the VALUES, not the object
         await categoryService.updateCategory(
@@ -792,7 +720,6 @@ export const CourseBuilderProvider = ({
           updatedCat.name, // string (NOT object)
           updatedCat.color, // string (NOT object)
         );
-        console.log("[processCategoryChanges] Category updated successfully");
       } catch (error) {
         console.error(
           "[processCategoryChanges] Error updating category:",
@@ -809,10 +736,6 @@ export const CourseBuilderProvider = ({
 
     // Update original category to new value
     setOriginalCourseCategory(finalCategoryId);
-
-    console.log(
-      "[processCategoryChanges] All category changes processed successfully",
-    );
     return finalCategoryId;
   };
 
@@ -820,11 +743,6 @@ export const CourseBuilderProvider = ({
    * Revert all category changes and restore original state
    */
   const revertCategoryChanges = () => {
-    console.log(
-      "[revertCategoryChanges] Reverting to original category:",
-      originalCourseCategory,
-    );
-
     // Restore original category
     setCourseCategory(originalCourseCategory);
 
@@ -847,12 +765,15 @@ export const CourseBuilderProvider = ({
       errors.push("❌ Course title must be at least 3 characters");
     }
 
-    // 2. Course description required
-    const courseDesc = courseDescription?.trim() || "";
-    if (!courseDesc) {
+    // 2. Course description required (normalize rich-text markup to plain text)
+    const courseDescRaw = courseDescription || "";
+    const courseDescPlain = courseDescRaw
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!courseDescPlain) {
       errors.push("❌ Course description is required");
-    } else if (courseDesc.length < 10) {
-      errors.push("❌ Course description must be at least 10 characters");
     }
 
     // 3. Course must have at least one module
@@ -904,17 +825,17 @@ export const CourseBuilderProvider = ({
                 `Please add a video URL or upload a video file.`,
             );
           }
-        } else if (lesson.type === "pdf") {
-          // PDF lessons must have a resource URL or uploaded file
-          const hasPDF =
+        } else {
+          // Document lessons (PDF/DOCX/PPTX) must have a resource URL or uploaded file
+          const hasDocument =
             lesson.resourceUrl &&
             lesson.resourceUrl.trim() !== "" &&
             lesson.resourceUrl !== "[LOCAL_FILE: ]";
 
-          if (!hasPDF) {
+          if (!hasDocument) {
             errors.push(
-              `❌ ${lessonIdentifier}: PDF document is required. ` +
-                `Please add a PDF URL or upload a PDF file.`,
+              `❌ ${lessonIdentifier}: Document is required. ` +
+                `Please add a resource URL or upload a file (PDF, DOCX, PPTX supported).`,
             );
           }
         }
@@ -926,7 +847,7 @@ export const CourseBuilderProvider = ({
         const quizTitle = (quiz.baseTitle || quiz.title || "")
           .replace(/^Quiz \d+\.\d+:\s*/, "")
           .trim();
-        const quizIdentifier = `Quiz ${moduleNumber}.${quizNumber} "${quizTitle}"`;
+        const quizIdentifier = `Quiz ${moduleNumber}.${quizNumber} ${quizTitle}`;
 
         if (!quizTitle) {
           errors.push(`❌ Quiz ${moduleNumber}.${quizNumber}: Title is required.`);
@@ -953,6 +874,12 @@ export const CourseBuilderProvider = ({
             errors.push(`❌ ${questionIdentifier}: Question text is required.`);
           }
 
+          // Points must be at least 1
+          const points = Number(question.points);
+          if (Number.isNaN(points) || points < 1) {
+            errors.push(`❌ ${questionIdentifier}: Points must be at least 1.`);
+          }
+
           // Validate based on question type
           if (
             question.type === "multiple-choice" ||
@@ -963,6 +890,22 @@ export const CourseBuilderProvider = ({
             const options = question.options || [];
             const hasOptions = options.length > 0;
             const nonEmptyOptions = options.filter((opt) => String(opt).trim() !== "");
+            const resolveAnswerIndex = (answer: any): number => {
+              if (Number.isInteger(answer)) return answer;
+              if (typeof answer === "string") {
+                return options.findIndex(
+                  (opt: any) => String(opt).trim() === answer.trim(),
+                );
+              }
+              return -1;
+            };
+            const resolveAnswerIndices = (answer: any): number[] => {
+              const raw = Array.isArray(answer) ? answer : [answer];
+              const mapped = raw
+                .map((item: any) => resolveAnswerIndex(item))
+                .filter((idx: number) => Number.isInteger(idx) && idx >= 0);
+              return Array.from(new Set(mapped));
+            };
 
             if (!hasOptions || nonEmptyOptions.length === 0) {
               errors.push(
@@ -983,8 +926,7 @@ export const CourseBuilderProvider = ({
             // For multiple-correct, ensure at least one answer is selected
             if (
               question.type === "multiple-correct" &&
-              Array.isArray(question.correctAnswer) &&
-              question.correctAnswer.length === 0
+              resolveAnswerIndices(question.correctAnswer).length === 0
             ) {
               errors.push(
                 `❌ ${questionIdentifier}: Must select at least one correct answer.`,
@@ -994,21 +936,32 @@ export const CourseBuilderProvider = ({
             // Validate correct answer index(es) for multiple-choice / multiple-correct
             if (
               question.type === "multiple-choice" &&
-              typeof question.correctAnswer === "number" &&
               options.length > 0 &&
-              (question.correctAnswer < 0 || question.correctAnswer >= options.length)
+              (() => {
+                const idx = resolveAnswerIndex(question.correctAnswer);
+                return idx < 0 || idx >= options.length;
+              })()
             ) {
               errors.push(
                 `❌ ${questionIdentifier}: Correct answer must be a valid option.`,
               );
             }
 
+            if (question.type === "multiple-choice" && options.length > 0) {
+              const idx = resolveAnswerIndex(question.correctAnswer);
+              if (idx >= 0 && !String(options[idx] ?? "").trim()) {
+                errors.push(
+                  `❌ ${questionIdentifier}: Correct answer points to an empty option.`,
+                );
+              }
+            }
+
             if (
               question.type === "multiple-correct" &&
-              Array.isArray(question.correctAnswer) &&
               options.length > 0
             ) {
-              const invalidIndex = question.correctAnswer.some(
+              const normalizedAnswers = resolveAnswerIndices(question.correctAnswer);
+              const invalidIndex = normalizedAnswers.some(
                 (idx: number) => idx < 0 || idx >= options.length,
               );
               if (invalidIndex) {
@@ -1016,6 +969,42 @@ export const CourseBuilderProvider = ({
                   `❌ ${questionIdentifier}: One or more correct answers are invalid.`,
                 );
               }
+
+              const hasEmptySelectedOption = normalizedAnswers.some(
+                (idx: number) => !String(options[idx] ?? "").trim(),
+              );
+              if (hasEmptySelectedOption) {
+                errors.push(
+                  `❌ ${questionIdentifier}: A correct answer points to an empty option.`,
+                );
+              }
+            }
+          }
+
+          if (question.type === "short-answer") {
+            if (!question.sampleAnswer || !question.sampleAnswer.trim()) {
+              errors.push(
+                `❌ ${questionIdentifier}: Explanation/Sample Answer is required for short-answer questions.`,
+              );
+            }
+          }
+
+          if (question.type === "matching") {
+            const pairs = Array.isArray(question.matchingPairs)
+              ? question.matchingPairs
+              : [];
+            if (pairs.length === 0) {
+              errors.push(
+                `❌ ${questionIdentifier}: At least one matching pair is required.`,
+              );
+            }
+            const hasIncompletePair = pairs.some(
+              (pair: any) => !pair?.left?.trim() || !pair?.right?.trim(),
+            );
+            if (hasIncompletePair) {
+              errors.push(
+                `❌ ${questionIdentifier}: All matching pairs must have both left and right items filled.`,
+              );
             }
           }
         });
@@ -1043,21 +1032,15 @@ export const CourseBuilderProvider = ({
       };
     }
 
-    console.log("[saveCourse] ✓ Validation passed!");
     setShowValidationErrors(false);
 
     // Continue with existing save logic...
     setIsSaving(true);
     try {
       // Step 0 - Process category changes FIRST
-      console.log("[saveCourse] Processing category changes...");
       let finalCategoryId;
       try {
         finalCategoryId = await processCategoryChanges();
-        console.log(
-          "[saveCourse] Category changes processed, final category ID:",
-          finalCategoryId,
-        );
       } catch (error) {
         console.error("[saveCourse] Category processing failed:", error);
         showModal({
@@ -1080,7 +1063,6 @@ export const CourseBuilderProvider = ({
       }
 
       // Step 1: Upload all pending files first
-      console.log("Uploading pending files...");
       const { uploadedModules, uploadedCourseThumbnailUrl, hasErrors } =
         await uploadAllPendingFiles();
 
@@ -1098,13 +1080,17 @@ export const CourseBuilderProvider = ({
 
       let finalCourseId = currentCourseId;
 
+      const getModuleBaseTitle = (title: string) =>
+        String(title || "").replace(/^Module\s+\d+\s*:\s*/i, "").trim();
+
       // Transform modules from CourseBuilder format to backend API format
       // Use uploadedModules which has the Supabase URLs instead of local file markers
       // IMPORTANT: Include IDs for existing items to preserve student progress
       // Extract baseTitle (user input) instead of full title with "Lesson X.Y:" prefix
       const transformedModules = uploadedModules.map((module, index) => ({
         id: module.id, // Preserve section ID for UPDATE (not INSERT)
-        title: module.title,
+        // Persist only the user title; module numbering prefix is display-only.
+        title: getModuleBaseTitle(module.title),
         description: module.description || "",
         order: index, // Add order index for each module
         lessons: module.lessons.map((lesson, lessonIndex) => ({
@@ -1149,24 +1135,38 @@ export const CourseBuilderProvider = ({
             // Prepare correctAnswer for database storage
             // Save actual option values (not indices) so options can be scrambled on mobile
             let correctAnswerForDb: string | string[] | number[];
+            const options = q.options || [];
+            const resolveAnswerIndex = (answer: any): number => {
+              if (Number.isInteger(answer)) return answer;
+              if (typeof answer === "string") {
+                return options.findIndex(
+                  (opt: any) => String(opt).trim() === answer.trim(),
+                );
+              }
+              return -1;
+            };
 
             if (q.type === "multiple-choice" || q.type === "multiple_choice") {
               // Single answer: store the actual option text
-              const answerIndex = typeof q.correctAnswer === "number" ? q.correctAnswer : 0;
-              correctAnswerForDb = q.options[answerIndex] || "";
+              const answerIndex = resolveAnswerIndex(q.correctAnswer);
+              correctAnswerForDb = answerIndex >= 0 ? options[answerIndex] || "" : "";
             } else if (q.type === "true-false") {
               // True/False: store the actual option text ("True" or "False")
               const answerIndex = q.correctAnswer === 0 ? 0 : 1;
-              correctAnswerForDb = q.options[answerIndex] || "True";
+              correctAnswerForDb = options[answerIndex] || "True";
             } else if (q.type === "multiple-correct") {
               // Multiple answers: store array of actual option texts
-              if (Array.isArray(q.correctAnswer)) {
-                correctAnswerForDb = q.correctAnswer
-                  .filter((idx: any) => typeof idx === "number" && idx >= 0 && idx < q.options.length)
-                  .map((idx: number) => q.options[idx]);
-              } else {
-                correctAnswerForDb = [];
-              }
+              const rawAnswers = Array.isArray(q.correctAnswer)
+                ? q.correctAnswer
+                : [q.correctAnswer];
+              const answerIndices = Array.from(
+                new Set(
+                  rawAnswers
+                    .map((ans: any) => resolveAnswerIndex(ans))
+                    .filter((idx: number) => idx >= 0 && idx < options.length),
+                ),
+              );
+              correctAnswerForDb = answerIndices.map((idx: number) => options[idx]);
             } else {
               // For other types (short-answer, matching), store as-is
               correctAnswerForDb = String(q.correctAnswer || "");
@@ -1190,8 +1190,6 @@ export const CourseBuilderProvider = ({
 
       // Step 1: Create or update the course WITH full module structure
       if (!courseExistsInDb) {
-        console.log("Creating new course with modules:", courseName);
-
         // Use courseService.createCourseWithModules which calls /createCourse endpoint
         const courseData = {
           courseId: currentCourseId && currentCourseId !== "new" ? currentCourseId : undefined, // Pass pre-generated ID if exists
@@ -1217,7 +1215,6 @@ export const CourseBuilderProvider = ({
 
         setCurrentCourseId(finalCourseId);
         setCourseExistsInDb(true);
-        console.log("Course created with ID:", finalCourseId);
 
         // Update URL to reflect the new course ID (so subsequent saves use UPDATE)
         if (typeof window !== "undefined") {
@@ -1228,7 +1225,6 @@ export const CourseBuilderProvider = ({
           );
         }
       } else {
-        console.log("Updating course with modules:", currentCourseId);
         const updateData = {
           title: courseName,
           description: courseDescription,
@@ -1239,7 +1235,6 @@ export const CourseBuilderProvider = ({
           outcomes: courseOutcomes.map((outcome) => outcome.trim()).filter(Boolean),
         };
 
-        console.log("check course category:", courseCategory);
 
         await courseService.updateCourseWithModules(
           currentCourseId,

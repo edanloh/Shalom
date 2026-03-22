@@ -9,9 +9,11 @@ export { notificationService } from './notificationService';
 export { studentService } from './studentService';
 export { instructorTaskService } from './instructorTaskService';
 export { analyticsService } from './analyticsService';
+export { quizService } from './quizService';
 
 export type { Course, CourseListParams, Module, ModuleItem, Review, Student, ModuleDetail, Lesson, Quiz, Question } from './courseService';
 // export type { ModuleDetail, Lesson, Quiz, Question } from './moduleService';
 export type { LessonDetail } from './lessonService';
 export type { Notification } from './notificationService';
 export type { StudentProfile } from './studentService';
+export type { PendingGradingItem, QuestionGrading, AnswerVariation, StudentAnswer, GradeSubmission, VariationGradeSubmission, GradeResponse, QuizResultsStats, StudentAttemptDetails, QuestionAttemptDetail } from './quizService';

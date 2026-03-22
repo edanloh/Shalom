@@ -94,6 +94,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
     : isRemotePptx
       ? "📊 Slides URL added"
       : "📄 PDF URL added";
+  const isSupabaseBucketOfficeUrl =
+    !!remoteResourceUrl &&
+    (isRemoteDocx || isRemotePptx) &&
+    remoteResourceUrl.includes(
+      "/storage/v1/object/public/course-documents/",
+    );
+  const isResourceUrlLocked = isSupabaseBucketOfficeUrl;
 
   // Detect and handle unsupported document types
   useEffect(() => {
@@ -180,11 +187,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             return numA - numB;
           });
 
-          console.log(
-            "Slide files found:",
-            slideFilePaths.length,
-            slideFilePaths,
-          );
 
           const slidePreviews: string[] = [];
 
@@ -208,7 +210,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     ? slideTexts.join("\n")
                     : `[Slide ${i + 1}]`;
 
-                console.log(`Slide ${i + 1}:`, slideContent);
                 slidePreviews.push(slideContent);
               }
             } catch (err) {
@@ -765,19 +766,28 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 ? ""
                 : lesson?.resourceUrl || ""
             }
-            onChange={(e) =>
+            onChange={(e) => {
+              if (isResourceUrlLocked) return;
               updateLesson(module.id, lesson.id, {
                 resourceUrl: e.target.value,
-              })
-            }
+              });
+            }}
+            readOnly={isResourceUrlLocked}
             style={{
               backgroundColor: Colors.textInputBg,
               borderColor: Colors.gray600,
               color: Colors.textPrimary,
+              opacity: isResourceUrlLocked ? 0.8 : 1,
+              cursor: isResourceUrlLocked ? "not-allowed" : "text",
             }}
             className="w-full px-3 py-2 border rounded focus:outline-none focus:border-opacity-80"
             placeholder="https://example.com/document.pdf"
           />
+          {isResourceUrlLocked && (
+            <p className="mt-1 text-xs" style={{ color: Colors.textMuted }}>
+              URL is auto-generated from local DOCX/PPTX upload and cannot be edited here.
+            </p>
+          )}
           {lesson?.resourceUrl &&
             !lesson.resourceUrl.startsWith("[LOCAL_FILE:") && (
               <>
@@ -923,7 +933,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         </div>
       )}
 
-      {/* PDF Options */}
+      {/* PDF Options
       <div className="mt-4">
         <label className="flex items-center gap-2">
           <input
@@ -940,7 +950,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             Allow students to download this PDF
           </span>
         </label>
-      </div>
+      </div> */}
     </div>
   );
 };

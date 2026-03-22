@@ -125,4 +125,108 @@ describe('MatchingQuestion', () => {
     expect(getByText('Carrot')).toBeTruthy();
     expect(getByText('Vegetable')).toBeTruthy();
   });
+
+  it('parses JSON string answers in review mode', () => {
+    const matchingState = new Map<string, Map<string, string>>();
+    const questionWithJson = {
+      ...question,
+      correct_answer: JSON.stringify(question.correct_answer),
+    };
+
+    const { getByText } = render(
+      <MatchingQuestion
+        question={questionWithJson as any}
+        matchingState={matchingState}
+        reviewMode={true}
+        onMatch={jest.fn()}
+        onClearMatch={jest.fn()}
+      />,
+    );
+
+    expect(getByText('Correct Matches')).toBeTruthy();
+    expect(getByText('Fruit')).toBeTruthy();
+  });
+
+  it('ignores a right-side tap until a left item is selected', () => {
+    const matchingState = new Map<string, Map<string, string>>();
+    const onMatch = jest.fn();
+
+    const { getByText } = render(
+      <MatchingQuestion
+        question={question as any}
+        matchingState={matchingState}
+        reviewMode={false}
+        onMatch={onMatch}
+        onClearMatch={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(getByText('Fruit'));
+    expect(onMatch).not.toHaveBeenCalled();
+  });
+
+  it('updates the instruction while selecting and deselecting a left item', () => {
+    const matchingState = new Map<string, Map<string, string>>();
+    const { getByText } = render(
+      <MatchingQuestion
+        question={question as any}
+        matchingState={matchingState}
+        reviewMode={false}
+        onMatch={jest.fn()}
+        onClearMatch={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(getByText('Apple'));
+    expect(getByText('Now tap a B item →')).toBeTruthy();
+
+    fireEvent.press(getByText('Apple'));
+    expect(getByText('Tap an A item to start')).toBeTruthy();
+  });
+
+  it('does not allow selecting a right item that is already matched to another pair', () => {
+    const currentMatches = new Map<string, string>([['Carrot', 'Fruit']]);
+    const matchingState = new Map<string, Map<string, string>>([
+      ['q1', currentMatches],
+    ]);
+    const onMatch = jest.fn();
+    const onClearMatch = jest.fn();
+
+    const { getByText } = render(
+      <MatchingQuestion
+        question={question as any}
+        matchingState={matchingState}
+        reviewMode={false}
+        onMatch={onMatch}
+        onClearMatch={onClearMatch}
+      />,
+    );
+
+    fireEvent.press(getByText('Apple'));
+    fireEvent.press(getByText('Fruit'));
+
+    expect(onClearMatch).not.toHaveBeenCalled();
+    expect(onMatch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to an empty state when correct answers cannot be parsed', () => {
+    const matchingState = new Map<string, Map<string, string>>();
+    const invalidQuestion = {
+      ...question,
+      correct_answer: 'not-json',
+    };
+
+    const { getByText, queryByText } = render(
+      <MatchingQuestion
+        question={invalidQuestion as any}
+        matchingState={matchingState}
+        reviewMode={false}
+        onMatch={jest.fn()}
+        onClearMatch={jest.fn()}
+      />,
+    );
+
+    expect(getByText('0/0')).toBeTruthy();
+    expect(queryByText('Apple')).toBeNull();
+  });
 });

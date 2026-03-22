@@ -30,8 +30,33 @@ const ENDPOINTS = {
   POST_ENROLLMENT: (uid: string) => `/postUserEnrollment/${encodeURIComponent(uid)}`, 
   CATEGORIES: '/categoryHandler',
   RECOMMENDATIONS: '/getRecommendations',
+  ML_RECOMMENDATIONS: '/getMLRecommendations',
   RECOMMENDATION_EVENT: '/postRecommendationEvent',
 };
+
+// ── ML traffic routing ────────────────────────────────────────────────────────
+// Set EXPO_PUBLIC_ML_SPLIT=20 to send 20 % of users to the ML re-ranker.
+// Uses the same deterministic hash-bucket approach as the edge function so
+// assignment is sticky per userId (same user always gets the same path).
+const ML_SPLIT = Number(process.env.EXPO_PUBLIC_ML_SPLIT ?? '0');
+
+const hashToBucket100 = (uid: string): number => {
+  // djb2-style hash, matches hashToBucket100 in getRecommendations.ts
+  let hash = 2166136261;
+  for (let i = 0; i < uid.length; i++) {
+    hash ^= uid.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0) % 100;
+};
+
+const shouldUseML = (uid: string): boolean => {
+  if (ML_SPLIT <= 0) return false;
+  return hashToBucket100(uid) < ML_SPLIT;
+};
+
+const getRecommendationCacheKey = (userId: string): string =>
+  `${CACHE_CONFIG.COURSES_KEY}_recommended_${userId}`;
 
 
 // Wishlist endpoints - Supabase Edge Functions
@@ -186,6 +211,16 @@ export interface CategoryApiResponse {
   };
 }
 
+export interface PaginatedCoursesResult {
+  courses: Course[];
+  pagination: {
+    limit: number;
+    offset: number;
+    totalCount: number;
+    hasMore: boolean;
+  };
+}
+
 // Cache utility functions
 class CacheManager {
   static async get<T>(key: string): Promise<T | null> {
@@ -230,6 +265,41 @@ class CacheManager {
   }
 }
 
+const getCoursesCacheKey = (params?: CourseListParams): string => {
+  const paramString = params ? JSON.stringify(params) : 'default';
+  return `${CACHE_CONFIG.COURSES_KEY}_${paramString}`;
+};
+
+const extractCoursesResponse = (response: any): PaginatedCoursesResult => {
+  if (!response) {
+    throw new Error('No response received from API');
+  }
+
+  let coursesArray;
+  if (Array.isArray(response.data)) {
+    coursesArray = response.data;
+  } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
+    coursesArray = response.data.courses;
+  } else if (response.courses && Array.isArray(response.courses)) {
+    coursesArray = response.courses;
+  } else if (Array.isArray(response)) {
+    coursesArray = response;
+  } else {
+    console.error('Invalid API response structure:', JSON.stringify(response).slice(0, 500));
+    throw new Error('Invalid API response: courses array not found');
+  }
+
+  return {
+    courses: coursesArray.map(convertAWSCourseToAppCourse),
+    pagination: {
+      limit: Number(response?.pagination?.limit ?? coursesArray.length ?? 0),
+      offset: Number(response?.pagination?.offset ?? 0),
+      totalCount: Number(response?.pagination?.totalCount ?? coursesArray.length ?? 0),
+      hasMore: Boolean(response?.pagination?.hasMore),
+    },
+  };
+};
+
 // Helper function to convert AWS course format to our app format
 const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   // Safety checks
@@ -265,6 +335,7 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   const modulesFromExplicit = Number(explicitModules);
   const lessonsFromExplicit = Number(explicitLessons);
   const durationHours = Number(awsCourse.duration_hours ?? 0);
+  const totalRatings = Number(awsCourse.total_ratings ?? awsCourse.totalRatings ?? 0);
 
   const resolvedModules = Number.isFinite(modulesFromExplicit) && modulesFromExplicit > 0
     ? modulesFromExplicit
@@ -272,6 +343,18 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
   const resolvedLessons = Number.isFinite(lessonsFromExplicit) && lessonsFromExplicit > 0
     ? lessonsFromExplicit
     : 0;
+
+  const parseRating = (value: unknown): number => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 0;
+    if (parsed < 0) return 0;
+    if (parsed > 5) return 5;
+    return parsed;
+  };
+  const hasAnyReviewData =
+    Number.isFinite(totalRatings) && totalRatings > 0;
+  const parsedRating = parseRating(awsCourse.rating);
+  const rating = hasAnyReviewData ? parsedRating : 0;
 
   return {
     id: String(awsCourse.courseid || awsCourse.id || 'unknown'),
@@ -282,7 +365,7 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
       name: awsCourse.instructor_name || 'Unknown Instructor',
       avatar: generateAvatar(awsCourse.instructor_name || 'Unknown'),
       category: awsCourse.category_name || 'General',
-      rating: parseFloat(awsCourse.instructor_rating || '4.5'),
+      rating: parseRating(awsCourse.instructor_rating),
       bio: awsCourse.instructor_bio || 'No bio available',
     },
     progress_percentage: awsCourse.progress_percentage,
@@ -293,7 +376,7 @@ const convertAWSCourseToAppCourse = (awsCourse: any): Course => {
     //   lastAccessed: new Date().toISOString(),
     // },
     duration: durationStr,
-    rating: parseFloat(awsCourse.rating || '4.0'),
+    rating,
     image:
       awsCourse.thumbnail_url ||
       awsCourse.image ||
@@ -347,6 +430,15 @@ export const clearCategoriesCache = async (): Promise<void> => {
 
 // Helper function to convert enrollment data to Course format
 const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
+  const normalizedCategory = String(
+    enrollment.category_name || (enrollment as any).category || "General",
+  ).trim() || "General";
+
+  const normalizedCategoryColor =
+    enrollment.category_color ||
+    (enrollment as any).categoryColor ||
+    Colors.categoryDefault;
+
   // Primary: Use section counts if available (preferred method)
   const totalSections = enrollment.total_sections || 0;
   const completedSections = enrollment.completed_sections || 0;
@@ -360,15 +452,25 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
   const totalItems = totalVideos + totalQuizzes;
   const completedItems = completedVideos + passedQuizzes;
   
-  // Determine which data to use
+  // Determine which data to use.
+  // Keep this module-first to match CourseDetailScreen progress semantics.
   const hasSectionData = totalSections > 0;
   const progressTotal = hasSectionData ? totalSections : totalItems;
   const progressCompleted = hasSectionData ? completedSections : completedItems;
-  
-  // Calculate progress percentage
-  const calculatedPercentage = progressTotal > 0 
-    ? Math.round((progressCompleted / progressTotal) * 100) 
+
+  const numericEnrollmentPercentage = Number(enrollment.progress_percentage);
+  const fallbackEnrollmentPercentage = Number.isFinite(numericEnrollmentPercentage)
+    ? Math.max(0, Math.min(100, Math.round(numericEnrollmentPercentage)))
     : 0;
+
+  const calculatedPercentage = progressTotal > 0
+    ? Math.round((progressCompleted / progressTotal) * 100)
+    : fallbackEnrollmentPercentage;
+
+  // If backend marks completion explicitly, enforce 100% to prevent mixed UI states.
+  const effectiveProgressPercentage = enrollment.is_completed
+    ? 100
+    : calculatedPercentage;
   
   console.log(`[courseService] Converting enrollment for "${enrollment.title}":`, {
     hasSectionData,
@@ -395,16 +497,16 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
       id: `instructor-${enrollment.instructor_name.replace(/\s+/g, '-').toLowerCase()}`,
       name: enrollment.instructor_name,
       avatar: enrollment.instructor_avatar || generateAvatar(enrollment.instructor_name),
-      category: enrollment.category_name,
-      rating: parseFloat(enrollment.instructor_rating),
-      bio: `Expert ${enrollment.category_name} instructor`,
+      category: normalizedCategory,
+      rating: Number(enrollment.instructor_rating) || 0,
+      bio: `Expert ${normalizedCategory} instructor`,
     },
-    progress_percentage: enrollment.progress_percentage,
+    progress_percentage: effectiveProgressPercentage,
     duration: `${enrollment.duration_hours}h`,
-    rating: parseFloat(enrollment.rating),
+    rating: Number(enrollment.rating) || 0,
     image: enrollment.thumbnail_url,
-    category: enrollment.category_name,
-    categoryColor: enrollment.category_color || Colors.categoryDefault,
+    category: normalizedCategory,
+    categoryColor: normalizedCategoryColor,
     modules: progressTotal,
     tags: enrollment.tags || [],
     prerequisites: [],
@@ -422,8 +524,7 @@ class CourseService {
   async getCourses(params?: CourseListParams): Promise<Course[]> {
     try {
       // Check cache first
-      const paramString = params ? JSON.stringify(params) : 'default';
-      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_${paramString}`;
+      const cacheKey = getCoursesCacheKey(params);
       const cachedCourses = await CacheManager.get<Course[]>(cacheKey);
       if (cachedCourses) {
         return cachedCourses;
@@ -431,42 +532,16 @@ class CourseService {
 
       // Build query parameters
       const queryParams: Record<string, string> = {};
-      if (params?.limit) queryParams.limit = params.limit.toString();
+      queryParams.limit = String(params?.limit ?? 24);
       if (params?.category) queryParams.category = params.category;
-      if (params?.sortBy) queryParams.sortBy = params.sortBy;
-      if (params?.sortOrder) queryParams.sortOrder = params.sortOrder;
+      queryParams.sortBy = params?.sortBy ?? 'updated_at';
+      queryParams.sortOrder = params?.sortOrder ?? 'desc';
 
       const response = await apiService.get<any>(
         ENDPOINTS.COURSES,
         queryParams
       );
-      // Safety check: ensure response exists
-      if (!response) {
-        throw new Error('No response received from API');
-      }
-
-      // The API response structure is: { success: true, data: [...], pagination: {...} }
-      // Where data is the array of courses directly
-      let coursesArray;
-      if (Array.isArray(response.data)) {
-        // Format: { success: true, data: [...] }
-        coursesArray = response.data;
-      } else if (response.data && response.data.courses && Array.isArray(response.data.courses)) {
-        // Nested format: { success: true, data: { courses: [...] } }
-        coursesArray = response.data.courses;
-      } else if (response.courses && Array.isArray(response.courses)) {
-        // Direct format: { courses: [...] }
-        coursesArray = response.courses;
-      } else if (Array.isArray(response)) {
-        // Array format: [...]
-        coursesArray = response;
-      } else {
-        console.error('Invalid API response structure:', JSON.stringify(response).slice(0, 500));
-        throw new Error('Invalid API response: courses array not found');
-      }
-      
-      // Convert AWS course format to our app format
-      const courses = coursesArray.map(convertAWSCourseToAppCourse);
+      const { courses } = extractCoursesResponse(response);
 
       // Cache the response
       await CacheManager.set(cacheKey, courses);
@@ -476,6 +551,26 @@ class CourseService {
       console.error('Error fetching courses:', error);
       throw error;
     }
+  }
+
+  async getPublishedCoursesPage(
+    params?: CourseListParams & { offset?: number }
+  ): Promise<PaginatedCoursesResult> {
+    const queryParams: Record<string, string> = {
+      limit: String(params?.limit ?? 24),
+      offset: String(params?.offset ?? 0),
+      sortBy: params?.sortBy ?? 'updated_at',
+      sortOrder: params?.sortOrder ?? 'desc',
+    };
+
+    if (params?.category) queryParams.category = params.category;
+
+    const response = await apiService.get<any>(ENDPOINTS.COURSES, queryParams);
+    return extractCoursesResponse(response);
+  }
+
+  async clearCoursesCache(params?: CourseListParams): Promise<void> {
+    await CacheManager.clear(getCoursesCacheKey(params));
   }
 
   /**
@@ -547,85 +642,110 @@ class CourseService {
   /**
    * Get recommended courses (remaining courses after enrolled ones)
    */
-  async getRecommendedCourses(userId?: string): Promise<Course[]> {
-    try {
-      const uid = userId || DEFAULT_USER_ID;
-      if (!uid) return [];
-      const cacheKey = `${CACHE_CONFIG.COURSES_KEY}_recommended_${uid}`;
+  async getRecommendedCourses(userId?: string): Promise<{
+    courses: Course[];
+    meta: any;
+    recommendations: any[];
+  }> {
+    const uid = userId || DEFAULT_USER_ID;
 
-      const resp = await apiService.get<any>(ENDPOINTS.RECOMMENDATIONS, {
+    try {
+      if (!uid) {
+        return { courses: [], meta: {}, recommendations: [] };
+      }
+      const cacheKey = getRecommendationCacheKey(uid);
+      const cached = await CacheManager.get<{
+        courses: Course[];
+        meta: any;
+        recommendations: any[];
+      }>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const useML = shouldUseML(uid);
+      const recoEndpoint = useML ? ENDPOINTS.ML_RECOMMENDATIONS : ENDPOINTS.RECOMMENDATIONS;
+
+      const resp = await apiService.get<any>(recoEndpoint, {
         userId: uid,
         limit: '8',
+        placement: 'home',
+        // Pass local time so context-factors (evening boost, weekend explore) work correctly
+        localHour: String(new Date().getHours()),
+        dayOfWeek: String(new Date().getDay()),
       });
 
-      const recs =
-        (Array.isArray(resp?.data) ? resp?.data : null) ??
-        resp?.data?.data?.recommendations ??
+      const recommendations =
         resp?.data?.recommendations ??
         resp?.recommendations ??
+        resp?.recommendations ??
         [];
-      const meta =
+      const meta = resp?.meta ??
         resp?.data?.data?.meta ??
         resp?.data?.meta ??
         resp?.meta ??
         {};
-
-      const sorted = Array.isArray(recs)
-        ? [...recs].sort((a, b) => {
-            const sa = Number(a.score ?? a.recommendation_score ?? 0);
-            const sb = Number(b.score ?? b.recommendation_score ?? 0);
-            if (sb !== sa) return sb - sa;
-            const ra = Number(a.rank ?? a.recommendation_rank ?? Infinity);
-            const rb = Number(b.rank ?? b.recommendation_rank ?? Infinity);
-            return ra - rb;
-          })
+      const sorted = Array.isArray(recommendations)
+        ? [...recommendations]
+            .sort((a, b) => {
+              const sa = Number(a.score ?? a.recommendation_score ?? 0);
+              const sb = Number(b.score ?? b.recommendation_score ?? 0);
+              if (sb !== sa) return sb - sa;
+              const ra = Number(a.rank ?? a.recommendation_rank ?? Infinity);
+              const rb = Number(b.rank ?? b.recommendation_rank ?? Infinity);
+              return ra - rb;
+            })
         : [];
 
-      const courses = sorted
-        .map((item: any, idx: number) => {
-          let coursePayload: any = item.course || item;
-          if (typeof coursePayload === 'string') {
-            try {
-              coursePayload = JSON.parse(coursePayload);
-            } catch {
-              coursePayload = null;
-            }
-          }
-          if (!coursePayload || typeof coursePayload !== 'object') {
-            return null;
-          }
+      const courses = sorted.map((r: any) => {
+        const coursePayload = r?.course || r;
+        let course = coursePayload;
+        if (typeof course === 'string') {
           try {
-            const course = convertAWSCourseToAppCourse(coursePayload);
-            return {
-              ...course,
-              recommendationPrimaryTag:
-                item.primary_reason_tag ||
-                coursePayload.recommendation_primary_tag ||
-                undefined,
-              recommendationModelVersion:
-                meta?.model_version ||
-                item.model_version ||
-                coursePayload.recommendation_model_version,
-              recommendationRequestId:
-                meta?.request_id ||
-                item.request_id ||
-                coursePayload.recommendation_request_id,
-              recommendationScore: item.score || coursePayload.recommendation_score,
-              recommendationRank: item.rank ?? item.recommendation_rank ?? idx + 1,
-            };
-          } catch (err) {
-            console.warn('Failed to map recommendation item', err);
-            return null;
+            course = JSON.parse(course);
+          } catch {
+            course = null;
           }
-        })
-        .filter(Boolean) as Course[];
+        }
+        if (!course || typeof course !== 'object') {
+          return null;
+        }
+        return {
+          ...(convertAWSCourseToAppCourse(course) || course),
+          primary_reason_tag: r.primary_reason_tag ?? null,
+          recommendationPrimaryTag: r.primary_reason_tag ?? null,
+          // ml_score is 0-1 probability — scale to 0-10 to match rule-based score display
+          // fall back to r.score (rule-based 0-10) if ml_score not present
+          recommendationScore: Number.isFinite(Number(r.ml_score))
+            ? Number((r.ml_score * 10).toFixed(1))
+            : Number.isFinite(Number(r.score))
+              ? Number(Number(r.score).toFixed(1))
+              : null,
+          recommendationRank: Number.isFinite(Number(r.rank)) ? Number(r.rank) : null,
+          recommendationRequestId: r.context?.requestId ?? meta?.request_id ?? null,
+          recommendationModelVersion: r.context?.modelVersion ?? meta?.model_version ?? null,
+          score_breakdown: r.score_breakdown ?? null,
+        };
+      }).filter(Boolean) as Course[];
 
-      await CacheManager.set(cacheKey, courses);
-      return courses;
+      const result = { courses, meta, recommendations: sorted };
+      await CacheManager.set(cacheKey, result);
+      return result;
     } catch (error) {
       console.warn('Error fetching recommended courses, falling back to empty list:', error);
-      return [];
+      const cacheKey = getRecommendationCacheKey(uid);
+      const cached = await CacheManager.get<{
+        courses: Course[];
+        meta: any;
+        recommendations: any[];
+      }>(cacheKey);
+      return cached ?? { courses: [], meta: {}, recommendations: [] };
     }
+  }
+
+  async clearRecommendationCache(userId?: string): Promise<void> {
+    if (!userId) return;
+    await CacheManager.clear(getRecommendationCacheKey(userId));
   }
 
 async getWishlist(userId: string): Promise<Course[]> {
@@ -707,10 +827,19 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    */
   async refreshCache(): Promise<void> {
     try {
+      const recommendationCacheKeys = [
+        CACHE_CONFIG.COURSES_KEY,
+        `${CACHE_CONFIG.COURSES_KEY}_my`,
+        `${CACHE_CONFIG.COURSES_KEY}_recommended`,
+      ];
+      if (DEFAULT_USER_ID) {
+        recommendationCacheKeys.push(
+          getRecommendationCacheKey(DEFAULT_USER_ID)
+        );
+      }
+
       await Promise.all([
-        CacheManager.clear(CACHE_CONFIG.COURSES_KEY),
-        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_my`),
-        CacheManager.clear(`${CACHE_CONFIG.COURSES_KEY}_recommended`),
+        ...recommendationCacheKeys.map((key) => CacheManager.clear(key)),
       ]);
       
       // Pre-load essential data
@@ -735,7 +864,9 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
     const [courses, myCourses, recommendedCourses] = await Promise.all([
       CacheManager.get(CACHE_CONFIG.COURSES_KEY),
       CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_my`),
-      CacheManager.get(`${CACHE_CONFIG.COURSES_KEY}_recommended`),
+      CacheManager.get(
+        getRecommendationCacheKey(DEFAULT_USER_ID || "")
+      ),
     ]);
 
     return {
@@ -866,32 +997,63 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
   async recordRecommendationEvent(payload: {
     userId?: string;
     courseId?: string;
-    eventType: 'impression' | 'view' | 'click' | 'start' | 'complete' | 'dismiss' | 'save';
+    eventType: 'impression' | 'view' | 'click' | 'start' | 'complete' | 'dismiss' | 'save' | 'wishlist' | 'enroll';
     context?: Record<string, any>;
     requestId?: string;
   }): Promise<void> {
     const resolvedUserId = payload.userId || DEFAULT_USER_ID;
     if (!resolvedUserId) return;
-    const body = {
+    await this.postRecommendationEvent({
       userId: resolvedUserId,
-      courseId: payload.courseId ?? null,
+      courseId: payload.courseId || '',
       eventType: payload.eventType,
-      context: payload.context || {},
-      requestId: payload.requestId,
+      placement: 'home',
+      context: {
+        ...(payload.context || {}),
+        ...(payload.requestId ? { requestId: payload.requestId } : {}),
+      },
+    });
+  }
+
+  async postRecommendationEvent(payload: {
+    userId: string;
+    courseId: string;
+    eventType: string;
+    placement?: string;
+    context?: Record<string, unknown>;
+  }): Promise<void> {
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !anonKey || !payload.userId || !payload.courseId) {
+      return;
+    }
+
+    const body = {
+      userId: payload.userId,
+      courseId: payload.courseId,
+      eventType: payload.eventType,
+      placement: payload.placement ?? 'home',
+      context: payload.context ?? {},
     };
 
     try {
-      await apiService.post(ENDPOINTS.RECOMMENDATION_EVENT, body);
-      console.info('rec_event_ok', {
-        eventType: body.eventType,
-        courseId: body.courseId,
-        placement: body.context?.placement,
+      await fetch(`${supabaseUrl}/functions/v1${ENDPOINTS.RECOMMENDATION_EVENT}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${anonKey}`,
+          'apikey': anonKey,
+        },
+        body: JSON.stringify(body),
       });
+      if (payload.userId && payload.userId !== 'anon') {
+        await CacheManager.clear(getRecommendationCacheKey(payload.userId));
+      }
     } catch (err) {
       console.warn('rec_event_fail', {
         eventType: body.eventType,
         courseId: body.courseId,
-        placement: body.context?.placement,
+        placement: body.placement,
         error: (err as any)?.message || err,
       });
       throw err;

@@ -42,7 +42,6 @@ const Students = () => {
   const [profileCache, setProfileCache] = useState<Record<string, any>>({});
   const [profileLoadingId, setProfileLoadingId] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -426,7 +425,6 @@ const Students = () => {
   }
 
   const handleDisableUser = async (email: string, enable: boolean) => {
-    console.log(selectedStudent)
     const sessionResponse = await supabase.auth.getSession();
     const accessToken = sessionResponse.data.session?.access_token;
     try {

@@ -300,8 +300,8 @@ const Settings = () => {
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-foreground">Assignment submissions</p>
-                      <p className="text-sm text-muted-foreground">Receive alerts for new assignment submissions</p>
+                      <p className="font-medium text-foreground">Quiz submissions</p>
+                      <p className="text-sm text-muted-foreground">Receive alerts for new quiz submissions</p>
                     </div>
                     <Switch defaultChecked />
                   </div>

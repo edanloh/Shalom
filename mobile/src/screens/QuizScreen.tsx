@@ -29,9 +29,20 @@ import Screen from "@/components/common/Screen";
 import ActionButton from "@/components/ActionButton";
 import MatchingQuestion from "@/components/MatchingQuestion";
 import { useCourseNavigation } from "@/hooks";
+import { useCourses } from "@/contexts/CourseContext";
 
 type QuizDetail = QuizDetailResponse["data"];
-type QuizResult = SubmitQuizResponse["data"];
+type QuizResult = SubmitQuizResponse["data"] & {
+  graded_answers?: Record<
+    string,
+    {
+      pointsAwarded: number;
+      maxPoints: number;
+      feedback?: string | null;
+      gradedAt: string;
+    }
+  >;
+};
 
 type QuizScreenNavigationProp = StackNavigationProp<
   MainStackParamList,
@@ -41,7 +52,9 @@ type QuizScreenNavigationProp = StackNavigationProp<
 const QuizScreen = () => {
   const route = useRoute();
   const navigation = useNavigation<QuizScreenNavigationProp>();
-  const { quizId, courseId, sectionId, userId } = route.params as any;
+  const { quizId, courseId, sectionId, userId, sourceScreen } =
+    route.params as any;
+  const { refreshMyCourses } = useCourses();
 
   const [loading, setLoading] = useState(true);
   const [quizDetail, setQuizDetail] = useState<QuizDetail | null>(null);
@@ -63,6 +76,8 @@ const QuizScreen = () => {
   const [reviewMode, setReviewMode] = useState(false);
   const [attemptsBlocked, setAttemptsBlocked] = useState(false);
   const [practiceMode, setPracticeMode] = useState(false); // For practicing after attempts exhausted
+  const [gradingPending, setGradingPending] = useState(false); // For short-answer quizzes awaiting grading
+  const [inputHeight, setInputHeight] = useState(100);
 
   // Matching question states
   const [matchingState, setMatchingState] = useState<
@@ -88,29 +103,60 @@ const QuizScreen = () => {
     fetchQuizDetail();
   }, [quizId]);
 
-  useEffect(() => {
-    // Timer countdown - only runs when timer is active and not in review/results mode
-    if (
-      timerActive &&
-      timeRemaining !== null &&
-      timeRemaining > 0 &&
-      !showResults &&
-      !reviewMode
-    ) {
-      const timer = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev === null || prev <= 1) {
-            setTimerActive(false);
-            handleSubmitQuiz(); // Auto-submit when time runs out
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
+  const navigateBackToModuleDetail = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
     }
-  }, [timerActive, timeRemaining, showResults, reviewMode]);
+    const resolvedSectionId = (quizDetail as any)?.section?.id || sectionId;
+    const hasShortAnswerQuestions =
+      quizDetail?.questions?.some(
+        (q: any) => q.question_type === "short-answer",
+      ) || false;
+    const shouldMarkCompleted =
+      hasShortAnswerQuestions && (gradingPending || !!quizResult);
+    if (resolvedSectionId) {
+      navigation.navigate("ModuleDetail", {
+        courseId,
+        sectionId: resolvedSectionId,
+        userId,
+        sourceScreen,
+        ...(shouldMarkCompleted
+          ? {
+              quizCompleted: true,
+              completedQuizId: quizId,
+              timestamp: Date.now(),
+            }
+          : {}),
+      } as any);
+      return;
+    }
+    navigation.navigate("CourseDetail", { courseId, sourceScreen } as any);
+  };
+
+  // useEffect(() => {
+  //   // Timer countdown - only runs when timer is active and not in review/results mode
+  //   if (
+  //     timerActive &&
+  //     timeRemaining !== null &&
+  //     timeRemaining > 0 &&
+  //     !showResults &&
+  //     !reviewMode
+  //   ) {
+  //     const timer = setInterval(() => {
+  //       setTimeRemaining((prev) => {
+  //         if (prev === null || prev <= 1) {
+  //           setTimerActive(false);
+  //           handleSubmitQuiz(); // Auto-submit when time runs out
+  //           return 0;
+  //         }
+  //         return prev - 1;
+  //       });
+  //     }, 1000);
+
+  //     return () => clearInterval(timer);
+  //   }
+  // }, [timerActive, timeRemaining, showResults, reviewMode]);
 
   const fetchQuizDetail = async () => {
     try {
@@ -118,7 +164,6 @@ const QuizScreen = () => {
       setError(null);
 
       const data = await quizService.getQuizDetail(courseId, quizId, userId);
-
       // Scramble options for all questions
       const scrambledData = {
         ...data,
@@ -172,27 +217,52 @@ const QuizScreen = () => {
           Number(attempt.correct_answers) ||
           Math.round((attempt.score / 100) * totalQuestions);
         const answersMap = attempt.answers || {};
+
+        // Parse graded_answers if it's a JSON string
+        let gradedAnswersData = attempt.graded_answers;
+        if (typeof gradedAnswersData === "string") {
+          try {
+            gradedAnswersData = JSON.parse(gradedAnswersData);
+          } catch (e) {
+            console.error("Failed to parse graded_answers:", e);
+            gradedAnswersData = undefined;
+          }
+        }
+
         const gradedAnswers = data.questions
           .map((question) => {
             const selected = answersMap[question.id];
             if (!selected) return null;
             const correctAnswer = question.correct_answer || "";
-            
+
             // Properly compare answers based on question type
             let isCorrect = false;
             if (question.question_type === "multiple-correct") {
               // For multiple-correct, compare arrays
-              const selectedArray = Array.isArray(selected) ? selected : (typeof selected === 'string' && selected.startsWith('[') ? JSON.parse(selected) : [selected]);
-              const correctArray = Array.isArray(correctAnswer) ? correctAnswer : (typeof correctAnswer === 'string' && correctAnswer.startsWith('[') ? JSON.parse(correctAnswer) : [correctAnswer]);
-              isCorrect = JSON.stringify(selectedArray.sort()) === JSON.stringify(correctArray.sort());
+              const selectedArray = Array.isArray(selected)
+                ? selected
+                : typeof selected === "string" && selected.startsWith("[")
+                  ? JSON.parse(selected)
+                  : [selected];
+              const correctArray = Array.isArray(correctAnswer)
+                ? correctAnswer
+                : typeof correctAnswer === "string" &&
+                    correctAnswer.startsWith("[")
+                  ? JSON.parse(correctAnswer)
+                  : [correctAnswer];
+              isCorrect =
+                JSON.stringify(selectedArray.sort()) ===
+                JSON.stringify(correctArray.sort());
             } else if (question.question_type === "matching") {
               // For matching, compare JSON objects
-              isCorrect = JSON.stringify(selected) === JSON.stringify(correctAnswer);
+              isCorrect =
+                JSON.stringify(selected) === JSON.stringify(correctAnswer);
             } else {
               // For single answer questions
-              isCorrect = String(selected).trim() === String(correctAnswer).trim();
+              isCorrect =
+                String(selected).trim() === String(correctAnswer).trim();
             }
-            
+
             return {
               questionId: question.id,
               isCorrect,
@@ -214,16 +284,34 @@ const QuizScreen = () => {
           attemptNumber: attempt.attempt_number,
           attemptsRemaining,
           answers: gradedAnswers,
+          graded_answers: gradedAnswersData,
         });
       };
 
       // If user has any attempts (passed or failed), show results screen
       if (attempts.length > 0) {
-        const latestAttempt = isPassed 
-          ? attempts.find((attempt) => attempt.is_passed) 
+        const latestAttempt = isPassed
+          ? attempts.find((attempt) => attempt.is_passed)
           : quizService.getLatestAttempt(attempts);
-        
+
         if (latestAttempt) {
+          // Check if quiz has short-answer questions and grades are not released
+          const hasShortAnswer = data.questions.some(
+            (q) => q.question_type === "short-answer",
+          );
+          const gradesReleased = latestAttempt.grades_released !== false;
+
+          if (hasShortAnswer && !gradesReleased) {
+            // Show pending grading screen
+            setSelectedAnswers(
+              new Map(Object.entries(latestAttempt.answers || {})),
+            );
+            setGradingPending(true);
+            setShowResults(false);
+            setTimerActive(false);
+            return;
+          }
+
           buildResultFromAttempt(latestAttempt, isPassed);
           setAttemptsRemainingDisplay(attemptsRemaining);
           setShowResults(true);
@@ -238,12 +326,12 @@ const QuizScreen = () => {
       setQuizStartTime(new Date());
 
       // Set timer if quiz has time limit
-      if (data.time_limit_minutes) {
-        const timeInSeconds = data.time_limit_minutes * 60;
-        setTimeRemaining(timeInSeconds);
-        setInitialTime(timeInSeconds);
-        setTimerActive(true);
-      }
+      // if (data.time_limit_minutes) {
+      //   const timeInSeconds = data.time_limit_minutes * 60;
+      //   setTimeRemaining(timeInSeconds);
+      //   setInitialTime(timeInSeconds);
+      //   setTimerActive(true);
+      // }
     } catch (err: any) {
       console.error("Error fetching quiz detail:", err);
       setError(err.message || "Failed to load quiz");
@@ -403,12 +491,15 @@ const QuizScreen = () => {
 
   const handleSubmitQuiz = async () => {
     if (!quizDetail) return;
-    
+
     // Check if we're in practice mode (attempts exhausted but user retrying)
     if (practiceMode) {
       // Practice mode: Calculate results locally without backend submission
       if (
-        !quizService.validateAnswers(selectedAnswers, quizDetail.questions.length)
+        !quizService.validateAnswers(
+          selectedAnswers,
+          quizDetail.questions.length,
+        )
       ) {
         Alert.alert(
           "Incomplete Quiz",
@@ -421,36 +512,110 @@ const QuizScreen = () => {
       setTimerActive(false);
       setSubmitting(true);
 
-      // Calculate results locally
-      const answersArray = quizService.convertAnswersToArray(selectedAnswers);
+      // Calculate results locally using per-question selected values
       let correctCount = 0;
-      const gradedAnswers = quizDetail.questions.map((question, idx) => {
-        const userAnswer = answersArray[idx];
+      const gradedAnswers = quizDetail.questions.map((question) => {
+        const userAnswer = selectedAnswers.get(question.id);
         const correctAnswer = question.correct_answer || "";
-        
+
         // Compare answers based on question type
         let isCorrect = false;
         if (question.question_type === "multiple-correct") {
-          // For multiple-correct, compare arrays
-          const userAnswerArray = Array.isArray(userAnswer) ? userAnswer : [];
-          const correctAnswerArray = Array.isArray(correctAnswer) 
-            ? correctAnswer 
-            : (typeof correctAnswer === 'string' && correctAnswer.startsWith('[')
-                ? JSON.parse(correctAnswer)
-                : [correctAnswer]);
-          
-          // Sort and compare
-          isCorrect = JSON.stringify(userAnswerArray.sort()) === JSON.stringify(correctAnswerArray.sort());
+          // For multiple-correct, compare normalized arrays of selected option text
+          const userAnswerArray = Array.isArray(userAnswer)
+            ? userAnswer
+            : typeof userAnswer === "string"
+              ? (() => {
+                  try {
+                    const parsed = JSON.parse(userAnswer);
+                    return Array.isArray(parsed) ? parsed : [userAnswer];
+                  } catch {
+                    return [userAnswer];
+                  }
+                })()
+              : [];
+
+          const correctAnswerArray = Array.isArray(correctAnswer)
+            ? correctAnswer
+            : typeof correctAnswer === "string"
+              ? (() => {
+                  try {
+                    const parsed = JSON.parse(correctAnswer);
+                    return Array.isArray(parsed) ? parsed : [correctAnswer];
+                  } catch {
+                    return [correctAnswer];
+                  }
+                })()
+              : [];
+
+          const normalizedUser = userAnswerArray
+            .map((v) => String(v).trim())
+            .filter(Boolean)
+            .sort();
+          const normalizedCorrect = correctAnswerArray
+            .map((v) => String(v).trim())
+            .filter(Boolean)
+            .sort();
+
+          isCorrect =
+            normalizedUser.length === normalizedCorrect.length &&
+            JSON.stringify(normalizedUser) ===
+              JSON.stringify(normalizedCorrect);
         } else if (question.question_type === "matching") {
-          // For matching, compare JSON objects
-          isCorrect = JSON.stringify(userAnswer) === JSON.stringify(correctAnswer);
+          // For matching, compare normalized left->right mappings
+          const toPairArray = (
+            value: any,
+          ): Array<{ left: string; right: string }> => {
+            if (Array.isArray(value))
+              return value as Array<{ left: string; right: string }>;
+            if (typeof value === "string") {
+              try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed)
+                  ? (parsed as Array<{ left: string; right: string }>)
+                  : [];
+              } catch {
+                return [];
+              }
+            }
+            return [];
+          };
+
+          const normalizePairs = (
+            pairs: Array<{ left: string; right: string }>,
+          ) =>
+            pairs
+              .map((p) => `${String(p.left).trim()}=>${String(p.right).trim()}`)
+              .sort();
+
+          const normalizedUser = normalizePairs(toPairArray(userAnswer));
+          const normalizedCorrect = normalizePairs(toPairArray(correctAnswer));
+          isCorrect =
+            JSON.stringify(normalizedUser) ===
+            JSON.stringify(normalizedCorrect);
         } else {
-          // For single answer questions
-          isCorrect = String(userAnswer).trim() === String(correctAnswer).trim();
+          // For single answer questions, support both answer text and index-style correct_answer
+          const selectedValue = Array.isArray(userAnswer)
+            ? String(userAnswer[0] ?? "").trim()
+            : String(userAnswer ?? "").trim();
+
+          let normalizedCorrect = String(correctAnswer ?? "").trim();
+          const parsedIndex = Number(normalizedCorrect);
+          if (
+            Number.isInteger(parsedIndex) &&
+            parsedIndex >= 0 &&
+            parsedIndex < (question.options?.length || 0)
+          ) {
+            normalizedCorrect = String(
+              question.options?.[parsedIndex]?.option_text ?? normalizedCorrect,
+            ).trim();
+          }
+
+          isCorrect = selectedValue === normalizedCorrect;
         }
-        
+
         if (isCorrect) correctCount++;
-        
+
         return {
           questionId: question.id,
           isCorrect,
@@ -479,7 +644,7 @@ const QuizScreen = () => {
         Alert.alert(
           "Practice Mode",
           "This is a practice attempt and was not recorded. Your previous attempts are still saved.",
-          [{ text: "OK" }]
+          [{ text: "OK" }],
         );
       }, 500);
 
@@ -534,22 +699,31 @@ const QuizScreen = () => {
         timeTakenMinutes,
       });
 
-      console.log("📥 Backend quiz result:", {
-        score: result.score,
-        isPassed: result.isPassed,
-        attemptsRemaining: result.attemptsRemaining,
-        attemptNumber: result.attemptNumber,
-        willBlockAttempts: result.attemptsRemaining === 0 && !result.isPassed
-      });
-
       setQuizResult(result);
       // Update attempts remaining display after submission
-      if (result.attemptsRemaining !== undefined && result.attemptsRemaining !== null) {
+      if (
+        result.attemptsRemaining !== undefined &&
+        result.attemptsRemaining !== null
+      ) {
         setAttemptsRemainingDisplay(result.attemptsRemaining);
         // Update attemptsBlocked based on new attempts remaining
         setAttemptsBlocked(result.attemptsRemaining === 0 && !result.isPassed);
       }
-      setShowResults(true);
+
+      // Check if quiz has short-answer questions
+      const hasShortAnswer = quizDetail.questions.some(
+        (q) => q.question_type === "short-answer",
+      );
+
+      if (hasShortAnswer) {
+        // Keep students on pending screen until grading is released.
+        // Completion for short-answer quizzes is handled when they leave this screen.
+        setGradingPending(true);
+        setShowResults(false);
+        return;
+      } else {
+        setShowResults(true);
+      }
 
       // Award credits for passing quizzes
       if (result.isPassed && userId) {
@@ -600,22 +774,35 @@ const QuizScreen = () => {
               const selected = answersMap[question.id];
               if (!selected) return null;
               const correctAnswer = question.correct_answer || "";
-              
+
               // Properly compare answers based on question type
               let isCorrect = false;
               if (question.question_type === "multiple-correct") {
                 // For multiple-correct, compare arrays
-                const selectedArray = Array.isArray(selected) ? selected : (typeof selected === 'string' && selected.startsWith('[') ? JSON.parse(selected) : [selected]);
-                const correctArray = Array.isArray(correctAnswer) ? correctAnswer : (typeof correctAnswer === 'string' && correctAnswer.startsWith('[') ? JSON.parse(correctAnswer) : [correctAnswer]);
-                isCorrect = JSON.stringify(selectedArray.sort()) === JSON.stringify(correctArray.sort());
+                const selectedArray = Array.isArray(selected)
+                  ? selected
+                  : typeof selected === "string" && selected.startsWith("[")
+                    ? JSON.parse(selected)
+                    : [selected];
+                const correctArray = Array.isArray(correctAnswer)
+                  ? correctAnswer
+                  : typeof correctAnswer === "string" &&
+                      correctAnswer.startsWith("[")
+                    ? JSON.parse(correctAnswer)
+                    : [correctAnswer];
+                isCorrect =
+                  JSON.stringify(selectedArray.sort()) ===
+                  JSON.stringify(correctArray.sort());
               } else if (question.question_type === "matching") {
                 // For matching, compare JSON objects
-                isCorrect = JSON.stringify(selected) === JSON.stringify(correctAnswer);
+                isCorrect =
+                  JSON.stringify(selected) === JSON.stringify(correctAnswer);
               } else {
                 // For single answer questions
-                isCorrect = String(selected).trim() === String(correctAnswer).trim();
+                isCorrect =
+                  String(selected).trim() === String(correctAnswer).trim();
               }
-              
+
               return {
                 questionId: question.id,
                 isCorrect,
@@ -655,11 +842,27 @@ const QuizScreen = () => {
   const handleRetry = () => {
     if (!quizDetail) return;
 
+    // Check if quiz has short-answer questions - if so, don't allow retry
+    const hasShortAnswer = quizDetail.questions.some(
+      (q: any) => q.question_type === "short-answer",
+    );
+
+    if (hasShortAnswer) {
+      // For short-answer quizzes, only allow review (not retry)
+      Alert.alert(
+        "Retry Not Available",
+        "This quiz contains short-answer questions requiring manual grading. You can review your answers but cannot retake the quiz.",
+        [{ text: "OK" }],
+      );
+      return;
+    }
+
     // Enable practice mode if:
     // 1. User passed the quiz (no need to record another attempt)
     // 2. User failed and has no attempts remaining (practice mode)
     // Disable practice mode if user failed and still has attempts (normal retry)
-    const shouldEnablePracticeMode = attemptsBlocked || (quizResult?.isPassed === true);
+    const shouldEnablePracticeMode =
+      attemptsBlocked || quizResult?.isPassed === true;
     setPracticeMode(shouldEnablePracticeMode);
 
     // Reset quiz state completely
@@ -675,12 +878,12 @@ const QuizScreen = () => {
     setQuizStartTime(new Date());
 
     // Reset and restart timer if quiz has time limit
-    if (quizDetail.time_limit_minutes) {
-      const timeInSeconds = quizDetail.time_limit_minutes * 60;
-      setTimeRemaining(timeInSeconds);
-      setInitialTime(timeInSeconds);
-      setTimerActive(true);
-    }
+    // if (quizDetail.time_limit_minutes) {
+    //   const timeInSeconds = quizDetail.time_limit_minutes * 60;
+    //   setTimeRemaining(timeInSeconds);
+    //   setInitialTime(timeInSeconds);
+    //   setTimerActive(true);
+    // }
 
     // Don't call fetchQuizDetail() - it would show results screen again
     // Just use the existing quizDetail data to start fresh
@@ -697,6 +900,71 @@ const QuizScreen = () => {
     setReviewMode(false);
     setShowResults(true);
   };
+
+  const navigateAfterCompletion = () => {
+    void refreshMyCourses().catch((err) => {
+      console.warn("Failed to refresh My Courses after quiz completion", err);
+    });
+
+    // Extra safety check - make sure nextItemInModule AND nextItemInModule.item exist
+    if (nextItemInModule && nextItemInModule.item) {
+      // Navigate to next item (video, quiz, or document)
+      if (nextItemInModule.item.type === "video") {
+        navigation.replace("VideoPlayer", {
+          videoId: nextItemInModule.item.id,
+          courseId,
+          sectionId: nextItemInModule.sectionId,
+          userId,
+        });
+      } else if (nextItemInModule.item.type === "quiz") {
+        navigation.replace("QuizScreen", {
+          quizId: nextItemInModule.item.id,
+          courseId,
+          sectionId: nextItemInModule.sectionId,
+          userId,
+        });
+      } else if (
+        ["pdf", "document", "ppt"].includes(nextItemInModule.item.type)
+      ) {
+        navigation.replace("DocumentView", {
+          documentId: nextItemInModule.item.id,
+          courseId,
+          sectionId: nextItemInModule.sectionId,
+          userId,
+          documentType: nextItemInModule.item.type,
+        });
+      }
+      return;
+    }
+
+    if (isLastItem) {
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: "MainTabs", params: { screen: "Home" } as any },
+          {
+            name: "CourseDetail",
+            params: {
+              courseId,
+              sourceScreen,
+              quizCompleted: true,
+              quizId,
+            } as any,
+          },
+        ],
+      });
+      return;
+    }
+
+    // Default: Navigate back with state to refresh CourseDetail
+    navigation.navigate("CourseDetail", {
+      courseId,
+      sourceScreen,
+      quizCompleted: true,
+      quizId,
+    } as any);
+  };
+
   const handleComplete = () => {
     console.log("🎯 handleComplete called:", {
       isPassed: quizResult?.isPassed,
@@ -708,110 +976,39 @@ const QuizScreen = () => {
       isLastItem,
     });
 
-    // Mark as complete and auto-navigate if:
-    // 1. Quiz is passed (and not in practice mode), OR
-    // 2. All attempts are exhausted (even if failed, and not in practice mode)
-    // Additional safeguard: Don't complete if failed and still has attempts
-    const hasFailed = quizResult && !quizResult.isPassed;
-    const hasAttemptsRemaining = attemptsRemainingDisplay !== null && attemptsRemainingDisplay > 0;
-    
-    const canComplete = ((quizResult && quizResult.isPassed) || attemptsBlocked) && 
-                        !practiceMode &&
-                        !(hasFailed && hasAttemptsRemaining);
+    // Check if quiz has short-answer questions requiring manual grading
+    const hasShortAnswer =
+      quizDetail?.questions.some(
+        (q: any) => q.question_type === "short-answer",
+      ) || false;
 
-    console.log("🔍 Completion check:", {
-      isPassed: quizResult?.isPassed,
-      attemptsBlocked,
-      practiceMode,
-      attemptsRemainingDisplay,
-      hasFailed,
-      hasAttemptsRemaining,
-      canComplete,
-    });
+    // Mark as complete and auto-navigate if:
+    // 1. Quiz has short-answer questions (manual grading - no strict checks needed), OR
+    // 2. Quiz is passed (including practice-mode attempts), OR
+    // 3. All attempts are exhausted (even if failed)
+    // Additional safeguard: Don't complete if failed and still has attempts (unless manual grading)
+    const hasFailed = quizResult && !quizResult.isPassed;
+    const hasAttemptsRemaining =
+      attemptsRemainingDisplay !== null && attemptsRemainingDisplay > 0;
+
+    const canComplete =
+      practiceMode ||
+      hasShortAnswer ||
+      (((quizResult && quizResult.isPassed) || attemptsBlocked) &&
+        !(hasFailed && hasAttemptsRemaining));
 
     if (canComplete) {
-      console.log("🎯 Quiz can be completed! Checking next item...", {
-        isPassed: quizResult?.isPassed,
-        attemptsBlocked,
-        currentQuizId: quizId,
-        currentSectionId: sectionId,
-        isLastItem,
-        nextItemInModule,
-      });
-
-      // Extra safety check - make sure nextItemInModule AND nextItemInModule.item exist
-      if (nextItemInModule && nextItemInModule.item) {
-        console.log("✅ Next item found:", {
-          id: nextItemInModule.item.id,
-          type: nextItemInModule.item.type,
-          title: nextItemInModule.item.title,
-          sectionId: nextItemInModule.sectionId,
-        });
-
-        // Navigate to next item (video, quiz, or document)
-        if (nextItemInModule.item.type === "video") {
-          navigation.replace("LessonPlayer", {
-            videoId: nextItemInModule.item.id,
-            courseId,
-            sectionId: nextItemInModule.sectionId,
-            userId,
-          });
-        } else if (nextItemInModule.item.type === "quiz") {
-          navigation.replace("QuizScreen", {
-            quizId: nextItemInModule.item.id,
-            courseId,
-            sectionId: nextItemInModule.sectionId,
-            userId,
-          });
-        } else if (
-          ["pdf", "document", "ppt"].includes(nextItemInModule.item.type)
-        ) {
-          navigation.replace("DocumentView", {
-            documentId: nextItemInModule.item.id,
-            courseId,
-            sectionId: nextItemInModule.sectionId,
-            userId,
-            documentType: nextItemInModule.item.type,
-          });
-        }
-        return;
-      } else {
-        console.log(
-          "⚠️ No valid next item - nextItemInModule:",
-          nextItemInModule,
-        );
-      }
+      navigateAfterCompletion();
+      return;
     } else {
       // Quiz not passed and still has attempts - cannot complete yet
-      console.log("⚠️ Cannot complete - quiz not passed and attempts remaining");
       Alert.alert(
         "Cannot Complete Yet",
         "You need to pass this quiz or use all attempts before proceeding.",
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
       return;
     }
-
-    if (isLastItem) {
-      navigation.reset({
-        index: 1,
-        routes: [
-          { name: "MainTabs", params: { screen: "Home" } as any },
-          {
-            name: "CourseDetail",
-            params: { courseId, quizCompleted: true, quizId } as any,
-          },
-        ],
-      });
-      return;
-    }
-
-    // Default: Navigate back with state to refresh CourseDetail
-    navigation.navigate("CourseDetail", {
-      courseId,
-      quizCompleted: true,
-      quizId,
-    } as any);
   };
 
   const formatTime = (seconds: number) => {
@@ -846,30 +1043,142 @@ const QuizScreen = () => {
     );
   }
 
+  // Pending Grading Screen - for short-answer quizzes
+  if (gradingPending) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.resultsHeader}>
+          <TouchableOpacity onPress={navigateBackToModuleDetail}>
+            <Ionicons name="close" size={28} color={Colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.resultsHeaderTitle}>Quiz Submitted</Text>
+          <View style={{ width: 28 }} />
+        </View>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.resultsScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Result Section */}
+          <View style={styles.resultSection}>
+            <View style={styles.resultContainer}>
+              <Image
+                source={Images.quizSuccess}
+                style={styles.resultImage}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Score Display */}
+            <View style={styles.scoreSection}>
+              <Text style={styles.scoreTitle}>Quiz Submitted</Text>
+              <Text style={styles.scoreSubtext}>
+                Your answers are being reviewed by your instructor.
+              </Text>
+
+              <View style={styles.attemptsContainer}>
+                <Ionicons
+                  name="time-outline"
+                  size={18}
+                  color={Colors.purple400}
+                />
+                <Text style={styles.attemptsText}>Awaiting manual grading</Text>
+              </View>
+
+              <Text
+                style={[
+                  styles.scoreSubtext,
+                  { marginTop: 12, fontSize: 14, lineHeight: 20 },
+                ]}
+              >
+                You'll be notified once your instructor has finished grading all
+                questions. Your final score will be available then.
+              </Text>
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.resultActions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={navigateBackToModuleDetail}
+            >
+              <Ionicons name="arrow-back" size={32} color={Colors.white} />
+              <Text style={styles.actionButtonText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleComplete}
+            >
+              <Image
+                source={Images.quizComplete}
+                style={styles.actionButtonIcon}
+                resizeMode="contain"
+              />
+              <Text style={styles.actionButtonText}>Complete</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   if (showResults && quizResult) {
     const isPassed = quizResult.isPassed;
     const scorePercentage = quizResult.score;
 
-    console.log("🎨 Rendering results screen:", {
-      isPassed,
-      attemptsBlocked,
-      practiceMode,
-      showCompleteButton: isPassed || attemptsBlocked,
-      attemptsRemainingDisplay
-    });
-
     // Check if this is the first time passing the quiz
     const isFirstPass = isPassed && quizResult.attemptNumber === 1;
 
-    // Calculate passing mark in questions
-    const passingMarkQuestions = quizDetail
-      ? Math.ceil((quizDetail.passing_score / 100) * quizResult.totalQuestions)
-      : 0;
+    // Calculate actual points from graded_answers if available
+    let totalPointsEarned = quizResult.correctAnswers || 0;
+    let totalPointsPossible = quizResult.totalQuestions || 0;
+
+    if (
+      quizResult.graded_answers &&
+      Object.keys(quizResult.graded_answers).length > 0 &&
+      quizDetail
+    ) {
+      // When we have graded_answers, calculate points for each question type
+      totalPointsEarned = 0;
+      totalPointsPossible = 0;
+
+      quizDetail.questions.forEach((question) => {
+        if (
+          quizResult.graded_answers &&
+          question.id in quizResult.graded_answers
+        ) {
+          // Short answer question with manual grading
+          const graded = quizResult.graded_answers[question.id];
+          totalPointsEarned += graded.pointsAwarded;
+          totalPointsPossible += graded.maxPoints;
+        } else {
+          // Auto-graded question (MCQ, true/false, etc.) - 1 point each
+          const answer = quizResult.answers.find(
+            (a) => a.questionId === question.id,
+          );
+          const points = answer?.isCorrect ? 1 : 0;
+          totalPointsEarned += points;
+          totalPointsPossible += 1;
+        }
+      });
+    }
+
+    console.log("📊 Points calculation:", {
+      totalPointsEarned,
+      totalPointsPossible,
+      scorePercentage,
+      hasGradedAnswers: !!quizResult.graded_answers,
+      gradedAnswersCount: quizResult.graded_answers
+        ? Object.keys(quizResult.graded_answers).length
+        : 0,
+    });
 
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.resultsHeader}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity onPress={navigateBackToModuleDetail}>
             <Ionicons name="close" size={28} color={Colors.white} />
           </TouchableOpacity>
           <Text style={styles.resultsHeaderTitle}>
@@ -897,44 +1206,53 @@ const QuizScreen = () => {
             <View style={styles.scoreSection}>
               <Text style={styles.scoreTitle}>Your Score</Text>
               <Text style={styles.scoreValue}>
-                {quizResult.correctAnswers}/{quizResult.totalQuestions}
+                {scorePercentage.toFixed(2)}%
               </Text>
-
-              {/* Show points only on first pass (not in practice mode) */}
-              {isFirstPass && !practiceMode && (
-                <View style={styles.pointsContainer}>
-                  <Text style={styles.pointsText}>
-                    +{quizResult.correctAnswers * 10} Points
-                  </Text>
-                </View>
-              )}
+              <Text
+                style={[styles.scoreSubtext, { fontSize: 16, marginTop: 4 }]}
+              >
+                ({totalPointsEarned.toFixed(2)}/{totalPointsPossible.toFixed(2)}{" "}
+                points)
+              </Text>
 
               {/* Show passing mark for failed attempts */}
               {!isPassed && (
                 <Text style={styles.passingMarkText}>
-                  Passing Mark: {passingMarkQuestions}/
-                  {quizResult.totalQuestions}
+                  Passing Score: {quizDetail?.passing_score || 70}%
                 </Text>
               )}
 
               {/* Show attempts remaining */}
-              {!practiceMode && attemptsRemainingDisplay !== null && (
-                <View style={styles.attemptsContainer}>
-                  <Ionicons 
-                    name={attemptsRemainingDisplay > 0 ? "refresh-circle" : "alert-circle"} 
-                    size={18} 
-                    color={attemptsRemainingDisplay > 0 ? Colors.purple400 : Colors.error} 
-                  />
-                  <Text style={[
-                    styles.attemptsText,
-                    attemptsRemainingDisplay === 0 && styles.attemptsTextError
-                  ]}>
-                    {attemptsRemainingDisplay > 0 
-                      ? `${attemptsRemainingDisplay} attempt${attemptsRemainingDisplay === 1 ? '' : 's'} remaining`
-                      : "No attempts remaining"}
-                  </Text>
-                </View>
-              )}
+              {!practiceMode &&
+                attemptsRemainingDisplay !== null &&
+                !isPassed && (
+                  <View style={styles.attemptsContainer}>
+                    <Ionicons
+                      name={
+                        attemptsRemainingDisplay > 0
+                          ? "refresh-circle"
+                          : "alert-circle"
+                      }
+                      size={18}
+                      color={
+                        attemptsRemainingDisplay > 0
+                          ? Colors.purple400
+                          : Colors.red
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.attemptsText,
+                        attemptsRemainingDisplay === 0 &&
+                          styles.attemptsTextError,
+                      ]}
+                    >
+                      {attemptsRemainingDisplay > 0
+                        ? `${attemptsRemainingDisplay} attempt${attemptsRemainingDisplay === 1 ? "" : "s"} remaining`
+                        : "No attempts remaining"}
+                    </Text>
+                  </View>
+                )}
 
               <Text style={styles.scoreSubtext}>
                 {isPassed
@@ -977,88 +1295,98 @@ const QuizScreen = () => {
                 <View style={styles.completionInfoContainer}>
                   {isPassed ? (
                     <Text style={styles.completionInfoText}>
-                      ✅ Quiz passed! Click Complete to proceed to the next item.
+                      ✅ Quiz passed! Click Complete to proceed to the next
+                      item.
                     </Text>
                   ) : attemptsBlocked ? (
                     <Text style={styles.completionInfoText}>
-                      ⚠️ You've used all attempts. Click Complete to proceed to the next item.
+                      ⚠️ You've used all attempts. Click Complete to proceed to
+                      the next item.
                     </Text>
                   ) : null}
                 </View>
               )}
 
               <View style={styles.resultActions}>
-                {!isPassed && !attemptsBlocked ? (
-                  // Failed with attempts remaining: Show Retry + Review + Back
-                  <>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handleRetry}
-                    >
-                      <Image
-                        source={Images.quizRetry}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Retry</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handleReview}
-                    >
-                      <Image
-                        source={Images.quizReview}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Review</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => navigation.goBack()}
-                    >
-                      <Ionicons name="arrow-back" size={32} color={Colors.white} />
-                      <Text style={styles.actionButtonText}>Back</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  // Passed OR Failed with no attempts: Show Retry (no attempt) + Review + Complete
-                  <>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handleRetry}
-                    >
-                      <Image
-                        source={Images.quizRetry}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Retry</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handleReview}
-                    >
-                      <Image
-                        source={Images.quizReview}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Review</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={handleComplete}
-                    >
-                      <Image
-                        source={Images.quizComplete}
-                        style={styles.actionButtonIcon}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.actionButtonText}>Complete</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+                {(() => {
+                  // Check if quiz has short-answer questions
+                  const hasShortAnswer = quizDetail.questions.some(
+                    (q: any) => q.question_type === "short-answer",
+                  );
+
+                  if (!isPassed && !attemptsBlocked && !practiceMode) {
+                    // Failed with attempts remaining: Show Retry (unless short-answer) + Back only
+                    return (
+                      <>
+                        {!hasShortAnswer && (
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={handleRetry}
+                          >
+                            <Image
+                              source={Images.quizRetry}
+                              style={styles.actionButtonIcon}
+                              resizeMode="contain"
+                            />
+                            <Text style={styles.actionButtonText}>Retry</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={navigateBackToModuleDetail}
+                        >
+                          <Ionicons
+                            name="arrow-back"
+                            size={32}
+                            color={Colors.white}
+                          />
+                          <Text style={styles.actionButtonText}>Back</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  } else {
+                    // Passed OR Failed with no attempts: Show Retry (no attempt, unless short-answer) + Review + Complete
+                    return (
+                      <>
+                        {!hasShortAnswer && (
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={handleRetry}
+                          >
+                            <Image
+                              source={Images.quizRetry}
+                              style={styles.actionButtonIcon}
+                              resizeMode="contain"
+                            />
+                            <Text style={styles.actionButtonText}>Retry</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={handleReview}
+                        >
+                          <Image
+                            source={Images.quizReview}
+                            style={styles.actionButtonIcon}
+                            resizeMode="contain"
+                          />
+                          <Text style={styles.actionButtonText}>Review</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={handleComplete}
+                        >
+                          <Image
+                            source={Images.quizComplete}
+                            style={styles.actionButtonIcon}
+                            resizeMode="contain"
+                          />
+                          <Text style={styles.actionButtonText}>Complete</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  }
+                })()}
               </View>
             </>
           )}
@@ -1143,21 +1471,21 @@ const QuizScreen = () => {
             {
               text: "Exit",
               style: "destructive",
-              onPress: () => navigation.goBack(),
+              onPress: navigateBackToModuleDetail,
             },
           ],
         );
       }}
       headerRightComponent={
         <>
-          {timeRemaining !== null && timerActive && !reviewMode && (
+          {/* {timeRemaining !== null && timerActive && !reviewMode && (
             <View style={styles.modernTimer}>
               <Ionicons name="time-outline" size={18} color={Colors.yellow} />
               <Text style={styles.modernTimerText}>
                 {formatTime(timeRemaining)}
               </Text>
-            </View>
-          )}
+            </View> 
+          )}*/}
           {!timerActive && !reviewMode && <View style={{ width: 80 }} />}
         </>
       }
@@ -1167,7 +1495,9 @@ const QuizScreen = () => {
         {!reviewMode && quizDetail?.max_attempts !== undefined && (
           <Text style={styles.attemptsInline}>
             {practiceMode ? (
-              <Text style={{ color: Colors.yellow }}>Practice Mode (Not Recorded)</Text>
+              <Text style={{ color: Colors.yellow }}>
+                Practice Mode (Not Recorded)
+              </Text>
             ) : (
               <>
                 Attempts left:{" "}
@@ -1178,6 +1508,15 @@ const QuizScreen = () => {
             )}
           </Text>
         )}
+        {/* Short Answer Quiz Notice */}
+        {!reviewMode &&
+          quizDetail?.questions.some(
+            (q: any) => q.question_type === "short-answer",
+          ) && (
+            <Text style={styles.shortAnswerNotice}>
+              ⚠️ This quiz requires manual grading. Only 1 attempt allowed.
+            </Text>
+          )}
         <View style={styles.progressHeaderRow}>
           <Text style={styles.progressLabel}>
             {reviewMode ? "Review Mode - " : ""}Question{" "}
@@ -1231,6 +1570,85 @@ const QuizScreen = () => {
         <Text style={styles.modernQuestionText}>
           {currentQuestion.question_text}
         </Text>
+
+        {/* Points Earned Display in Review Mode */}
+        {(() => {
+          if (reviewMode) {
+            console.log("🔍 Review mode - checking for graded answers:", {
+              currentQuestionId: currentQuestion.id,
+              hasQuizResult: !!quizResult,
+              hasGradedAnswers: !!quizResult?.graded_answers,
+              gradedAnswersKeys: quizResult?.graded_answers
+                ? Object.keys(quizResult.graded_answers)
+                : [],
+              isInGradedAnswers: quizResult?.graded_answers
+                ? currentQuestion.id in quizResult.graded_answers
+                : false,
+            });
+          }
+          return null;
+        })()}
+        {reviewMode &&
+          quizResult?.graded_answers &&
+          currentQuestion.id in quizResult.graded_answers && (
+            <View style={styles.pointsEarnedContainer}>
+              <Text
+                style={{
+                  color: Colors.purple200,
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
+              >
+                Points Earned:
+              </Text>
+              <Text
+                style={{
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: "bold",
+                }}
+              >
+                {quizResult.graded_answers[
+                  currentQuestion.id
+                ].pointsAwarded.toFixed(2)}
+                /
+                {quizResult.graded_answers[
+                  currentQuestion.id
+                ].maxPoints.toFixed(2)}
+              </Text>
+            </View>
+          )}
+        {reviewMode &&
+          quizResult?.graded_answers &&
+          currentQuestion.id in quizResult.graded_answers &&
+          quizResult.graded_answers[currentQuestion.id].feedback && (
+            <View
+              style={{
+                marginTop: 8,
+                padding: 10,
+                backgroundColor: Colors.blue + "20",
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: Colors.blue + "40",
+              }}
+            >
+              <Text
+                style={{
+                  color: Colors.blue,
+                  fontSize: 12,
+                  fontWeight: "600",
+                  marginBottom: 4,
+                }}
+              >
+                Instructor Feedback:
+              </Text>
+              <Text
+                style={{ color: Colors.gray200, fontSize: 13, lineHeight: 18 }}
+              >
+                {quizResult.graded_answers[currentQuestion.id].feedback}
+              </Text>
+            </View>
+          )}
 
         {/* Question Type Indicator */}
         {currentQuestion.question_type === "multiple-correct" && (
@@ -1314,7 +1732,7 @@ const QuizScreen = () => {
               <TouchableOpacity
                 key={String(
                   option.id ??
-                    `option-${index}-${option.option_text ?? "choice"}`
+                    `option-${index}-${option.option_text ?? "choice"}`,
                 )}
                 style={[
                   styles.modernOptionCard,
@@ -1379,16 +1797,18 @@ const QuizScreen = () => {
           </Text>
           {!reviewMode && (
             <TextInput
-              style={styles.shortAnswerInput}
-              placeholder="Type your answer here..."
-              placeholderTextColor={Colors.textSecondary}
+              value={String(selectedAnswers.get(currentQuestion.id) ?? "")}
+              onChangeText={(text) => {
+                setSelectedAnswers((prev) => {
+                  const next = new Map(prev);
+                  next.set(currentQuestion.id, text);
+                  return next;
+                });
+              }}
               multiline
-              numberOfLines={4}
-              value={(selectedAnswers.get(currentQuestion.id) as string) || ""}
-              onChangeText={(text) =>
-                handleAnswerSelect(currentQuestion.id, text, false)
-              }
-              editable={!reviewMode}
+              textAlignVertical="top"
+              style={styles.shortAnswerInput}
+              placeholder="Type your answer here"
             />
           )}
           {reviewMode && (
@@ -1508,6 +1928,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.backgroundGray,
   },
   centerContainer: {
+    backgroundColor: Colors.backgroundGray,
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
@@ -1557,6 +1978,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: Spacing.sm,
     marginBottom: 6,
     gap: 8,
   },
@@ -1587,7 +2009,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "right",
   },
+  shortAnswerNotice: {
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
+    fontSize: 11,
+    color: Colors.yellow,
+    fontWeight: "600",
+    textAlign: "right",
+    fontStyle: "italic",
+  },
   questionNavRow: {
+    marginTop: Spacing.sm,
     flexDirection: "row",
     justifyContent: "center",
     gap: 12,
@@ -1618,15 +2050,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modernQuestionCard: {
-    marginBottom: Spacing.lg,
+    height: "auto",
+    marginBottom: Spacing.md,
+    padding: 0,
   },
   questionImageContainer: {
     alignItems: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.base,
   },
   questionImagePlaceholder: {
     width: "100%",
-    height: 200,
+    height: "auto",
+    minHeight: 150,
     backgroundColor: "#1a1a2e",
     borderRadius: 16,
     justifyContent: "center",
@@ -1635,7 +2070,8 @@ const styles = StyleSheet.create({
   },
   questionImage: {
     width: "100%",
-    height: 200,
+    height: "auto",
+    minHeight: 150,
     borderRadius: 16,
     backgroundColor: "#1a1a2e",
   },
@@ -1645,6 +2081,17 @@ const styles = StyleSheet.create({
     color: Colors.white,
     lineHeight: 28,
     textAlign: "left",
+  },
+  pointsEarnedContainer: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: Colors.purple850 + "40",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.purple400 + "30",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   questionTypeHint: {
     fontSize: 13,
@@ -1721,6 +2168,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: 16,
     marginBottom: Spacing.md,
+    alignSelf: "stretch",
   },
   shortAnswerLabel: {
     fontSize: 15,
@@ -1734,10 +2182,12 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     fontSize: 16,
     color: Colors.textPrimary,
-    minHeight: 100,
     textAlignVertical: "top",
+
     borderWidth: 2,
     borderColor: Colors.gray600,
+
+    flexGrow: 1, // ✅ THIS fixes hidden text issue
   },
   shortAnswerReviewContainer: {
     marginTop: Spacing.md,
@@ -1772,7 +2222,7 @@ const styles = StyleSheet.create({
   explanationTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: Colors.purple400,
+    color: Colors.purple200,
     marginBottom: Spacing.sm,
   },
   explanationText: {
@@ -1805,7 +2255,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     opacity: 0.9,
     borderRadius: 24,
-    padding: Spacing.xl,
+    padding: Spacing.base,
     alignItems: "center",
     marginBottom: Spacing.xl,
     position: "relative",
@@ -1875,7 +2325,7 @@ const styles = StyleSheet.create({
     color: Colors.purple400,
   },
   attemptsTextError: {
-    color: Colors.error,
+    color: Colors.red,
   },
   scoreSubtext: {
     fontSize: 20,
@@ -1887,7 +2337,7 @@ const styles = StyleSheet.create({
   courseCompletionCard: {
     backgroundColor: Colors.textInputBg,
     marginBottom: Spacing.xl,
-    padding: Spacing.lg,
+    padding: Spacing.md,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: Colors.starGold + "40",
