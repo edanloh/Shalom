@@ -502,7 +502,7 @@ test.describe('Messages page', () => {
 
     // Check for unread badge (implementation may vary)
     await expect(page.getByText('John Doe')).toBeVisible();
-    await expect(page.getByText('3')).toBeVisible();
+    await page.getByRole('main').getByText('3').click();
   });
 
   test('marks messages as read when conversation is selected', async ({

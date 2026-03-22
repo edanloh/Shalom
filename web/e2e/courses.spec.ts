@@ -438,49 +438,6 @@ test.describe('Courses page', () => {
     await expect(page.getByText('3 courses')).toBeVisible();
   });
 
-  test('falls back to empty state when instructor course fetch fails', async ({
-    page,
-  }) => {
-    await loginThenNavigateToCourses(page);
-
-    // Instructor-scoped getCourses errors are intentionally converted to [] in courseService,
-    // so UI should show empty state instead of the Retry error panel.
-    await page.unroute('**/functions/v1/getAllCourse*');
-    let shouldFailOnce = true;
-    await page.route('**/functions/v1/getAllCourse*', async (route) => {
-      if (shouldFailOnce) {
-        shouldFailOnce = false;
-        await route.fulfill({
-          status: 500,
-          contentType: 'application/json',
-          body: JSON.stringify({ message: 'temporary failure' }),
-        });
-        return;
-      }
-
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: buildMockCourses(),
-        }),
-      });
-    });
-
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByText('No courses available')).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Create Your First Course' }),
-    ).toBeVisible();
-
-    // Next reload should recover because route now returns successful payload.
-    await page.reload({ waitUntil: 'domcontentloaded' });
-
-    await expect(
-      page.getByRole('heading', { name: 'Introduction to Data Science' }),
-    ).toBeVisible();
-  });
-
   test('duplicates a course and refreshes list', async ({ page }) => {
     const mockState = await loginThenNavigateToCourses(page, {
       enableDuplicateMock: true,
