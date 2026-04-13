@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, ContainerStyles, Spacing, Typography, TextStyles } from '../constants';
 import { useNavigation, CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
@@ -21,6 +22,8 @@ import { ActionButton, Screen } from '@/components';
 import ProfileHeader from '../components/home/ProfileHeader';
 import ProgressSection from '../components/home/ProgressSection';
 import CourseCard from '../components/home/CourseCard';
+import InterestSelectionModal from '../components/home/InterestSelectionModal';
+import { PREFERRED_CATEGORIES_KEY } from '../contexts/CourseContext';
 
 // Import hooks and types
 import { useCourses } from '../contexts/CourseContext';
@@ -53,6 +56,7 @@ export default function HomeScreen({ navigation, route }: any) {
   const { user, login, register } = useAuth();
   const { user: profileUser } = useUser();
   const recommendationUserId = profileUser?.uuid;
+  const [showInterestModal, setShowInterestModal] = useState(false);
   const [certCount, setCertCount] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [goalProgress, setGoalProgress] = useState<{
@@ -108,6 +112,33 @@ export default function HomeScreen({ navigation, route }: any) {
       console.log('HomeScreen - DB User ID for enrollment fetch:', profileUser.uuid);
     }
   }, [profileUser]);
+
+  // Show interest selection modal for cold-start users (no enrolled courses,
+  // and haven't been shown the modal before).
+  useEffect(() => {
+    if (!profileUser?.uuid || myCoursesLoading) return;
+    if ((myCoursesData ?? []).length > 0) return; // already has history
+    const key = `interests_prompted_${profileUser.uuid}`;
+    AsyncStorage.getItem(key).then(val => {
+      if (!val) setShowInterestModal(true);
+    });
+  }, [myCoursesData, myCoursesLoading, profileUser?.uuid]);
+
+  const handleInterestConfirm = async (selected: string[]) => {
+    if (profileUser?.uuid) {
+      await AsyncStorage.setItem(`${PREFERRED_CATEGORIES_KEY}_${profileUser.uuid}`, JSON.stringify(selected));
+      await AsyncStorage.setItem(`interests_prompted_${profileUser.uuid}`, 'confirmed');
+    }
+    setShowInterestModal(false);
+    refreshRecommended();
+  };
+
+  const handleInterestSkip = async () => {
+    if (profileUser?.uuid) {
+      await AsyncStorage.setItem(`interests_prompted_${profileUser.uuid}`, 'skipped');
+    }
+    setShowInterestModal(false);
+  };
 
   const loadCreditMeta = React.useCallback(async () => {
     try {
@@ -591,10 +622,16 @@ export default function HomeScreen({ navigation, route }: any) {
         <View style={{ height: 130 }} />
 
       {/* Bottom Navigation - Home, My Courses, Search, Settings */}
-      {/* <BottomNavigation 
+      {/* <BottomNavigation
         activeTab={activeTab}
         onTabPress={handleTabPress}
       /> */}
+
+      <InterestSelectionModal
+        visible={showInterestModal}
+        onConfirm={handleInterestConfirm}
+        onSkip={handleInterestSkip}
+      />
     </Screen>
   );
 };

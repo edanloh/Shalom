@@ -31,6 +31,19 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
+# ── Optional LightGBM tree inference ─────────────────────────────────────────
+# Mirrors the traverseTree / predictLGBM logic in getMLRecommendations.ts.
+def _traverse_tree(node: dict, features: list) -> float:
+    if "leaf_value" in node:
+        return float(node["leaf_value"])
+    val = features[node["split_feature"]] if node["split_feature"] < len(features) else float("nan")
+    go_left = node.get("default_left", False) if math.isnan(val) else (val <= node["threshold"])
+    return _traverse_tree(node["left_child"] if go_left else node["right_child"], features)
+
+def _predict_lgbm(breakdown: dict, feature_cols: list, trees: list) -> float:
+    feats = [breakdown.get(f, 0.0) for f in feature_cols]
+    return sum(_traverse_tree(tree, feats) for tree in trees)
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 POSITIVE_EVENTS = {"click", "start", "enroll", "complete", "wishlist", "save"}
 
@@ -41,6 +54,11 @@ def load_real_requests(lookback_days: int = 90):
     Requires that your mobile app saves score_breakdown in the event context.
     Groups events by request_id so each group = one recommendation request,
     matching the structure of make_synthetic_requests().
+
+    Temporal split: events are tagged with their `created_at` timestamp so
+    the caller can split into train-era vs evaluation-era requests, preventing
+    data leakage where the model is evaluated on data it could have seen during
+    training.
     """
     try:
         from supabase import create_client
@@ -58,10 +76,10 @@ def load_real_requests(lookback_days: int = 90):
         since = (datetime.now(UTC) - timedelta(days=lookback_days)).isoformat()
         resp = (
             sb.table("recommendation_events")
-            .select("course_id, event_type, context")
+            .select("course_id, event_type, context, timestamp")
             .gte("timestamp", since)
-            .order("timestamp", desc=True)   # newest first — these have score_breakdown
-            .limit(2000)                      # fetch more to capture enough real events
+            .order("timestamp", desc=False)  # oldest first — for temporal ordering
+            .limit(2000)
             .execute()
         )
         rows = resp.data or []
@@ -81,7 +99,14 @@ def load_real_requests(lookback_days: int = 90):
             label = 1 if (ev.get("event_type") or "").lower() in POSITIVE_EVENTS else 0
             # Note: real events don't carry course tags through the event payload,
             # so we leave tags empty. ILD now uses score_breakdown drivers instead.
-            item = {"id": ev.get("course_id"), "breakdown": breakdown, "label": label, "tags": []}
+            created_at = ev.get("timestamp")
+            item = {
+                "id": ev.get("course_id"),
+                "breakdown": breakdown,
+                "label": label,
+                "tags": [],
+                "created_at": created_at,
+            }
             if request_id:
                 groups[request_id].append(item)
             else:
@@ -119,7 +144,12 @@ FEATURE_COLS = MODEL["feature_cols"]
 
 
 def ml_score(breakdown: dict) -> float:
-    logit = MODEL["intercept"]
+    """Dispatch to the right inference function based on model_type."""
+    model_type = MODEL.get("model_type", "logreg")
+    if model_type == "lgbm":
+        return _predict_lgbm(breakdown, FEATURE_COLS, MODEL["lgbm_trees"])
+    # Logistic regression path (legacy)
+    logit = MODEL.get("intercept", 0.0)
     for i, feat in enumerate(FEATURE_COLS):
         raw = breakdown.get(feat, 0.0)
         scaled = (raw - MODEL["scaler_mean"][i]) / MODEL["scaler_scale"][i]
@@ -159,6 +189,7 @@ def make_synthetic_requests(n_requests=200, candidates_per_request=20, seed=0):
                 "overexposed_penalty":       float(rng.uniform(0, 0.5)),
                 "instructor_fatigue_penalty":float(rng.uniform(0, 0.5)),
                 "quality_penalty":           float(rng.uniform(0, 0.5)),
+                "session_cf_boost":          float(rng.beta(1.5, 3)),
             }
             # Simulated "true" click probability (ground truth)
             true_logit = (
@@ -250,26 +281,43 @@ def evaluate(requests, score_fn, k=6, name="system"):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    # Try real data first; fall back to synthetic if unavailable
-    requests = load_real_requests(lookback_days=90)
+    # ── Load and optionally split real data ───────────────────────────────────
+    real_requests = load_real_requests(lookback_days=90)
     data_source = "real"
 
-    if requests is None or len(requests) < 10:
-        if requests is not None:
-            print(f"[warn] Only {len(requests)} real requests — supplementing with synthetic data.")
+    # Temporal split: if real data has timestamps, use the newest 20% for
+    # evaluation only. This mirrors how a live system works — the model was
+    # trained on historical data and evaluated on data it never saw.
+    eval_requests = real_requests
+    if real_requests and len(real_requests) >= 20:
+        # Sort request groups by the earliest event timestamp in each group
+        def group_min_ts(group):
+            ts_vals = [c.get("created_at") or "" for c in group]
+            return min((t for t in ts_vals if t), default="")
+
+        sorted_real = sorted(real_requests, key=group_min_ts)
+        split_idx = int(len(sorted_real) * 0.8)
+        if split_idx > 0 and split_idx < len(sorted_real):
+            eval_requests = sorted_real[split_idx:]  # newest 20% for evaluation
+            print(f"[temporal-split] Using newest {len(eval_requests)}/{len(sorted_real)} request groups for evaluation.")
+
+    if eval_requests is None or len(eval_requests) < 10:
+        if eval_requests is not None:
+            print(f"[warn] Only {len(eval_requests)} real requests — supplementing with synthetic data.")
         else:
             print("Falling back to synthetic data.")
         synthetic = make_synthetic_requests(n_requests=500)
-        requests = (requests or []) + synthetic
-        data_source = "synthetic" if not requests else "mixed"
+        eval_requests = (eval_requests or []) + synthetic
+        data_source = "synthetic" if not real_requests else "mixed"
 
-    print(f"Evaluating on {len(requests)} requests (source: {data_source})...\n")
+    print(f"Evaluating on {len(eval_requests)} requests (source: {data_source})...\n")
 
+    model_label = f"ML re-ranker ({MODEL.get('model_version', 'unknown')})"
     results = [
-        evaluate(requests, score_random,    name="Random baseline"),
-        evaluate(requests, score_popularity, name="Popularity baseline"),
-        evaluate(requests, score_rules,     name="Rule-based (rules_v2)"),
-        evaluate(requests, score_ml,        name="ML re-ranker (ltr_logreg_v1)"),
+        evaluate(eval_requests, score_random,     name="Random baseline"),
+        evaluate(eval_requests, score_popularity,  name="Popularity baseline"),
+        evaluate(eval_requests, score_rules,       name="Rule-based (rules_v2)"),
+        evaluate(eval_requests, score_ml,          name=model_label),
     ]
 
     df = pd.DataFrame(results).set_index("system")
@@ -289,5 +337,10 @@ if __name__ == "__main__":
         f.write(f"RECOMMENDATION SYSTEM EVALUATION RESULTS (data: {data_source})\n")
         f.write("=" * 65 + "\n")
         f.write(df.to_string())
-        f.write("\n")
+        f.write("\n\n")
+        f.write("Notes:\n")
+        if data_source == "real":
+            f.write("  - Evaluation used the newest 20% of request groups (temporal split).\n")
+            f.write("    This prevents data leakage from training-era events.\n")
+        f.write(f"  - ML model: {MODEL.get('model_type', 'logreg')} / {MODEL.get('model_version', 'unknown')}\n")
     print(f"\nSaved to {report_path}")

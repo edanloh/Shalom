@@ -642,7 +642,7 @@ class CourseService {
   /**
    * Get recommended courses (remaining courses after enrolled ones)
    */
-  async getRecommendedCourses(userId?: string): Promise<{
+  async getRecommendedCourses(userId?: string, preferredCategories?: string[]): Promise<{
     courses: Course[];
     meta: any;
     recommendations: any[];
@@ -666,14 +666,22 @@ class CourseService {
       const useML = shouldUseML(uid);
       const recoEndpoint = useML ? ENDPOINTS.ML_RECOMMENDATIONS : ENDPOINTS.RECOMMENDATIONS;
 
-      const resp = await apiService.get<any>(recoEndpoint, {
+      const params: Record<string, string> = {
         userId: uid,
         limit: '8',
         placement: 'home',
         // Pass local time so context-factors (evening boost, weekend explore) work correctly
         localHour: String(new Date().getHours()),
         dayOfWeek: String(new Date().getDay()),
-      });
+      };
+      // Cold-start: seed category affinity from onboarding selections when the
+      // user has no behavioral history yet. Ignored by the backend once real
+      // events exist (categoryAffinityRaw will be non-empty from enrollment data).
+      if (preferredCategories && preferredCategories.length > 0) {
+        params.preferredCategories = preferredCategories.join(',');
+      }
+
+      const resp = await apiService.get<any>(recoEndpoint, params);
 
       const recommendations =
         resp?.data?.recommendations ??

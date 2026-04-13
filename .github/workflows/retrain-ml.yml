@@ -1,0 +1,59 @@
+name: Retrain ML Re-ranker
+
+on:
+  schedule:
+    - cron: '0 2 1 * *'   # 2 AM UTC on the 1st of every month
+  workflow_dispatch:        # allow manual trigger from GitHub Actions UI
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pandas scikit-learn numpy python-dotenv joblib supabase lightgbm
+
+      - name: Train model
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python backend/ml/train_reranker.py
+
+      - name: Upload model weights to Supabase Storage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          HTTP_STATUS=$(curl -s -o /tmp/upload_response.txt -w "%{http_code}" \
+            -X POST "${SUPABASE_URL}/storage/v1/object/ml-models/model_weights.json" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data-binary @backend/ml/model_weights.json)
+          echo "Upload response: $(cat /tmp/upload_response.txt)"
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "201" ]; then
+            echo "Upload failed with HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Model uploaded successfully (HTTP $HTTP_STATUS)"
+
+      - name: Run evaluation
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python backend/ml/evaluate.py
+
+      - name: Upload eval report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-${{ github.run_id }}
+          path: backend/ml/eval_report.txt
+          retention-days: 90

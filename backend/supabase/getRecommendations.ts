@@ -92,6 +92,11 @@ const HARD_SUPPRESS_DISMISSALS = Number(
 const HARD_SUPPRESS_IGNORED_IMPRESSIONS = Number(
   Deno.env.get("RECO_HARD_SUPPRESS_IGNORED_IMPRESSIONS") ?? "6"
 );
+// ── MMR diversity ─────────────────────────────────────────────────────────────
+// λ = 0 → maximise diversity only; λ = 1 → maximise relevance only.
+// Default 0.7 gives a 70/30 relevance-diversity blend, matching Carbonell &
+// Goldstein (1998). Set RECO_MMR_LAMBDA=0.5 for more aggressive diversification.
+const MMR_LAMBDA = Number(Deno.env.get("RECO_MMR_LAMBDA") ?? "0.7");
 const DEFAULT_ALGO = (Deno.env.get("RECO_ALGO_DEFAULT") ?? "rules_v2").toLowerCase();
 const SPLIT_V2 = Number(Deno.env.get("RECO_SPLIT_V2") ?? "100");
 const SPLIT_V2A = Number(Deno.env.get("RECO_SPLIT_V2A") ?? "0");
@@ -566,6 +571,128 @@ const pickPrimaryReasonTag = (
   return ranked[0]?.key ?? "recommended_for_you";
 };
 
+// ── Maximal Marginal Relevance (MMR) diversity selection ─────────────────────
+// MMR (Carbonell & Goldstein 1998) iteratively picks the next item that best
+// balances relevance against similarity to already-selected items:
+//
+//   mmr(c) = λ · rel(c) − (1−λ) · max_{s ∈ selected} sim(c, s)
+//
+// Unlike the previous hard-cap approach (max N per category/instructor), MMR:
+//  - Grades similarity on a spectrum instead of binary category membership
+//  - Avoids "gaming" where a single dominant category fills all slots
+//  - Naturally handles tag-level diversity (two different categories can still
+//    be very similar if they share many tags)
+//
+// Hard caps (maxPerCategory, maxPerInstructor) are still applied as emergency
+// rails to prevent degenerate cases on small catalogues.
+
+const itemSimilarity = <
+  T extends { category_key: string; instructor_key: string; tags?: string[] }
+>(a: T, b: T): number => {
+  let sim = 0;
+  if (a.category_key === b.category_key && a.category_key !== "uncategorized") {
+    sim += 0.5;
+  }
+  if (a.instructor_key === b.instructor_key && a.instructor_key !== "unknown_instructor") {
+    sim += 0.3;
+  }
+  const tagsA = new Set((a.tags ?? []).map(normalizeTag));
+  const tagsB = new Set((b.tags ?? []).map(normalizeTag));
+  if (tagsA.size > 0 || tagsB.size > 0) {
+    let intersection = 0;
+    for (const t of tagsA) {
+      if (tagsB.has(t)) intersection += 1;
+    }
+    const union = tagsA.size + tagsB.size - intersection;
+    sim += 0.2 * (intersection / union);
+  }
+  return Math.min(sim, 1.0);
+};
+
+const mmrSelect = <
+  T extends {
+    id: string;
+    score: number;
+    category_key: string;
+    instructor_key: string;
+    tags?: string[];
+    is_novel?: boolean;
+  }
+>(
+  items: T[],
+  targetCount: number,
+  lambda: number,
+  noveltyMinSlots: number,
+  maxPerCategory: number,
+  maxPerInstructor: number
+): T[] => {
+  const selected: T[] = [];
+  const pool = [...items];
+  const perCategory = new Map<string, number>();
+  const perInstructor = new Map<string, number>();
+  let noveltyCount = 0;
+
+  // Normalise relevance scores to [0, 1] so the λ blend is meaningful
+  const maxScore = Math.max(...items.map((i) => i.score), 1e-9);
+
+  while (selected.length < targetCount && pool.length > 0) {
+    let bestScore = -Infinity;
+    let bestIndex = -1;
+
+    for (let i = 0; i < pool.length; i++) {
+      const item = pool[i];
+      const catKey = item.category_key || "uncategorized";
+      const instKey = item.instructor_key || "unknown_instructor";
+
+      // Hard caps as emergency rails — only skip when limit is truly exceeded
+      if ((perCategory.get(catKey) ?? 0) >= maxPerCategory) continue;
+      if ((perInstructor.get(instKey) ?? 0) >= maxPerInstructor) continue;
+
+      const relevance = item.score / maxScore;
+
+      // Diversity term: maximum similarity to any already-selected item.
+      // First item always has maxSim = 0 (nothing selected yet).
+      const maxSim = selected.length > 0
+        ? selected.reduce((mx, s) => Math.max(mx, itemSimilarity(item, s)), 0)
+        : 0;
+
+      // Small bonus to push unseen items when novelty budget is not yet met
+      const noveltyBonus = (noveltyMinSlots - noveltyCount > 0 && item.is_novel) ? 0.05 : 0;
+
+      const mmrScore = lambda * relevance - (1 - lambda) * maxSim + noveltyBonus;
+
+      if (mmrScore > bestScore) {
+        bestScore = mmrScore;
+        bestIndex = i;
+      }
+    }
+
+    if (bestIndex < 0) break;
+    const picked = pool.splice(bestIndex, 1)[0];
+    selected.push(picked);
+    perCategory.set(
+      picked.category_key || "uncategorized",
+      (perCategory.get(picked.category_key || "uncategorized") ?? 0) + 1
+    );
+    perInstructor.set(
+      picked.instructor_key || "unknown_instructor",
+      (perInstructor.get(picked.instructor_key || "unknown_instructor") ?? 0) + 1
+    );
+    if (picked.is_novel) noveltyCount += 1;
+  }
+
+  // Safety fill: if catalogue is too small to meet caps, fill without constraints
+  if (selected.length < targetCount) {
+    for (const item of items) {
+      if (selected.length >= targetCount) break;
+      if (selected.some((s) => s.id === item.id)) continue;
+      selected.push(item);
+    }
+  }
+
+  return selected;
+};
+
 const applyCategoryDiversity = <
   T extends { id: string; category_key: string; instructor_key: string; score: number }
 >(
@@ -736,6 +863,12 @@ serve(async (req) => {
     const userId = url.searchParams.get("userId");
     const algo = url.searchParams.get("algo");
     const learningGoal = url.searchParams.get("learningGoal");
+    // preferredCategories: comma-separated category names set during onboarding.
+    // Used to seed category affinity for cold-start users who haven't enrolled yet.
+    const preferredCategoriesParam = url.searchParams.get("preferredCategories");
+    const preferredCategories: string[] = preferredCategoriesParam
+      ? preferredCategoriesParam.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
     const placement = url.searchParams.get("placement") ?? "home"; // new: track which UI surface requested recommendations
     const localHourParam = Number(url.searchParams.get("localHour"));
     const dayOfWeekParam = Number(url.searchParams.get("dayOfWeek"));
@@ -868,10 +1001,46 @@ const courseSelect = `
       (c) => !excluded.has(c.id)
     );
 
+    // ── Embedding-based candidate retrieval (ANN) ─────────────────────────────
+    // When RECO_EMBEDDINGS_ENABLED=true and the user has enrolled courses,
+    // fetch semantically similar courses via pgvector ANN search. This bucket
+    // surfaces courses that rule-based category matching would miss — e.g.
+    // a "Python for Data Science" course for a user who enrolled in "SQL Basics"
+    // (different categories, but semantically related).
+    let embeddingCandidates: CourseCandidate[] = [];
+    if (EMBEDDINGS_ENABLED && userId && userEnrolledCourseIds.length > 0) {
+      try {
+        const uniqueEnrolledIds = Array.from(new Set(userEnrolledCourseIds));
+        const excludedArr = Array.from(excluded);
+        const { data: embCandRows, error: embCandErr } = await (supabase as any).rpc(
+          "get_embedding_candidates",
+          {
+            enrolled_ids: uniqueEnrolledIds,
+            excluded_ids: excludedArr,
+            candidate_count: CANDIDATE_CATEGORY_POOL_LIMIT,
+          }
+        );
+        if (!embCandErr && Array.isArray(embCandRows) && embCandRows.length > 0) {
+          const embCandIds = (embCandRows as Array<{ course_id: string }>).map((r) => r.course_id);
+          const { data: embCandCourses } = await supabase
+            .from("courses")
+            .select(courseSelect)
+            .eq("is_published", true)
+            .in("id", embCandIds);
+          embeddingCandidates = ((embCandCourses ?? []) as CourseCandidate[]).filter(
+            (c) => !excluded.has(c.id)
+          );
+        }
+      } catch {
+        // Silently fall back if pgvector / embeddings not yet set up
+      }
+    }
+
     const mergedCandidates = new Map<string, CourseCandidate>();
     for (const course of topRatedCandidates) mergedCandidates.set(course.id, course);
     for (const course of personalizedCategoryCandidates) mergedCandidates.set(course.id, course);
     for (const course of longTailCandidates) mergedCandidates.set(course.id, course);
+    for (const course of embeddingCandidates) mergedCandidates.set(course.id, course);
     const candidates = Array.from(mergedCandidates.values()).slice(
       0,
       Math.max(MAX_CANDIDATES, MAX_CANDIDATE_POOL)
@@ -879,11 +1048,6 @@ const courseSelect = `
     const courseIds = candidates.map((c) => c.id);
 
     if (courseIds.length === 0) {
-      const explorationSlots = clampInt(
-        policy.explorationSlots,
-        0,
-        Math.max(0, MAX_RESULTS - 1)
-      );
       const meta = {
         model_version: experiment.modelVersion,
         request_id: requestId,
@@ -917,7 +1081,7 @@ const courseSelect = `
           instructor_fatigue_penalty: INSTRUCTOR_FATIGUE_PENALTY,
           max_per_category: policy.maxPerCategory,
           max_per_instructor: policy.maxPerInstructor,
-          exploration_slots: explorationSlots,
+          mmr_lambda: MMR_LAMBDA,
           max_exposures_per_course_7d: policy.maxExposuresPerCourse7d,
           suppression_cooldown_days: policy.suppressionCooldownDays,
         },
@@ -1109,6 +1273,7 @@ const courseSelect = `
     const uniqueUserCourseIds = Array.from(new Set(userEnrolledCourseIds));
     const enrolledVectors: CourseVector[] = []; // for item-based CF similarity
     const enrolledVectorIds = new Set<string>(); // dedupe by course id
+    const enrolledVectorById = new Map<string, CourseVector>(); // keyed for session lookups
 
     if (userId && uniqueUserCourseIds.length > 0) {
       const { data: enrolledCourses, error: enrolledCoursesErr } = await supabase
@@ -1141,7 +1306,9 @@ const courseSelect = `
         // Build vector for item-based CF
         if (!enrolledVectorIds.has(course.id)) {
           enrolledVectorIds.add(course.id);
-          enrolledVectors.push(buildCourseVector(course));
+          const vec = buildCourseVector(course);
+          enrolledVectors.push(vec);
+          enrolledVectorById.set(course.id, vec);
         }
       }
     }
@@ -1191,9 +1358,20 @@ const courseSelect = `
         ) {
           if (!enrolledVectorIds.has(course.id)) {
             enrolledVectorIds.add(course.id);
-            enrolledVectors.push(buildCourseVector(course));
+            const vec = buildCourseVector(course);
+            enrolledVectors.push(vec);
+            enrolledVectorById.set(course.id, vec);
           }
         }
+      }
+    }
+    // Cold-start preference seeding: if the user has no behavioral history
+    // (empty affinity map) but provided preferred categories during onboarding,
+    // seed those into the affinity map at equal weight so the ranking stage
+    // treats them as interest signals instead of falling back to pure popularity.
+    if (categoryAffinityRaw.size === 0 && preferredCategories.length > 0) {
+      for (const cat of preferredCategories) {
+        categoryAffinityRaw.set(cat, 1);
       }
     }
     const categoryAffinityNorm = normalizeMapByMax(categoryAffinityRaw);
@@ -1203,6 +1381,30 @@ const courseSelect = `
       Array.from(difficultyAffinityRaw.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ??
       "unknown";
     const sessionCategoryNorm = normalizeMapByMax(recentSessionCategoryRaw);
+
+    // ── Session sequence vectors ──────────────────────────────────────────────
+    // Build course vectors for the last 3 courses the user positively interacted
+    // with in the current session. These represent the user's immediate intent —
+    // stronger signal than the long-term category affinity profile.
+    // Used to compute session_cf_boost: similarity between each candidate and
+    // the user's within-session behaviour.
+    const sessionPositiveTypes = new Set(["click", "start", "save", "complete", "enroll", "wishlist"]);
+    const sessionVectors: CourseVector[] = [];
+    const sessionVectorIds = new Set<string>();
+    for (const ev of sessionEvents) {
+      if (sessionVectors.length >= 3) break;
+      const type = (ev.event_type ?? "").toLowerCase();
+      if (!sessionPositiveTypes.has(type) || !ev.course_id) continue;
+      if (sessionVectorIds.has(ev.course_id)) continue;
+      // Look up vector from already-built map (avoids extra DB fetches)
+      const vec =
+        enrolledVectorById.get(ev.course_id) ??
+        (candidateById.has(ev.course_id) ? buildCourseVector(candidateById.get(ev.course_id)!) : null);
+      if (vec) {
+        sessionVectors.push(vec);
+        sessionVectorIds.add(ev.course_id);
+      }
+    }
 
     // ── Learning path: target the next difficulty step up ─────────────────────
     // If the user's dominant completed-course level is beginner, we want to
@@ -1472,6 +1674,16 @@ const courseSelect = `
         clamp(sessionCategoryNorm.get(categoryKey) ?? 0, 0, 1) *
         Math.max(0, SESSION_INTENT_BOOST) *
         Math.max(0.1, contextFactors.session);
+
+      // Session collaborative filtering boost: how similar is this candidate to
+      // the last 3 courses the user positively interacted with in this session?
+      // This captures immediate intent more precisely than the category-level
+      // sessionCategoryBoost — two courses can be in the same category but have
+      // very different tags and instructors.
+      const sessionCfBoost = sessionVectors.length > 0
+        ? computeItemSimilarity(buildCourseVector(course), sessionVectors)
+        : 0;
+
       const instructorKey = course.instructor_id ?? "unknown_instructor";
       const instructorImpressions =
         recentInstructorImpressions.get(instructorKey) ?? 0;
@@ -1520,7 +1732,8 @@ const courseSelect = `
           freshness * 10 * scoring.freshness +
           popularity * 10 * scoring.globalPopularity * Math.max(0.1, contextFactors.popularity) +
           contentSimilarityBoost * 10 * scoring.contentSimilarityBoost +
-          thompsonBonus * 10 * scoring.thompsonBonus -  // exploration bonus
+          thompsonBonus * 10 * scoring.thompsonBonus +   // exploration bonus
+          sessionCfBoost * 10 * 0.12 -                  // session sequence CF
           userBeh.ignoredPenalty * scoring.ignorePenalty -
           userBeh.dismissPenalty * scoring.dismissPenalty;
         score += sessionCategoryBoost;
@@ -1604,8 +1817,9 @@ const courseSelect = `
           instructor_fatigue_penalty: Number(instructorFatiguePenalty.toFixed(3)),
           quality_penalty: Number(qualityPenalty.toFixed(3)),
           content_similarity_boost: Number((contentSimilarityBoost * 10).toFixed(3)),
-          thompson_bonus: Number((thompsonBonus * 10).toFixed(3)),        // UCB exploration signal
+          thompson_bonus: Number((thompsonBonus * 10).toFixed(3)),          // UCB exploration signal
           difficulty_progression: Number((difficultyProgression * 10).toFixed(3)), // learning path
+          session_cf_boost: Number((sessionCfBoost * 10).toFixed(3)),     // session sequence similarity
         },
         course: {
           ...course,
@@ -1622,41 +1836,32 @@ const courseSelect = `
     const fallbackPool = unsuppressed.length > 0 ? unsuppressed : blended;
     const sortedByScore = [...fallbackPool].sort((a, b) => b.score - a.score);
 
-    const explorationSlots = clampInt(
-      policy.explorationSlots,
-      0,
-      Math.max(0, effectiveMaxResults - 1)
-    );
-    const seedSelected = rerankWithConstraints(
+    // ── MMR diversity selection ──────────────────────────────────────────────
+    // Replaces the previous rerankWithConstraints + separate exploration-slots
+    // logic. MMR handles both diversity and novelty in a single pass:
+    //   - λ=MMR_LAMBDA controls the relevance/diversity trade-off
+    //   - noveltyMinSlots is surfaced as a small score bonus for unseen items
+    //   - Hard caps (maxPerCategory/Instructor) remain as emergency rails
+    const mmrSelected = mmrSelect(
       sortedByScore,
       effectiveMaxResults,
+      clamp(MMR_LAMBDA, 0, 1),
+      clampInt(NOVELTY_MIN_SLOTS, 0, effectiveMaxResults),
       Math.max(1, policy.maxPerCategory),
-      Math.max(1, policy.maxPerInstructor),
-      clampInt(NOVELTY_MIN_SLOTS, 0, effectiveMaxResults)
-    );
-    const diversityFallback =
-      seedSelected.length > 0
-        ? seedSelected
-        : applyCategoryDiversity(
-            sortedByScore,
-            effectiveMaxResults,
-            Math.max(1, policy.maxPerCategory),
-            Math.max(1, policy.maxPerInstructor)
-          );
-
-    const remainingForExplore = sortedByScore.filter(
-      (item) => !diversityFallback.some((picked) => picked.id === item.id)
-    );
-    const explorationSelected = [...remainingForExplore]
-      .sort((a, b) => b.exploration_score - a.exploration_score)
-      .slice(0, explorationSlots);
-
-    const combined = [...diversityFallback, ...explorationSelected];
-    const deduped = combined.filter(
-      (item, index, arr) => arr.findIndex((x) => x.id === item.id) === index
+      Math.max(1, policy.maxPerInstructor)
     );
 
-    let rankedForOutput = deduped.sort((a, b) => b.score - a.score).slice(0, effectiveMaxResults);
+    // Fallback: if MMR returns nothing (extremely small catalogue), use hard caps
+    const selectedPool = mmrSelected.length > 0
+      ? mmrSelected
+      : applyCategoryDiversity(
+          sortedByScore,
+          effectiveMaxResults,
+          Math.max(1, policy.maxPerCategory),
+          Math.max(1, policy.maxPerInstructor)
+        );
+
+    let rankedForOutput = selectedPool.sort((a, b) => b.score - a.score).slice(0, effectiveMaxResults);
     const noveltyTarget = clampInt(NOVELTY_MIN_SLOTS, 0, effectiveMaxResults);
     if (noveltyTarget > 0) {
       let noveltyCount = rankedForOutput.filter((item) => item.is_novel).length;
@@ -1723,7 +1928,7 @@ const courseSelect = `
         instructor_fatigue_penalty: INSTRUCTOR_FATIGUE_PENALTY,
         max_per_category: policy.maxPerCategory,
         max_per_instructor: policy.maxPerInstructor,
-        exploration_slots: explorationSlots,
+        mmr_lambda: MMR_LAMBDA,
         max_exposures_per_course_7d: policy.maxExposuresPerCourse7d,
         suppression_cooldown_days: policy.suppressionCooldownDays,
         cold_min_score_floor: COLD_MIN_SCORE_FLOOR,
@@ -1732,10 +1937,16 @@ const courseSelect = `
         candidate_count_top_rated: topRatedCandidates.length,
         candidate_count_category_pool: personalizedCategoryCandidates.length,
         candidate_count_long_tail_pool: longTailCandidates.length,
+        candidate_count_embedding_pool: embeddingCandidates.length,
+        embeddings_enabled: EMBEDDINGS_ENABLED,
         candidate_count_before_seen_filter: candidates.length,
         candidate_count_after_seen_filter: candidatePool.length,
         novelty_count_in_results: rankedForOutput.filter((item) => item.is_novel).length,
         session_event_count: sessionEvents.length,
+        session_cf_vectors: sessionVectors.length,
+        cold_start_seeded_categories: preferredCategories.length > 0 && categoryAffinityRaw.size === preferredCategories.length
+          ? preferredCategories
+          : [],
       },
       context: {
         learning_goal: learningGoal,

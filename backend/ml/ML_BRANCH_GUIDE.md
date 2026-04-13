@@ -48,7 +48,7 @@ ml/eval_report.txt
 ## 3. Install Python dependencies
 
 ```bash
-pip install pandas scikit-learn numpy python-dotenv joblib supabase
+pip install pandas scikit-learn numpy python-dotenv joblib supabase lightgbm sentence-transformers
 ```
 
 Create `ml/.env` (or use your existing `.env`):
@@ -118,27 +118,41 @@ Key points to write up:
 
 ## 6. Deploy the ML function
 
-```bash
-# Store model weights as a Supabase secret
-supabase secrets set RECO_ML_WEIGHTS="$(cat ml/model_weights.json)"
+The LightGBM model JSON is too large for Supabase's 24 KB secret limit, so
+weights are stored in **Supabase Storage** instead.
 
-# Deploy the new function
-supabase functions deploy getMLRecommendations
+```bash
+# One-time: create the storage bucket (private)
+# Supabase Dashboard → Storage → New bucket → name: "ml-models", private
+
+# Upload model weights (re-run this after every retrain)
+source backend/.env   # sets SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+curl -X POST "${SUPABASE_URL}/storage/v1/object/ml-models/model_weights.json" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+  -H "Content-Type: application/json" \
+  --data-binary @backend/ml/model_weights.json
+
+# Deploy the edge function (paste into Supabase Dashboard editor)
+# getMLRecommendations/index.ts — loads model from Storage on cold start
 ```
+
+Do NOT set `RECO_ML_WEIGHTS` as a secret — it will exceed the size limit.
+The edge function checks Storage automatically (using the already-set `SUPABASE_SERVICE_ROLE_KEY`).
 
 ---
 
 ## 7. Route some traffic to the ML function
 
-The A/B infrastructure is already in `getRecommendations.ts`.
-To test ML on 20% of users, set these env vars in Supabase:
+`RECO_SPLIT_ML` controls what percentage of requests are routed to
+`getMLRecommendations` (ML re-ranking). Set it in Supabase Dashboard → Edge Functions → getRecommendations → Secrets:
 
 ```
-RECO_SPLIT_V2=80       # 80% rule-based
-RECO_SPLIT_V2A=20      # 20% ML (point this to getMLRecommendations)
+RECO_SPLIT_ML=20    # route 20% of users to ML re-ranking
 ```
 
-Or for the demo, force ML for your demo user:
+Set to `100` to send all traffic through ML. Set to `0` (or unset) to disable.
+
+To force ML for a specific user (e.g. for the demo), call the ML function directly:
 ```
 GET /functions/v1/getMLRecommendations?userId=YOUR_USER_ID
 ```
@@ -153,17 +167,17 @@ GET /functions/v1/getMLRecommendations?userId=YOUR_USER_ID
 - Mention that the feature engineering was done in the rule-based stage (this is intentional)
 
 ### ML section
-- Model: Logistic Regression (Learning-to-Rank)
-- Features: 17 signals derived from user behaviour, course metadata, and session context
-- Training: supervised, binary labels (click/no-click) from interaction data
-- Evaluation: 5-fold cross-validated AUC, Precision@6, nDCG@6 on held-out simulated requests
+- Model: LightGBM `LGBMRanker` with `lambdarank` objective (directly optimises nDCG)
+- Features: 21 signals — user behaviour, course metadata, session context, content embeddings
+- Training: temporal cross-validation (train on past, evaluate on future) to prevent data leakage
+- Evaluation: Precision@6, nDCG@6, ILD, Coverage% vs random / popularity / rule-based baselines
 
 ### Limitations (important to include — examiners appreciate honesty)
 - With <100 real events, training relies heavily on synthetic data
 - Synthetic data uses heuristic click probabilities, not true user behaviour
-- Logistic regression assumes feature independence (limitation vs tree-based models)
 - Model weights are static — no online learning / periodic retraining yet
-- Natural next step: collect more real events, retrain monthly, compare LR vs LightGBM
+- LightGBM requires OpenMP (`brew install libomp` on Mac) — not a cloud dependency issue
+- Natural next step: collect more real events, retrain monthly, add online learning
 
 ---
 

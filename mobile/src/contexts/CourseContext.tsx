@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Course } from '../types';
 import courseService from '../services/courseService';
 import { useUser } from './UserContext';
 import { showToast } from '@/components/common/Toast';
+
+export const PREFERRED_CATEGORIES_KEY = 'preferred_categories';
 
 interface CourseContextType {
   // All courses
@@ -130,8 +133,18 @@ export default function CourseProvider({ children }: { children: React.ReactNode
     setRecommendedError(null);
     
     try {
+      // Read preferred categories saved during onboarding interest selection.
+      // Passed to the backend to seed cold-start affinity when the user has no history.
+      let preferredCategories: string[] = [];
+      if (dbUserId) {
+        try {
+          const raw = await AsyncStorage.getItem(`${PREFERRED_CATEGORIES_KEY}_${dbUserId}`);
+          if (raw) preferredCategories = JSON.parse(raw);
+        } catch {}
+      }
+
       // getRecommendedCourses now returns { courses, meta } — see courseService patch
-      const result = await courseService.getRecommendedCourses(dbUserId);
+      const result = await courseService.getRecommendedCourses(dbUserId, preferredCategories.length ? preferredCategories : undefined);
       const coursesData: Course[] = Array.isArray(result) ? result : result.courses ?? [];
       const meta = Array.isArray(result) ? null : result.meta;
 
