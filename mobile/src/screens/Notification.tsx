@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef } from "react";
+import { memo, useMemo, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Alert,
   Pressable,
-  Animated,
   Modal,
   ActivityIndicator,
   SectionList,
@@ -15,7 +14,9 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Swipeable } from "react-native-gesture-handler";
+import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
+import Reanimated, { useAnimatedStyle, SharedValue } from "react-native-reanimated";
 import { useFocusEffect } from "@react-navigation/native";
 import { Colors, Spacing, TextStyles } from "../constants";
 import Screen from "../components/common/Screen";
@@ -44,6 +45,115 @@ const parseValidDate = (value?: string | null) => {
   return Number.isNaN(dt.getTime()) ? null : dt;
 };
 
+function getIcon(type?: string) {
+  switch (type) {
+    case "achievement":      return { name: "trophy-outline",           color: Colors.yellow };
+    case "course":           return { name: "book-outline",             color: Colors.blue };
+    case "reminder":         return { name: "alarm-outline",            color: Colors.red };
+    case "streak_hot":
+    case "streak_reminder":  return { name: "flame-outline",            color: Colors.streakFire };
+    case "streak_broken":    return { name: "warning-outline",          color: Colors.notificationRed };
+    case "goal_completed":   return { name: "checkmark-circle-outline", color: Colors.secondary };
+    case "goal_expired":     return { name: "time-outline",             color: Colors.notificationRed };
+    default:                 return { name: "notifications-outline",    color: Colors.textSecondary };
+  }
+}
+
+function SwipeDeleteAction({
+  progress,
+  onDelete,
+}: {
+  progress: SharedValue<number>;
+  onDelete: () => void;
+}) {
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: (1 - progress.value) * 72 }],
+  }));
+  return (
+    <Reanimated.View style={[styles.swipeActionContainer, animStyle]}>
+      <TouchableOpacity style={styles.swipeDelete} onPress={onDelete}>
+        <Ionicons name="trash-outline" size={20} color={Colors.white} />
+      </TouchableOpacity>
+    </Reanimated.View>
+  );
+}
+
+type RowProps = {
+  item: InAppNotification;
+  onMarkRead: (id: string, userId: string) => void;
+  onDelete: (id: string) => void;
+  onOpen: (methods: SwipeableMethods) => void;
+};
+
+const NotificationRow = memo(function NotificationRow({
+  item,
+  onMarkRead,
+  onDelete,
+  onOpen,
+}: RowProps) {
+  const icon = getIcon(item.type);
+  const swipeableRef = useRef<SwipeableMethods | null>(null);
+
+  const renderRightActions = useCallback(
+    (progress: SharedValue<number>) => (
+      <SwipeDeleteAction progress={progress} onDelete={() => onDelete(item.id)} />
+    ),
+    [item.id, onDelete]
+  );
+
+  return (
+    <ReanimatedSwipeable
+      ref={swipeableRef}
+      renderRightActions={renderRightActions}
+      overshootRight={false}
+      friction={1.5}
+      rightThreshold={40}
+      onSwipeableOpen={() => {
+        if (swipeableRef.current) onOpen(swipeableRef.current);
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[
+          styles.row,
+          !item.read ? styles.rowUnread : null,
+          item.read ? styles.rowRead : null,
+        ]}
+        onPress={() => onMarkRead(item.id, item.userId)}
+      >
+        <View style={[styles.iconBadge, { borderColor: icon.color }]}>
+          {isIconUrl(item.iconUrl) ? (
+            <Image source={{ uri: item.iconUrl }} style={styles.iconImage} resizeMode="cover" />
+          ) : (
+            <Ionicons name={icon.name as any} size={22} color={icon.color} />
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={[
+              TextStyles.body,
+              item.read ? styles.titleRead : styles.titleUnread,
+            ]}
+            numberOfLines={1}
+          >
+            {item.title}
+          </Text>
+          <Text
+            style={[
+              TextStyles.captionSmall,
+              item.read ? styles.messageRead : styles.messageUnread,
+            ]}
+            numberOfLines={2}
+          >
+            {item.message}
+          </Text>
+        </View>
+        {!item.read ? <View style={styles.unreadDot} /> : null}
+      </TouchableOpacity>
+    </ReanimatedSwipeable>
+  );
+});
+
 export default function NotificationsScreen({ navigation }: any) {
   const {
     inAppNotifications,
@@ -62,6 +172,14 @@ export default function NotificationsScreen({ navigation }: any) {
   const menuButtonRef = useRef<View>(null);
   const lastScrollY = useRef(0);
   const tabHidden = useRef(false);
+  const openRowRef = useRef<SwipeableMethods | null>(null);
+
+  const handleRowOpen = useCallback((methods: SwipeableMethods) => {
+    if (openRowRef.current && openRowRef.current !== methods) {
+      openRowRef.current.close();
+    }
+    openRowRef.current = methods;
+  }, []);
 
   const sections = useMemo(() => {
     const today: InAppNotification[] = [];
@@ -159,107 +277,6 @@ export default function NotificationsScreen({ navigation }: any) {
     );
   }, [clearNotifications, hasNotifications]);
 
-  const renderRow = (item: InAppNotification) => {
-    const icon =
-      item.type === "achievement"
-        ? { name: "trophy-outline", color: Colors.yellow }
-        : item.type === "course"
-        ? { name: "book-outline", color: Colors.blue }
-        : item.type === "reminder"
-        ? { name: "alarm-outline", color: Colors.red }
-        : item.type === "streak_hot" || item.type === "streak_reminder"
-        ? { name: "flame-outline", color: Colors.streakFire }
-        : item.type === "streak_broken"
-        ? { name: "warning-outline", color: Colors.notificationRed }
-        : item.type === "goal_completed"
-        ? { name: "checkmark-circle-outline", color: Colors.secondary }
-        : item.type === "goal_expired"
-        ? { name: "time-outline", color: Colors.notificationRed }
-        : { name: "notifications-outline", color: Colors.textSecondary };
-
-    const renderRightActions = (
-      progress: Animated.AnimatedInterpolation<number>
-    ) => {
-      const translateX = progress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [64, 0],
-        extrapolate: "clamp",
-      });
-      return (
-        <Animated.View style={[styles.swipeActionContainer, { transform: [{ translateX }] }]}>
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert(
-                "Delete notification?",
-                "This action cannot be undone.",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: () => deleteNotification(item.id),
-                  },
-                ]
-              )
-            }
-            style={styles.swipeDelete}
-          >
-            <Ionicons name="trash-outline" size={20} color={Colors.white} />
-          </TouchableOpacity>
-        </Animated.View>
-      );
-    };
-
-    return (
-      <Swipeable
-        renderRightActions={renderRightActions}
-        overshootRight={false}
-        friction={2}
-        rightThreshold={40}
-      >
-      <TouchableOpacity
-        activeOpacity={0.8}
-        style={[
-          styles.row,
-          !item.read ? styles.rowUnread : null,
-          item.read ? styles.rowRead : null,
-        ]}
-        onPress={() => markNotificationRead(item.id, item.userId)}
-      >
-        {!item.read ? <View style={styles.unreadAccent} /> : null}
-        <View style={[styles.iconBadge, { borderColor: icon.color }]}>
-          {isIconUrl(item.iconUrl) ? (
-            <Image source={{ uri: item.iconUrl }} style={styles.iconImage} resizeMode="cover" />
-          ) : (
-            <Ionicons name={icon.name as any} size={22} color={icon.color} />
-          )}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text
-            style={[
-              TextStyles.body,
-              item.read ? styles.titleRead : styles.titleUnread,
-            ]}
-            numberOfLines={1}
-          >
-            {item.title}
-          </Text>
-          <Text
-            style={[
-              TextStyles.captionSmall,
-              item.read ? styles.messageRead : styles.messageUnread,
-            ]}
-            numberOfLines={2}
-          >
-            {item.message}
-          </Text>
-        </View>
-        {!item.read ? <View style={styles.unreadDot} /> : null}
-      </TouchableOpacity>
-      </Swipeable>
-    );
-  };
-
   const onToggleMenu = () => {
     if (menuOpen) {
       setMenuOpen(false);
@@ -356,7 +373,14 @@ export default function NotificationsScreen({ navigation }: any) {
               `notification-${index}-${item.createdAt ?? item.title ?? item.message ?? "row"}`
           )
         }
-        renderItem={({ item }) => renderRow(item)}
+        renderItem={({ item }) => (
+            <NotificationRow
+              item={item}
+              onMarkRead={markNotificationRead}
+              onDelete={deleteNotification}
+              onOpen={handleRowOpen}
+            />
+          )}
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
             <Text style={TextStyles.h5}>{section.title}</Text>
@@ -433,21 +457,20 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 0,
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    alignSelf: "stretch",
-    position: "relative",
+    paddingHorizontal: Spacing.md,
+    borderRadius: 14,
+    marginBottom: Spacing.xs,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
   },
   rowUnread: {
-    backgroundColor: Colors.cardDark,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
-    paddingHorizontal: Spacing.md,
-    marginHorizontal: -Spacing.xs,
+    backgroundColor: "rgba(86, 75, 235, 0.18)",
+    borderColor: "rgba(255, 255, 255, 0.12)",
   },
   rowRead: {
-    opacity: 0.65,
+    opacity: 0.6,
   },
   iconBadge: {
     width: THUMB,
@@ -484,28 +507,20 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.notificationRed,
     marginLeft: Spacing.sm,
   },
-  unreadAccent: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 6,
-    backgroundColor: Colors.purple400,
-    borderTopLeftRadius: 8,
-    borderBottomLeftRadius: 8,
-  },
   swipeDelete: {
     backgroundColor: Colors.notificationRed,
     justifyContent: "center",
     alignItems: "center",
-    width: 72,
-    height: "100%",
-    alignSelf: "stretch",
+    width: 60,
+    flex: 1,
+    borderRadius: 14,
   },
   swipeActionContainer: {
     justifyContent: "center",
     alignItems: "center",
-    paddingRight: Spacing.xs,
+    paddingLeft: Spacing.xs,
+    paddingVertical: 2,
+    marginBottom: Spacing.xs,
     alignSelf: "stretch",
   },
   emptyState: {

@@ -522,7 +522,11 @@ export default function CourseDetailScreen({
     }
 
     if (sourceScreen === "Home" || sourceScreen === "Courses") {
-      navigation.replace("MainTabs", { screen: sourceScreen } as any);
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.replace("MainTabs", { screen: sourceScreen } as any);
+      }
       return;
     }
 

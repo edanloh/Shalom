@@ -1369,7 +1369,8 @@ const courseSelect = `
     // (empty affinity map) but provided preferred categories during onboarding,
     // seed those into the affinity map at equal weight so the ranking stage
     // treats them as interest signals instead of falling back to pure popularity.
-    if (categoryAffinityRaw.size === 0 && preferredCategories.length > 0) {
+    const coldStartSeeded = categoryAffinityRaw.size === 0 && preferredCategories.length > 0;
+    if (coldStartSeeded) {
       for (const cat of preferredCategories) {
         categoryAffinityRaw.set(cat, 1);
       }
@@ -1944,9 +1945,7 @@ const courseSelect = `
         novelty_count_in_results: rankedForOutput.filter((item) => item.is_novel).length,
         session_event_count: sessionEvents.length,
         session_cf_vectors: sessionVectors.length,
-        cold_start_seeded_categories: preferredCategories.length > 0 && categoryAffinityRaw.size === preferredCategories.length
-          ? preferredCategories
-          : [],
+        cold_start_seeded_categories: coldStartSeeded ? preferredCategories : [],
       },
       context: {
         learning_goal: learningGoal,

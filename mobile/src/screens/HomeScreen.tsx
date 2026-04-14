@@ -127,7 +127,7 @@ export default function HomeScreen({ navigation, route }: any) {
     AsyncStorage.getItem(key).then(val => {
       if (!val) setShowInterestModal(true);
     });
-  }, [myCoursesData, myCoursesLoading, profileUser?.uuid]);
+  }, [myCoursesData?.length, myCoursesLoading, profileUser?.uuid]);
 
   const handleInterestConfirm = async (selected: string[]) => {
     if (profileUser?.uuid) {
@@ -639,6 +639,7 @@ export default function HomeScreen({ navigation, route }: any) {
                       course={course}
                       variant="compact"
                       showInstructor={false}
+                      showRecommendationReason={true}
                       onPress={(c) => handleRecommendationClick(c)}
                     />
                   ))}

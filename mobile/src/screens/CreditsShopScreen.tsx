@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing['4xl'],
+    paddingBottom: Spacing.base,
     flexGrow: 1,
   },
   listHeader: {
