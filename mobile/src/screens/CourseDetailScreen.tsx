@@ -425,14 +425,11 @@ export default function CourseDetailScreen({
 
     try {
       setIsEnrolling(true);
-      const { firstModuleId } = await courseService.enrollInCourse(
-        userId,
-        courseId,
-      );
+      const enrollResult = await courseService.enrollInCourse(userId, courseId);
+      const { firstModuleId } = enrollResult;
 
       // Mark as enrolled immediately so UI updates
       setIsEnrolled(true);
-      // Release blocking overlay immediately after successful enrollment.
       setIsEnrolling(false);
 
       // Refresh shared "My Courses" context immediately so Home/MyCourses
@@ -446,25 +443,13 @@ export default function CourseDetailScreen({
       // Refresh details in background without switching screen into full loading state.
       void loadCourseDetail({ background: true });
 
-      try {
-        await creditService.recordCreditEvent({
-          userId,
-          type: "course_enrolled",
-          title: courseDetail?.title || "Enrolled in course",
-          points: 20,
-          courseId,
-        });
+      // Credits are now awarded server-side in postUserEnrollment — just show the toast.
+      const creditsAwarded = (enrollResult as any).creditsAwarded;
+      if (creditsAwarded > 0) {
         showToast({
           title: "Enrolled",
-          message: "Earned +20 credits for enrolling",
+          message: `+${creditsAwarded} credits earned`,
           type: "success",
-        });
-      } catch (err) {
-        console.warn("Failed to record credit for enrollment", err);
-        showToast({
-          title: "Unable to record credits",
-          message: "Something unexpected happened. Please try again later.",
-          type: "error",
         });
       }
 

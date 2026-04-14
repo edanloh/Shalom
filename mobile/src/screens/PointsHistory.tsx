@@ -90,7 +90,7 @@ export default function PointsHistoryScreen({ navigation }: any) {
   const mapEvents = useCallback((events: CreditEvent[]) => {
     return events.map((e) => ({
       id: e.id,
-      pointsTitle: `+${e.points}`,
+      pointsTitle: e.points >= 0 ? `+${e.points}` : `${e.points}`,
       subtitle: e.title,
       createdAt: e.timestamp,
     }));
@@ -170,7 +170,9 @@ export default function PointsHistoryScreen({ navigation }: any) {
       refreshing={refreshing}
       onRefresh={onRefresh}
       headerLeftIcon="chevron-back"
+      headerRightIcon="storefront-outline"
       onHeaderLeftPress={() => navigation.goBack()}
+      onHeaderRightPress={() => navigation.navigate("CreditsShop")}
       stickyHeader
       useScrollView={false}
       disableChildrenWrapper

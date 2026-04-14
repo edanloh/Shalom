@@ -39,7 +39,7 @@ async function recordLessonCompleted(userId: string, courseId: string, pdfId: st
         userId,
         type: "lesson_completed",
         title: "Lesson completed",
-        points: 0,
+        points: 5,
         courseId,
         referenceKey: `lesson_completed:pdf:${pdfId}`,
       }),

@@ -905,7 +905,7 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
    * Maps to postUserEnrollment.mjs Lambda function
    * Expects idempotent server (409 if already enrolled).
    */
-  async enrollInCourse(userId: string, courseId: string): Promise<{ firstModuleId?: string }> {
+  async enrollInCourse(userId: string, courseId: string): Promise<{ firstModuleId?: string; creditsAwarded?: number }> {
     // if (!userId || !courseId) throw new Error('Missing userId/courseId');
     const uid = userId || DEFAULT_USER_ID;
     if (!uid) throw new Error('Missing userId');
@@ -928,8 +928,10 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
     // Normalize API value to undefined (no nulls)
     const apiFirst: string | undefined =
       (resp?.data?.firstModuleId ?? resp?.firstModuleId) || undefined;
+    const creditsAwarded: number | undefined =
+      resp?.data?.creditsAwarded ?? undefined;
 
-    if (apiFirst) return { firstModuleId: apiFirst };
+    if (apiFirst) return { firstModuleId: apiFirst, creditsAwarded };
 
     try {
       const detail =
@@ -937,9 +939,9 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
           .courseDetailService.getCourseDetail(courseId);
 
       const derived: string | undefined = detail?.modules?.[0]?.id || undefined;
-      return derived ? { firstModuleId: derived } : {};
+      return derived ? { firstModuleId: derived, creditsAwarded } : { creditsAwarded };
     } catch {
-      return {}; // no nulls; caller handles absence
+      return { creditsAwarded };
     }
   }
 

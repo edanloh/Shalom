@@ -24,6 +24,7 @@ import creditService from "../services/creditService";
 import { showToast } from "@/components/common/Toast";
 import { AchievementItem, CreditEvent } from "../types";
 import { useUser } from "@/contexts/UserContext";
+import { ShopItem } from "@/services/creditService";
 
 const CARD_BG = "#3A3A45";
 const TILE_BG = "#5B38E3";
@@ -46,6 +47,9 @@ export default function ProfileScreen({ navigation }: any) {
   const [balance, setBalance] = useState<number>((user as any)?.points ?? 0);
   const [creditHistory, setCreditHistory] = useState<CreditEvent[]>([]);
   const [achievementsData, setAchievementsData] = useState<AchievementItem[]>([]);
+  const [equippedTitle, setEquippedTitle] = useState<ShopItem | null>(null);
+  const [equippedAvatarFrame, setEquippedAvatarFrame] = useState<ShopItem | null>(null);
+  const [equippedBanner, setEquippedBanner] = useState<ShopItem | null>(null);
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,12 +88,16 @@ export default function ProfileScreen({ navigation }: any) {
         setBalance(0);
         setAchievementsData([]);
         setCreditHistory([]);
+        setEquippedTitle(null);
+        setEquippedAvatarFrame(null);
+        setEquippedBanner(null);
         return;
       }
-      const [bal, ach, hist] = await Promise.all([
+      const [bal, ach, hist, shop] = await Promise.all([
         creditService.getCreditBalance(uid).catch(() => null),
         creditService.getAchievements(uid).catch(() => []),
         creditService.getCreditHistory(uid).catch(() => []),
+        creditService.getShopItems(uid).catch(() => ({ items: [], balance: 0 })),
       ]);
       if (bal?.balance != null) setBalance(bal.balance);
 
@@ -113,6 +121,9 @@ export default function ProfileScreen({ navigation }: any) {
       }));
       setAchievementsData(normalized);
       setCreditHistory(Array.isArray(hist) ? hist : []);
+      setEquippedTitle((shop.items ?? []).find((item) => item.type === 'title' && item.isEquipped) ?? null);
+      setEquippedAvatarFrame((shop.items ?? []).find((item) => item.type === 'avatar_frame' && item.isEquipped) ?? null);
+      setEquippedBanner((shop.items ?? []).find((item) => item.type === 'profile_banner' && item.isEquipped) ?? null);
     } catch (err) {
       console.warn("Profile: failed to load credits/achievements", err);
       showToast({
@@ -210,7 +221,14 @@ export default function ProfileScreen({ navigation }: any) {
       >
         <View style={externalStyles.scrollContent}>
           {/* Avatar & name */}
-          <View style={[externalStyles.header, { marginBottom: 16 }]}>
+          <View
+            style={[
+              externalStyles.header,
+              styles.profileHero,
+              equippedBanner ? { borderColor: equippedBanner.color, backgroundColor: `${equippedBanner.color}18` } : null,
+              { marginBottom: 16 },
+            ]}
+          >
             <Pressable
               style={[externalStyles.logo, { marginBottom: 16 }]}
               onPress={() => setShowAvatarModal(true)}
@@ -220,7 +238,10 @@ export default function ProfileScreen({ navigation }: any) {
               <ImageWithFallback
                 source={{ uri: getAvatarUri() }}
                 fallback={Images.profile}
-                style={externalStyles.avatar}
+                style={[
+                  externalStyles.avatar,
+                  equippedAvatarFrame ? { borderColor: equippedAvatarFrame.color } : null,
+                ]}
               />
               {user?.auth_provider && user?.auth_provider == "google" && (
                 <Image
@@ -238,7 +259,16 @@ export default function ProfileScreen({ navigation }: any) {
                   <ImageWithFallback
                     source={{ uri: getAvatarUri() }}
                     fallback={Images.profile}
-                    style={{ width: 150, height: 150, borderRadius: 75, marginBottom: 12 }}
+                    style={[
+                      {
+                        width: 150,
+                        height: 150,
+                        borderRadius: 75,
+                        marginBottom: 12,
+                        borderWidth: 3,
+                        borderColor: equippedAvatarFrame?.color ?? Colors.white,
+                      },
+                    ]}
                   />
                   <Text style={[TextStyles.h3, { textAlign: "center", color: Colors.textSecondary }]}>{displayName}</Text>
                 </View>
@@ -254,6 +284,13 @@ export default function ProfileScreen({ navigation }: any) {
                 {displayName}
               </Text>
             </View>
+            {equippedTitle ? (
+              <View style={styles.titleBadge}>
+                <Text style={styles.titleBadgeText}>
+                  {equippedTitle.icon} {equippedTitle.name}
+                </Text>
+              </View>
+            ) : null}
             <Text style={TextStyles.bodyMedium}>{balance} points</Text>
           </View>
 
@@ -479,6 +516,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.white,
     fontWeight: "600",
+  },
+  profileHero: {
+    alignSelf: "stretch",
+    borderWidth: 1,
+    borderColor: "transparent",
+    borderRadius: 20,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.base,
+  },
+  titleBadge: {
+    alignSelf: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  titleBadgeText: {
+    ...TextStyles.caption,
+    color: Colors.white,
+    fontWeight: "700",
   },
 
   // Achievements

@@ -230,7 +230,6 @@ export default function LearningGoalScreen({ navigation }: any) {
     try {
       const { goals: raw, completedCourses: completed, totalTimeMinutes, streakDays: analyticsStreakDays } =
         await creditService.getGoalsWithProgress(goalUserId);
-      creditService.recordGoalMilestones(raw, goalUserId);
       const mapped = mapGoals(raw);
       const maxGoalStreak = raw.reduce((max, g) => Math.max(max, g.streakDays || 0), 0);
       const resolvedStreak = Math.max(Number(analyticsStreakDays || 0), maxGoalStreak);

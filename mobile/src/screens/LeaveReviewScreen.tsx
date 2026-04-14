@@ -14,7 +14,6 @@ import { Spacing, TextStyles } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
 import { courseService } from '../services/courseService';
-import creditService from '../services/creditService';
 import type { MainStackParamList } from '../types/navigation';
 import Screen from '../components/common/Screen';
 import { ActionButton, CustomTextInput } from '@/components';
@@ -68,22 +67,16 @@ export default function LeaveReviewScreen() {
 
     const payload = { userId, rating, review: reviewText.trim(), isAnonymous: false };
 
-    const doSuccess = (msg = 'Thanks for your feedback.') => {
-      Alert.alert(isEditing ? '✅ Review updated!' : '✅ Review submitted!', msg);
-      navigation.goBack();
-    };
-    const awardReviewCredit = async () => {
-      try {
-        await creditService.recordCreditEvent({
-          userId,
-          type: 'course_reviewed',
-          title: 'Review submitted',
-          points: 10,
-          courseId,
-        });
-      } catch (err) {
-        console.warn('Failed to record credit for review', err);
+    const doSuccess = (msg = 'Thanks for your feedback.', creditsAwarded = 0) => {
+      if (creditsAwarded > 0) {
+        Alert.alert(
+          isEditing ? '✅ Review updated!' : '✅ Review submitted!',
+          `${msg} +${creditsAwarded} credits earned.`
+        );
+      } else {
+        Alert.alert(isEditing ? '✅ Review updated!' : '✅ Review submitted!', msg);
       }
+      navigation.goBack();
     };
 
     try {
@@ -93,9 +86,10 @@ export default function LeaveReviewScreen() {
         return doSuccess();
       }
 
-      await courseService.postCourseReview(courseId, payload);
-      await awardReviewCredit();
-      return doSuccess();
+      const reviewResp = await courseService.postCourseReview(courseId, payload);
+      // Credits awarded server-side in courseReviewHandler (POST only)
+      const creditsAwarded = (reviewResp as any)?.creditsAwarded ?? 0;
+      return doSuccess('Thanks for your feedback.', creditsAwarded);
     } catch (e: any) {
       const status = e?.status ?? e?.statusCode;
       const msg =
@@ -135,9 +129,9 @@ export default function LeaveReviewScreen() {
       if (status === 404 && isEditing) {
         // You tried to edit but no row exists → fall back to create
         try {
-          await courseService.postCourseReview(courseId, payload);
-          await awardReviewCredit();
-          return doSuccess();
+          const reviewResp = await courseService.postCourseReview(courseId, payload);
+          const creditsAwarded = (reviewResp as any)?.creditsAwarded ?? 0;
+          return doSuccess('Thanks for your feedback.', creditsAwarded);
         } catch (err2: any) {
           const m =
             err2?.data?.message ||

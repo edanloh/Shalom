@@ -40,7 +40,7 @@ async function recordCourseCompleted(userId: string, courseId: string, courseTit
         userId,
         type: "course_completed",
         title: `Course completed: ${courseTitle}`,
-        points: 0,
+        points: 50,
         courseId,
         referenceKey: `course_completed:${courseId}`,
       }),

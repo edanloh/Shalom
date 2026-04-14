@@ -11,16 +11,9 @@ import {
   LearningGoal,
 } from '../types';
 
-const STREAK_INCREMENT_POINTS = 10;
-
-type GoalSnapshot = {
-  id: string;
-  current: number;
-  target: number;
-  label: string;
-};
-
-let lastGoalSnapshot: { streakDays: number; goals: GoalSnapshot[] } | null = null;
+// Module-level guard so recordDailyLogin only fires once per calendar day per session,
+// even if the HomeScreen refocuses many times.
+let _dailyLoginFiredDate: string | null = null;
 
 const ENDPOINTS = {
   BALANCE: '/getCredits',
@@ -29,10 +22,13 @@ const ENDPOINTS = {
   GOALS: '/getGoals',
   CERTS: '/getCertificates',
   EVENTS: '/postCreditEvent',
+  DAILY_ACTIVITY: '/recordDailyActivity',
   SET_GOAL_ACTIVE: '/setGoalActive',
   GOAL_TEMPLATES: '/getGoalTemplates',
   CREATE_GOALS: '/createGoalsFromTemplates',
   CLEAR_GOAL: '/clearGoal',
+  SHOP_ITEMS: '/getShopItems',
+  REDEEM: '/redeemCredits',
 };
 
 export const CREDIT_EVENT_CHANNEL = 'credits:updated';
@@ -174,52 +170,6 @@ export async function recordCreditEvent(payload: CreditEventPayload) {
   }
 }
 
-export async function recordGoalMilestones(goals: LearningGoal[], userId?: string) {
-  if (!userId) return;
-  const raw = Array.isArray(goals) ? goals : [];
-  const snapshot: GoalSnapshot[] = raw.map((g, idx) => {
-    const target = Number(
-      g.targetPoints ?? g.targetCourses ?? g.targetHours ?? g.targetLessons ?? g.targetQuizzes ?? 0
-    );
-    const current = Number(
-      g.currentPoints ??
-        g.currentCourses ??
-        g.currentHours ??
-        g.currentLessons ??
-        g.currentQuizzes ??
-        0
-    );
-    const label = g.label || 'Goal';
-    const id = String(g.id || label || `goal_${idx}`);
-    return { id, current, target, label };
-  });
-  const maxStreak = raw.reduce((max, g) => Math.max(max, Number(g.streakDays || 0)), 0);
-  const prev = lastGoalSnapshot;
-
-  lastGoalSnapshot = { streakDays: maxStreak, goals: snapshot };
-
-  if (!prev) return;
-
-  const streakIncreased = maxStreak > prev.streakDays ? maxStreak : null;
-
-  try {
-    const events: Promise<any>[] = [];
-    if (streakIncreased != null) {
-      events.push(
-        recordCreditEvent({
-          userId,
-          type: 'streak_increment',
-          title: `Streak extended to ${streakIncreased} days`,
-          points: STREAK_INCREMENT_POINTS,
-          referenceKey: `streak_increment:${streakIncreased}`,
-        })
-      );
-    }
-    await Promise.all(events);
-  } catch (err) {
-    console.warn('credit_goal_milestone_fail', err);
-  }
-}
 
 export async function setGoalActive(
   goalId: string,
@@ -267,10 +217,76 @@ export async function createGoalsFromTemplates(
   return resp?.data ?? resp ?? [];
 }
 
+export async function recordDailyLogin(userId?: string) {
+  if (!userId) return;
+  // Use a local date as a session-level guard only — the server will compute
+  // the authoritative date from the user's stored timezone.
+  const today = new Date().toLocaleDateString('en-CA');
+  if (_dailyLoginFiredDate === today) return;
+  _dailyLoginFiredDate = today;
+  try {
+    const resp = await apiService.post<any>(ENDPOINTS.DAILY_ACTIVITY, { userId });
+    if (!resp?.data?.duplicate) {
+      const creditsAwarded: number = resp?.data?.creditsAwarded ?? 0;
+      if (creditsAwarded > 0) {
+        showToast({
+          type: 'success',
+          title: 'Daily check-in',
+          message: `+${creditsAwarded} credits earned`,
+          durationMs: 2400,
+        });
+      }
+      emitCreditUpdate();
+    }
+  } catch (err) {
+    _dailyLoginFiredDate = null; // reset so we retry on next focus if it genuinely failed
+    console.info('daily_login_skip', (err as any)?.message);
+  }
+}
+
 export async function clearGoal(goalId: string, userId?: string): Promise<LearningGoal | null> {
   if (!userId) throw new Error('userId is required');
   const resp = await apiService.post<any>(ENDPOINTS.CLEAR_GOAL, { userId, goalId });
   return resp?.data ?? resp ?? null;
+}
+
+export type ShopItem = {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  cost: number;
+  icon: string;
+  color: string;
+  rarity: string;
+  collection?: string | null;
+  isFeatured?: boolean;
+  isLimited?: boolean;
+  isUnlocked: boolean;
+  isEquipped: boolean;
+  unlockedAt: string | null;
+  canAfford: boolean;
+};
+
+export async function getShopItems(userId?: string): Promise<{ items: ShopItem[]; balance: number }> {
+  if (!userId) return { items: [], balance: 0 };
+  const resp = await apiService.get<any>(ENDPOINTS.SHOP_ITEMS, { userId });
+  const data = resp?.data ?? resp;
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    balance: Number(data?.balance ?? 0),
+  };
+}
+
+export async function purchaseShopItem(userId: string, itemId: string): Promise<{ newBalance: number }> {
+  const resp = await apiService.post<any>(ENDPOINTS.REDEEM, { userId, itemId, action: 'purchase' });
+  emitCreditUpdate();
+  return { newBalance: resp?.data?.newBalance ?? 0 };
+}
+
+export async function equipShopItem(userId: string, itemId: string): Promise<void> {
+  await apiService.post<any>(ENDPOINTS.REDEEM, { userId, itemId, action: 'equip' });
+  // Intentionally no emitCreditUpdate — equipping doesn't change balance
 }
 
 export default {
@@ -281,10 +297,13 @@ export default {
   getGoalsWithProgress,
   getCertificates,
   recordCreditEvent,
-  recordGoalMilestones,
+  recordDailyLogin,
   setGoalActive,
   getGoalTemplates,
   createGoalsFromTemplates,
   clearGoal,
+  getShopItems,
+  purchaseShopItem,
+  equipShopItem,
   subscribeToCreditUpdates,
 };

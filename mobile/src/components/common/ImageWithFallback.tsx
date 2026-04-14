@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Image, ImageStyle } from 'react-native';
+import { Image, ImageStyle, StyleProp } from 'react-native';
 
 interface ImageWithFallbackProps {
   source: { uri: string } | any;
   fallback: any;
-  style: ImageStyle;
+  style: StyleProp<ImageStyle>;
   onError?: () => void;
 }
 

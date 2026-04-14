@@ -31,6 +31,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
 import courseService from '../services/courseService';
 import creditService from '../services/creditService';
+import type { ShopItem } from '../services/creditService';
 import { showToast } from '@/components/common/Toast';
 
 // types
@@ -57,6 +58,10 @@ export default function HomeScreen({ navigation, route }: any) {
   const { user: profileUser } = useUser();
   const recommendationUserId = profileUser?.uuid;
   const [showInterestModal, setShowInterestModal] = useState(false);
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [equippedTitle, setEquippedTitle] = useState<Pick<ShopItem, 'icon' | 'name'> | null>(null);
+  const [equippedFrameColor, setEquippedFrameColor] = useState<string | null>(null);
+  const [equippedBannerColor, setEquippedBannerColor] = useState<string | null>(null);
   const [certCount, setCertCount] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [goalProgress, setGoalProgress] = useState<{
@@ -143,11 +148,16 @@ export default function HomeScreen({ navigation, route }: any) {
   const loadCreditMeta = React.useCallback(async () => {
     try {
       if (!profileUser?.uuid) {
+        setCreditBalance(0);
+        setEquippedTitle(null);
+        setEquippedFrameColor(null);
+        setEquippedBannerColor(null);
         setCertCount(0);
         setStreakDays(0);
         return;
       }
-      const [certs, goalStats] = await Promise.all([
+      const [balanceResult, certs, goalStats, shopResult] = await Promise.all([
+        creditService.getCreditBalance(profileUser.uuid).catch(() => null),
         creditService.getCertificates(profileUser.uuid).catch(() => []),
         creditService.getGoalsWithProgress(profileUser.uuid).catch(() => ({
           goals: [],
@@ -155,9 +165,17 @@ export default function HomeScreen({ navigation, route }: any) {
           totalTimeMinutes: 0,
           streakDays: 0,
         })),
+        creditService.getShopItems(profileUser.uuid).catch(() => ({ items: [], balance: 0 })),
       ]);
+      creditService.recordDailyLogin(profileUser.uuid);
+      setCreditBalance(Number(balanceResult?.balance ?? 0));
+      const activeTitle = (shopResult.items ?? []).find((item) => item.type === 'title' && item.isEquipped);
+      const activeFrame = (shopResult.items ?? []).find((item) => item.type === 'avatar_frame' && item.isEquipped);
+      const activeBanner = (shopResult.items ?? []).find((item) => item.type === 'profile_banner' && item.isEquipped);
+      setEquippedTitle(activeTitle ? { icon: activeTitle.icon, name: activeTitle.name } : null);
+      setEquippedFrameColor(activeFrame?.color ?? null);
+      setEquippedBannerColor(activeBanner?.color ?? null);
       const goals = Array.isArray(goalStats?.goals) ? goalStats.goals : [];
-      creditService.recordGoalMilestones(goals, profileUser.uuid);
       setCertCount(Array.isArray(certs) ? certs.length : 0);
       const maxGoalStreak = Array.isArray(goals)
         ? goals.reduce((m, g) => Math.max(m, g.streakDays || 0), 0)
@@ -303,6 +321,10 @@ export default function HomeScreen({ navigation, route }: any) {
       }
     } catch (err) {
       console.warn('Home: failed to load credit stats', err);
+      setCreditBalance(0);
+      setEquippedTitle(null);
+      setEquippedFrameColor(null);
+      setEquippedBannerColor(null);
       setGoalList([]);
     }
   }, [profileUser?.uuid]);
@@ -465,6 +487,11 @@ export default function HomeScreen({ navigation, route }: any) {
     >
       {/* Combined Header with Profile, Welcome, and Notifications */}
       <ProfileHeader
+        balance={creditBalance}
+        equippedTitle={equippedTitle}
+        avatarFrameColor={equippedFrameColor}
+        bannerAccentColor={equippedBannerColor}
+        onCreditsPress={() => navigation.navigate('PointsHistory')}
         hasNotifications={true}
         onNotificationPress={handleNotificationPress}
       />

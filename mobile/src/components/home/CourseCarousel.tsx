@@ -69,7 +69,7 @@ export default function CourseCarousel({
           styles.scrollContent,
           {
             paddingRight: (screenWidth - CARD_WIDTH) / 2,
-            paddingLeft: Spacing["3xl"],
+            paddingLeft: Spacing.lg,
           },
         ]}
       >
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 3,
     alignSelf: "center",
-    marginVertical: 20,
+    marginVertical: Spacing.sm,
   },
   imageContainer: {
     height: 200,

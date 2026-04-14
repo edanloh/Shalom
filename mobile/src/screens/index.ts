@@ -20,6 +20,7 @@ export { default as WishlistScreen } from "./WishlistScreen";
 export { default as CertificatesScreen } from "./CertificatesScreen";
 export { default as DocumentView } from "./DocumentView";
 export { default as LearningGoalScreen } from "./LearningGoalScreen";
+export { default as CreditsShopScreen } from "./CreditsShopScreen";
 export { default as MessagesScreen } from "./MessagesScreen";
 export { default as ConversationScreen } from "./ConversationScreen";
 

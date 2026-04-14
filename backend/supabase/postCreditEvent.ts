@@ -497,6 +497,14 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return fail("Method not allowed", 405);
 
+  // Reject any call not carrying the service role key.
+  // User JWTs, missing headers, or wrong keys all get 403.
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!serviceKey || authHeader !== `Bearer ${serviceKey}`) {
+    return fail("Forbidden", 403);
+  }
+
   try {
     const body = await req.json();
     const userId = body.userId;
@@ -558,6 +566,38 @@ serve(async (req) => {
     );
     const balance = await computeBalance(event.user_id);
     await notifyAchievements(event.user_id, awardedAchievements);
+
+    // Push notification for background server-side awards the user never sees in-app
+    const SILENT_NOTIFY_TYPES: Record<string, { title: string; message: (pts: number) => string }> = {
+      course_completed: {
+        title: "Course completed!",
+        message: (pts) => `Congratulations! You earned +${pts} credits for completing this course.`,
+      },
+      module_completed: {
+        title: "Module completed!",
+        message: (pts) => `You earned +${pts} credits for completing a module.`,
+      },
+      streak_milestone: {
+        title: "Streak milestone!",
+        message: (pts) => `Milestone reached — +${pts} credits added to your balance.`,
+      },
+      first_course_enrollment: {
+        title: "First enrollment bonus!",
+        message: (pts) => `Welcome! You earned +${pts} credits for enrolling in your first course.`,
+      },
+    };
+    const notifyDef = SILENT_NOTIFY_TYPES[event.type];
+    if (notifyDef && event.points > 0) {
+      await sendNotification({
+        userId: event.user_id,
+        type: event.type,
+        title: notifyDef.title,
+        message: notifyDef.message(event.points),
+        relatedEntityType: event.course_id ? "course" : undefined,
+        relatedEntityId: event.course_id ?? undefined,
+      });
+    }
+
     return ok({ success: true, data: { balance, event, awardedAchievements } });
   } catch (err: any) {
     console.error("postCreditEvent error", err);

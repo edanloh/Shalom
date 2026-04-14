@@ -14,6 +14,8 @@ const supabase = createClient(
 
 const GRACE_DAYS = 1;
 const HOT_STREAK_THRESHOLDS = new Set([3, 7, 14, 30]);
+const STREAK_INCREMENT_POINTS = 10;
+const STREAK_MILESTONES: Record<number, number> = { 7: 50, 30: 150, 100: 500 };
 
 const ok = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -42,6 +44,58 @@ async function sendNotification(payload: {
     },
     body: JSON.stringify(payload),
   });
+}
+
+async function postCreditInternal(payload: {
+  userId: string;
+  type: string;
+  title: string;
+  points: number;
+  referenceKey: string;
+}): Promise<number> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) return 0;
+  const resp = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+    },
+    body: JSON.stringify(payload),
+  });
+  const result = await resp.json();
+  return result?.success && !result?.data?.duplicate ? payload.points : 0;
+}
+
+async function awardStreakCredits(userId: string, streakDays: number): Promise<number> {
+  let creditsAwarded = 0;
+
+  // Daily streak increment
+  const incPoints = await postCreditInternal({
+    userId,
+    type: "streak_increment",
+    title: `Streak extended to ${streakDays} days`,
+    points: STREAK_INCREMENT_POINTS,
+    referenceKey: `streak_increment:${streakDays}`,
+  });
+  creditsAwarded += incPoints;
+
+  // Milestone bonus
+  const milestonePoints = STREAK_MILESTONES[streakDays];
+  if (milestonePoints) {
+    const mPoints = await postCreditInternal({
+      userId,
+      type: "streak_milestone",
+      title: `${streakDays}-day streak milestone!`,
+      points: milestonePoints,
+      referenceKey: `streak_milestone:${streakDays}`,
+    });
+    creditsAwarded += mPoints;
+  }
+
+  return creditsAwarded;
 }
 
 async function maybeNotifyHotStreak(userId: string, streakDays: number) {
@@ -123,14 +177,18 @@ serve(async (req) => {
     if (lastErr) throw lastErr;
 
     let newStreak = 1;
+    let streakAdvanced = !lastRow?.date; // true on first-ever record
     if (lastRow?.date) {
       const diffDays = daysBetween(lastRow.date, today);
       if (diffDays <= 0) {
         newStreak = Math.max(Number(lastRow.streak_days ?? 0), 1);
+        streakAdvanced = false; // same day, no advance
       } else if (diffDays <= GRACE_DAYS + 1) {
         newStreak = Number(lastRow.streak_days ?? 0) + 1;
+        streakAdvanced = true;
       } else {
-        newStreak = 1;
+        newStreak = 1; // streak reset — still award day-1 increment
+        streakAdvanced = true;
       }
     }
 
@@ -152,7 +210,13 @@ serve(async (req) => {
 
     await maybeNotifyHotStreak(userId, newStreak);
 
-    return ok({ success: true, data: { streakDays: newStreak, date: today } });
+    // Award streak credits only when the streak actually advanced to a new day
+    let creditsAwarded = 0;
+    if (streakAdvanced) {
+      creditsAwarded = await awardStreakCredits(userId, newStreak);
+    }
+
+    return ok({ success: true, data: { streakDays: newStreak, date: today, creditsAwarded } });
   } catch (err: any) {
     console.error("updateStreak error", err);
     return fail("Failed to update streak", 500, { error: err.message });

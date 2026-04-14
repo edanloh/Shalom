@@ -140,6 +140,7 @@ export interface SubmitQuizResponse {
     isPassed: boolean;
     attemptNumber: number;
     attemptsRemaining: number | null;
+    creditsAwarded: number;
     answers: Array<{
       questionId: string;
       isCorrect: boolean;

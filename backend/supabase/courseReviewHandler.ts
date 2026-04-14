@@ -24,6 +24,39 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
 };
 
+async function recordReviewCredit(userId: string, courseId: string): Promise<number> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) return 0;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({
+        userId,
+        type: 'course_reviewed',
+        title: 'Review submitted',
+        points: 10,
+        courseId,
+        referenceKey: `course_reviewed:${courseId}`,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postCreditEvent course_reviewed failed:', res.status, text);
+      return 0;
+    }
+    return 10;
+  } catch (err) {
+    console.error('Failed to record course_reviewed credit:', err);
+    return 0;
+  }
+}
+
 function badRequest(msg: string) {
   return new Response(
     JSON.stringify({ success: false, message: msg }),
@@ -291,11 +324,14 @@ serve(async (req) => {
         reviewerAvatar: reviewDetails.is_anonymous ? null : (reviewDetails.reviewer?.avatar_url ?? null),
       };
 
+      const creditsAwarded = await recordReviewCredit(userId, courseId);
+
       return new Response(
         JSON.stringify({
           success: true,
           message: "Review added",
           data: payload,
+          creditsAwarded,
           meta: { timestamp: new Date().toISOString() }
         }),
         {

@@ -86,6 +86,36 @@ async function notifyStreakUpdate(userId: string, activityAt: string) {
   }
 }
 
+async function recordModuleCompleted(userId: string, courseId: string, sectionId: string) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({
+        userId,
+        type: 'module_completed',
+        title: 'Module completed',
+        points: 15,
+        courseId,
+        referenceKey: `module_completed:${sectionId}`,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postCreditEvent module_completed failed:', res.status, text);
+    }
+  } catch (error) {
+    console.error('Failed to record module completion:', error);
+  }
+}
+
 async function recordLessonCompleted(userId: string, courseId: string, videoId: string) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -102,7 +132,7 @@ async function recordLessonCompleted(userId: string, courseId: string, videoId: 
         userId,
         type: 'lesson_completed',
         title: 'Lesson completed',
-        points: 0,
+        points: 5,
         courseId,
         referenceKey: `lesson_completed:video:${videoId}`,
       }),
@@ -532,12 +562,15 @@ serve(async (req) => {
     if (section_id) {
       console.log(`\n🔍 Checking module completion for section ${section_id}`);
       moduleCompletionStatus = await checkAndUpdateModuleCompletion(
-        supabaseClient, 
-        userId, 
-        course_id, 
+        supabaseClient,
+        userId,
+        course_id,
         section_id
       );
       console.log('Module completion status:', moduleCompletionStatus);
+      if (moduleCompletionStatus?.isCompleted) {
+        await recordModuleCompleted(userId, course_id, section_id);
+      }
     }
 
     // ========================================

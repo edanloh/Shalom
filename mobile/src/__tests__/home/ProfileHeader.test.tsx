@@ -36,12 +36,16 @@ describe('ProfileHeader', () => {
   });
 
   it('renders welcome text and user name', () => {
-    const { getByText, getByTestId } = render(<ProfileHeader />);
+    const { getByText, getByTestId } = render(
+      <ProfileHeader balance={240} equippedTitle={{ icon: '📚', name: 'Scholar' }} />
+    );
 
     expect(getByTestId('linear-gradient')).toBeTruthy();
     expect(getByTestId('profile-image')).toBeTruthy();
     expect(getByText('Welcome Back,')).toBeTruthy();
     expect(getByText('Shalom User')).toBeTruthy();
+    expect(getByText('240')).toBeTruthy();
+    expect(getByText('📚 Scholar')).toBeTruthy();
   });
 
   it('falls back to User when name is missing', () => {

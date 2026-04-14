@@ -158,6 +158,96 @@ async function notifyStreakUpdate(userId: string, activityAt: string) {
   }
 }
 
+async function recordModuleCompleted(userId: string, courseId: string, sectionId: string) {
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({
+        userId,
+        type: 'module_completed',
+        title: 'Module completed',
+        points: 15,
+        courseId,
+        referenceKey: `module_completed:${sectionId}`,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postCreditEvent module_completed failed:', res.status, text);
+    }
+  } catch (error) {
+    console.error('Failed to record module completion:', error);
+  }
+}
+
+async function recordQuizPassed(
+  userId: string,
+  quizId: string,
+  courseId: string,
+  score: number,
+  quizTitle: string
+): Promise<number> {
+  if (!supabaseUrl || !serviceKey) return 0;
+
+  // Rebalanced: flat 20 base + up to 10 mastery bonus (score/10 rounded)
+  const points = 20 + Math.round(score / 10);
+  let awarded = 0;
+
+  const postCredit = async (payload: Record<string, unknown>) => {
+    const res = await fetch(`${supabaseUrl}/functions/v1/postCreditEvent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postCreditEvent failed:', res.status, text);
+    }
+  };
+
+  try {
+    await postCredit({
+      userId,
+      type: 'quiz_passed',
+      title: quizTitle || 'Quiz completed',
+      points,
+      courseId,
+      referenceKey: `quiz_passed:${quizId}`,
+    });
+    awarded += points;
+  } catch (err) {
+    console.error('Failed to record quiz_passed credit:', err);
+  }
+
+  if (score === 100) {
+    try {
+      await postCredit({
+        userId,
+        type: 'quiz_perfect_score',
+        title: `Perfect score: ${quizTitle || 'Quiz'}`,
+        points: 15,
+        courseId,
+        referenceKey: `quiz_perfect_score:${quizId}`,
+      });
+      awarded += 15;
+    } catch (err) {
+      console.error('Failed to record quiz_perfect_score credit:', err);
+    }
+  }
+
+  return awarded;
+}
+
 async function recordQuizScore(userId: string, quizId: string, courseId: string, score: number) {
   if (!supabaseUrl || !serviceKey) return;
   try {
@@ -839,14 +929,33 @@ serve(async (req) => {
     if (quiz.section_id) {
       console.log(`\n🔍 Checking module completion for section ${quiz.section_id}`);
       moduleCompletionStatus = await checkAndUpdateModuleCompletion(
-        supabaseClient, 
-        userId, 
-        quiz.course_id, 
+        supabaseClient,
+        userId,
+        quiz.course_id,
         quiz.section_id
       );
+      if (moduleCompletionStatus?.isCompleted) {
+        await recordModuleCompleted(userId, quiz.course_id, quiz.section_id);
+      }
     }
 
     await recordQuizScore(userId, quizId, quiz.course_id, score);
+
+    let creditsAwarded = 0;
+    if (isPassed && previousPasses === 0) {
+      const { data: quizRow } = await supabaseClient
+        .from('course_quizzes')
+        .select('title')
+        .eq('id', quizId)
+        .maybeSingle();
+      creditsAwarded = await recordQuizPassed(
+        userId,
+        quizId,
+        quiz.course_id,
+        score,
+        quizRow?.title || ''
+      );
+    }
 
     const { data: course } = await supabaseClient
       .from('courses')
@@ -892,6 +1001,7 @@ serve(async (req) => {
           isPassed,
           attemptNumber,
           attemptsRemaining,
+          creditsAwarded,
           answers: gradedAnswers,
           moduleProgress: moduleCompletionStatus ? {
             section_id: quiz.section_id,

@@ -366,7 +366,7 @@ export default function CoursesScreen({ navigation }: any) {
           </Text>
         ) : null}
         {withProgress ? (
-          <View style={{ marginTop: 8 }}>
+          <View style={{ marginTop: 8, paddingBottom: Spacing.sm }}>
             <ProgressBar value={progressFrom(item)} />
             <Text style={styles.progressLabel}>
               {Math.round(progressFrom(item) * 100)}% complete
@@ -544,6 +544,7 @@ export default function CoursesScreen({ navigation }: any) {
                 renderItem={({ item }) => <HCard item={item} withProgress />}
                 horizontal
                 showsVerticalScrollIndicator={false}
+                style={styles.hList}
                 contentContainerStyle={styles.hRow}
                 extraData={wishlist}
               />

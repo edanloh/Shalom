@@ -308,6 +308,11 @@ export default function MainNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="CreditsShop"
+        component={Screens.CreditsShopScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="ChangePassword"
         component={Screens.ChangePassword}
         options={{ headerShown: false }}

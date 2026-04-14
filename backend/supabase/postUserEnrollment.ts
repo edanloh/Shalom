@@ -18,6 +18,72 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
+async function recordEnrollmentCredits(
+  supabaseClient: any,
+  userId: string,
+  courseId: string,
+  courseTitle: string
+): Promise<number> {
+  const url = supabaseUrl;
+  const key = serviceKey;
+  if (!url || !key) return 0;
+
+  let awarded = 0;
+
+  const postCredit = async (payload: Record<string, unknown>) => {
+    const res = await fetch(`${url}/functions/v1/postCreditEvent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+        apikey: key,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('postCreditEvent failed:', res.status, text);
+    }
+  };
+
+  try {
+    await postCredit({
+      userId,
+      type: 'course_enrolled',
+      title: courseTitle,
+      points: 20,
+      courseId,
+      referenceKey: `course_enrolled:${courseId}`,
+    });
+    awarded += 20;
+  } catch (err) {
+    console.error('Failed to record course_enrolled credit:', err);
+  }
+
+  // Award first-enrollment bonus if this is the user's first course
+  try {
+    const { count } = await supabaseClient
+      .from('course_enrollments')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    if ((count ?? 0) === 1) {
+      await postCredit({
+        userId,
+        type: 'first_course_enrollment',
+        title: 'First course enrolled!',
+        points: 30,
+        courseId,
+        referenceKey: 'first_course_enrollment',
+      });
+      awarded += 30;
+    }
+  } catch (err) {
+    console.error('Failed to record first_course_enrollment credit:', err);
+  }
+
+  return awarded;
+}
+
 const resolveInstructorId = async (supabaseClient: any, course: any) => {
   if (!course) return null;
   if (course.instructor_id) return { id: course.instructor_id, name: course.instructor_name };
@@ -364,11 +430,19 @@ serve(async (req) => {
       });
     }
 
+    const creditsAwarded = await recordEnrollmentCredits(
+      supabaseClient,
+      userId,
+      courseId,
+      course.title || "Enrolled in course"
+    );
+
     return new Response(
       JSON.stringify({
         success: true,
         message: "User enrolled successfully",
         data: {
+          creditsAwarded,
           enrollment: {
             enrollment_id: created.id,
             user_id: created.user_id,

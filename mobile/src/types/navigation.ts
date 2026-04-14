@@ -33,6 +33,7 @@ export type MainStackParamList = {
   AchievementsScreen: undefined;
   CertificatesScreen: undefined;
   LearningGoalScreen: undefined;
+  CreditsShop: undefined;
   ChangePassword: undefined;
   ResetPassword: undefined;
   Conversation: { conversationId: string };

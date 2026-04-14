@@ -725,31 +725,13 @@ const QuizScreen = () => {
         setShowResults(true);
       }
 
-      // Award credits for passing quizzes
-      if (result.isPassed && userId) {
-        creditService
-          .recordCreditEvent({
-            userId,
-            type: "quiz_passed",
-            title: quizDetail?.title || "Quiz completed",
-            points: Math.max(10, result.score), // simple heuristic
-            courseId,
-          })
-          .then(() => {
-            showToast({
-              title: "Credits earned",
-              message: `+${Math.max(10, result.score)} for passing ${quizDetail?.title || "quiz"}`,
-              type: "success",
-            });
-          })
-          .catch((err) => {
-            console.warn("Failed to record credit for quiz", err);
-            showToast({
-              title: "Unable to record credits",
-              message: "Something unexpected happened. Please try again later.",
-              type: "error",
-            });
-          });
+      // Credits are now awarded server-side in submitQuiz — show toast from response.
+      if (result.isPassed && result.creditsAwarded > 0) {
+        showToast({
+          title: result.score === 100 ? "Perfect score!" : "Credits earned",
+          message: `+${result.creditsAwarded} credits for passing ${quizDetail?.title || "quiz"}`,
+          type: "success",
+        });
       }
     } catch (err: any) {
       console.error("Error submitting quiz:", err);
