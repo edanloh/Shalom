@@ -8,6 +8,9 @@ on:
 jobs:
   retrain:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     steps:
       - name: Checkout repo
@@ -23,15 +26,9 @@ jobs:
           pip install pandas scikit-learn numpy python-dotenv joblib supabase lightgbm
 
       - name: Train model
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python backend/ml/train_reranker.py
 
       - name: Upload model weights to Supabase Storage
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           HTTP_STATUS=$(curl -s -o /tmp/upload_response.txt -w "%{http_code}" \
             -X POST "${SUPABASE_URL}/storage/v1/object/ml-models/model_weights.json" \
@@ -46,9 +43,6 @@ jobs:
           echo "Model uploaded successfully (HTTP $HTTP_STATUS)"
 
       - name: Run evaluation
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python backend/ml/evaluate.py
 
       - name: Upload eval report as artifact

@@ -52,6 +52,9 @@ export async function postNotification(payload: {
   title: string;
   message: string;
   type: string;
+  actionUrl?: string;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
 }) {
   console.log('Posting notifications to userIds:', payload.userIds);
   const resp = await apiService.post<any>(ENDPOINTS.POST, payload);

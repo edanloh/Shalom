@@ -155,6 +155,7 @@ export async function recordCreditEvent(payload: CreditEventPayload) {
         title,
         message,
         durationMs: 2600,
+        skipInApp: true, // backend already persists these as type "achievement"
       });
     }
     emitCreditUpdate();
@@ -234,6 +235,7 @@ export async function recordDailyLogin(userId?: string) {
           title: 'Daily check-in',
           message: `+${creditsAwarded} credits earned`,
           durationMs: 2400,
+          notificationType: 'daily_login',
         });
       }
       emitCreditUpdate();
@@ -286,7 +288,10 @@ export async function purchaseShopItem(userId: string, itemId: string): Promise<
 
 export async function equipShopItem(userId: string, itemId: string): Promise<void> {
   await apiService.post<any>(ENDPOINTS.REDEEM, { userId, itemId, action: 'equip' });
-  // Intentionally no emitCreditUpdate — equipping doesn't change balance
+}
+
+export async function unequipShopItem(userId: string, itemId: string): Promise<void> {
+  await apiService.post<any>(ENDPOINTS.REDEEM, { userId, itemId, action: 'unequip' });
 }
 
 export default {
@@ -305,5 +310,6 @@ export default {
   getShopItems,
   purchaseShopItem,
   equipShopItem,
+  unequipShopItem,
   subscribeToCreditUpdates,
 };

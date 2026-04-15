@@ -291,7 +291,9 @@ serve(async (req) => {
             title: "Course completed",
             message: `You completed ${courseTitle}. Your certificate is ready!`,
             type: "course",
-            data: { courseId },
+            actionUrl: "CertificatesScreen",
+            relatedEntityType: "course",
+            relatedEntityId: courseId,
           }),
         });
       } catch (notifyError) {

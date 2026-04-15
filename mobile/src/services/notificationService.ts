@@ -15,22 +15,8 @@ type NotificationRecord = {
   created_at: string;
   action_url?: string | null;
   icon_url?: string | null;
-};
-
-const normalizeNotificationType = (value?: string): Notification["type"] => {
-  if (
-    value === "course" ||
-    value === "achievement" ||
-    value === "reminder" ||
-    value === "streak_reminder" ||
-    value === "streak_broken" ||
-    value === "streak_hot" ||
-    value === "goal_completed" ||
-    value === "goal_expired"
-  ) {
-    return value;
-  }
-  return "system";
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
 };
 
 const toNotification = (record: NotificationRecord): Notification => ({
@@ -38,11 +24,13 @@ const toNotification = (record: NotificationRecord): Notification => ({
   userId: record.user_id,
   title: record.title,
   message: record.message,
-  type: normalizeNotificationType(record.type),
+  type: record.type ?? "system",
   read: record.is_read,
   createdAt: record.created_at,
   actionUrl: record.action_url ?? undefined,
   iconUrl: record.icon_url ?? undefined,
+  relatedEntityType: record.related_entity_type ?? undefined,
+  relatedEntityId: record.related_entity_id ?? undefined,
 });
 
 const ENDPOINTS = {

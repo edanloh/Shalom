@@ -450,6 +450,7 @@ export default function CourseDetailScreen({
           title: "Enrolled",
           message: `+${creditsAwarded} credits earned`,
           type: "success",
+          notificationType: "course_enrolled",
         });
       }
 

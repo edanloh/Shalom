@@ -81,6 +81,7 @@ describe('CourseCarousel', () => {
     fireEvent.press(getByText('Course One'));
     expect(mockNavigate).toHaveBeenCalledWith('CourseDetail', {
       courseId: 'c1',
+      sourceScreen: 'Home',
     });
   });
 

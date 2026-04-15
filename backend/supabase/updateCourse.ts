@@ -338,7 +338,7 @@ serve(async (req) => {
           title: "Course published",
           message: `Your course "${course.title}" is now published.`,
           type: "course",
-          actionUrl: "/courses",
+          actionUrl: `/course/${course.id}`,
           relatedEntityType: "course",
           relatedEntityId: course.id,
         });
@@ -356,7 +356,7 @@ serve(async (req) => {
           title: "Course unpublished",
           message: `Your course "${course.title}" has been moved back to draft.`,
           type: "course",
-          actionUrl: "/courses",
+          actionUrl: `/course/${course.id}`,
           relatedEntityType: "course",
           relatedEntityId: course.id,
         });

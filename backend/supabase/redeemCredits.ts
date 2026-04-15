@@ -31,8 +31,8 @@ serve(async (req) => {
 
     if (!userId) return fail("userId is required", 400);
     if (!itemId) return fail("itemId is required", 400);
-    if (action !== "purchase" && action !== "equip") {
-      return fail("action must be 'purchase' or 'equip'", 400);
+    if (action !== "purchase" && action !== "equip" && action !== "unequip") {
+      return fail("action must be 'purchase', 'equip', or 'unequip'", 400);
     }
 
     // Fetch item
@@ -113,6 +113,19 @@ serve(async (req) => {
       if (equipErr) throw equipErr;
 
       return ok({ success: true, data: { action: "equip", itemId, itemName: item.name } });
+    }
+
+    if (action === "unequip") {
+      if (!existing) return fail("Item not unlocked", 403);
+
+      const { error: unequipErr } = await supabase
+        .from("user_unlocked_items")
+        .update({ is_equipped: false })
+        .eq("user_id", userId)
+        .eq("item_id", itemId);
+      if (unequipErr) throw unequipErr;
+
+      return ok({ success: true, data: { action: "unequip", itemId, itemName: item.name } });
     }
 
     // Verify balance

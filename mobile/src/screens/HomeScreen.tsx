@@ -58,6 +58,7 @@ export default function HomeScreen({ navigation, route }: any) {
   const { user: profileUser } = useUser();
   const recommendationUserId = profileUser?.uuid;
   const [showInterestModal, setShowInterestModal] = useState(false);
+  const [dismissedRecoIds, setDismissedRecoIds] = useState<Set<string>>(new Set());
   const [creditBalance, setCreditBalance] = useState(0);
   const [equippedTitle, setEquippedTitle] = useState<Pick<ShopItem, 'icon' | 'name'> | null>(null);
   const [equippedFrameColor, setEquippedFrameColor] = useState<string | null>(null);
@@ -437,18 +438,28 @@ export default function HomeScreen({ navigation, route }: any) {
     navigation.navigate('CourseDetail', { courseId: course.id });
   };
 
+  const handleRecommendationDismiss = (course: Course) => {
+    setDismissedRecoIds((prev) => new Set(prev).add(course.id));
+    recordRecommendationEvent(course.id, 'dismiss', 'home_recommended')
+      .catch((err) => console.warn('Failed to record rec dismiss', err));
+  };
+
   const handleWishlistCourseClick = async (course: Course) => {
     recordRecommendationEvent(course.id, 'click', 'wishlist')
       .catch((err) => console.warn('Failed to record wishlist click', err));
     navigation.navigate('CourseDetail', { courseId: course.id });
   };
 
-  // Build recommended list: prefer API recs, fallback to non-enrolled
+  // Build recommended list: prefer API recs, fallback to non-enrolled, exclude dismissed
   const recommendedList = React.useMemo(() => {
-    if (recommendedCourses?.length) return recommendedCourses;
-    const enrolledIds = new Set((myCoursesData ?? []).map((c) => c.id));
-    return (courses ?? []).filter((c) => !enrolledIds.has(c.id)).slice(0, 8);
-  }, [courses, myCoursesData, recommendedCourses]);
+    const base = recommendedCourses?.length
+      ? recommendedCourses
+      : (() => {
+          const enrolledIds = new Set((myCoursesData ?? []).map((c) => c.id));
+          return (courses ?? []).filter((c) => !enrolledIds.has(c.id)).slice(0, 8);
+        })();
+    return base.filter((c) => !dismissedRecoIds.has(c.id));
+  }, [courses, myCoursesData, recommendedCourses, dismissedRecoIds]);
 
   const recommendedListLoading = recommendedLoading || coursesLoading;
 
@@ -641,6 +652,7 @@ export default function HomeScreen({ navigation, route }: any) {
                       showInstructor={false}
                       showRecommendationReason={true}
                       onPress={(c) => handleRecommendationClick(c)}
+                      onDismiss={handleRecommendationDismiss}
                     />
                   ))}
                 </ScrollView>

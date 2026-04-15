@@ -14,7 +14,7 @@ import Screen from "../components/common/Screen";
 import { Ionicons } from "@expo/vector-icons";
 import CustomTextInput from "@/components/CustomTextInput";
 import CustomModal from "../components/common/CustomModal";
-import creditService from "../services/creditService";
+import creditService, { type ShopItem } from "../services/creditService";
 import { AchievementItem } from "../types";
 import { useUser } from "../contexts/UserContext";
 
@@ -72,6 +72,7 @@ export default function AchievementsScreen({ navigation }: any) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [nextOffset, setNextOffset] = useState(0);
+  const [showcase, setShowcase] = useState<ShopItem | null>(null);
 
   const mapAchievements = useCallback((items: AchievementItem[] = []) => {
     const iconFor = (a: any) => {
@@ -149,6 +150,14 @@ export default function AchievementsScreen({ navigation }: any) {
   useEffect(() => {
     load();
   }, [load, dbUserId]);
+
+  useEffect(() => {
+    if (!dbUserId) return;
+    creditService.getShopItems(dbUserId).then(({ items }) => {
+      const equipped = items.find((i) => i.type === 'achievement_showcase' && i.isEquipped) ?? null;
+      setShowcase(equipped);
+    }).catch(() => {});
+  }, [dbUserId]);
 
   const sections = useMemo(() => {
     // Filter achievements based on search query
@@ -256,11 +265,14 @@ export default function AchievementsScreen({ navigation }: any) {
               style={styles.row}
               onPress={() => setSelectedAchievement(item)}
             >
-              <View style={styles.iconContainer}>
+              <View style={[
+                styles.iconContainer,
+                showcase ? { borderWidth: 1.5, borderColor: showcase.color, backgroundColor: `${showcase.color}22` } : null,
+              ]}>
                 {isIconUrl(item.icon) ? (
                   <Image source={{ uri: item.icon }} style={styles.iconImage} resizeMode="cover" />
                 ) : (
-                  <Ionicons name={item.icon as any} size={28} color="#FACC15" />
+                  <Ionicons name={item.icon as any} size={28} color={showcase?.color ?? "#FACC15"} />
                 )}
               </View>
               <View style={{ flex: 1 }}>
@@ -350,7 +362,10 @@ export default function AchievementsScreen({ navigation }: any) {
       >
         {/* Achievement Icon */}
         <View style={styles.modalIconContainer}>
-          <View style={styles.modalIconBadge}>
+          <View style={[
+            styles.modalIconBadge,
+            showcase ? { backgroundColor: `${showcase.color}33`, borderWidth: 2, borderColor: showcase.color } : null,
+          ]}>
             {isIconUrl(selectedAchievement?.icon) ? (
               <Image
                 source={{ uri: selectedAchievement?.icon }}
@@ -361,7 +376,7 @@ export default function AchievementsScreen({ navigation }: any) {
               <Ionicons
                 name={selectedAchievement?.icon as any}
                 size={64}
-                color={Colors.yellow}
+                color={showcase?.color ?? Colors.yellow}
               />
             )}
           </View>

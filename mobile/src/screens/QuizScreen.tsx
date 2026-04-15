@@ -731,6 +731,7 @@ const QuizScreen = () => {
           title: result.score === 100 ? "Perfect score!" : "Credits earned",
           message: `+${result.creditsAwarded} credits for passing ${quizDetail?.title || "quiz"}`,
           type: "success",
+          notificationType: "credits",
         });
       }
     } catch (err: any) {

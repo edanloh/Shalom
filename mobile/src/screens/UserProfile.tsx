@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   ScrollView,
@@ -146,12 +147,18 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   useEffect(() => {
-    loadCredits();
     const unsub = creditService.subscribeToCreditUpdates(loadCredits);
     return () => {
       if (unsub) unsub();
     };
   }, [loadCredits]);
+
+  // Reload equipped items whenever the user navigates to this tab
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCredits();
+    }, [loadCredits])
+  );
 
   type AccountItemIcon =
     | "person-outline"

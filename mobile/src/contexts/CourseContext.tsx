@@ -316,6 +316,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
           title: 'Removed from wishlist',
           message: course.title || 'Course removed',
           durationMs: 1800,
+          notificationType: 'wishlist',
         });
       } else {
         await courseService.addToWishlist(dbUserId, id);
@@ -324,6 +325,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
           title: 'Added to wishlist',
           message: course.title || 'Course saved',
           durationMs: 1800,
+          notificationType: 'wishlist',
         });
       }
     } catch (e) {

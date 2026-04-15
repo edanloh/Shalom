@@ -309,6 +309,7 @@ export default function LearningGoalScreen({ navigation }: any) {
         title: "Goals set",
         message: "Your new goals are active.",
         type: "success",
+        notificationType: "goal_set",
       });
     });
   }, [pendingGoalsToast]);

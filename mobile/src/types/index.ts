@@ -215,20 +215,13 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  type:
-    | 'course'
-    | 'achievement'
-    | 'reminder'
-    | 'system'
-    | 'streak_reminder'
-    | 'streak_broken'
-    | 'streak_hot'
-    | 'goal_completed'
-    | 'goal_expired';
+  type: string;
   read: boolean;
   createdAt: string;
   actionUrl?: string;
   iconUrl?: string;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
 }
 
 // Navigation types

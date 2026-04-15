@@ -8,6 +8,9 @@ export type ToastPayload = {
   type?: "success" | "error" | "info";
   durationMs?: number;
   skipInApp?: boolean;
+  /** Explicit in-app notification type. When set, NotificationContext uses this
+   *  directly instead of inferring the type from the toast title/message. */
+  notificationType?: string;
 };
 
 export const TOAST_CHANNEL = "toast:show";

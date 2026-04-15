@@ -21,20 +21,19 @@ import { showToast } from '../components/common/Toast';
 type ShopFilter = 'all' | 'owned' | 'affordable' | 'limited';
 type ShopCategory = 'all' | string;
 
-const TYPE_META: Record<string, { label: string; itemLabel: string; icon: string }> = {
+const TYPE_META: Record<string, { label: string; itemLabel: string; icon: string; comingSoon?: boolean }> = {
   title: { label: 'Titles', itemLabel: 'title', icon: 'ribbon-outline' },
   avatar_frame: { label: 'Frames', itemLabel: 'frame', icon: 'ellipse-outline' },
   profile_banner: { label: 'Banners', itemLabel: 'banner', icon: 'image-outline' },
   achievement_showcase: { label: 'Showcase', itemLabel: 'showcase', icon: 'trophy-outline' },
-  reaction_pack: { label: 'Reactions', itemLabel: 'reaction pack', icon: 'chatbubble-ellipses-outline' },
-  celebration_effect: { label: 'Effects', itemLabel: 'effect', icon: 'sparkles-outline' },
+  reaction_pack: { label: 'Reactions', itemLabel: 'reaction pack', icon: 'chatbubble-ellipses-outline', comingSoon: true },
+  celebration_effect: { label: 'Effects', itemLabel: 'effect', icon: 'sparkles-outline', comingSoon: true },
 };
 
 const FILTER_META: Array<{ key: ShopFilter; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'owned', label: 'Owned' },
   { key: 'affordable', label: 'Affordable' },
-  { key: 'limited', label: 'Limited' },
 ];
 
 const RARITY_COLORS: Record<string, string> = {
@@ -204,6 +203,7 @@ export default function CreditsShopScreen({ navigation }: any) {
                 type: 'success',
                 title: `"${item.name}" unlocked!`,
                 message: 'Select Equip to apply it to your profile setup.',
+                notificationType: 'shop_purchase',
               });
             } catch (e: any) {
               const msg = e?.data?.message || e?.message || 'Could not unlock item.';
@@ -232,10 +232,33 @@ export default function CreditsShopScreen({ navigation }: any) {
         type: 'success',
         title: `"${item.name}" equipped!`,
         message: 'Your updated cosmetic setup is now active.',
+        notificationType: 'shop_purchase',
       });
     } catch (e: any) {
       const msg = e?.data?.message || e?.message || 'Could not equip item.';
       Alert.alert('Equip failed', msg);
+    } finally {
+      setPurchasing(null);
+    }
+  };
+
+  const handleUnequip = async (item: ShopItem) => {
+    if (!userId) return;
+    setPurchasing(item.id);
+    try {
+      await creditService.unequipShopItem(userId, item.id);
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, isEquipped: false } : i))
+      );
+      showToast({
+        type: 'success',
+        title: `"${item.name}" unequipped`,
+        message: 'Removed from your active cosmetic setup.',
+        notificationType: 'shop_purchase',
+      });
+    } catch (e: any) {
+      const msg = e?.data?.message || e?.message || 'Could not unequip item.';
+      Alert.alert('Unequip failed', msg);
     } finally {
       setPurchasing(null);
     }
@@ -290,35 +313,58 @@ export default function CreditsShopScreen({ navigation }: any) {
             ) : null}
           </View>
 
-          <Text style={styles.itemMetaText}>
-            {typeMeta.label}
-            {item.collection ? `  •  ${item.collection}` : ''}
-          </Text>
+          <View style={styles.itemMetaRow}>
+            <Text style={styles.itemMetaText}>
+              {typeMeta.label}
+              {item.collection ? `  •  ${item.collection}` : ''}
+            </Text>
+            {typeMeta.comingSoon ? (
+              <View style={styles.comingSoonBadge}>
+                <Text style={styles.comingSoonBadgeText}>Coming soon</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.itemDescription}>{item.description}</Text>
 
           <View style={styles.cardFooter}>
-            <View style={styles.priceColumn}>
-              {isFree ? (
-                <Text style={styles.freeText}>Free</Text>
-              ) : (
-                <View style={styles.costRow}>
-                  <Ionicons name="star" size={12} color="#FFD700" />
-                  <Text style={styles.costText}>{item.cost.toLocaleString()}</Text>
-                </View>
-              )}
-              {!item.isUnlocked && !item.canAfford ? (
-                <Text style={styles.helperText}>Need {creditsNeeded.toLocaleString()} more credits</Text>
-              ) : (
-                <Text style={styles.helperText}>
-                  {item.isUnlocked ? 'Owned and ready to equip' : 'Tap to preview'}
+            {typeMeta.comingSoon ? (
+              <View style={styles.priceColumn}>
+                <Text style={[styles.helperText, { fontStyle: 'italic' }]}>
+                  This feature is in development
                 </Text>
-              )}
-            </View>
-
-            {item.isEquipped ? (
-              <View style={[styles.btn, styles.btnEquippedStatic]}>
-                <Text style={styles.btnText}>Active</Text>
               </View>
+            ) : (
+              <View style={styles.priceColumn}>
+                {isFree ? (
+                  <Text style={styles.freeText}>Free</Text>
+                ) : (
+                  <View style={styles.costRow}>
+                    <Ionicons name="star" size={12} color="#FFD700" />
+                    <Text style={styles.costText}>{item.cost.toLocaleString()}</Text>
+                  </View>
+                )}
+                {!item.isUnlocked && !item.canAfford ? (
+                  <Text style={styles.helperText}>Need {creditsNeeded.toLocaleString()} more credits</Text>
+                ) : (
+                  <Text style={styles.helperText}>
+                    {item.isUnlocked ? 'Owned and ready to equip' : 'Tap to preview'}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {typeMeta.comingSoon ? null : item.isEquipped ? (
+              <TouchableOpacity
+                style={[styles.btn, styles.btnUnequip]}
+                onPress={() => handleUnequip(item)}
+                disabled={anyBusy}
+              >
+                {isThisItemBusy ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.btnText}>Unequip</Text>
+                )}
+              </TouchableOpacity>
             ) : item.isUnlocked ? (
               <TouchableOpacity
                 style={[styles.btn, styles.btnEquip]}
@@ -455,15 +501,23 @@ export default function CreditsShopScreen({ navigation }: any) {
                   </TouchableOpacity>
                 )}
                 {featuredItem.isEquipped && (
-                  <View style={[styles.featuredActionBtn, styles.btnEquippedStatic]}>
-                    <Text style={styles.btnText}>Active</Text>
-                  </View>
+                  <TouchableOpacity
+                    style={[styles.featuredActionBtn, styles.btnUnequip]}
+                    onPress={() => handleUnequip(featuredItem)}
+                    disabled={anyBusy}
+                  >
+                    {purchasing === featuredItem.id ? (
+                      <ActivityIndicator size="small" color={Colors.white} />
+                    ) : (
+                      <Text style={styles.btnText}>Unequip</Text>
+                    )}
+                  </TouchableOpacity>
                 )}
               </View>
             ) : null}
 
             <Text style={styles.sectionLabel}>Shop by category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
               {categories.map((category) => {
                 const active = selectedCategory === category;
                 const meta = category === 'all' ? { label: 'All', icon: 'apps-outline' } : getTypeMeta(category);
@@ -486,7 +540,7 @@ export default function CreditsShopScreen({ navigation }: any) {
             </ScrollView>
 
             <Text style={styles.sectionLabel}>Refine</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
               {FILTER_META.map((filter) => {
                 const active = selectedFilter === filter.key;
                 return (
@@ -720,7 +774,12 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
+  chipScroll: {
+    marginHorizontal: -Spacing.xl,
+  },
   chipRow: {
+    paddingLeft: Spacing.xl,
+    paddingRight: Spacing.base,
     paddingBottom: Spacing.base,
     gap: Spacing.sm,
   },
@@ -914,10 +973,28 @@ const styles = StyleSheet.create({
     ...TextStyles.bodyMedium,
     color: Colors.textPrimary,
   },
+  itemMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
   itemMetaText: {
     ...TextStyles.captionSmall,
     color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
+  },
+  comingSoonBadge: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  comingSoonBadgeText: {
+    ...TextStyles.captionSmall,
+    color: Colors.textMuted,
+    fontSize: 10,
   },
   rarityBadge: {
     borderWidth: 1,
@@ -1009,7 +1086,7 @@ const styles = StyleSheet.create({
   btnEquip: {
     backgroundColor: Colors.green,
   },
-  btnEquippedStatic: {
+  btnUnequip: {
     backgroundColor: Colors.gray500,
   },
   btnLocked: {

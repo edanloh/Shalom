@@ -16,12 +16,197 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
-import Reanimated, { useAnimatedStyle, SharedValue } from "react-native-reanimated";
+import Reanimated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 import { useFocusEffect } from "@react-navigation/native";
 import { Colors, Spacing, TextStyles } from "../constants";
 import Screen from "../components/common/Screen";
 import { useNotification } from "../contexts/NotificationContext";
+import { apiService } from "../services";
 import type { Notification as InAppNotification } from "../types";
+
+const extractCoursePathId = (actionUrl?: string) => {
+  if (!actionUrl) return null;
+  const match = actionUrl.trim().match(/^\/course\/([^/?]+)/);
+  return match ? match[1] : null;
+};
+
+const isCourseCompletedNotification = (item: InAppNotification) => {
+  const title = item.title?.trim().toLowerCase() ?? "";
+  const message = item.message?.trim().toLowerCase() ?? "";
+  return title === "course completed" || message.includes("your certificate is ready");
+};
+
+const isPointsHistoryNotification = (item: InAppNotification) => {
+  const title = item.title?.trim().toLowerCase() ?? "";
+  const message = item.message?.trim().toLowerCase() ?? "";
+
+  return (
+    item.type === "credits" ||
+    item.type === "daily_login" ||
+    item.type === "course_completed" ||
+    item.type === "module_completed" ||
+    item.type === "course_enrolled" ||
+    item.type === "first_course_enrollment" ||
+    item.type === "streak_milestone" ||
+    title === "daily check-in" ||
+    title === "enrolled" ||
+    title === "credits earned" ||
+    title === "perfect score!" ||
+    message.includes("credits earned") ||
+    message.includes("credits for") ||
+    message.includes("credits added to your balance")
+  );
+};
+
+const isLearningGoalNotification = (item: InAppNotification) => {
+  const title = item.title?.trim().toLowerCase() ?? "";
+  const message = item.message?.trim().toLowerCase() ?? "";
+
+  return (
+    item.type === "goal_set" ||
+    item.type === "goal_completed" ||
+    item.type === "goal_hit" ||
+    item.type === "goal_expired" ||
+    item.type === "reminder" ||
+    item.relatedEntityType === "goal" ||
+    title === "goals set" ||
+    message.includes("goal is active") ||
+    message.includes("goals are active")
+  );
+};
+
+async function resolveGradeCourseId(item: InAppNotification): Promise<string | null> {
+  if (item.relatedEntityType === "course" && item.relatedEntityId) {
+    return item.relatedEntityId;
+  }
+
+  const candidateIds = Array.from(
+    new Set(
+      [
+        item.relatedEntityType === "quiz" ? item.relatedEntityId : null,
+        extractCoursePathId(item.actionUrl),
+        item.relatedEntityId,
+      ].filter(Boolean) as string[]
+    )
+  );
+
+  for (const candidateId of candidateIds) {
+    try {
+      const response = await apiService.get<{
+        success: boolean;
+        data?: { course?: { id?: string } };
+      }>(`/getQuizDetail/${candidateId}`, item.userId ? { userId: item.userId } : undefined);
+      const courseId = response?.data?.course?.id;
+      if (courseId) return courseId;
+    } catch {
+      // Candidate is not a quiz id we can recover from. Try the next one.
+    }
+  }
+
+  return null;
+}
+
+function resolveNotificationRoute(
+  item: InAppNotification
+): { screen: string; params?: Record<string, unknown> } | null {
+  if (isCourseCompletedNotification(item)) {
+    return { screen: "CertificatesScreen" };
+  }
+  if (isPointsHistoryNotification(item)) {
+    return { screen: "PointsHistory" };
+  }
+  if (isLearningGoalNotification(item)) {
+    return { screen: "LearningGoalScreen" };
+  }
+
+  if (item.actionUrl) {
+    const url = item.actionUrl.trim();
+
+    // Handle URL-style paths like /course/<id> or /achievement/<id>
+    const courseIdFromUrl = item.type === "grade" ? null : extractCoursePathId(url);
+    if (courseIdFromUrl) {
+      return { screen: "CourseDetail", params: { courseId: courseIdFromUrl } };
+    }
+    const achievementMatch = url.match(/^\/achievement/);
+    if (achievementMatch) {
+      return { screen: "AchievementsScreen" };
+    }
+
+    // Handle screen-name style: "ScreenName" or "ScreenName?key=value"
+    if (!url.startsWith("/")) {
+      const [screenPart, queryPart] = url.split("?");
+      const screen = screenPart.trim();
+      const params: Record<string, string> = {};
+      if (queryPart) {
+        for (const pair of queryPart.split("&")) {
+          const [k, v] = pair.split("=");
+          if (k) params[decodeURIComponent(k)] = decodeURIComponent(v ?? "");
+        }
+      }
+      return { screen, params: Object.keys(params).length > 0 ? params : undefined };
+    }
+  }
+  // Course-related: use related_entity_id as courseId when available
+  if (item.type === "course") {
+    if (item.relatedEntityType === "course" && item.relatedEntityId) {
+      return { screen: "CourseDetail", params: { courseId: item.relatedEntityId } };
+    }
+    const courseId = item.relatedEntityId ?? null;
+    if (courseId) return { screen: "CourseDetail", params: { courseId } };
+    return { screen: "Courses" };
+  }
+
+  if (item.type === "grade") {
+    if (item.relatedEntityType === "course" && item.relatedEntityId) {
+      return { screen: "CourseDetail", params: { courseId: item.relatedEntityId } };
+    }
+    return { screen: "Courses" };
+  }
+
+  // Course announcements embed the courseId in the type string.
+  // Patterns: "course_announcement-<courseId>-<uuid>" or "course_announcement-new-<courseId>"
+  // Use a loose UUID search anywhere in the string to handle both.
+  if (item.type?.startsWith("course_announcement")) {
+    const uuidMatch = item.type.match(
+      /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+    );
+    if (uuidMatch) {
+      return { screen: "CourseDetail", params: { courseId: uuidMatch[1] } };
+    }
+    return { screen: "Courses" };
+  }
+
+  switch (item.type) {
+    case "message":
+      return { screen: "Messages" };
+    case "wishlist":
+      return { screen: "Wishlist" };
+    case "achievement":
+    case "achievement_reward":
+      return { screen: "AchievementsScreen" };
+    case "credits":
+    case "daily_login":
+    case "course_completed":
+    case "module_completed":
+    case "course_enrolled":
+    case "first_course_enrollment":
+    case "streak_milestone":
+      return { screen: "PointsHistory" };
+    case "streak_hot":
+    case "streak_reminder":
+    case "streak_broken":
+    case "goal_completed":
+    case "goal_hit":
+    case "goal_expired":
+    case "goal_set":
+    case "reminder":
+      // Instructor task reminders have no mobile destination — read-only.
+      if (item.relatedEntityType === "instructor_task") return null;
+      return { screen: "LearningGoalScreen" };
+    default:
+      return null;
+  }
+}
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const isSameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
@@ -45,35 +230,106 @@ const parseValidDate = (value?: string | null) => {
   return Number.isNaN(dt.getTime()) ? null : dt;
 };
 
-function getIcon(type?: string) {
-  switch (type) {
-    case "achievement":      return { name: "trophy-outline",           color: Colors.yellow };
-    case "course":           return { name: "book-outline",             color: Colors.blue };
-    case "reminder":         return { name: "alarm-outline",            color: Colors.red };
+type NotificationAppearance = {
+  name: keyof typeof Ionicons.glyphMap;
+  color: string;
+  borderColor: string;
+};
+
+function getNotificationAppearance(item: InAppNotification): NotificationAppearance {
+  if (isCourseCompletedNotification(item)) {
+    return {
+      name: "ribbon-outline",
+      color: Colors.certificateCardBg,
+      borderColor: Colors.certificateCardBg,
+    };
+  }
+
+  if (item.type?.startsWith("course_announcement")) {
+    return {
+      name: "megaphone-outline",
+      color: Colors.accent,
+      borderColor: Colors.accent,
+    };
+  }
+
+  switch (item.type) {
+    case "achievement":
+      return { name: "trophy-outline", color: Colors.yellow, borderColor: Colors.yellow };
+    case "credits":
+    case "course_completed":
+    case "module_completed":
+    case "course_enrolled":
+    case "first_course_enrollment":
+      return { name: "wallet-outline", color: Colors.green, borderColor: Colors.green };
+    case "grade":
+      return { name: "clipboard-outline", color: Colors.green, borderColor: Colors.green };
+    case "assignment":
+      return { name: "document-text-outline", color: Colors.streakFire, borderColor: Colors.streakFire };
+    case "course":
+      return { name: "school-outline", color: Colors.blue, borderColor: Colors.blue };
+    case "message":
+      return { name: "chatbubble-ellipses-outline", color: Colors.blue, borderColor: Colors.blue };
+    case "wishlist":
+      return { name: "heart-outline", color: Colors.notificationRed, borderColor: Colors.notificationRed };
+    case "daily_login":
+      return { name: "sparkles-outline", color: Colors.secondary, borderColor: Colors.secondary };
+    case "shop_purchase":
+      return { name: "bag-handle-outline", color: Colors.categoryDefault, borderColor: Colors.categoryDefault };
+    case "goal_completed":
+    case "goal_hit":
+    case "goal_set":
+      return { name: "checkmark-circle-outline", color: Colors.secondary, borderColor: Colors.secondary };
+    case "goal_expired":
+      return { name: "hourglass-outline", color: Colors.notificationRed, borderColor: Colors.notificationRed };
+    case "reminder":
+      return { name: "alarm-outline", color: Colors.red, borderColor: Colors.red };
     case "streak_hot":
-    case "streak_reminder":  return { name: "flame-outline",            color: Colors.streakFire };
-    case "streak_broken":    return { name: "warning-outline",          color: Colors.notificationRed };
-    case "goal_completed":   return { name: "checkmark-circle-outline", color: Colors.secondary };
-    case "goal_expired":     return { name: "time-outline",             color: Colors.notificationRed };
-    default:                 return { name: "notifications-outline",    color: Colors.textSecondary };
+    case "streak_reminder":
+    case "streak_increment":
+    case "streak_milestone":
+      return { name: "flame-outline", color: Colors.streakFire, borderColor: Colors.streakFire };
+    case "streak_broken":
+      return { name: "warning-outline", color: Colors.notificationRed, borderColor: Colors.notificationRed };
+    case "achievement_reward":
+      return { name: "gift-outline", color: Colors.yellow, borderColor: Colors.yellow };
+    default:
+      return {
+        name: "notifications-outline",
+        color: Colors.textSecondary,
+        borderColor: Colors.gray500,
+      };
   }
 }
 
-function SwipeDeleteAction({
-  progress,
+function SwipeActions({
+  dragX,
+  isRead,
+  onMarkRead,
   onDelete,
 }: {
-  progress: SharedValue<number>;
+  dragX: SharedValue<number>;
+  isRead: boolean;
+  onMarkRead: () => void;
   onDelete: () => void;
 }) {
+  // Keep buttons pixel-perfect in sync with the drag at any swipe speed.
+  // dragX is negative when swiping left; buttons slide in from the right edge.
+  // two buttons: 60 + 60 + 8 gap + 4 paddingLeft = 132; one button: 60 + 4 = 64
+  const containerWidth = isRead ? 64 : 132;
   const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: (1 - progress.value) * 72 }],
+    transform: [{ translateX: containerWidth + dragX.value }],
   }));
   return (
     <Reanimated.View style={[styles.swipeActionContainer, animStyle]}>
-      <TouchableOpacity style={styles.swipeDelete} onPress={onDelete}>
+      {!isRead ? (
+        <Pressable style={styles.swipeRead} onPress={onMarkRead}>
+          <Ionicons name="checkmark" size={20} color={Colors.white} />
+        </Pressable>
+      ) : null}
+      <Pressable style={styles.swipeDelete} onPress={onDelete}>
         <Ionicons name="trash-outline" size={20} color={Colors.white} />
-      </TouchableOpacity>
+      </Pressable>
     </Reanimated.View>
   );
 }
@@ -83,6 +339,7 @@ type RowProps = {
   onMarkRead: (id: string, userId: string) => void;
   onDelete: (id: string) => void;
   onOpen: (methods: SwipeableMethods) => void;
+  onNavigate: (item: InAppNotification) => void;
 };
 
 const NotificationRow = memo(function NotificationRow({
@@ -90,15 +347,26 @@ const NotificationRow = memo(function NotificationRow({
   onMarkRead,
   onDelete,
   onOpen,
+  onNavigate,
 }: RowProps) {
-  const icon = getIcon(item.type);
+  const appearance = getNotificationAppearance(item);
   const swipeableRef = useRef<SwipeableMethods | null>(null);
 
+  const handleSwipeMarkRead = useCallback(() => {
+    swipeableRef.current?.close();
+    onMarkRead(item.id, item.userId);
+  }, [item.id, item.userId, onMarkRead]);
+
   const renderRightActions = useCallback(
-    (progress: SharedValue<number>) => (
-      <SwipeDeleteAction progress={progress} onDelete={() => onDelete(item.id)} />
+    (_progress: SharedValue<number>, dragX: SharedValue<number>) => (
+      <SwipeActions
+        dragX={dragX}
+        isRead={item.read}
+        onMarkRead={handleSwipeMarkRead}
+        onDelete={() => onDelete(item.id)}
+      />
     ),
-    [item.id, onDelete]
+    [item.id, item.read, handleSwipeMarkRead, onDelete]
   );
 
   return (
@@ -119,13 +387,13 @@ const NotificationRow = memo(function NotificationRow({
           !item.read ? styles.rowUnread : null,
           item.read ? styles.rowRead : null,
         ]}
-        onPress={() => onMarkRead(item.id, item.userId)}
+        onPress={() => onNavigate(item)}
       >
-        <View style={[styles.iconBadge, { borderColor: icon.color }]}>
+        <View style={[styles.iconBadge, { borderColor: appearance.borderColor }]}>
           {isIconUrl(item.iconUrl) ? (
             <Image source={{ uri: item.iconUrl }} style={styles.iconImage} resizeMode="cover" />
           ) : (
-            <Ionicons name={icon.name as any} size={22} color={icon.color} />
+            <Ionicons name={appearance.name} size={22} color={appearance.color} />
           )}
         </View>
         <View style={{ flex: 1 }}>
@@ -180,6 +448,28 @@ export default function NotificationsScreen({ navigation }: any) {
     }
     openRowRef.current = methods;
   }, []);
+
+  const handleNotificationNavigate = useCallback(
+    async (item: InAppNotification) => {
+      if (!item.read) {
+        markNotificationRead(item.id, item.userId);
+      }
+
+      if (item.type === "grade") {
+        const courseId = await resolveGradeCourseId(item);
+        if (courseId) {
+          navigation.navigate("CourseDetail" as any, { courseId } as any);
+          return;
+        }
+      }
+
+      const route = resolveNotificationRoute(item);
+      if (route) {
+        navigation.navigate(route.screen as any, route.params as any);
+      }
+    },
+    [markNotificationRead, navigation]
+  );
 
   const sections = useMemo(() => {
     const today: InAppNotification[] = [];
@@ -379,6 +669,7 @@ export default function NotificationsScreen({ navigation }: any) {
               onMarkRead={markNotificationRead}
               onDelete={deleteNotification}
               onOpen={handleRowOpen}
+              onNavigate={handleNotificationNavigate}
             />
           )}
         renderSectionHeader={({ section }) => (
@@ -451,6 +742,7 @@ export default function NotificationsScreen({ navigation }: any) {
 }
 
 const THUMB = 56;
+const NOTIFICATION_ROW_MIN_HEIGHT = THUMB + Spacing.sm * 2;
 
 const styles = StyleSheet.create({
   // Row
@@ -459,6 +751,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
+    minHeight: NOTIFICATION_ROW_MIN_HEIGHT,
     borderRadius: 14,
     marginBottom: Spacing.xs,
     borderWidth: 1,
@@ -507,19 +800,31 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.notificationRed,
     marginLeft: Spacing.sm,
   },
+  swipeRead: {
+    backgroundColor: Colors.secondary,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 60,
+    minHeight: NOTIFICATION_ROW_MIN_HEIGHT,
+    height: "100%",
+    borderRadius: 14,
+  },
   swipeDelete: {
     backgroundColor: Colors.notificationRed,
     justifyContent: "center",
     alignItems: "center",
     width: 60,
-    flex: 1,
+    minHeight: NOTIFICATION_ROW_MIN_HEIGHT,
+    height: "100%",
     borderRadius: 14,
   },
   swipeActionContainer: {
+    flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
+    alignItems: "stretch",
+    gap: Spacing.xs,
     paddingLeft: Spacing.xs,
-    paddingVertical: 2,
+    paddingVertical: 0,
     marginBottom: Spacing.xs,
     alignSelf: "stretch",
   },

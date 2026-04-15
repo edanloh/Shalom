@@ -316,15 +316,16 @@ serve(async (req) => {
         // Send notification to student only if all their short-answers are graded
         if (quizDetails && allShortAnswersGraded) {
           const courseTitle = quizDetails.courses?.title || 'Unknown Course';
+          const courseId = quizDetails.course_id;
           notificationPromises.push(
             sendNotification(supabaseClient, {
               userId: attempt.user_id,
               title: "Quiz Graded",
               message: `Your quiz "${quizDetails.title}" in ${courseTitle} has been graded. Score: ${score}%${isPassed ? ' (Passed)' : ''}`,
               type: "grade",
-              actionUrl: `/course/${question.quiz_id}`,
-              relatedEntityType: "quiz",
-              relatedEntityId: question.quiz_id,
+              actionUrl: courseId ? `/course/${courseId}` : undefined,
+              relatedEntityType: courseId ? "course" : undefined,
+              relatedEntityId: courseId ?? undefined,
               priority: "normal"
             })
           );

@@ -301,6 +301,9 @@ const CourseStudents = () => {
                         title: courseName,
                         message: messageStudent,
                         type: `course_announcement-${courseId}-${notificationId}`,
+                        actionUrl: `/course/${courseId}`,
+                        relatedEntityType: "course",
+                        relatedEntityId: courseId,
                       });
                       toast({
                         title: 'Notification Sent',

@@ -366,24 +366,12 @@ export const NotificationProvider = ({
       (payload: ToastPayload) => {
         if (!payload?.message) return;
         if (payload.skipInApp) return;
-        const title = payload.title?.toLowerCase() || "";
-        const message = payload.message?.toLowerCase() || "";
-        if (payload.type === "success" && (title.includes("achievement") || message.includes("achievement"))) {
-          return;
-        }
-        const type =
-          payload.type === "success"
-            ? "achievement"
-            : payload.type === "error"
-              ? "system"
-              : "system";
+        // Use explicit type from the toast caller; fall back to "system" for
+        // untagged toasts (e.g. generic error/info feedback that has no destination).
+        const type = payload.notificationType ?? (payload.type === "error" ? "system" : "system");
         const notificationTitle =
           payload.title ||
-          (payload.type === "success"
-            ? "Success"
-            : payload.type === "error"
-              ? "Error"
-              : "Update");
+          (payload.type === "success" ? "Success" : payload.type === "error" ? "Error" : "Update");
         pushInAppNotification({
           title: notificationTitle,
           message: payload.message,

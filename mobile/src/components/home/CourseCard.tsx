@@ -20,6 +20,7 @@ type Variant = "compact" | "progress";
 interface Props {
   course: Course;
   onPress?: (course: Course) => void;
+  onDismiss?: (course: Course) => void;
   variant?: Variant;
   // Optional toggles for subparts
   showInstructor?: boolean;
@@ -52,6 +53,7 @@ const getCourseProgressPercent = (course: Course): number => {
 export default function CourseCard({
   course,
   onPress,
+  onDismiss,
   variant = "compact",
   showInstructor = false,
   showRecommendationReason = true,
@@ -155,10 +157,24 @@ export default function CourseCard({
           </Text>
         </View>
         <MetaRow rating={course.rating} modules={course.modules} />
-        {showRecommendationReason && reasonText ? (
-          <Text style={styles.reason} numberOfLines={1}>
-            {reasonText}
-          </Text>
+        {showRecommendationReason && (reasonText || onDismiss) ? (
+          <View style={styles.reasonRow}>
+            {reasonText ? (
+              <Text style={styles.reason} numberOfLines={1}>
+                {reasonText}
+              </Text>
+            ) : <View />}
+            {onDismiss ? (
+              <TouchableOpacity
+                onPress={(e) => { e.stopPropagation(); onDismiss(course); }}
+                hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+                accessibilityLabel="Not for me"
+                accessibilityRole="button"
+              >
+                <Text style={styles.dismissText}>✕</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
 
         {showInstructor && course.instructor?.name ? (
@@ -279,12 +295,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     paddingTop: 6,
   },
+  reasonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 4,
+    paddingHorizontal: 2,
+    gap: 4,
+  },
   reason: {
+    flex: 1,
     color: Colors.purple200,
     fontSize: 12,
-    paddingHorizontal: 2,
-    paddingTop: 4,
     fontFamily: Typography.fontFamily.medium,
+  },
+  dismissText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
   },
   metaText: {
     color: Colors.textSecondary,

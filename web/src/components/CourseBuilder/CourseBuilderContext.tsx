@@ -1256,6 +1256,11 @@ export const CourseBuilderProvider = ({
       });
 
       try {
+        const targetCourseId =
+          currentCourseId && currentCourseId !== 'new'
+            ? currentCourseId
+            : finalCourseId;
+
         if (currentCourseId && currentCourseId !== 'new' ) {
           // Generate random uuid
           const notificationId = crypto.randomUUID();
@@ -1263,7 +1268,10 @@ export const CourseBuilderProvider = ({
             userIds: enrolledStudents.map(student => student.id.toString()),
             title: `${courseName}`,
             message: `${courseName} has been updated! Check out the latest content.`,
-            type: `course_announcement-${currentCourseId}-${notificationId}`,
+            type: `course_announcement-${targetCourseId}-${notificationId}`,
+            actionUrl: `/course/${targetCourseId}`,
+            relatedEntityType: "course",
+            relatedEntityId: targetCourseId,
           });
         } else {
           // Generate random uuid
@@ -1272,7 +1280,10 @@ export const CourseBuilderProvider = ({
             userIds: allStudents.map(student => student.id.toString()),
             title: `${courseName}`,
             message: `New course ${courseName} has been created! Check it out now.`,
-            type: `course_announcement-${currentCourseId}-${notificationId}`,
+            type: `course_announcement-${targetCourseId}-${notificationId}`,
+            actionUrl: `/course/${targetCourseId}`,
+            relatedEntityType: "course",
+            relatedEntityId: targetCourseId,
           });
         }
       } catch (notificationError) {
