@@ -165,21 +165,21 @@ export default function CourseDetailScreen({
     }
   };
 
-  const renderStarRating = (rating: number) => {
+  const renderStarRating = (rating: number, size = 16) => {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
 
     for (let i = 1; i <= 5; i++) {
       if (i <= fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={16} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star" size={size} color="#FFD700" />);
       } else if (i === fullStars + 1 && hasHalfStar) {
         stars.push(
-          <Ionicons key={i} name="star-half" size={16} color="#FFD700" />,
+          <Ionicons key={i} name="star-half" size={size} color="#FFD700" />,
         );
       } else {
         stars.push(
-          <Ionicons key={i} name="star-outline" size={16} color="#FFD700" />,
+          <Ionicons key={i} name="star-outline" size={size} color="#FFD700" />,
         );
       }
     }
@@ -694,6 +694,12 @@ export default function CourseDetailScreen({
             <Text style={styles.instructorName}>
               {courseDetail.instructor.name}
             </Text>
+            <View style={styles.instructorStars}>
+              {renderStarRating(courseDetail.instructor.rating, 11)}
+              <Text style={styles.instructorRole}>
+                {"  "}{courseDetail.instructor.rating.toFixed(1)}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -949,9 +955,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 6,
   },
-  scrollView: {
-    flex: 1,
-  },
   heroContainer: {
     position: "relative",
     height: 250,
@@ -1199,10 +1202,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.textPrimary,
   },
+  instructorStars: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
   instructorRole: {
-    fontSize: TextStyles.body.fontSize,
+    fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 3,
   },
   reviewsSectionCard: {
     backgroundColor: Colors.textInputBg,

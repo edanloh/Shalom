@@ -67,6 +67,117 @@ function progressFrom(course: Course): number {
   return v > 1 ? clamp01(v / 100) : clamp01(v);
 }
 
+function BadgeHeartRow({ item }: { item: Course }) {
+  const { wishlist = [], toggleWishlist } = useCourses();
+  const isWishlisted = wishlist.some((c) => c.id === item.id);
+  return (
+    <View style={styles.badgeRow}>
+      <TouchableOpacity
+        onPress={(e) => {
+          e.stopPropagation();
+          toggleWishlist?.(item);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+        hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+        style={styles.heartBtn}
+        activeOpacity={0.7}
+      >
+        <Ionicons name={isWishlisted ? "heart" : "heart-outline"} size={18} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function HCard({
+  item,
+  navigation,
+  withProgress,
+  trackRecommendation = false,
+  placement = "courses_recommended",
+}: {
+  item: Course;
+  navigation: any;
+  withProgress?: boolean;
+  trackRecommendation?: boolean;
+  placement?: string;
+}) {
+  const { recordRecommendationEvent } = useCourses();
+  const rankLabel = Number.isFinite(item.recommendationRank) ? `#${item.recommendationRank}` : null;
+  const reason = formatPrimaryRecommendationReason(item.recommendationPrimaryTag);
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <AnimatedPressable
+      onPress={() => {
+        if (trackRecommendation) {
+          recordRecommendationEvent(item.id, "click", placement)
+            .catch((err) => console.warn("Failed to record courses rec click", err));
+        }
+        navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "Courses" });
+      }}
+      onPressIn={() => { scale.value = withSpring(0.97, { damping: 20, stiffness: 400 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 20, stiffness: 400 }); }}
+      style={[styles.hCard, animatedStyle]}
+    >
+      <View style={styles.imageWrap}>
+        <ImageWithFallback source={{ uri: item.image }} fallback={Images.placeholder} style={styles.hImage} />
+        <BadgeHeartRow item={item} />
+        {rankLabel ? (
+          <View style={styles.rankBadge}>
+            <Text style={styles.rankText}>{rankLabel}</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={styles.hTitle} numberOfLines={2}>{item.title}</Text>
+      <MetaRow rating={item.rating} modules={item.modules} />
+      {reason ? <Text style={styles.reason} numberOfLines={1}>{reason}</Text> : null}
+      {withProgress ? (
+        <View style={{ marginTop: 8, paddingBottom: Spacing.sm }}>
+          <ProgressBar value={progressFrom(item)} />
+          <Text style={styles.progressLabel}>{Math.round(progressFrom(item) * 100)}% complete</Text>
+        </View>
+      ) : null}
+    </AnimatedPressable>
+  );
+}
+
+function GCard({ item, navigation, enrolledIds }: { item: Course; navigation: any; enrolledIds: Set<string> }) {
+  const { recordRecommendationEvent } = useCourses();
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <AnimatedPressable
+      onPress={() => {
+        recordRecommendationEvent(item.id, "click", "courses_popular")
+          .catch((err) => console.warn("Failed to record popular course click", err));
+        navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "Courses" });
+      }}
+      onPressIn={() => { scale.value = withSpring(0.97, { damping: 20, stiffness: 400 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 20, stiffness: 400 }); }}
+      style={[styles.gCard, animatedStyle]}
+    >
+      <View style={styles.imageWrap}>
+        <ImageWithFallback source={{ uri: item.image }} fallback={Images.placeholder} style={styles.gImage} />
+        <BadgeHeartRow item={item} />
+        {enrolledIds.has(String(item.id)) && (
+          <View style={styles.enrolledBadge}>
+            <Text style={styles.enrolledBadgeText}>Enrolled</Text>
+          </View>
+        )}
+      </View>
+      <View style={[styles.catBadge, { backgroundColor: item.categoryColor }]}>
+        <Text style={[TextStyles.bodySmall, styles.catBadgeText]} numberOfLines={1} ellipsizeMode="tail">
+          {item.category}
+        </Text>
+      </View>
+      <Text style={styles.gTitle} numberOfLines={2}>{item.title}</Text>
+      <MetaRow rating={item.rating} modules={item.modules} />
+    </AnimatedPressable>
+  );
+}
+
 export default function CoursesScreen({ navigation }: any) {
   const {
     myCourses = [],
@@ -297,140 +408,6 @@ export default function CoursesScreen({ navigation }: any) {
     }
   }, [refreshCourses, refreshRecommended, fetchCategories, loadCatalogPage]);
 
-  const BadgeHeartRow = ({ item }: { item: Course }) => (
-    <View style={styles.badgeRow}>
-      <TouchableOpacity
-        onPress={(e) => {
-          e.stopPropagation();
-          toggleWishlist?.(item);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={
-          isWishlisted(item) ? "Remove from wishlist" : "Add to wishlist"
-        }
-        hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
-        style={styles.heartBtn}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name={isWishlisted(item) ? "heart" : "heart-outline"}
-          size={18}
-          color="#fff"
-        />
-      </TouchableOpacity>
-    </View>
-  );
-
-  const HCard = ({
-    item,
-    withProgress,
-    trackRecommendation = false,
-    placement = "courses_recommended",
-  }: {
-    item: Course;
-    withProgress?: boolean;
-    trackRecommendation?: boolean;
-    placement?: string;
-  }) => {
-    const rankLabel = Number.isFinite(item.recommendationRank)
-      ? `#${item.recommendationRank}`
-      : null;
-    const reason = formatPrimaryRecommendationReason(
-      item.recommendationPrimaryTag
-    );
-    const scale = useSharedValue(1);
-    const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
-    return (
-      <AnimatedPressable
-        onPress={() => {
-          if (trackRecommendation) {
-            recordRecommendationEvent(item.id, 'click', placement)
-              .catch((err) => console.warn("Failed to record courses rec click", err));
-          }
-          navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "Courses" });
-        }}
-        onPressIn={() => { scale.value = withSpring(0.97, { damping: 20, stiffness: 400 }); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 20, stiffness: 400 }); }}
-        style={[styles.hCard, animatedStyle]}
-      >
-        <View style={styles.imageWrap}>
-          <ImageWithFallback
-            source={{ uri: item.image }}
-            fallback={Images.placeholder}
-            style={styles.hImage}
-          />
-          <BadgeHeartRow item={item} />
-          {rankLabel ? (
-            <View style={styles.rankBadge}>
-              <Text style={styles.rankText}>{rankLabel}</Text>
-            </View>
-          ) : null}
-        </View>
-        <Text style={styles.hTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <MetaRow rating={item.rating} modules={item.modules} />
-        {reason ? (
-          <Text style={styles.reason} numberOfLines={1}>
-            {reason}
-          </Text>
-        ) : null}
-        {withProgress ? (
-          <View style={{ marginTop: 8, paddingBottom: Spacing.sm }}>
-            <ProgressBar value={progressFrom(item)} />
-            <Text style={styles.progressLabel}>
-              {Math.round(progressFrom(item) * 100)}% complete
-            </Text>
-          </View>
-        ) : null}
-      </AnimatedPressable>
-    );
-  };
-
-  const GCard = ({ item }: { item: Course }) => {
-    const scale = useSharedValue(1);
-    const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-    return (
-      <AnimatedPressable
-        onPress={() => {
-          recordRecommendationEvent(item.id, 'click', 'courses_popular')
-            .catch((err) => console.warn("Failed to record popular course click", err));
-          navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "Courses" });
-        }}
-        onPressIn={() => { scale.value = withSpring(0.97, { damping: 20, stiffness: 400 }); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 20, stiffness: 400 }); }}
-        style={[styles.gCard, animatedStyle]}
-      >
-        <View style={styles.imageWrap}>
-          <ImageWithFallback
-            source={{ uri: item.image }}
-            fallback={Images.placeholder}
-            style={styles.gImage}
-          />
-          <BadgeHeartRow item={item} />
-          {enrolledIds.has(String(item.id)) && (
-            <View style={styles.enrolledBadge}>
-              <Text style={styles.enrolledBadgeText}>Enrolled</Text>
-            </View>
-          )}
-        </View>
-        <View style={[styles.catBadge, { backgroundColor: item.categoryColor }]}>
-          <Text
-            style={[TextStyles.bodySmall, styles.catBadgeText]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {item.category}
-          </Text>
-        </View>
-        <Text style={styles.gTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <MetaRow rating={item.rating} modules={item.modules} />
-      </AnimatedPressable>
-    );
-  };
 
   const EmptyState = ({
     icon = "sparkles-outline",
@@ -555,7 +532,7 @@ export default function CoursesScreen({ navigation }: any) {
                 keyExtractor={(i, index) =>
                   String(i.id ?? `jump-back-${index}-${i.title ?? "course"}`)
                 }
-                renderItem={({ item }) => <HCard item={item} withProgress />}
+                renderItem={({ item }) => <HCard item={item} navigation={navigation} withProgress />}
                 horizontal
                 showsVerticalScrollIndicator={false}
                 style={styles.hList}
@@ -623,7 +600,7 @@ export default function CoursesScreen({ navigation }: any) {
               keyExtractor={(i, index) =>
                 String(i.id ?? `popular-${index}-${i.title ?? "course"}`)
               }
-              renderItem={({ item }) => <GCard item={item} />}
+              renderItem={({ item }) => <GCard item={item} navigation={navigation} enrolledIds={enrolledIds} />}
               numColumns={2}
               columnWrapperStyle={{ justifyContent: "space-between" }}
               scrollEnabled={false}
@@ -890,13 +867,6 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     paddingHorizontal: 2,
     paddingTop: 10,
-    fontFamily: TextStyles.body.fontFamily,
-  },
-  gInstructor: {
-    color: Colors.textSecondary,
-    fontSize: 12.5,
-    paddingHorizontal: 2,
-    paddingTop: 4,
     fontFamily: TextStyles.body.fontFamily,
   },
   imageWrap: {

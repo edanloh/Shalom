@@ -333,6 +333,52 @@ function PaginationDot({
   return <Animated.View style={[styles.paginationDot, animatedDotStyle]} />;
 }
 
+const MAX_DOTS = 10;
+
+interface LimitedPaginationDotProps {
+  dotIndex: number;
+  scrollX: SharedValue<number>;
+  totalCourses: number;
+  cardWidth: number;
+}
+
+function LimitedPaginationDot({
+  dotIndex,
+  scrollX,
+  totalCourses,
+  cardWidth,
+}: LimitedPaginationDotProps) {
+  const animatedDotStyle = useAnimatedStyle(() => {
+    const currentIndex = Math.round(scrollX.value / (cardWidth + Spacing.md));
+
+    let startIndex = Math.max(0, currentIndex - Math.floor(MAX_DOTS / 2));
+    const endIndex = Math.min(totalCourses - 1, startIndex + MAX_DOTS - 1);
+
+    if (endIndex - startIndex < MAX_DOTS - 1) {
+      startIndex = Math.max(0, endIndex - MAX_DOTS + 1);
+    }
+
+    const actualIndex = startIndex + dotIndex;
+
+    if (actualIndex >= totalCourses) {
+      return { opacity: 0, width: 0 };
+    }
+
+    const inputRange = [
+      (actualIndex - 1) * (cardWidth + Spacing.md),
+      actualIndex * (cardWidth + Spacing.md),
+      (actualIndex + 1) * (cardWidth + Spacing.md),
+    ];
+
+    return {
+      width: interpolate(scrollX.value, inputRange, [8, 24, 8], Extrapolation.CLAMP),
+      opacity: interpolate(scrollX.value, inputRange, [0.3, 1, 0.3], Extrapolation.CLAMP),
+    };
+  });
+
+  return <Animated.View style={[styles.paginationDot, animatedDotStyle]} />;
+}
+
 interface LimitedPaginationDotsProps {
   scrollX: SharedValue<number>;
   totalCourses: number;
@@ -344,68 +390,17 @@ function LimitedPaginationDots({
   totalCourses,
   cardWidth,
 }: LimitedPaginationDotsProps) {
-  const MAX_DOTS = 10;
-
   return (
     <>
-      {Array.from({ length: MAX_DOTS }).map((_, i) => {
-        const animatedDotStyle = useAnimatedStyle(() => {
-          const currentIndex = Math.round(
-            scrollX.value / (cardWidth + Spacing.md),
-          );
-
-          // Calculate which dots to show based on current position
-          let startIndex = Math.max(0, currentIndex - Math.floor(MAX_DOTS / 2));
-          const endIndex = Math.min(
-            totalCourses - 1,
-            startIndex + MAX_DOTS - 1,
-          );
-
-          // Adjust start if we're near the end
-          if (endIndex - startIndex < MAX_DOTS - 1) {
-            startIndex = Math.max(0, endIndex - MAX_DOTS + 1);
-          }
-
-          const actualIndex = startIndex + i;
-
-          // Hide dots that are beyond the total courses
-          if (actualIndex >= totalCourses) {
-            return { opacity: 0, width: 0 };
-          }
-
-          const inputRange = [
-            (actualIndex - 1) * (cardWidth + Spacing.md),
-            actualIndex * (cardWidth + Spacing.md),
-            (actualIndex + 1) * (cardWidth + Spacing.md),
-          ];
-
-          const dotWidth = interpolate(
-            scrollX.value,
-            inputRange,
-            [8, 24, 8],
-            Extrapolation.CLAMP,
-          );
-
-          const opacity = interpolate(
-            scrollX.value,
-            inputRange,
-            [0.3, 1, 0.3],
-            Extrapolation.CLAMP,
-          );
-
-          return {
-            width: dotWidth,
-            opacity,
-          };
-        });
-
-        return (
-          <Animated.View
-            key={i}
-            style={[styles.paginationDot, animatedDotStyle]}
-          />
-        );
-      })}
+      {Array.from({ length: MAX_DOTS }).map((_, i) => (
+        <LimitedPaginationDot
+          key={i}
+          dotIndex={i}
+          scrollX={scrollX}
+          totalCourses={totalCourses}
+          cardWidth={cardWidth}
+        />
+      ))}
     </>
   );
 }
