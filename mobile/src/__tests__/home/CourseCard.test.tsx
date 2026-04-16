@@ -1,6 +1,5 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
-import { Animated } from 'react-native';
 import CourseCard from '../../components/home/CourseCard';
 
 const mockToggleWishlist = jest.fn();
@@ -42,15 +41,6 @@ describe('CourseCard', () => {
 
   beforeEach(() => {
     mockToggleWishlist.mockClear();
-    jest.spyOn(Animated, 'timing').mockReturnValue({ start: jest.fn() } as any);
-    jest.spyOn(Animated, 'spring').mockReturnValue({ start: jest.fn() } as any);
-    jest
-      .spyOn(Animated, 'sequence')
-      .mockReturnValue({ start: jest.fn() } as any);
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
   });
 
   it('renders key course details', () => {

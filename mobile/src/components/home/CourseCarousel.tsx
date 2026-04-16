@@ -12,6 +12,7 @@ import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
   useAnimatedStyle,
+  withSpring,
   interpolate,
   SharedValue,
   Extrapolation,
@@ -70,6 +71,8 @@ export default function CourseCarousel({
           {
             paddingRight: (screenWidth - CARD_WIDTH) / 2,
             paddingLeft: Spacing.lg,
+            paddingTop: Spacing.lg,
+            paddingBottom: Spacing.lg,
           },
         ]}
       >
@@ -158,8 +161,10 @@ function CourseCardItem({
   isWishlisted,
 }: CourseCardItemProps) {
   const progressPercent = getCourseProgressPercent(course);
+  const pressScale = useSharedValue(1);
+
   const animatedStyle = useAnimatedStyle(() => {
-    const scale = interpolate(
+    const scrollScale = interpolate(
       scrollX.value,
       inputRange,
       [0.92, 1.05, 0.92],
@@ -174,7 +179,7 @@ function CourseCardItem({
     );
 
     return {
-      transform: [{ scale }],
+      transform: [{ scale: scrollScale * pressScale.value }],
       opacity,
     };
   });
@@ -183,7 +188,12 @@ function CourseCardItem({
 
   return (
     <Animated.View style={[styles.card, animatedStyle, { width: cardWidth }]}>
-      <Pressable onPress={onPress} style={{ flex: 1 }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => { pressScale.value = withSpring(0.97, { damping: 20, stiffness: 400 }); }}
+        onPressOut={() => { pressScale.value = withSpring(1, { damping: 20, stiffness: 400 }); }}
+        style={{ flex: 1 }}
+      >
         {/* Image Section */}
         <View style={styles.imageContainer}>
           <ImageWithFallback

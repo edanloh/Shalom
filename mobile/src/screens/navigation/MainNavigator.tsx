@@ -9,6 +9,7 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
+  Easing,
 } from "react-native-reanimated";
 import { useNavigationState } from "@react-navigation/native";
 
@@ -57,9 +58,10 @@ function TabNavigator() {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener("tabbar:toggle", (payload: { visible: boolean }) => {
       if (typeof payload?.visible !== "boolean") return;
-      tabBarTranslateY.value = withTiming(payload.visible ? 0 : TAB_BAR_HIDE_TRANSLATE, {
-        duration: 220,
-      });
+      tabBarTranslateY.value = withTiming(
+        payload.visible ? 0 : TAB_BAR_HIDE_TRANSLATE,
+        { duration: 220, easing: Easing.out(Easing.cubic) }
+      );
     });
     return () => sub.remove();
   }, []);

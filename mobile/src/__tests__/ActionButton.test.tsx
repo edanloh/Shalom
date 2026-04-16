@@ -12,27 +12,25 @@ describe('ActionButton', () => {
     });
 
     it('should render with primary variant by default', () => {
-      const { getByText } = render(
+      const { getByTestId } = render(
         <ActionButton onPress={() => {}} text="Primary" />,
       );
-      const button = getByText('Primary').parent?.parent;
-      expect(button?.props.style).toMatchObject({
-        backgroundColor: '#564beb',
-      });
+      const style = getByTestId('action-button').props.style;
+      const flat = Array.isArray(style) ? Object.assign({}, ...style.flat(Infinity).filter(Boolean)) : style;
+      expect(flat).toMatchObject({ backgroundColor: '#564beb' });
     });
 
     it('should render with secondary variant', () => {
-      const { getByText } = render(
+      const { getByTestId } = render(
         <ActionButton
           onPress={() => {}}
           text="Secondary"
           variant="secondary"
         />,
       );
-      const button = getByText('Secondary').parent?.parent;
-      expect(button?.props.style).toMatchObject({
-        backgroundColor: '#3e3e47',
-      });
+      const style = getByTestId('action-button').props.style;
+      const flat = Array.isArray(style) ? Object.assign({}, ...style.flat(Infinity).filter(Boolean)) : style;
+      expect(flat).toMatchObject({ backgroundColor: '#3e3e47' });
     });
 
     it('should render loading state', () => {
@@ -101,12 +99,12 @@ describe('ActionButton', () => {
   describe('Styling', () => {
     it('should accept custom style prop', () => {
       const customStyle = { marginTop: 20, backgroundColor: 'red' };
-      const { getByText } = render(
+      const { getByTestId } = render(
         <ActionButton onPress={() => {}} text="Custom" style={customStyle} />,
       );
-
-      const button = getByText('Custom').parent?.parent;
-      expect(button?.props.style).toMatchObject(customStyle);
+      const style = getByTestId('action-button').props.style;
+      const flat = Array.isArray(style) ? Object.assign({}, ...style.flat(Infinity).filter(Boolean)) : style;
+      expect(flat).toMatchObject(customStyle);
     });
 
     it('should accept custom textStyle prop', () => {

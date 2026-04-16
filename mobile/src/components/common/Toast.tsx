@@ -33,15 +33,16 @@ export default function ToastHost() {
       setToast(payload);
 
       Animated.parallel([
-        Animated.timing(translateY, {
+        Animated.spring(translateY, {
           toValue: 0,
-          duration: 180,
-          easing: Easing.out(Easing.ease),
+          damping: 18,
+          stiffness: 280,
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
           toValue: 1,
-          duration: 180,
+          duration: 140,
+          easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }),
       ]).start();
@@ -87,11 +88,11 @@ export default function ToastHost() {
 
   const tint =
     toast.type === "success"
-      ? Colors.secondary
+      ? "#22c55e"
       : toast.type === "error"
       ? "#ef4444"
       : Colors.textSecondary;
-  const borderTint = "#22c55e";
+  const borderTint = tint;
 
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.overlay]}>

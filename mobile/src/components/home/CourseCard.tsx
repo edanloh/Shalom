@@ -1,14 +1,19 @@
-import React, { useRef } from "react";
+import React from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  Animated,
+  Pressable,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
-import { ImageWithFallback } from "../common"; // adjust path if needed
+import { ImageWithFallback } from "../common";
 import { Colors, Spacing, TextStyles, Typography } from "../../constants";
 import { Images } from "../../../assets";
 import type { Course } from "../../types";
@@ -61,7 +66,8 @@ export default function CourseCard({
   const progressPercent = getCourseProgressPercent(course);
   const { wishlist = [], toggleWishlist } = useCourses();
   const isWishlisted = !!wishlist?.some((c) => c.id === course.id);
-  const heartScale = useRef(new Animated.Value(1)).current;
+  const heartScale = useSharedValue(1);
+  const cardScale = useSharedValue(1);
   const hasRecommendationScore = Number.isFinite(course.recommendationScore);
   const hasRecommendationRank = Number.isFinite(course.recommendationRank);
   const rankLabel = hasRecommendationRank
@@ -71,33 +77,38 @@ export default function CourseCard({
     course.recommendationPrimaryTag
   );
 
+  const heartAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: heartScale.value }],
+  }));
+
+  const cardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale.value }],
+  }));
+
   const handleToggleWishlist = () => {
-    heartScale.stopAnimation();
-    heartScale.setValue(0.88);
-    Animated.sequence([
-      Animated.timing(heartScale, {
-        toValue: 1.18,
-        duration: 110,
-        useNativeDriver: true,
-      }),
-      Animated.spring(heartScale, {
-        toValue: 1,
-        friction: 4,
-        tension: 140,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    heartScale.value = 0.7;
+    heartScale.value = withSpring(1, { damping: 5, stiffness: 800 });
     toggleWishlist(course);
   };
 
+  const handleCardPressIn = () => {
+    cardScale.value = withSpring(0.97, { damping: 20, stiffness: 400 });
+  };
+
+  const handleCardPressOut = () => {
+    cardScale.value = withSpring(1, { damping: 20, stiffness: 400 });
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
+    <Animated.View style={cardAnimatedStyle}>
+    <Pressable
       style={[
         styles.card,
         variant === "compact" ? styles.cardCompact : styles.cardProgress,
       ]}
       onPress={() => onPress?.(course)}
+      onPressIn={handleCardPressIn}
+      onPressOut={handleCardPressOut}
     >
       {/* Image block with overlay */}
       <View style={styles.imageWrap}>
@@ -123,7 +134,7 @@ export default function CourseCard({
             style={styles.heartBtn}
             activeOpacity={0.7}
           >
-            <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+            <Animated.View style={heartAnimatedStyle}>
               <Ionicons
                 name={isWishlisted ? "heart" : "heart-outline"}
                 size={18}
@@ -199,7 +210,8 @@ export default function CourseCard({
           </View>
         ) : null}
       </View>
-    </TouchableOpacity>
+    </Pressable>
+    </Animated.View>
   );
 }
 

@@ -1,11 +1,17 @@
 import React from "react";
 import {
-  TouchableOpacity,
+  Pressable,
   Text,
   StyleSheet,
   ActivityIndicator,
   Image,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import { Colors, TextStyles } from "../constants";
 
 interface ActionButtonProps {
@@ -20,7 +26,9 @@ interface ActionButtonProps {
   variant?: "primary" | "secondary";
 }
 
-export default function ActionButton({ 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export default function ActionButton({
   onPress,
   disabled = false,
   loading = false,
@@ -29,10 +37,28 @@ export default function ActionButton({
   imageStyle,
   style,
   textStyle,
-  variant = "primary", 
+  variant = "primary",
 }: ActionButtonProps) {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.97, { damping: 18, stiffness: 400 });
+    if (variant === "primary") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 18, stiffness: 400 });
+  };
+
   const buttonStyle = [
     variant === "primary" ? styles.buttonPrimary : styles.buttonSecondary,
+    disabled && styles.disabled,
     style,
   ];
   const textStyleCombined = [
@@ -41,12 +67,20 @@ export default function ActionButton({
       : styles.buttonTextSecondary,
     textStyle,
   ];
+
   return (
-    <TouchableOpacity style={buttonStyle} onPress={onPress} disabled={disabled}>
+    <AnimatedPressable
+      testID="action-button"
+      style={[buttonStyle, animatedStyle]}
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled}
+    >
       {loading ? (
-        <ActivityIndicator 
+        <ActivityIndicator
           testID="activity-indicator"
-          color={variant === "primary" ? "#fff" : "#564beb"} 
+          color={variant === "primary" ? "#fff" : "#564beb"}
         />
       ) : imageSource ? (
         <Image
@@ -57,7 +91,7 @@ export default function ActionButton({
       ) : (
         <Text style={textStyleCombined}>{text}</Text>
       )}
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 };
 
@@ -83,6 +117,9 @@ const styles = StyleSheet.create({
   buttonTextSecondary: {
     ...TextStyles.bodyMedium,
     color: Colors.secondary,
+  },
+  disabled: {
+    opacity: 0.5,
   },
   image: {
     width: 28,

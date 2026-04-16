@@ -5,12 +5,20 @@ import {
   ScrollView,
   FlatList,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Dimensions,
   ActivityIndicator,
   RefreshControl,
   DeviceEventEmitter,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 import { Ionicons } from "@expo/vector-icons";
 
 import { useCourses } from "../contexts/CourseContext";
@@ -330,10 +338,11 @@ export default function CoursesScreen({ navigation }: any) {
     const reason = formatPrimaryRecommendationReason(
       item.recommendationPrimaryTag
     );
+    const scale = useSharedValue(1);
+    const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
     return (
-      <TouchableOpacity
-        activeOpacity={0.85}
+      <AnimatedPressable
         onPress={() => {
           if (trackRecommendation) {
             recordRecommendationEvent(item.id, 'click', placement)
@@ -341,7 +350,9 @@ export default function CoursesScreen({ navigation }: any) {
           }
           navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "Courses" });
         }}
-        style={styles.hCard}
+        onPressIn={() => { scale.value = withSpring(0.97, { damping: 20, stiffness: 400 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 20, stiffness: 400 }); }}
+        style={[styles.hCard, animatedStyle]}
       >
         <View style={styles.imageWrap}>
           <ImageWithFallback
@@ -373,50 +384,53 @@ export default function CoursesScreen({ navigation }: any) {
             </Text>
           </View>
         ) : null}
-      </TouchableOpacity>
+      </AnimatedPressable>
     );
   };
 
-  const GCard = ({ item }: { item: Course }) => (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() => {
-        // Courses aren't personalised so no score_breakdown, but
-        // still record via context for consistency
-        recordRecommendationEvent(item.id, 'click', 'courses_popular')
-          .catch((err) => console.warn("Failed to record popular course click", err));
-        navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "Courses" });
-      }}
-      style={styles.gCard}
-    >
-      <View style={styles.imageWrap}>
-        <ImageWithFallback
-          source={{ uri: item.image }}
-          fallback={Images.placeholder}
-          style={styles.gImage}
-        />
-        <BadgeHeartRow item={item} />
-        {enrolledIds.has(String(item.id)) && (
-          <View style={styles.enrolledBadge}>
-            <Text style={styles.enrolledBadgeText}>Enrolled</Text>
-          </View>
-        )}
-      </View>
-      <View style={[styles.catBadge, { backgroundColor: item.categoryColor }]}>
-        <Text
-          style={[TextStyles.bodySmall, styles.catBadgeText]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {item.category}
+  const GCard = ({ item }: { item: Course }) => {
+    const scale = useSharedValue(1);
+    const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+    return (
+      <AnimatedPressable
+        onPress={() => {
+          recordRecommendationEvent(item.id, 'click', 'courses_popular')
+            .catch((err) => console.warn("Failed to record popular course click", err));
+          navigation.navigate("CourseDetail", { courseId: item.id, sourceScreen: "Courses" });
+        }}
+        onPressIn={() => { scale.value = withSpring(0.97, { damping: 20, stiffness: 400 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 20, stiffness: 400 }); }}
+        style={[styles.gCard, animatedStyle]}
+      >
+        <View style={styles.imageWrap}>
+          <ImageWithFallback
+            source={{ uri: item.image }}
+            fallback={Images.placeholder}
+            style={styles.gImage}
+          />
+          <BadgeHeartRow item={item} />
+          {enrolledIds.has(String(item.id)) && (
+            <View style={styles.enrolledBadge}>
+              <Text style={styles.enrolledBadgeText}>Enrolled</Text>
+            </View>
+          )}
+        </View>
+        <View style={[styles.catBadge, { backgroundColor: item.categoryColor }]}>
+          <Text
+            style={[TextStyles.bodySmall, styles.catBadgeText]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {item.category}
+          </Text>
+        </View>
+        <Text style={styles.gTitle} numberOfLines={2}>
+          {item.title}
         </Text>
-      </View>
-      <Text style={styles.gTitle} numberOfLines={2}>
-        {item.title}
-      </Text>
-      <MetaRow rating={item.rating} modules={item.modules} />
-    </TouchableOpacity>
-  );
+        <MetaRow rating={item.rating} modules={item.modules} />
+      </AnimatedPressable>
+    );
+  };
 
   const EmptyState = ({
     icon = "sparkles-outline",

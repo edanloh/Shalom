@@ -1,12 +1,16 @@
-import React, { useRef } from "react";
+import React from "react";
 import {
-  Animated,
   TouchableOpacity,
   type GestureResponderEvent,
   type Insets,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
@@ -30,24 +34,15 @@ export default function AnimatedHeartButton({
   color = "#fff",
   activeOpacity = 0.7,
 }: Props) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   const handlePress = (event: GestureResponderEvent) => {
-    scale.stopAnimation();
-    scale.setValue(0.88);
-    Animated.sequence([
-      Animated.timing(scale, {
-        toValue: 1.18,
-        duration: 110,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scale, {
-        toValue: 1,
-        friction: 4,
-        tension: 140,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    scale.value = 0.7;
+    scale.value = withSpring(1, { damping: 5, stiffness: 800 });
     onPress?.(event);
   };
 
@@ -60,7 +55,7 @@ export default function AnimatedHeartButton({
       accessibilityLabel={accessibilityLabel}
       activeOpacity={activeOpacity}
     >
-      <Animated.View style={{ transform: [{ scale }] }}>
+      <Animated.View style={animatedStyle}>
         <Ionicons
           name={filled ? "heart" : "heart-outline"}
           size={size}

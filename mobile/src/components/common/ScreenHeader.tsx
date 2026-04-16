@@ -33,7 +33,8 @@ export default function ScreenHeader({
       ) : ( headerLeftIcon ) ? (
         <TouchableOpacity
           onPress={onHeaderLeftPress}
-          style={[styles.backButton, { width: 28 }]}
+          style={[styles.backButton, { width: 44, height: 44 }]}
+          hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
         >
           <Ionicons
             name={(headerLeftIcon as any) || "chevron-back"}
@@ -68,7 +69,11 @@ export default function ScreenHeader({
       {headerRightComponent ? (
         headerRightComponent
       ) : headerRightIcon && onHeaderRightPress ? (
-        <TouchableOpacity onPress={onHeaderRightPress}>
+        <TouchableOpacity
+          onPress={onHeaderRightPress}
+          style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
+          hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
+        >
           <Ionicons name={headerRightIcon as any} size={28} color="white" />
         </TouchableOpacity>
       ) : (
