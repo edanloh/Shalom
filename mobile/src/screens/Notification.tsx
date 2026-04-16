@@ -315,8 +315,8 @@ function SwipeActions({
 }) {
   // Keep buttons pixel-perfect in sync with the drag at any swipe speed.
   // dragX is negative when swiping left; buttons slide in from the right edge.
-  // two buttons: 60 + 60 + 8 gap + 4 paddingLeft = 132; one button: 60 + 4 = 64
-  const containerWidth = isRead ? 64 : 132;
+  // two buttons: 60 + 60 + 4 gap (Spacing.xs) + 4 paddingLeft = 128; one button: 60 + 4 = 64
+  const containerWidth = isRead ? 64 : 128;
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: containerWidth + dragX.value }],
   }));
