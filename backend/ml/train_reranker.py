@@ -63,6 +63,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold, TimeSeriesSplit
 from sklearn.metrics import roc_auc_score, ndcg_score
+from sklearn.metrics.pairwise import cosine_similarity
 
 # ── Supabase fetch ────────────────────────────────────────────────────────────
 try:
@@ -613,6 +614,13 @@ def evaluate_vs_baseline(df: pd.DataFrame, output: dict) -> str:
     group_size = 20
     n_groups = len(df) // group_size
     precision_ml, ndcg_ml, precision_rule, ndcg_rule = [], [], [], []
+    diversity_ml, diversity_rule = [], []
+
+    # course_id column present in real data; use row index as proxy for synthetic
+    course_ids = df["course_id"].values if "course_id" in df.columns else np.arange(len(df))
+    total_courses = len(set(course_ids))
+    recommended_ml: set = set()
+    recommended_rule: set = set()
 
     for i in range(n_groups):
         s, e = i * group_size, (i + 1) * group_size
@@ -624,6 +632,23 @@ def evaluate_vs_baseline(df: pd.DataFrame, output: dict) -> str:
         if labels.sum() > 0:
             ndcg_ml.append(ndcg_score([labels], [ml_scores[s:e]], k=6))
             ndcg_rule.append(ndcg_score([labels], [rule_scores[s:e]], k=6))
+
+        # Intra-list diversity: average pairwise cosine distance within top-6
+        feats = X[s:e]
+        for g, div_list in [(g_ml, diversity_ml), (g_rule, diversity_rule)]:
+            top_feats = feats[g]
+            if len(top_feats) >= 2:
+                sim = cosine_similarity(top_feats)
+                n = len(top_feats)
+                pairs = [(1.0 - sim[a, b]) for a in range(n) for b in range(a + 1, n)]
+                div_list.append(np.mean(pairs))
+
+        # Catalogue coverage: accumulate unique recommended course ids
+        recommended_ml.update(course_ids[s:e][g_ml])
+        recommended_rule.update(course_ids[s:e][g_rule])
+
+    coverage_ml = len(recommended_ml) / max(total_courses, 1)
+    coverage_rule = len(recommended_rule) / max(total_courses, 1)
 
     model_label = f"{'LightGBM' if model_type == 'lgbm' else 'LR'} re-ranker"
     report = (
@@ -637,6 +662,16 @@ def evaluate_vs_baseline(df: pd.DataFrame, output: dict) -> str:
             f"  nDCG@6        — {model_label}: {np.mean(ndcg_ml):.4f} "
             f"| Rule-based: {np.mean(ndcg_rule):.4f}\n"
         )
+    if diversity_ml:
+        report += (
+            f"  ILD@6         — {model_label}: {np.mean(diversity_ml):.4f} "
+            f"| Rule-based: {np.mean(diversity_rule):.4f}\n"
+        )
+    report += (
+        f"  Coverage      — {model_label}: {coverage_ml:.4f} "
+        f"| Rule-based: {coverage_rule:.4f} "
+        f"(out of {total_courses} unique courses)\n"
+    )
     return report
 
 
