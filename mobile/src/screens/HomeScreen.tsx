@@ -430,10 +430,7 @@ export default function HomeScreen({ navigation, route }: any) {
 
 
   const handleRecommendationClick = async (course: Course) => {
-    // recordRecommendationEvent (from context) automatically attaches score_breakdown
-    // so evaluate.py can use real data for ML training and evaluation
     recordRecommendationEvent(course.id, 'click', 'home_recommended')
-      .then(() => refreshRecommended().catch(() => {}))
       .catch((err) => console.warn('Failed to record rec click', err));
     navigation.navigate('CourseDetail', { courseId: course.id });
   };
@@ -647,7 +644,7 @@ export default function HomeScreen({ navigation, route }: any) {
                   {recommendedList.map((course, index) => (
                     <CourseCard
                       key={String(course.id ?? `recommended-${index}-${course.title ?? "course"}`)}
-                      course={course}
+                      course={{ ...course, recommendationRank: index + 1 }}
                       variant="compact"
                       showInstructor={false}
                       showRecommendationReason={true}

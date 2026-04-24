@@ -78,14 +78,15 @@ def load_real_requests(lookback_days: int = 90):
             sb.table("recommendation_events")
             .select("course_id, event_type, context, timestamp")
             .gte("timestamp", since)
-            .order("timestamp", desc=False)  # oldest first — for temporal ordering
-            .limit(2000)
+            .order("timestamp", desc=True)   # newest first so recent data isn't cut off by limit
+            .limit(5000)
             .execute()
         )
         rows = resp.data or []
         if not rows:
             print("[warn] No events found in Supabase for this period.")
             return None
+
 
         # Group by request_id — each group is one call to getRecommendations
         groups = defaultdict(list)
@@ -112,10 +113,10 @@ def load_real_requests(lookback_days: int = 90):
             else:
                 ungrouped.append(item)
 
-        requests = [items for items in groups.values() if len(items) >= 3]
+        requests = [items for items in groups.values() if len(items) >= 2]
         for i in range(0, len(ungrouped), 20):
             chunk = ungrouped[i:i+20]
-            if len(chunk) >= 3:
+            if len(chunk) >= 2:
                 requests.append(chunk)
 
         if not requests:

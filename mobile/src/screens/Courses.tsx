@@ -379,11 +379,10 @@ export default function CoursesScreen({ navigation }: any) {
   const handleRecommendedCourseClick = useCallback(
     (course: Course) => {
       recordRecommendationEvent(course.id, 'click', 'courses_recommended')
-        .then(() => refreshRecommended?.().catch(() => {}))
         .catch((err) => console.warn("Failed to record courses rec click", err));
       navigation.navigate("CourseDetail", { courseId: course.id, sourceScreen: "Courses" });
     },
-    [navigation, recordRecommendationEvent, refreshRecommended]
+    [navigation, recordRecommendationEvent]
   );
 
   const onRefresh = useCallback(async () => {

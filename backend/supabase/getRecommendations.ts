@@ -1957,6 +1957,29 @@ const courseSelect = `
       traffic_split: TRAFFIC_SPLIT,
     };
 
+    // ── Server-side impression events ─────────────────────────────────────────
+    // Insert per-course impression events directly so evaluate.py gets
+    // score_breakdown without depending on the mobile app forwarding it.
+    // Fire-and-forget: client impression events will hit the 45-second debounce.
+    if (userId && results.length > 0) {
+      const now = new Date().toISOString();
+      const impressionEvents = results.map((r: any) => ({
+        user_id: userId,
+        course_id: r.course?.id ?? r.id ?? null,
+        event_type: "impression",
+        placement: placement,
+        timestamp: now,
+        context: {
+          requestId,
+          modelVersion: meta.model_version,
+          score_breakdown: r.score_breakdown ?? null,
+          rank: r.rank ?? null,
+        },
+      })).filter((e: any) => e.course_id);
+      supabase.from("recommendation_events").insert(impressionEvents)
+        .then(() => {}).catch(() => {});
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

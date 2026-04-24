@@ -223,14 +223,14 @@ serve(async (req) => {
       enrichedEnrollments = enrollments.map((enrollment: any) => {
         const courseId = enrollment.courses.id;
 
-        const totalVideos = videoCountsMap.get(courseId) || 0;
-        const completedVideos = completedVideosMap.get(courseId) || 0;
-        const totalQuizzes = quizCountsMap.get(courseId) || 0;
-        const passedQuizzes = passedQuizzesMap.get(courseId) || 0;
-        const totalPdfs = pdfCountsMap.get(courseId) || 0;
-        const completedPdfs = completedPdfsMap.get(courseId) || 0;
-        const totalSections = sectionCountsMap.get(courseId) || 0;
-        const completedModules = completedModulesMap.get(courseId) || 0;
+        const totalVideos = Number(videoCountsMap.get(courseId) ?? 0);
+        const completedVideos = Number(completedVideosMap.get(courseId) ?? 0);
+        const totalQuizzes = Number(quizCountsMap.get(courseId) ?? 0);
+        const passedQuizzes = Number(passedQuizzesMap.get(courseId) ?? 0);
+        const totalPdfs = Number(pdfCountsMap.get(courseId) ?? 0);
+        const completedPdfs = Number(completedPdfsMap.get(courseId) ?? 0);
+        const totalSections = Number(sectionCountsMap.get(courseId) ?? 0);
+        const completedModules = Number(completedModulesMap.get(courseId) ?? 0);
 
         const videoProgressPercent = totalVideos > 0
           ? (completedVideos / totalVideos) * 100
