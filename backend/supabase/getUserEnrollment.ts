@@ -99,6 +99,7 @@ serve(async (req) => {
         )
       `, { count: 'exact' })
       .eq('user_id', userId)
+      .eq('courses.is_published', true)
       .not('enrollment_date', 'is', null)
       .range(offset, offset + limit - 1)
       .order(safeSortBy, { ascending });
