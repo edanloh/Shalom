@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Course } from '../types';
 import courseService from '../services/courseService';
+import { ApiError } from '../services/apiService';
 import { useUser } from './UserContext';
 import { showToast } from '@/components/common/Toast';
 
@@ -329,7 +330,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
         });
       }
     } catch (e) {
-      // rollback on failure
+      // rollback optimistic update
       if (currently) {
         setWishlist(prev => [{ ...course, isWishlisted: true }, ...prev]);
         setFlagInLists(id, true);
@@ -337,13 +338,30 @@ export default function CourseProvider({ children }: { children: React.ReactNode
         setWishlist(prev => prev.filter(c => c.id !== id));
         setFlagInLists(id, false);
       }
-      setWishlistError((e as Error)?.message ?? 'Failed to update wishlist');
-      showToast({
-        type: 'error',
-        title: 'Wishlist update failed',
-        message: (e as Error)?.message ?? 'Please try again.',
-        durationMs: 2200,
-      });
+
+      const isGone = !currently && e instanceof ApiError && e.status === 404;
+      if (isGone) {
+        // Course was unpublished/deleted since the cache was populated — drop it from
+        // every list and bust the cache so the next fetch reflects reality.
+        setCourses(prev => prev.filter(c => c.id !== id));
+        setRecommendedCourses(prev => prev.filter(c => c.id !== id));
+        setMyCourses(prev => prev.filter(c => c.id !== id));
+        courseService.clearCoursesCache();
+        showToast({
+          type: 'error',
+          title: 'Course no longer available',
+          message: 'This course has been unpublished.',
+          durationMs: 2500,
+        });
+      } else {
+        setWishlistError((e as Error)?.message ?? 'Failed to update wishlist');
+        showToast({
+          type: 'error',
+          title: 'Wishlist update failed',
+          message: (e as Error)?.message ?? 'Please try again.',
+          durationMs: 2200,
+        });
+      }
     }
   };
 

@@ -67,6 +67,26 @@ function progressFrom(course: Course): number {
   return v > 1 ? clamp01(v / 100) : clamp01(v);
 }
 
+function MetaRow({ rating, modules }: { rating: number; modules?: number }) {
+  return (
+    <View style={styles.metaRow}>
+      <Ionicons name="star" size={12} color="#FACC15" />
+      <Text style={styles.metaText}>{rating?.toFixed?.(1) ?? rating}</Text>
+      <Text style={styles.metaDot}>•</Text>
+      <Text style={styles.metaText}>{modules ?? 12} modules</Text>
+    </View>
+  );
+}
+
+function ProgressBar({ value }: { value: number }) {
+  const pct = clamp01(value);
+  return (
+    <View style={styles.progressWrap}>
+      <View style={[styles.progressFill, { width: `${pct * 100}%` }]} />
+    </View>
+  );
+}
+
 function BadgeHeartRow({ item }: { item: Course }) {
   const { wishlist = [], toggleWishlist } = useCourses();
   const isWishlisted = wishlist.some((c) => c.id === item.id);
@@ -349,33 +369,6 @@ export default function CoursesScreen({ navigation }: any) {
     if (value.trim() && selectedCategory !== "All") {
       setSelectedCategory("All");
     }
-  };
-
-  // ---- small UI bits ----
-  const MetaRow = ({
-    rating,
-    modules,
-  }: {
-    rating: number;
-    modules?: number;
-  }) => (
-    <>
-      <View style={styles.metaRow}>
-        <Ionicons name="star" size={12} color="#FACC15" />
-        <Text style={styles.metaText}>{rating?.toFixed?.(1) ?? rating}</Text>
-        <Text style={styles.metaDot}>•</Text>
-        <Text style={styles.metaText}>{modules ?? 12} modules</Text>
-      </View>
-    </>
-  );
-
-  const ProgressBar = ({ value }: { value: number }) => {
-    const pct = clamp01(value);
-    return (
-      <View style={styles.progressWrap}>
-        <View style={[styles.progressFill, { width: `${pct * 100}%` }]} />
-      </View>
-    );
   };
 
   const [refreshing, setRefreshing] = useState(false);
