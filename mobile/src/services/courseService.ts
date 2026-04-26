@@ -696,12 +696,15 @@ class CourseService {
       const sorted = Array.isArray(recommendations)
         ? [...recommendations]
             .sort((a, b) => {
-              const sa = Number(a.score ?? a.recommendation_score ?? 0);
-              const sb = Number(b.score ?? b.recommendation_score ?? 0);
-              if (sb !== sa) return sb - sa;
-              const ra = Number(a.rank ?? a.recommendation_rank ?? Infinity);
-              const rb = Number(b.rank ?? b.recommendation_rank ?? Infinity);
-              return ra - rb;
+              const ra = Number(a.rank ?? a.recommendation_rank);
+              const rb = Number(b.rank ?? b.recommendation_rank);
+              const hasRankA = Number.isFinite(ra);
+              const hasRankB = Number.isFinite(rb);
+              if (hasRankA && hasRankB && ra !== rb) return ra - rb;
+              if (hasRankA !== hasRankB) return hasRankA ? -1 : 1;
+              const sa = Number(a.ml_score ?? a.score ?? a.recommendation_score ?? 0);
+              const sb = Number(b.ml_score ?? b.score ?? b.recommendation_score ?? 0);
+              return sb - sa;
             })
         : [];
 
@@ -1027,20 +1030,20 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
 
   async postRecommendationEvent(payload: {
     userId: string;
-    courseId: string;
+    courseId?: string;
     eventType: string;
     placement?: string;
     context?: Record<string, unknown>;
   }): Promise<void> {
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !anonKey || !payload.userId || !payload.courseId) {
+    if (!supabaseUrl || !anonKey || !payload.userId) {
       return;
     }
 
     const body = {
       userId: payload.userId,
-      courseId: payload.courseId,
+      ...(payload.courseId ? { courseId: payload.courseId } : {}),
       eventType: payload.eventType,
       placement: payload.placement ?? 'home',
       context: payload.context ?? {},
@@ -1062,7 +1065,7 @@ async removeFromWishlist(userId: string, courseId: string): Promise<void> {
     } catch (err) {
       console.warn('rec_event_fail', {
         eventType: body.eventType,
-        courseId: body.courseId,
+        courseId: payload.courseId,
         placement: body.placement,
         error: (err as any)?.message || err,
       });

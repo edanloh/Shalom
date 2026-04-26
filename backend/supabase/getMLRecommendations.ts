@@ -300,9 +300,11 @@ serve(async (req) => {
     const localHour = url.searchParams.get("localHour");
     const dayOfWeek = url.searchParams.get("dayOfWeek");
     const learningGoal = url.searchParams.get("learningGoal");
+    const preferredCategories = url.searchParams.get("preferredCategories");
     if (localHour) internalUrl.searchParams.set("localHour", localHour);
     if (dayOfWeek) internalUrl.searchParams.set("dayOfWeek", dayOfWeek);
     if (learningGoal) internalUrl.searchParams.set("learningGoal", learningGoal);
+    if (preferredCategories) internalUrl.searchParams.set("preferredCategories", preferredCategories);
     // _mlInternal=1 tells getRecommendations to skip its own ML redirect,
     // preventing an infinite loop when RECO_SPLIT_ML is set.
     internalUrl.searchParams.set("_mlInternal", "1");

@@ -927,7 +927,7 @@ const courseSelect = `
     if (coursesErr) throw coursesErr;
 
     /* ------------------------------------------------------------------ */
-    /* 2️⃣ Exclude completed courses (if user provided) */
+    /* 2️⃣ Exclude already-enrolled courses from recommendations */
     /* ------------------------------------------------------------------ */
     let excluded = new Set<string>();
     const userEnrolledCourseIds: string[] = [];
@@ -946,11 +946,7 @@ const courseSelect = `
         }
       }
 
-      excluded = new Set(
-        (enrollments ?? [])
-          .filter((e) => e.is_completed)
-          .map((e) => e.course_id)
-      );
+      excluded = new Set(userEnrolledCourseIds);
     }
 
     const topRatedCandidates = ((courses ?? []) as CourseCandidate[]).filter(
@@ -1152,15 +1148,13 @@ const courseSelect = `
       .in("course_id", courseIds);
     if (globalEventsErr) throw globalEventsErr;
 
-    let userEventsQuery = supabase
-      .from("recommendation_events")
-      .select("course_id, event_type, timestamp")
-      .gte("timestamp", since)
-      .in("course_id", courseIds);
-
     let userEvents: RecommendationEvent[] = [];
     if (userId) {
-      const { data, error } = await userEventsQuery.eq("user_id", userId);
+      const { data, error } = await supabase
+        .from("recommendation_events")
+        .select("course_id, event_type, timestamp")
+        .gte("timestamp", since)
+        .eq("user_id", userId);
       if (error) throw error;
       userEvents = data ?? [];
     }
@@ -1173,6 +1167,27 @@ const courseSelect = `
     const candidateById = new Map<string, CourseCandidate>(
       candidates.map((course) => [course.id, course])
     );
+    const userEventCourseIds = Array.from(
+      new Set(
+        userEvents
+          .map((ev) => ev.course_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+      )
+    );
+    const userEventCourseById = new Map<string, CourseCandidate>(candidateById);
+    const missingUserEventCourseIds = userEventCourseIds.filter(
+      (courseId) => !userEventCourseById.has(courseId)
+    );
+    if (missingUserEventCourseIds.length > 0) {
+      const { data: eventCourses, error: eventCoursesErr } = await supabase
+        .from("courses")
+        .select(courseSelect)
+        .in("id", missingUserEventCourseIds);
+      if (eventCoursesErr) throw eventCoursesErr;
+      for (const course of (eventCourses ?? []) as CourseCandidate[]) {
+        userEventCourseById.set(course.id, course);
+      }
+    }
     const recentSeenImpressionCounts = new Map<string, number>();
     const recentSessionCategoryRaw = new Map<string, number>();
     const recentInstructorImpressions = new Map<string, number>();
@@ -1222,7 +1237,7 @@ const courseSelect = `
         inCurrentSession &&
         (type === "click" || type === "save" || type === "start" || type === "complete" || type === "enroll" || type === "wishlist")
       ) {
-        const course = candidateById.get(ev.course_id);
+        const course = userEventCourseById.get(ev.course_id);
         if (!course) continue;
         const categoryKey =
           course.category?.name ?? course.category_id ?? "uncategorized";
@@ -1235,7 +1250,7 @@ const courseSelect = `
       }
 
       if (ageMs <= instructorFatigueWindowMs) {
-        const course = candidateById.get(ev.course_id);
+        const course = userEventCourseById.get(ev.course_id);
         if (!course) continue;
         const instructorKey = course.instructor_id ?? "unknown_instructor";
         if (type === "impression" || type === "view") {
@@ -1315,7 +1330,7 @@ const courseSelect = `
 
     for (const ev of userEvents ?? []) {
       if (!ev.course_id) continue;
-      const course = candidates.find((item) => item.id === ev.course_id);
+      const course = userEventCourseById.get(ev.course_id);
       if (!course) continue;
 
       const categoryKey =
@@ -1400,7 +1415,7 @@ const courseSelect = `
       // Look up vector from already-built map (avoids extra DB fetches)
       const vec =
         enrolledVectorById.get(ev.course_id) ??
-        (candidateById.has(ev.course_id) ? buildCourseVector(candidateById.get(ev.course_id)!) : null);
+        (userEventCourseById.has(ev.course_id) ? buildCourseVector(userEventCourseById.get(ev.course_id)!) : null);
       if (vec) {
         sessionVectors.push(vec);
         sessionVectorIds.add(ev.course_id);
