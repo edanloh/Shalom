@@ -21,6 +21,9 @@ export interface StudentProfile {
   averageScore: number;
   strengths?: string[];
   risks?: string[];
+  avatarUrl?: string | null;
+  equippedTitle?: { name: string; icon: string; color: string; rarity: string } | null;
+  equippedFrame?: { name: string; color: string } | null;
 }
 
 const ENDPOINTS = {

@@ -840,21 +840,43 @@ const Students = () => {
                             <div className="space-y-6 mt-6 flex flex-col min-h-0">
                               {/* Header */}
                               <div className="flex items-center gap-4 pb-6 border-b border-border">
-                                <Avatar className="h-20 w-20">
-                                  {activeProfileBase.avatarUrl && activeProfileBase.avatarUrl.includes("avatar") ? (
-                                    <img
-                                      src={getAvatarUri(activeProfileBase.avatarUrl)}
-                                      alt="Profile"
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <AvatarFallback className="text-2xl bg-primary">
-                                      {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
-                                    </AvatarFallback>
-                                  )}
-                                </Avatar>
+                                <div
+                                  style={activeProfile?.equippedFrame ? {
+                                    padding: 3,
+                                    borderRadius: '50%',
+                                    border: `3px solid ${activeProfile.equippedFrame.color}`,
+                                    boxShadow: `0 0 12px ${activeProfile.equippedFrame.color}55`,
+                                    background: `${activeProfile.equippedFrame.color}18`,
+                                  } : undefined}
+                                >
+                                  <Avatar className="h-20 w-20">
+                                    {activeProfileBase.avatarUrl && activeProfileBase.avatarUrl.includes("avatar") ? (
+                                      <img
+                                        src={getAvatarUri(activeProfileBase.avatarUrl)}
+                                        alt="Profile"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <AvatarFallback className="text-2xl bg-primary">
+                                        {activeProfileBase.name.split(' ').map((n: string) => n[0]).join('')}
+                                      </AvatarFallback>
+                                    )}
+                                  </Avatar>
+                                </div>
                                 <div className="flex-1">
                                   <h3 className="font-semibold text-2xl text-foreground">{activeProfileBase.name}</h3>
+                                  {activeProfile?.equippedTitle && (
+                                    <span
+                                      className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mb-1"
+                                      style={{
+                                        border: `1px solid ${activeProfile.equippedTitle.color}`,
+                                        backgroundColor: `${activeProfile.equippedTitle.color}22`,
+                                        color: activeProfile.equippedTitle.color,
+                                      }}
+                                    >
+                                      {activeProfile.equippedTitle.icon} {activeProfile.equippedTitle.name}
+                                    </span>
+                                  )}
                                   <p className="text-sm text-muted-foreground mb-2">{activeProfileBase.email}</p>
                                   <div className="flex gap-2">
                                     <Badge variant={activeProfileBase.enabled ? "default" : "destructive"}>

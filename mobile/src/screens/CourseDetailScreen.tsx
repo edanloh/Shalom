@@ -10,6 +10,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from "react-native";
+import { frameStyleFor, titleBadgeStyleFor } from '@/utils/cosmetics';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StackScreenProps } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -333,17 +334,22 @@ export default function CourseDetailScreen({
     );
   };
 
-  const renderReview = (review: ProcessedCourseDetail["reviews"][0]) => (
+  const renderReview = (review: ProcessedCourseDetail["reviews"][0]) => {
+    const frameStyle = frameStyleFor(review.reviewerFrame);
+    const titleStyle = titleBadgeStyleFor(review.reviewerTitle);
+    return (
     <View
       key={`${review.reviewerName}-${review.createdAt}`}
       style={styles.reviewItem}
     >
       <View style={styles.reviewHeader}>
-        <ImageWithFallback
-          source={{ uri: review.reviewerAvatar }}
-          fallback={Images.defaultAvatar}
-          style={styles.reviewerAvatar}
-        />
+        <View style={[styles.reviewerAvatarRing, review.reviewerFrame ? frameStyle.outer : null]}>
+          <ImageWithFallback
+            source={{ uri: review.reviewerAvatar }}
+            fallback={Images.defaultAvatar}
+            style={[styles.reviewerAvatar, review.reviewerFrame ? frameStyle.inner : null]}
+          />
+        </View>
         <View style={styles.reviewerInfo}>
           <View style={styles.reviewNameRow}>
             <Text style={styles.reviewerName}>{review.reviewerName}</Text>
@@ -354,6 +360,13 @@ export default function CourseDetailScreen({
               </View>
             ) : null}
           </View>
+          {review.reviewerTitle ? (
+            <View style={[styles.reviewTitleBadge, titleStyle.badge]}>
+              <Text style={[styles.reviewTitleBadgeText, titleStyle.text]}>
+                {review.reviewerTitle.icon} {review.reviewerTitle.name}
+              </Text>
+            </View>
+          ) : null}
           <Text style={styles.reviewDate}>
             {new Date(review.createdAt).toLocaleDateString()}
           </Text>
@@ -380,6 +393,7 @@ export default function CourseDetailScreen({
       ) : null}
     </View>
   );
+  };
 
   const handleLeaveReview = () => {
     if (!userId) {
@@ -1292,11 +1306,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: Spacing.xs,
   },
-  reviewerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  reviewerAvatarRing: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.sm,
+  },
+  reviewerAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  reviewTitleBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  reviewTitleBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   reviewerInfo: {
     flex: 1,

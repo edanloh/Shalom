@@ -37,6 +37,7 @@ export type MainStackParamList = {
   ChangePassword: undefined;
   ResetPassword: undefined;
   Conversation: { conversationId: string };
+  ConversationProfile: { conversation: { id: string | number; name: string; avatar_url?: string } };
 };
 
 export type BottomTabNavParamList = {

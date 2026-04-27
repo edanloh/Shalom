@@ -10,6 +10,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, TextStyles, BorderRadius } from '../constants';
@@ -17,17 +18,16 @@ import Screen from '../components/common/Screen';
 import creditService, { ShopItem } from '../services/creditService';
 import { useUser } from '../contexts/UserContext';
 import { showToast } from '../components/common/Toast';
+import { bannerPaletteFor, frameStyleFor, titleBadgeStyleFor } from '@/utils/cosmetics';
 
 type ShopFilter = 'all' | 'owned' | 'affordable' | 'limited';
 type ShopCategory = 'all' | string;
 
-const TYPE_META: Record<string, { label: string; itemLabel: string; icon: string; comingSoon?: boolean }> = {
+const TYPE_META: Record<string, { label: string; itemLabel: string; icon: string }> = {
   title: { label: 'Titles', itemLabel: 'title', icon: 'ribbon-outline' },
   avatar_frame: { label: 'Frames', itemLabel: 'frame', icon: 'ellipse-outline' },
   profile_banner: { label: 'Banners', itemLabel: 'banner', icon: 'image-outline' },
   achievement_showcase: { label: 'Showcase', itemLabel: 'showcase', icon: 'trophy-outline' },
-  reaction_pack: { label: 'Reactions', itemLabel: 'reaction pack', icon: 'chatbubble-ellipses-outline', comingSoon: true },
-  celebration_effect: { label: 'Effects', itemLabel: 'effect', icon: 'sparkles-outline', comingSoon: true },
 };
 
 const FILTER_META: Array<{ key: ShopFilter; label: string }> = [
@@ -35,6 +35,8 @@ const FILTER_META: Array<{ key: ShopFilter; label: string }> = [
   { key: 'owned', label: 'Owned' },
   { key: 'affordable', label: 'Affordable' },
 ];
+
+const HIDDEN_SHOP_TYPES = new Set(['reaction_pack', 'celebration_effect']);
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#94A3B8',
@@ -63,6 +65,10 @@ export default function CreditsShopScreen({ navigation }: any) {
   const [selectedCategory, setSelectedCategory] = useState<ShopCategory>('all');
   const [selectedFilter, setSelectedFilter] = useState<ShopFilter>('all');
   const [selectedPreviewId, setSelectedPreviewId] = useState<string | null>(null);
+  const visibleItems = useMemo(
+    () => items.filter((item) => !HIDDEN_SHOP_TYPES.has(item.type)),
+    [items]
+  );
 
   const load = useCallback(async (isRefresh = false) => {
     if (!userId) {
@@ -89,12 +95,13 @@ export default function CreditsShopScreen({ navigation }: any) {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const categories = useMemo(() => {
-    const dynamic = Array.from(new Set(items.map((item) => item.type)));
+    const dynamic = Array.from(new Set(visibleItems.map((item) => item.type)));
     return ['all', ...dynamic] as ShopCategory[];
-  }, [items]);
+  }, [visibleItems]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
+      if (HIDDEN_SHOP_TYPES.has(item.type)) return false;
       if (selectedCategory !== 'all' && item.type !== selectedCategory) return false;
       if (selectedFilter === 'owned' && !item.isUnlocked) return false;
       if (selectedFilter === 'affordable' && !item.canAfford && !item.isUnlocked) return false;
@@ -104,28 +111,27 @@ export default function CreditsShopScreen({ navigation }: any) {
   }, [items, selectedCategory, selectedFilter]);
 
   useEffect(() => {
-    if (items.length === 0) {
+    if (visibleItems.length === 0) {
       setSelectedPreviewId(null);
       return;
     }
-    const current = items.find((item) => item.id === selectedPreviewId);
+    const current = visibleItems.find((item) => item.id === selectedPreviewId);
     if (!current) {
       const nextPreview =
-        items.find((item) => item.isFeatured) ??
-        items.find((item) => item.isEquipped) ??
-        items[0];
+        visibleItems.find((item) => item.isFeatured) ??
+        visibleItems.find((item) => item.isEquipped) ??
+        visibleItems[0];
       setSelectedPreviewId(nextPreview?.id ?? null);
     }
-  }, [items, selectedPreviewId]);
+  }, [visibleItems, selectedPreviewId]);
 
   const selectedPreviewItem = useMemo(() => {
     return (
-      items.find((item) => item.id === selectedPreviewId) ??
+      visibleItems.find((item) => item.id === selectedPreviewId) ??
       filteredItems[0] ??
-      items[0] ??
       null
     );
-  }, [filteredItems, items, selectedPreviewId]);
+  }, [filteredItems, visibleItems, selectedPreviewId]);
 
   const previewByType = useMemo(() => {
     const map = new Map<string, ShopItem>();
@@ -140,24 +146,24 @@ export default function CreditsShopScreen({ navigation }: any) {
   const previewFrame = previewByType.get('avatar_frame');
   const previewBanner = previewByType.get('profile_banner');
   const previewShowcase = previewByType.get('achievement_showcase');
-  const previewReaction = previewByType.get('reaction_pack');
-  const previewEffect = previewByType.get('celebration_effect');
+  const previewFrameStyle = frameStyleFor(previewFrame);
+  const previewTitleStyle = titleBadgeStyleFor(previewTitle);
 
-  const ownedCount = useMemo(() => items.filter((item) => item.isUnlocked).length, [items]);
+  const ownedCount = useMemo(() => visibleItems.filter((item) => item.isUnlocked).length, [visibleItems]);
   const affordableCount = useMemo(
-    () => items.filter((item) => item.canAfford && !item.isUnlocked).length,
-    [items]
+    () => filteredItems.filter((item) => item.canAfford && !item.isUnlocked).length,
+    [filteredItems]
   );
   const collectionCount = useMemo(() => {
-    const collections = new Set(items.map((item) => item.collection).filter(Boolean));
+    const collections = new Set(visibleItems.map((item) => item.collection).filter(Boolean));
     return collections.size;
-  }, [items]);
+  }, [visibleItems]);
   const recentUnlocks = useMemo(() => {
-    return [...items]
+    return [...visibleItems]
       .filter((item) => item.isUnlocked && item.unlockedAt)
       .sort((a, b) => new Date(b.unlockedAt ?? 0).getTime() - new Date(a.unlockedAt ?? 0).getTime())
       .slice(0, 3);
-  }, [items]);
+  }, [visibleItems]);
   const featuredItem = useMemo(() => {
     return (
       filteredItems.find((item) => item.isFeatured) ??
@@ -281,12 +287,28 @@ export default function CreditsShopScreen({ navigation }: any) {
         style={[
           styles.card,
           isSelected && styles.cardSelected,
-          isSelected && { borderColor: item.color },
         ]}
       >
-        <View style={[styles.iconBadge, { backgroundColor: `${item.color}22` }]}>
-          <Text style={styles.iconText}>{item.icon}</Text>
-        </View>
+        {item.type === 'profile_banner' ? (
+          <LinearGradient
+            colors={bannerPaletteFor(item)}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.iconBadge}
+          >
+            <Text style={styles.iconText}>{item.icon}</Text>
+          </LinearGradient>
+        ) : item.type === 'avatar_frame' ? (
+          <View style={[styles.iconBadge, styles.frameIconBadge, frameStyleFor(item).outer]}>
+            <View style={[styles.frameIconInner, frameStyleFor(item).inner]}>
+              <Text style={styles.iconText}>{item.icon}</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.iconBadge, { backgroundColor: `${item.color}22` }]}>
+            <Text style={styles.iconText}>{item.icon}</Text>
+          </View>
+        )}
 
         <View style={styles.cardBody}>
           <View style={styles.titleRow}>
@@ -318,42 +340,29 @@ export default function CreditsShopScreen({ navigation }: any) {
               {typeMeta.label}
               {item.collection ? `  •  ${item.collection}` : ''}
             </Text>
-            {typeMeta.comingSoon ? (
-              <View style={styles.comingSoonBadge}>
-                <Text style={styles.comingSoonBadgeText}>Coming soon</Text>
-              </View>
-            ) : null}
           </View>
           <Text style={styles.itemDescription}>{item.description}</Text>
 
           <View style={styles.cardFooter}>
-            {typeMeta.comingSoon ? (
-              <View style={styles.priceColumn}>
-                <Text style={[styles.helperText, { fontStyle: 'italic' }]}>
-                  This feature is in development
+            <View style={styles.priceColumn}>
+              {isFree ? (
+                <Text style={styles.freeText}>Free</Text>
+              ) : (
+                <View style={styles.costRow}>
+                  <Ionicons name="star" size={12} color="#FFD700" />
+                  <Text style={styles.costText}>{item.cost.toLocaleString()}</Text>
+                </View>
+              )}
+              {!item.isUnlocked && !item.canAfford ? (
+                <Text style={styles.helperText}>Need {creditsNeeded.toLocaleString()} more credits</Text>
+              ) : (
+                <Text style={styles.helperText}>
+                  {item.isUnlocked ? 'Owned and ready to equip' : 'Tap to preview'}
                 </Text>
-              </View>
-            ) : (
-              <View style={styles.priceColumn}>
-                {isFree ? (
-                  <Text style={styles.freeText}>Free</Text>
-                ) : (
-                  <View style={styles.costRow}>
-                    <Ionicons name="star" size={12} color="#FFD700" />
-                    <Text style={styles.costText}>{item.cost.toLocaleString()}</Text>
-                  </View>
-                )}
-                {!item.isUnlocked && !item.canAfford ? (
-                  <Text style={styles.helperText}>Need {creditsNeeded.toLocaleString()} more credits</Text>
-                ) : (
-                  <Text style={styles.helperText}>
-                    {item.isUnlocked ? 'Owned and ready to equip' : 'Tap to preview'}
-                  </Text>
-                )}
-              </View>
-            )}
+              )}
+            </View>
 
-            {typeMeta.comingSoon ? null : item.isEquipped ? (
+            {item.isEquipped ? (
               <TouchableOpacity
                 style={[styles.btn, styles.btnUnequip]}
                 onPress={() => handleUnequip(item)}
@@ -565,11 +574,16 @@ export default function CreditsShopScreen({ navigation }: any) {
                   style={[
                     styles.previewCard,
                     {
-                      backgroundColor: `${(previewBanner ?? selectedPreviewItem).color}20`,
-                      borderColor: (previewBanner ?? selectedPreviewItem).color,
+                      borderColor: previewBanner?.color ?? 'rgba(255,255,255,0.12)',
                     },
                   ]}
                 >
+                  <LinearGradient
+                    colors={bannerPaletteFor(previewBanner)}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.previewBannerBand}
+                  />
                   <View style={styles.previewTopRow}>
                     <View>
                       <Text style={styles.previewOverline}>Previewing</Text>
@@ -581,22 +595,27 @@ export default function CreditsShopScreen({ navigation }: any) {
                   <View style={styles.previewProfileRow}>
                     <View
                       style={[
-                        styles.previewAvatarFrame,
-                        { borderColor: previewFrame?.color ?? Colors.white },
+                        styles.previewAvatarFrameOuter,
+                        previewFrameStyle.outer,
                       ]}
                     >
-                      <Text style={styles.previewAvatarLetter}>
-                        {(user?.name || 'User').charAt(0).toUpperCase()}
-                      </Text>
+                      <View style={[styles.previewAvatarFrameInner, previewFrameStyle.inner]}>
+                        <Text style={styles.previewAvatarLetter}>
+                          {(user?.name || 'User').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
                     </View>
                     <View style={styles.previewTextBlock}>
                       <Text style={styles.previewName}>{user?.name || 'User'}</Text>
                       {previewTitle ? (
-                        <View style={[styles.previewTitleBadge, { borderColor: previewTitle.color }]}>
-                          <Text style={styles.previewTitleBadgeText}>
+                        <View style={[styles.previewTitleBadge, previewTitleStyle.badge]}>
+                          <Text style={[styles.previewTitleBadgeText, previewTitleStyle.text]}>
                             {previewTitle.icon} {previewTitle.name}
                           </Text>
                         </View>
+                      ) : null}
+                      {previewFrame ? (
+                        <Text style={styles.previewTraitText}>{previewFrameStyle.label}</Text>
                       ) : null}
                     </View>
                   </View>
@@ -610,19 +629,7 @@ export default function CreditsShopScreen({ navigation }: any) {
                         <Text style={styles.previewMiniCardText}>Featured milestones with a polished shelf.</Text>
                       </View>
                     ) : null}
-
-                    {previewReaction ? (
-                      <View style={[styles.previewBubble, { borderColor: previewReaction.color }]}>
-                        <Text style={styles.previewBubbleText}>{previewReaction.icon} Reactions unlocked</Text>
-                      </View>
-                    ) : null}
                   </View>
-
-                  {previewEffect ? (
-                    <Text style={styles.previewEffectText}>
-                      {previewEffect.icon} {previewEffect.name} adds extra celebration energy to your setup.
-                    </Text>
-                  ) : null}
                 </View>
               </>
             ) : null}
@@ -823,6 +830,14 @@ const styles = StyleSheet.create({
     padding: Spacing.base,
     borderWidth: 1,
     marginBottom: Spacing.lg,
+    backgroundColor: Colors.textInputBg,
+    overflow: 'hidden',
+  },
+  previewBannerBand: {
+    height: 28,
+    marginHorizontal: -Spacing.base,
+    marginTop: -Spacing.base,
+    marginBottom: Spacing.base,
   },
   previewTopRow: {
     flexDirection: 'row',
@@ -848,15 +863,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.base,
   },
-  previewAvatarFrame: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  previewAvatarFrameOuter: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
     marginRight: Spacing.base,
+  },
+  previewAvatarFrameInner: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   previewAvatarLetter: {
     ...TextStyles.h3,
@@ -882,6 +904,11 @@ const styles = StyleSheet.create({
     ...TextStyles.caption,
     color: Colors.textPrimary,
   },
+  previewTraitText: {
+    ...TextStyles.captionSmall,
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
   previewDetailsRow: {
     gap: Spacing.sm,
   },
@@ -899,23 +926,6 @@ const styles = StyleSheet.create({
   previewMiniCardText: {
     ...TextStyles.caption,
     color: Colors.textSecondary,
-  },
-  previewBubble: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  previewBubbleText: {
-    ...TextStyles.caption,
-    color: Colors.textPrimary,
-  },
-  previewEffectText: {
-    ...TextStyles.caption,
-    color: Colors.textSecondary,
-    marginTop: Spacing.sm,
   },
   recentRow: {
     flexDirection: 'row',
@@ -947,6 +957,7 @@ const styles = StyleSheet.create({
   },
   cardSelected: {
     backgroundColor: Colors.backgroundGray,
+    borderColor: Colors.secondary,
   },
   iconBadge: {
     width: 52,
@@ -955,6 +966,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  frameIconBadge: {
+    borderWidth: 2,
+  },
+  frameIconInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   iconText: {
     fontSize: 26,
@@ -982,19 +1004,6 @@ const styles = StyleSheet.create({
   itemMetaText: {
     ...TextStyles.captionSmall,
     color: Colors.textSecondary,
-  },
-  comingSoonBadge: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  comingSoonBadgeText: {
-    ...TextStyles.captionSmall,
-    color: Colors.textMuted,
-    fontSize: 10,
   },
   rarityBadge: {
     borderWidth: 1,

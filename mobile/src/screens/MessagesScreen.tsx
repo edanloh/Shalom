@@ -238,26 +238,18 @@ export default function MessagesScreen() {
 
   // Mark messages as read
   const markMessagesAsRead = async (convo: Conversation) => {
-    if (!user) return;
+    const myId = user?.uuid ?? user?.id;
+    if (!myId) return;
     const { error } = await supabase.rpc('mark_messages_as_read', {
-      sender_id: convo.id,
-      recipient_id: user.uuid,
+      sender_id: String(convo.id),
+      recipient_id: myId,
     });
     if (error) {
-      console.error('Failed to mark messages as read:', error);
-      return;
+      console.error('Failed to mark messages as read:', JSON.stringify(error));
+    } else {
+      refreshUnreadMessages();
     }
-    refreshUnreadMessages();
   };
-
-  // Render avatar (first letter fallback)
-  const renderAvatar = (convo: Conversation) => (
-    <ImageWithFallback
-      source={{ uri: getAvatarUri(convo.avatar_url) }}
-      fallback={Images.profile}
-      style={styles.convoProfilePic}
-    />
-  );
 
   // Conversation item
   const renderConversation = ({ item }: { item: Conversation }) => (
@@ -280,7 +272,11 @@ export default function MessagesScreen() {
         style={styles.compactGradient}
       >
         <View style={styles.compactHeader}>
-          <View>{renderAvatar(item)}</View>
+          <ImageWithFallback
+            source={{ uri: getAvatarUri(item.avatar_url) }}
+            fallback={Images.profile}
+            style={styles.convoProfilePic}
+          />
           <View style={{ flex: 1, paddingHorizontal: Spacing.base }}>
             <Text style={[TextStyles.bodyMedium, { marginBottom: 2 }]}>
               {item.name}

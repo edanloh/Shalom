@@ -111,6 +111,21 @@ serve(async (req) => {
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId);
 
+    const { data: equippedCosmetics } = await supabase
+      .from("user_unlocked_items")
+      .select("shop_items(name, color, icon, rarity, type)")
+      .eq("user_id", userId)
+      .eq("is_equipped", true);
+
+    let equippedTitle: any = null;
+    let equippedFrame: any = null;
+    (equippedCosmetics || []).forEach((row: any) => {
+      const item = row.shop_items;
+      if (!item) return;
+      if (item.type === "title") equippedTitle = item;
+      if (item.type === "avatar_frame") equippedFrame = item;
+    });
+
     const { data: certificates } = await supabase
       .from("certificates")
       .select("id,course_id")
@@ -236,7 +251,9 @@ serve(async (req) => {
       averageScore,
       strengths,
       risks,
-      avatarUrl: user.avatar_url
+      avatarUrl: user.avatar_url,
+      equippedTitle,
+      equippedFrame,
     };
 
     return new Response(JSON.stringify({ success: true, data: payload }), {

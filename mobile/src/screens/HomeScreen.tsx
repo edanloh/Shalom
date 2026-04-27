@@ -59,9 +59,9 @@ export default function HomeScreen({ navigation, route }: any) {
   const recommendationUserId = profileUser?.uuid;
   const [showInterestModal, setShowInterestModal] = useState(false);
   const [creditBalance, setCreditBalance] = useState(0);
-  const [equippedTitle, setEquippedTitle] = useState<Pick<ShopItem, 'icon' | 'name'> | null>(null);
-  const [equippedFrameColor, setEquippedFrameColor] = useState<string | null>(null);
-  const [equippedBannerColor, setEquippedBannerColor] = useState<string | null>(null);
+  const [equippedTitle, setEquippedTitle] = useState<ShopItem | null>(null);
+  const [equippedFrame, setEquippedFrame] = useState<ShopItem | null>(null);
+  const [equippedBanner, setEquippedBanner] = useState<ShopItem | null>(null);
   const [certCount, setCertCount] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [goalProgress, setGoalProgress] = useState<{
@@ -152,8 +152,8 @@ export default function HomeScreen({ navigation, route }: any) {
       if (!profileUser?.uuid) {
         setCreditBalance(0);
         setEquippedTitle(null);
-        setEquippedFrameColor(null);
-        setEquippedBannerColor(null);
+        setEquippedFrame(null);
+        setEquippedBanner(null);
         setCertCount(0);
         setStreakDays(0);
         return;
@@ -174,9 +174,9 @@ export default function HomeScreen({ navigation, route }: any) {
       const activeTitle = (shopResult.items ?? []).find((item) => item.type === 'title' && item.isEquipped);
       const activeFrame = (shopResult.items ?? []).find((item) => item.type === 'avatar_frame' && item.isEquipped);
       const activeBanner = (shopResult.items ?? []).find((item) => item.type === 'profile_banner' && item.isEquipped);
-      setEquippedTitle(activeTitle ? { icon: activeTitle.icon, name: activeTitle.name } : null);
-      setEquippedFrameColor(activeFrame?.color ?? null);
-      setEquippedBannerColor(activeBanner?.color ?? null);
+      setEquippedTitle(activeTitle ?? null);
+      setEquippedFrame(activeFrame ?? null);
+      setEquippedBanner(activeBanner ?? null);
       const goals = Array.isArray(goalStats?.goals) ? goalStats.goals : [];
       setCertCount(Array.isArray(certs) ? certs.length : 0);
       const maxGoalStreak = Array.isArray(goals)
@@ -325,8 +325,8 @@ export default function HomeScreen({ navigation, route }: any) {
       console.warn('Home: failed to load credit stats', err);
       setCreditBalance(0);
       setEquippedTitle(null);
-      setEquippedFrameColor(null);
-      setEquippedBannerColor(null);
+      setEquippedFrame(null);
+      setEquippedBanner(null);
       setGoalList([]);
     }
   }, [profileUser?.uuid]);
@@ -501,8 +501,8 @@ export default function HomeScreen({ navigation, route }: any) {
       <ProfileHeader
         balance={creditBalance}
         equippedTitle={equippedTitle}
-        avatarFrameColor={equippedFrameColor}
-        bannerAccentColor={equippedBannerColor}
+        equippedFrame={equippedFrame}
+        equippedBanner={equippedBanner}
         onCreditsPress={() => navigation.navigate('PointsHistory')}
         hasNotifications={true}
         onNotificationPress={handleNotificationPress}

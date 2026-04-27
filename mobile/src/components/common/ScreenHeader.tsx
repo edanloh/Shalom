@@ -12,6 +12,7 @@ interface ScreenHeaderProps {
   headerRightComponent?: React.ReactNode;
   onHeaderLeftPress?: () => void;
   onHeaderRightPress?: () => void;
+  onHeaderTitlePress?: () => void;
   customStyles?: object;
 }
 
@@ -24,6 +25,7 @@ export default function ScreenHeader({
   headerRightComponent,
   onHeaderLeftPress,
   onHeaderRightPress,
+  onHeaderTitlePress,
   customStyles,
 }: ScreenHeaderProps) {
   return (
@@ -56,13 +58,28 @@ export default function ScreenHeader({
         }}
         pointerEvents="box-none"
       >
-        <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
-          {title}
-        </Text>
-        {subtitle && (
-          <Text style={styles.headerSubtitle} numberOfLines={1} ellipsizeMode="tail">
-            {subtitle}
-          </Text>
+        {onHeaderTitlePress ? (
+          <TouchableOpacity onPress={onHeaderTitlePress} activeOpacity={0.7} hitSlop={{ top: 8, left: 16, right: 16, bottom: 8 }}>
+            <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
+              {title}
+            </Text>
+            {subtitle && (
+              <Text style={styles.headerSubtitle} numberOfLines={1} ellipsizeMode="tail">
+                {subtitle}
+              </Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <>
+            <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
+              {title}
+            </Text>
+            {subtitle && (
+              <Text style={styles.headerSubtitle} numberOfLines={1} ellipsizeMode="tail">
+                {subtitle}
+              </Text>
+            )}
+          </>
         )}
       </View>
 

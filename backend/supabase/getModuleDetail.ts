@@ -534,19 +534,48 @@ serve(async (req) => {
     // ========================================
     // 5. Process reviews and calculate ratings
     // ========================================
-    const processedReviews = (reviews || []).map((review: any) => ({
-      id: review.id,
-      rating: review.rating,
-      review: review.review,
-      createdAt: review.created_at,
-      reviewerName: review.reviewer?.name || 'Anonymous',
-      reviewerAvatar: review.reviewer?.avatar_url || null,
-      reviewerId: review.reviewer?.id || null,
-      instructorReply: review.instructor_reply || null,
-      instructorRepliedAt: review.instructor_replied_at || null,
-      acknowledgedAt: review.acknowledged_at || null,
-      isPinned: Boolean(review.is_pinned)
-    }));
+
+    // Batch-fetch equipped cosmetics for all non-anonymous reviewers
+    const reviewerIds = (reviews || [])
+      .filter((r: any) => !r.is_anonymous && r.reviewer?.id)
+      .map((r: any) => r.reviewer.id as string);
+
+    const cosmeticsMap = new Map<string, { title: any; frame: any }>();
+    if (reviewerIds.length > 0) {
+      const { data: equippedCosmetics } = await supabaseClient
+        .from('user_unlocked_items')
+        .select('user_id, shop_items(name, color, icon, rarity, type)')
+        .in('user_id', reviewerIds)
+        .eq('is_equipped', true);
+
+      (equippedCosmetics || []).forEach((row: any) => {
+        const item = row.shop_items;
+        if (!item) return;
+        if (!cosmeticsMap.has(row.user_id)) cosmeticsMap.set(row.user_id, { title: null, frame: null });
+        const entry = cosmeticsMap.get(row.user_id)!;
+        if (item.type === 'title') entry.title = item;
+        if (item.type === 'avatar_frame') entry.frame = item;
+      });
+    }
+
+    const processedReviews = (reviews || []).map((review: any) => {
+      const cosmetics = cosmeticsMap.get(review.reviewer?.id);
+      return {
+        id: review.id,
+        rating: review.rating,
+        review: review.review,
+        createdAt: review.created_at,
+        reviewerName: review.reviewer?.name || 'Anonymous',
+        reviewerAvatar: review.reviewer?.avatar_url || null,
+        reviewerId: review.reviewer?.id || null,
+        reviewerTitle: review.is_anonymous ? null : (cosmetics?.title ?? null),
+        reviewerFrame: review.is_anonymous ? null : (cosmetics?.frame ?? null),
+        instructorReply: review.instructor_reply || null,
+        instructorRepliedAt: review.instructor_replied_at || null,
+        acknowledgedAt: review.acknowledged_at || null,
+        isPinned: Boolean(review.is_pinned),
+      };
+    });
 
     // Calculate average rating and rating breakdown
     let averageRating = 0;

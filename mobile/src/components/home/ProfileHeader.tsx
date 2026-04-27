@@ -12,15 +12,14 @@ import { ImageWithFallback } from '../common';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useUser } from '@/contexts/UserContext';
 import { Ionicons } from '@expo/vector-icons';
+import type { ShopItem } from '@/services/creditService';
+import { bannerPaletteFor, frameStyleFor, titleBadgeStyleFor } from '@/utils/cosmetics';
 
 interface CombinedHeaderProps {
   balance?: number;
-  equippedTitle?: {
-    icon: string;
-    name: string;
-  } | null;
-  avatarFrameColor?: string | null;
-  bannerAccentColor?: string | null;
+  equippedTitle?: Partial<Pick<ShopItem, 'icon' | 'name' | 'color' | 'rarity'>> | null;
+  equippedFrame?: Partial<Pick<ShopItem, 'name' | 'color'>> | null;
+  equippedBanner?: Partial<Pick<ShopItem, 'name' | 'color'>> | null;
   onCreditsPress?: () => void;
   hasNotifications?: boolean;
   onNotificationPress?: () => void;
@@ -29,37 +28,42 @@ interface CombinedHeaderProps {
 export default function CombinedHeader({ 
   balance = 0,
   equippedTitle = null,
-  avatarFrameColor = null,
-  bannerAccentColor = null,
+  equippedFrame = null,
+  equippedBanner = null,
   onCreditsPress,
   hasNotifications = false,
   onNotificationPress,
 }: CombinedHeaderProps) {
   const user = useUser().user;
   const formattedBalance = balance.toLocaleString();
+  const frameStyle = frameStyleFor(equippedFrame);
+  const titleStyle = titleBadgeStyleFor(equippedTitle);
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={[Colors.purple850, bannerAccentColor || Colors.secondary]}
-        style={{height: Spacing.lg}}
-      />
+    <LinearGradient
+      colors={bannerPaletteFor(equippedBanner)}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.welcomeSection}>
         <View style={styles.avatarContainer}>
-          <ImageWithFallback
-            source={{uri: getAvatarUri()}}
-            fallback={Images.profile}
-            style={[styles.avatar, avatarFrameColor ? { borderColor: avatarFrameColor } : null]}
-          />
+          <View style={[styles.avatarRing, equippedFrame ? frameStyle.outer : null]}>
+            <ImageWithFallback
+              source={{uri: getAvatarUri()}}
+              fallback={Images.profile}
+              style={[styles.avatar, equippedFrame ? frameStyle.inner : null]}
+            />
+          </View>
         </View>
         
         <View style={styles.welcomeTextContainer}>
           <Text style={styles.welcomeText}>Welcome Back,</Text>
           <Text style={styles.userName}>{user?.name || "User"}</Text>
           {equippedTitle ? (
-            <View style={styles.titleBadge}>
-              <Text style={styles.titleBadgeText}>
-                {equippedTitle.icon} {equippedTitle.name}
+            <View style={[styles.titleBadge, titleStyle.badge]}>
+              <Text style={[styles.titleBadgeText, titleStyle.text]}>
+                {equippedTitle.icon ? `${equippedTitle.icon} ` : ""}{equippedTitle.name ?? "Learner"}
               </Text>
             </View>
           ) : null}
@@ -90,16 +94,13 @@ export default function CombinedHeader({
           ) : null}
         </View>
       </View>
-    </View>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    // paddingHorizontal: Spacing.lg,
-    // paddingVertical: Spacing.base,
     marginBottom: Spacing.sm,
-    backgroundColor: Colors.purple400,
   },
   topHeader: {
     flexDirection: 'row',
@@ -116,6 +117,16 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginRight: Spacing.base,
+  },
+  avatarRing: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   avatar: {
     width: 50,

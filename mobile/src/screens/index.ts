@@ -23,6 +23,7 @@ export { default as LearningGoalScreen } from "./LearningGoalScreen";
 export { default as CreditsShopScreen } from "./CreditsShopScreen";
 export { default as MessagesScreen } from "./MessagesScreen";
 export { default as ConversationScreen } from "./ConversationScreen";
+export { default as ConversationProfileScreen } from "./ConversationProfileScreen";
 
 // Re-export from subdirectories
 export * from "./auth/index";

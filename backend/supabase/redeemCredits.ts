@@ -86,10 +86,15 @@ serve(async (req) => {
     });
     if (error) {
       const msg = error.message ?? "Failed to process redemption";
+      // Custom domain errors from the SQL function
       if (error.code === "P4020") return fail(msg, 402);
       if (error.code === "P4030") return fail(msg, 403);
       if (error.code === "P4040") return fail(msg, 404);
       if (error.code === "P4000") return fail(msg, 400);
+      // PostgREST: function not found — migration not applied yet
+      if (error.code === "PGRST202" || error.code === "42883") {
+        return fail("Shop function not available — migration pending", 503);
+      }
       throw error;
     }
 

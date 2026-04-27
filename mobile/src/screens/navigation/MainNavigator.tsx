@@ -329,6 +329,11 @@ export default function MainNavigator() {
         component={Screens.ConversationScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="ConversationProfile"
+        component={Screens.ConversationProfileScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

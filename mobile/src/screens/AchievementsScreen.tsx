@@ -17,6 +17,7 @@ import CustomModal from "../components/common/CustomModal";
 import creditService, { type ShopItem } from "../services/creditService";
 import { AchievementItem } from "../types";
 import { useUser } from "../contexts/UserContext";
+import { showcaseStyleFor } from "@/utils/cosmetics";
 
 type Achievement = {
   id: string;
@@ -205,6 +206,7 @@ export default function AchievementsScreen({ navigation }: any) {
   }, [query, achievements]);
 
   const [refreshing, setRefreshing] = useState(false);
+  const showcaseStyle = showcaseStyleFor(showcase);
 
   const onRefresh = useCallback(async () => {
     try {
@@ -267,12 +269,12 @@ export default function AchievementsScreen({ navigation }: any) {
             >
               <View style={[
                 styles.iconContainer,
-                showcase ? { borderWidth: 1.5, borderColor: showcase.color, backgroundColor: `${showcase.color}22` } : null,
+                showcase ? showcaseStyle.container : null,
               ]}>
                 {isIconUrl(item.icon) ? (
                   <Image source={{ uri: item.icon }} style={styles.iconImage} resizeMode="cover" />
                 ) : (
-                  <Ionicons name={item.icon as any} size={28} color={showcase?.color ?? "#FACC15"} />
+                  <Ionicons name={item.icon as any} size={28} color={showcase ? showcaseStyle.iconColor : "#FACC15"} />
                 )}
               </View>
               <View style={{ flex: 1 }}>
@@ -364,7 +366,7 @@ export default function AchievementsScreen({ navigation }: any) {
         <View style={styles.modalIconContainer}>
           <View style={[
             styles.modalIconBadge,
-            showcase ? { backgroundColor: `${showcase.color}33`, borderWidth: 2, borderColor: showcase.color } : null,
+            showcase ? showcaseStyle.container : null,
           ]}>
             {isIconUrl(selectedAchievement?.icon) ? (
               <Image
@@ -376,7 +378,7 @@ export default function AchievementsScreen({ navigation }: any) {
               <Ionicons
                 name={selectedAchievement?.icon as any}
                 size={64}
-                color={showcase?.color ?? Colors.yellow}
+                color={showcase ? showcaseStyle.iconColor : Colors.yellow}
               />
             )}
           </View>

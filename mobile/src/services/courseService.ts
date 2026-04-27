@@ -171,6 +171,8 @@ export interface CourseReview {
   createdAt: string;         // ISO
   reviewerName: string;      // "Anonymous" or real name
   reviewerAvatar: string|null;
+  reviewerTitle?: { name: string; icon: string; color: string; rarity: string } | null;
+  reviewerFrame?: { name: string; color: string } | null;
 }
 
 export interface AddReviewPayload {

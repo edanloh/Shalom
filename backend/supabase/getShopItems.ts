@@ -144,6 +144,24 @@ serve(async (req) => {
         .map((key) => key.slice("shop_purchase:".length))
     );
 
+    // Repair: if a purchase exists in credits_events but no user_unlocked_items row,
+    // insert the missing row so the equip action succeeds without needing the SQL fallback.
+    const orphanItemIds = [...purchasedItemIds].filter((id) => !unlockedMap.has(id));
+    if (orphanItemIds.length > 0) {
+      const repairRows = orphanItemIds.map((itemId) => ({
+        user_id: userId,
+        item_id: itemId,
+        is_equipped: false,
+      }));
+      await supabase
+        .from("user_unlocked_items")
+        .upsert(repairRows, { onConflict: "user_id,item_id", ignoreDuplicates: true });
+      // Reflect the repair in the local map so isEquipped is accurate.
+      for (const id of orphanItemIds) {
+        unlockedMap.set(id, { isEquipped: false, unlockedAt: null });
+      }
+    }
+
     const result = shopRows.map((item) => {
       const unlock = unlockedMap.get(item.id);
       return {

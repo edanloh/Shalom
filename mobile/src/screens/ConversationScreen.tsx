@@ -79,16 +79,17 @@ export default function ConversationScreen({ navigation }: any) {
 
   // Mark messages as read
   const markMessagesAsRead = async () => {
-    if (!user || !selectedConversation) return;
+    const myId = user?.uuid ?? user?.id;
+    if (!myId || !selectedConversation) return;
     const { error } = await supabase.rpc('mark_messages_as_read', {
-      sender_id: selectedConversation.id,
-      recipient_id: user.uuid,
+      sender_id: String(selectedConversation.id),
+      recipient_id: myId,
     });
     if (error) {
-      console.error('Failed to mark messages as read:', error);
-      return;
+      console.error('Failed to mark messages as read:', JSON.stringify(error));
+    } else {
+      refreshUnreadMessages();
     }
-    refreshUnreadMessages();
   };
 
   useFocusEffect(() => () => {
@@ -171,6 +172,11 @@ export default function ConversationScreen({ navigation }: any) {
     setSending(false);
   };
 
+  const openProfile = () => {
+    if (!selectedConversation) return;
+    navigation.navigate('ConversationProfile', { conversation: selectedConversation });
+  };
+
   const getAvatarUri = (avatar_url?: string) => {
     const uri = avatar_url
       ? `https://cmtfxsntlfoxgcznanpe.supabase.co/storage/v1/object/public/profilepics/${avatar_url}`
@@ -242,13 +248,16 @@ export default function ConversationScreen({ navigation }: any) {
             title={selectedConversation?.name || 'Conversation'}
             headerLeftIcon={'chevron-back'}
             headerRightComponent={
-              <ImageWithFallback
-                source={{ uri: getAvatarUri(selectedConversation?.avatar_url) }}
-                fallback={Images.profile}
-                style={styles.convoProfilePic}
-              />
+              <TouchableOpacity onPress={openProfile} activeOpacity={0.7}>
+                <ImageWithFallback
+                  source={{ uri: getAvatarUri(selectedConversation?.avatar_url) }}
+                  fallback={Images.profile}
+                  style={styles.convoProfilePic}
+                />
+              </TouchableOpacity>
             }
             onHeaderLeftPress={() => navigation?.goBack()}
+            onHeaderTitlePress={openProfile}
           />
         </View>
         <View style={{ flex: 1 }}>

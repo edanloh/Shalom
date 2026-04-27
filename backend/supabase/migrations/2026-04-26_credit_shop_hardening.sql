@@ -76,16 +76,16 @@ BEGIN
     RAISE EXCEPTION 'Item cost cannot be negative' USING ERRCODE = 'P4000';
   END IF;
 
-  SELECT id
+  SELECT u.id
     INTO v_existing_id
-  FROM public.user_unlocked_items
-  WHERE user_id = p_user_id
-    AND item_id = p_item_id;
+  FROM public.user_unlocked_items u
+  WHERE u.user_id = p_user_id
+    AND u.item_id = p_item_id;
 
-  SELECT COALESCE(SUM(points), 0)::integer
+  SELECT COALESCE(SUM(ce.points), 0)::integer
     INTO v_balance
-  FROM public.credits_events
-  WHERE user_id = p_user_id;
+  FROM public.credits_events ce
+  WHERE ce.user_id = p_user_id;
 
   IF p_action = 'equip' THEN
     IF v_existing_id IS NULL THEN
@@ -93,10 +93,10 @@ BEGIN
 
       IF NOT EXISTS (
         SELECT 1
-        FROM public.credits_events
-        WHERE user_id = p_user_id
-          AND type = 'shop_purchase'
-          AND reference_key = v_reference_key
+        FROM public.credits_events ce
+        WHERE ce.user_id = p_user_id
+          AND ce.type = 'shop_purchase'
+          AND ce.reference_key = v_reference_key
       ) THEN
         RAISE EXCEPTION 'Item not unlocked' USING ERRCODE = 'P4030';
       END IF;
@@ -106,20 +106,20 @@ BEGIN
       ON CONFLICT (user_id, item_id) DO NOTHING;
     END IF;
 
-    UPDATE public.user_unlocked_items
+    UPDATE public.user_unlocked_items AS u
       SET is_equipped = false
-    WHERE user_id = p_user_id
-      AND item_id IN (
-        SELECT id
-        FROM public.shop_items
-        WHERE type = v_item.type
-          AND is_active = true
+    WHERE u.user_id = p_user_id
+      AND u.item_id IN (
+        SELECT s.id
+        FROM public.shop_items s
+        WHERE s.type = v_item.type
+          AND s.is_active = true
       );
 
-    UPDATE public.user_unlocked_items
+    UPDATE public.user_unlocked_items AS u
       SET is_equipped = true
-    WHERE user_id = p_user_id
-      AND item_id = p_item_id;
+    WHERE u.user_id = p_user_id
+      AND u.item_id = p_item_id;
 
     RETURN QUERY SELECT 'equip'::text, v_item.id, v_item.name, v_balance, false;
     RETURN;
@@ -130,10 +130,10 @@ BEGIN
       RAISE EXCEPTION 'Item not unlocked' USING ERRCODE = 'P4030';
     END IF;
 
-    UPDATE public.user_unlocked_items
+    UPDATE public.user_unlocked_items AS u
       SET is_equipped = false
-    WHERE user_id = p_user_id
-      AND item_id = p_item_id;
+    WHERE u.user_id = p_user_id
+      AND u.item_id = p_item_id;
 
     RETURN QUERY SELECT 'unequip'::text, v_item.id, v_item.name, v_balance, false;
     RETURN;

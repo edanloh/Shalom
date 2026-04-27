@@ -26,6 +26,8 @@ import { showToast } from "@/components/common/Toast";
 import { AchievementItem, CreditEvent } from "../types";
 import { useUser } from "@/contexts/UserContext";
 import { ShopItem } from "@/services/creditService";
+import { LinearGradient } from "expo-linear-gradient";
+import { bannerPaletteFor, frameStyleFor, titleBadgeStyleFor } from "@/utils/cosmetics";
 
 const CARD_BG = "#3A3A45";
 const TILE_BG = "#5B38E3";
@@ -60,6 +62,8 @@ export default function ProfileScreen({ navigation }: any) {
 
   // Safe fallbacks so the UI renders even if some fields are missing
   const displayName = user?.name ?? "User";
+  const frameStyle = frameStyleFor(equippedAvatarFrame);
+  const titleStyle = titleBadgeStyleFor(equippedTitle);
 
   const quickActions = useMemo(
     () => [
@@ -232,24 +236,32 @@ export default function ProfileScreen({ navigation }: any) {
             style={[
               externalStyles.header,
               styles.profileHero,
-              equippedBanner ? { borderColor: equippedBanner.color, backgroundColor: `${equippedBanner.color}18` } : null,
+              equippedBanner ? { borderColor: equippedBanner.color } : null,
               { marginBottom: 16 },
             ]}
           >
+            <LinearGradient
+              colors={bannerPaletteFor(equippedBanner)}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.profileHeroBanner}
+            />
             <Pressable
-              style={[externalStyles.logo, { marginBottom: 16 }]}
+              style={[externalStyles.logo, styles.profileAvatarPressable]}
               onPress={() => setShowAvatarModal(true)}
               accessibilityLabel="View profile picture"
               accessibilityRole="imagebutton"
             >
-              <ImageWithFallback
-                source={{ uri: getAvatarUri() }}
-                fallback={Images.profile}
-                style={[
-                  externalStyles.avatar,
-                  equippedAvatarFrame ? { borderColor: equippedAvatarFrame.color } : null,
-                ]}
-              />
+              <View style={[styles.profileAvatarRing, equippedAvatarFrame ? frameStyle.outer : null]}>
+                <ImageWithFallback
+                  source={{ uri: getAvatarUri() }}
+                  fallback={Images.profile}
+                  style={[
+                    externalStyles.avatar,
+                    equippedAvatarFrame ? frameStyle.inner : null,
+                  ]}
+                />
+              </View>
               {user?.auth_provider && user?.auth_provider == "google" && (
                 <Image
                   source={require("@assets/google.png")}
@@ -263,20 +275,16 @@ export default function ProfileScreen({ navigation }: any) {
                 onClose={() => setShowAvatarModal(false)}
               >
                 <View style={{ alignItems: "center", justifyContent: "center"}}>
-                  <ImageWithFallback
-                    source={{ uri: getAvatarUri() }}
-                    fallback={Images.profile}
-                    style={[
-                      {
-                        width: 150,
-                        height: 150,
-                        borderRadius: 75,
-                        marginBottom: 12,
-                        borderWidth: 3,
-                        borderColor: equippedAvatarFrame?.color ?? Colors.white,
-                      },
-                    ]}
-                  />
+                  <View style={[styles.modalAvatarRing, equippedAvatarFrame ? frameStyle.outer : null]}>
+                    <ImageWithFallback
+                      source={{ uri: getAvatarUri() }}
+                      fallback={Images.profile}
+                      style={[
+                        styles.modalAvatarImage,
+                        equippedAvatarFrame ? frameStyle.inner : null,
+                      ]}
+                    />
+                  </View>
                   <Text style={[TextStyles.h3, { textAlign: "center", color: Colors.textSecondary }]}>{displayName}</Text>
                 </View>
               </CustomModal>
@@ -292,13 +300,17 @@ export default function ProfileScreen({ navigation }: any) {
               </Text>
             </View>
             {equippedTitle ? (
-              <View style={styles.titleBadge}>
-                <Text style={styles.titleBadgeText}>
+              <View style={[styles.titleBadge, titleStyle.badge]}>
+                <Text style={[styles.titleBadgeText, titleStyle.text]}>
                   {equippedTitle.icon} {equippedTitle.name}
                 </Text>
               </View>
             ) : null}
-            <Text style={TextStyles.bodyMedium}>{balance} points</Text>
+            {/* Points badge — inside the card, anchored to top-right of banner */}
+            <View style={styles.balanceBadge} pointerEvents="none">
+              <Ionicons name="star" size={13} color="#FFD700" />
+              <Text style={styles.balanceText}>{balance.toLocaleString()} pts</Text>
+            </View>
           </View>
 
         {/* Quick actions (visual-only) */}
@@ -531,6 +543,67 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.base,
+    overflow: "hidden",
+  },
+  profileHeroBanner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+  },
+  balanceBadge: {
+    position: "absolute",
+    top: 14,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  balanceText: {
+    fontFamily: TextStyles.bodyMedium.fontFamily,
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+  },
+  profileAvatarPressable: {
+    marginBottom: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileAvatarRing: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  modalAvatarRing: {
+    width: 164,
+    height: 164,
+    borderRadius: 82,
+    borderWidth: 4,
+    borderColor: "rgba(255,255,255,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginBottom: 12,
+  },
+  modalAvatarImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 3,
+    borderColor: Colors.white,
   },
   titleBadge: {
     alignSelf: "center",
