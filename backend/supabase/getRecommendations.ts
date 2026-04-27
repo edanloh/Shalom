@@ -24,7 +24,7 @@ const CANDIDATE_CATEGORY_POOL_LIMIT = Number(
 const CANDIDATE_LONG_TAIL_POOL_LIMIT = Number(
   Deno.env.get("RECO_CANDIDATE_LONG_TAIL_POOL_LIMIT") ?? "20"
 );
-const MAX_RESULTS = 6;
+const MAX_RESULTS = 12;
 const MIN_SCORE_FLOOR = Number(Deno.env.get("RECO_MIN_SCORE_FLOOR") ?? "1");
 const COLD_MIN_SCORE_FLOOR = (() => {
   const parsed = Number(Deno.env.get("RECO_COLD_MIN_SCORE_FLOOR") ?? String(MIN_SCORE_FLOOR));
@@ -563,10 +563,10 @@ const computeItemSimilarity = (
 };
 
 const pickPrimaryReasonTag = (
-  contributions: Array<{ key: string; value: number }>
+  contributions: Array<{ key: string; value: number; minValue?: number }>
 ): string => {
   const ranked = contributions
-    .filter((item) => item.value > 0)
+    .filter((item) => item.value >= (item.minValue ?? 0.2))
     .sort((a, b) => b.value - a.value);
   return ranked[0]?.key ?? "recommended_for_you";
 };
@@ -870,6 +870,7 @@ serve(async (req) => {
       ? preferredCategoriesParam.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
     const placement = url.searchParams.get("placement") ?? "home"; // new: track which UI surface requested recommendations
+    const limitParam = Number(url.searchParams.get("limit"));
     const localHourParam = Number(url.searchParams.get("localHour"));
     const dayOfWeekParam = Number(url.searchParams.get("dayOfWeek"));
     const now = new Date();
@@ -885,7 +886,9 @@ serve(async (req) => {
     const effectiveMaxResults =
       Number.isFinite(maxResultsParam) && maxResultsParam > MAX_RESULTS
         ? clampInt(maxResultsParam, MAX_RESULTS, MAX_CANDIDATE_POOL)
-        : MAX_RESULTS;
+        : Number.isFinite(limitParam) && limitParam > 0
+          ? clampInt(limitParam, 1, MAX_RESULTS)
+          : MAX_RESULTS;
     const contextFactors = getContextFactors(learningGoal, localHour, dayOfWeek);
     const assigned = assignAlgoByTrafficSplit(userId);
     const selectedAlgo = (algo ?? assigned.algo).toLowerCase();
@@ -1767,41 +1770,48 @@ const courseSelect = `
       }
       const primaryReasonTag = isColdStart
         ? pickPrimaryReasonTag([
-            { key: "highly_rated", value: ratingNorm * 10 * scoring.coldRating },
-            { key: "popular_now", value: popularity * 10 * scoring.coldPopularity },
-            { key: "trending_clicks", value: globalCtr * 10 * scoring.coldCtr },
+            { key: "trending_clicks", value: globalCtr * 10 * scoring.coldCtr, minValue: 0.6 },
+            { key: "highly_rated", value: ratingNorm * 10 * scoring.coldRating, minValue: 1.1 },
+            { key: "popular_now", value: popularity * 10 * scoring.coldPopularity, minValue: 0.8 },
           ])
         : pickPrimaryReasonTag([
             {
               key: "matches_your_interests",
               value: categoryAffinity * 10 * scoring.categoryAffinity,
+              minValue: 0.8,
             },
             {
               key: "based_on_your_recent_clicks",
               value: userBeh.ctrScore * scoring.userCtr,
+              minValue: 0.35,
             },
             {
               key: "from_instructors_you_like",
               value: instructorAffinity * 10 * scoring.instructorAffinity,
+              minValue: 0.6,
             },
             {
               key: "matches_your_topics",
               value: tagAffinity * 10 * scoring.tagAffinity,
+              minValue: 0.6,
             },
             {
               key: "matches_your_level",
               value: difficultyMatch * 10 * scoring.difficultyMatch,
+              minValue: 0.5,
             },
             {
               key: "similar_to_courses_you_took",
               value: contentSimilarityBoost * 10 * scoring.contentSimilarityBoost,
+              minValue: 0.45,
             },
             {
               key: "based_on_this_session",
               value: sessionCategoryBoost,
+              minValue: 0.5,
             },
-            { key: "popular_now", value: popularity * 10 * scoring.globalPopularity },
-            { key: "highly_rated", value: ratingNorm * 10 * scoring.rating },
+            { key: "popular_now", value: popularity * 10 * scoring.globalPopularity, minValue: 0.8 },
+            { key: "highly_rated", value: ratingNorm * 10 * scoring.rating, minValue: 1.0 },
           ]);
 
       return {

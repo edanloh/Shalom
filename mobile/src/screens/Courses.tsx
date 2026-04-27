@@ -39,6 +39,7 @@ const { width } = Dimensions.get("window");
 
 const CARD_BG = "#3A3A45";
 const CHIP_BORDER = "#4B4B57";
+const RECOMMENDED_VISIBLE_LIMIT = 5;
 
 function clamp01(n: number) {
   if (Number.isNaN(n)) return 0;
@@ -206,6 +207,8 @@ export default function CoursesScreen({ navigation }: any) {
     recommendedLoading,
     refreshCourses,
     refreshRecommended,
+    dismissedRecommendationIds,
+    dismissRecommendedCourse,
     wishlist = [],
     toggleWishlist,
     recordRecommendationEvent,
@@ -336,11 +339,15 @@ export default function CoursesScreen({ navigation }: any) {
 
   const recommended = useMemo(() => {
     if (query) return [];
-    if (recommendedCourses.length) {
-      return recommendedCourses.filter((c) => !enrolledIds.has(String(c.id)));
-    }
-    return catalogCourses.filter((c) => !enrolledIds.has(String(c.id))).slice(0, 10);
-  }, [catalogCourses, enrolledIds, query, recommendedCourses]);
+    const deduped = new Map<string, Course>();
+    [...recommendedCourses, ...catalogCourses].forEach((course) => {
+      if (course?.id) deduped.set(String(course.id), course);
+    });
+
+    return Array.from(deduped.values())
+      .filter((c) => !enrolledIds.has(String(c.id)) && !dismissedRecommendationIds.has(String(c.id)))
+      .slice(0, RECOMMENDED_VISIBLE_LIMIT);
+  }, [catalogCourses, dismissedRecommendationIds, enrolledIds, query, recommendedCourses]);
 
   const allCoursesForResults = useMemo(() => {
     const merged = [...catalogCourses, ...myCourses];
@@ -383,6 +390,14 @@ export default function CoursesScreen({ navigation }: any) {
       navigation.navigate("CourseDetail", { courseId: course.id, sourceScreen: "Courses" });
     },
     [navigation, recordRecommendationEvent]
+  );
+
+  const handleRecommendedCourseDismiss = useCallback(
+    (course: Course) => {
+      dismissRecommendedCourse(course, "courses_recommended")
+        .catch((err) => console.warn("Failed to record courses rec dismiss", err));
+    },
+    [dismissRecommendedCourse]
   );
 
   const onRefresh = useCallback(async () => {
@@ -559,13 +574,14 @@ export default function CoursesScreen({ navigation }: any) {
                       showInstructor={false}
                       showRecommendationReason={true}
                       onPress={handleRecommendedCourseClick}
+                      onDismiss={handleRecommendedCourseDismiss}
                     />
                   )}
                   horizontal
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.hRow}
                   style={styles.hList}
-                  extraData={wishlist}
+                  extraData={{ wishlist, dismissedRecommendationIds }}
                 />
               ) : (
                 <EmptyState

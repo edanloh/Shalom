@@ -10,7 +10,6 @@ const TAG_LABELS: Record<string, string> = {
   highly_rated: "Highly rated by learners",
   trending_clicks: "Trending this week",
   recommended_for_new_learners: "Good for new learners",
-  recommended_for_you: "Recommended for you",
 };
 
 const humanizeTag = (tag: string): string => {
@@ -24,6 +23,6 @@ const humanizeTag = (tag: string): string => {
 };
 
 export const formatPrimaryRecommendationReason = (primaryTag?: string): string => {
-  if (primaryTag) return humanizeTag(primaryTag);
-  return "Recommended for you";
+  if (!primaryTag || primaryTag === "recommended_for_you") return "";
+  return humanizeTag(primaryTag);
 };

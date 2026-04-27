@@ -6,7 +6,7 @@
 import { Colors } from '@/constants';
 import { Course } from '../types';
 import apiService from './apiService';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 function unwrap<T = any>(r: any): T {
   return (r && typeof r === 'object' && 'data' in r ? r.data : r) as T;
@@ -225,7 +225,7 @@ export interface PaginatedCoursesResult {
 class CacheManager {
   static async get<T>(key: string): Promise<T | null> {
     try {
-      const cachedData = await SecureStore.getItemAsync(key);
+      const cachedData = await AsyncStorage.getItem(key);
       if (!cachedData) return null;
 
       const { data, timestamp } = JSON.parse(cachedData);
@@ -233,7 +233,7 @@ class CacheManager {
 
       // Check if cache is still valid
       if (now - timestamp > CACHE_CONFIG.CACHE_DURATION) {
-        await SecureStore.deleteItemAsync(key);
+        await AsyncStorage.removeItem(key);
         return null;
       }
 
@@ -250,7 +250,7 @@ class CacheManager {
         data,
         timestamp: Date.now(),
       };
-      await SecureStore.setItemAsync(key, JSON.stringify(cacheData));
+      await AsyncStorage.setItem(key, JSON.stringify(cacheData));
     } catch (error) {
       console.warn(`Cache write error for key ${key}:`, error);
     }
@@ -258,7 +258,7 @@ class CacheManager {
 
   static async clear(key: string): Promise<void> {
     try {
-      await SecureStore.deleteItemAsync(key);
+      await AsyncStorage.removeItem(key);
     } catch (error) {
       console.warn(`Cache clear error for key ${key}:`, error);
     }
@@ -668,7 +668,7 @@ class CourseService {
 
       const params: Record<string, string> = {
         userId: uid,
-        limit: '8',
+        limit: '12',
         placement: 'home',
         // Pass local time so context-factors (evening boost, weekend explore) work correctly
         localHour: String(new Date().getHours()),

@@ -5,32 +5,23 @@
 // import 'react-native-get-random-values';
 
 import { createClient } from '@supabase/supabase-js';
-import { deleteItemAsync, getItemAsync, setItemAsync } from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { deleteItemAsync, getItemAsync } from 'expo-secure-store';
 import 'react-native-url-polyfill/auto';
 import { Platform } from 'react-native';
 
-const ExpoSecureStoreAdapter = {
-  getItem: (key: string) => {
-    return getItemAsync(key);
-  },
-  setItem: (key: string, value: string) => {
-    if (value.length > 2048) {
-      console.warn(
-        'Value being stored in SecureStore is larger than 2048 bytes and it may not be stored successfully. In a future SDK version, this call may throw an error.',
-      );
-    }
-    return setItemAsync(key, value);
-  },
-  removeItem: (key: string) => {
-    return deleteItemAsync(key);
-  },
-};
+const SupabaseAuthStorage = {
+  getItem: async (key: string) => {
+    const value = await AsyncStorage.getItem(key);
+    if (value) return value;
+    if (Platform.OS === 'web') return null;
 
-const ExpoWebSecureStoreAdapter = {
-  getItem: (key: string) => {
-    console.debug('getItem', { key });
-    return AsyncStorage.getItem(key);
+    const legacyValue = await getItemAsync(key);
+    if (legacyValue) {
+      await AsyncStorage.setItem(key, legacyValue);
+      await deleteItemAsync(key);
+    }
+    return legacyValue;
   },
   setItem: (key: string, value: string) => {
     return AsyncStorage.setItem(key, value);
@@ -62,10 +53,7 @@ if (
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage:
-      Platform.OS === 'web'
-        ? (ExpoWebSecureStoreAdapter as any)
-        : (ExpoSecureStoreAdapter as any),
+    storage: SupabaseAuthStorage as any,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

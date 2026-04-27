@@ -25,7 +25,7 @@ SYSTEMS COMPARED
 Run: python ml/evaluate.py
 """
 
-import json, math, random, os
+import argparse, json, math, random, os
 from datetime import datetime, timedelta, UTC
 from collections import defaultdict
 import numpy as np
@@ -48,7 +48,21 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 POSITIVE_EVENTS = {"click", "start", "enroll", "complete", "wishlist", "save"}
 
 # ── Supabase real data loader ─────────────────────────────────────────────────
-def load_real_requests(lookback_days: int = 90):
+def parse_datetime_arg(value: str) -> datetime:
+    """
+    Accepts YYYY-MM-DD or an ISO timestamp. Naive values are treated as UTC.
+    """
+    raw = value.strip()
+    if len(raw) == 10:
+        dt = datetime.fromisoformat(raw).replace(tzinfo=UTC)
+    else:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+def load_real_requests(lookback_days: int = 90, since_arg: str | None = None, until_arg: str | None = None):
     """
     Loads real recommendation events from Supabase.
     Requires that your mobile app saves score_breakdown in the event context.
@@ -73,34 +87,43 @@ def load_real_requests(lookback_days: int = 90):
             return None
 
         sb = create_client(url, key)
-        since = (datetime.now(UTC) - timedelta(days=lookback_days)).isoformat()
-        resp = (
+        until = parse_datetime_arg(until_arg) if until_arg else datetime.now(UTC)
+        since = parse_datetime_arg(since_arg) if since_arg else until - timedelta(days=lookback_days)
+
+        query = (
             sb.table("recommendation_events")
-            .select("course_id, event_type, context, timestamp")
-            .gte("timestamp", since)
+            .select("course_id, event_type, context, timestamp, created_at")
+            .gte("timestamp", since.isoformat())
+            .lt("timestamp", until.isoformat())
             .order("timestamp", desc=True)   # newest first so recent data isn't cut off by limit
             .limit(5000)
-            .execute()
         )
+        resp = query.execute()
         rows = resp.data or []
         if not rows:
-            print("[warn] No events found in Supabase for this period.")
+            print(f"[warn] No events found in Supabase for {since.isoformat()} to {until.isoformat()}.")
             return None
 
 
         # Group by request_id — each group is one call to getRecommendations
         groups = defaultdict(list)
         ungrouped = []
+        skipped_missing_breakdown = 0
+        skipped_missing_course = 0
         for ev in rows:
             ctx = ev.get("context") or {}
             breakdown = ctx.get("score_breakdown")
             if not breakdown:
+                skipped_missing_breakdown += 1
                 continue  # skip events without score_breakdown — see guide
+            if not ev.get("course_id"):
+                skipped_missing_course += 1
+                continue
             request_id = ctx.get("requestId") or ctx.get("request_id")
             label = 1 if (ev.get("event_type") or "").lower() in POSITIVE_EVENTS else 0
             # Note: real events don't carry course tags through the event payload,
             # so we leave tags empty. ILD now uses score_breakdown drivers instead.
-            created_at = ev.get("timestamp")
+            created_at = ev.get("created_at") or ev.get("timestamp")
             item = {
                 "id": ev.get("course_id"),
                 "breakdown": breakdown,
@@ -113,6 +136,7 @@ def load_real_requests(lookback_days: int = 90):
             else:
                 ungrouped.append(item)
 
+        single_event_groups = sum(1 for items in groups.values() if len(items) < 2)
         requests = [items for items in groups.values() if len(items) >= 2]
         for i in range(0, len(ungrouped), 20):
             chunk = ungrouped[i:i+20]
@@ -124,6 +148,17 @@ def load_real_requests(lookback_days: int = 90):
             return None
 
         n_events = sum(len(r) for r in requests)
+        print(f"[window] {since.isoformat()} to {until.isoformat()}")
+        print(
+            "[diagnostics] "
+            f"rows={len(rows)}, "
+            f"missing_score_breakdown={skipped_missing_breakdown}, "
+            f"missing_course_id={skipped_missing_course}, "
+            f"grouped_request_ids={len(groups)}, "
+            f"single_event_groups={single_event_groups}, "
+            f"ungrouped_events={len(ungrouped)}, "
+            f"usable_groups={len(requests)}"
+        )
         print(f"[real data] {n_events} events across {len(requests)} requests loaded from Supabase.")
         return requests
 
@@ -282,8 +317,34 @@ def evaluate(requests, score_fn, k=6, name="system"):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Evaluate recommendation systems.")
+    parser.add_argument(
+        "--lookback-days",
+        type=int,
+        default=90,
+        help="Rolling lookback window in days when --since is not provided.",
+    )
+    parser.add_argument(
+        "--since",
+        help="Fixed inclusive start date/time, e.g. 2026-04-01 or 2026-04-01T00:00:00Z.",
+    )
+    parser.add_argument(
+        "--until",
+        help="Fixed exclusive end date/time, e.g. 2026-04-27 or 2026-04-27T23:59:59Z.",
+    )
+    parser.add_argument(
+        "--allow-synthetic",
+        action="store_true",
+        help="Use synthetic fallback data when real data is unavailable or too sparse.",
+    )
+    args = parser.parse_args()
+
     # ── Load and optionally split real data ───────────────────────────────────
-    real_requests = load_real_requests(lookback_days=90)
+    real_requests = load_real_requests(
+        lookback_days=args.lookback_days,
+        since_arg=args.since,
+        until_arg=args.until,
+    )
     data_source = "real"
 
     # Temporal split: if real data has timestamps, use the newest 20% for
@@ -304,9 +365,15 @@ if __name__ == "__main__":
 
     if eval_requests is None or len(eval_requests) < 10:
         if eval_requests is not None:
-            print(f"[warn] Only {len(eval_requests)} real requests — supplementing with synthetic data.")
+            print(f"[warn] Only {len(eval_requests)} real requests.")
         else:
-            print("Falling back to synthetic data.")
+            print("[warn] Real recommendation data unavailable.")
+        if not args.allow_synthetic:
+            raise SystemExit(
+                "[err] Not enough real request groups for evaluation. "
+                "Collect more events or rerun with --allow-synthetic for a smoke test only."
+            )
+        print("[warn] Using synthetic fallback data because --allow-synthetic was passed.")
         synthetic = make_synthetic_requests(n_requests=500)
         eval_requests = (eval_requests or []) + synthetic
         data_source = "synthetic" if not real_requests else "mixed"

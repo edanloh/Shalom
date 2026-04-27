@@ -7,6 +7,7 @@ import { useUser } from './UserContext';
 import { showToast } from '@/components/common/Toast';
 
 export const PREFERRED_CATEGORIES_KEY = 'preferred_categories';
+const DISMISSED_RECOMMENDATIONS_KEY = 'dismissed_recommendations';
 
 interface CourseContextType {
   // All courses
@@ -26,6 +27,8 @@ interface CourseContextType {
   recommendedLoading: boolean;
   recommendedError: string | null;
   refreshRecommended: () => Promise<void>;
+  dismissedRecommendationIds: Set<string>;
+  dismissRecommendedCourse: (course: Course, placement?: string) => Promise<void>;
   
   // Search and filter functions
   searchCourses: (query: string) => Course[];
@@ -64,6 +67,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   const [recommendedCourses, setRecommendedCourses] = useState<Course[]>([]);
   const [recommendedLoading, setRecommendedLoading] = useState(false);
   const [recommendedError, setRecommendedError] = useState<string | null>(null);
+  const [dismissedRecommendationIds, setDismissedRecommendationIds] = useState<Set<string>>(new Set());
 
   const [wishlist, setWishlist] = useState<Course[]>([]);
   const [wishlistLoading, setWishlistLoading] = useState(false);
@@ -75,6 +79,7 @@ export default function CourseProvider({ children }: { children: React.ReactNode
 
   const { user: profileUser } = useUser();
   const dbUserId = profileUser?.uuid;
+  const todayKey = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     loadCourses();
@@ -90,6 +95,20 @@ export default function CourseProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (dbUserId) refreshWishlist();
   }, [dbUserId]);
+
+  useEffect(() => {
+    if (!dbUserId) {
+      setDismissedRecommendationIds(new Set());
+      return;
+    }
+
+    AsyncStorage.getItem(`${DISMISSED_RECOMMENDATIONS_KEY}_${dbUserId}_${todayKey}`)
+      .then((raw) => {
+        const ids = raw ? JSON.parse(raw) : [];
+        setDismissedRecommendationIds(new Set(Array.isArray(ids) ? ids.map(String) : []));
+      })
+      .catch(() => setDismissedRecommendationIds(new Set()));
+  }, [dbUserId, todayKey]);
 
   const loadCourses = async () => {
     if (loading) return;
@@ -237,6 +256,23 @@ export default function CourseProvider({ children }: { children: React.ReactNode
 
   const refreshRecommended = async () => {
     await loadRecommendedCourses();
+  };
+
+  const dismissRecommendedCourse = async (course: Course, placement = 'home') => {
+    if (!course?.id) return;
+    const courseId = String(course.id);
+    setDismissedRecommendationIds((prev) => {
+      const next = new Set(prev);
+      next.add(courseId);
+      if (dbUserId) {
+        AsyncStorage.setItem(
+          `${DISMISSED_RECOMMENDATIONS_KEY}_${dbUserId}_${todayKey}`,
+          JSON.stringify(Array.from(next))
+        ).catch(() => {});
+      }
+      return next;
+    });
+    await recordRecommendationEvent(courseId, 'dismiss', placement);
   };
 
   const searchCourses = (query: string): Course[] => {
@@ -404,6 +440,8 @@ export default function CourseProvider({ children }: { children: React.ReactNode
       recommendedLoading,
       recommendedError,
       refreshRecommended,
+      dismissedRecommendationIds,
+      dismissRecommendedCourse,
       
       searchCourses,
       getCoursesByCategory,

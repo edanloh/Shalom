@@ -124,51 +124,10 @@ export async function getCertificates(
   return resp?.data ?? resp ?? [];
 }
 
-export async function recordCreditEvent(payload: CreditEventPayload) {
-  if (!payload.userId) throw new Error('userId is required');
-  const body = {
-    userId: payload.userId,
-    ...payload,
-  };
-  try {
-    const resp = await apiService.post<any>(ENDPOINTS.EVENTS, body);
-    console.info('credit_event_ok', {
-      type: body.type,
-      points: body.points,
-      courseId: body.courseId,
-    });
-    const data = resp?.data ?? resp;
-    const awarded = data?.awardedAchievements ?? [];
-    if (Array.isArray(awarded) && awarded.length > 0) {
-      const first = awarded[0];
-      const title = awarded.length > 1 ? 'Achievements unlocked' : 'Achievement unlocked';
-      const message =
-        typeof first?.name === 'string' && awarded.length === 1
-          ? first.name
-          : typeof first?.name === 'string'
-          ? `${first.name} +${awarded.length - 1} more`
-          : awarded.length > 1
-          ? `${awarded.length} new achievements`
-          : 'New achievement unlocked';
-      showToast({
-        type: 'success',
-        title,
-        message,
-        durationMs: 2600,
-        skipInApp: true, // backend already persists these as type "achievement"
-      });
-    }
-    emitCreditUpdate();
-    return resp?.data ?? resp;
-  } catch (err) {
-    console.warn('credit_event_fail', {
-      type: body.type,
-      points: body.points,
-      courseId: body.courseId,
-      error: (err as any)?.message || err,
-    });
-    throw err;
-  }
+export async function recordCreditEvent(_payload: CreditEventPayload) {
+  throw new Error(
+    'recordCreditEvent is server-only. Call the relevant learning action endpoint instead.'
+  );
 }
 
 

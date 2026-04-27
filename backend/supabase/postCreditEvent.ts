@@ -30,6 +30,16 @@ async function computeBalance(userId: string) {
   return (data ?? []).reduce((sum, row) => sum + (Number(row.points) || 0), 0);
 }
 
+async function computePositiveCredits(userId: string) {
+  const { data, error } = await supabase
+    .from("credits_events")
+    .select("points")
+    .eq("user_id", userId)
+    .gt("points", 0);
+  if (error) throw error;
+  return (data ?? []).reduce((sum, row) => sum + (Number(row.points) || 0), 0);
+}
+
 type AchievementDef = {
   id: string;
   criteria: Record<string, unknown> | null;
@@ -200,7 +210,13 @@ async function awardGoalCredits(userId: string, goal: any) {
   if (error && error.code !== "23505") throw error;
 
   const balance = await computeBalance(userId);
-  const awardedAchievements = await awardAchievementsForCreditEvent(userId, event, balance);
+  const lifetimeCredits = await computePositiveCredits(userId);
+  const awardedAchievements = await awardAchievementsForCreditEvent(
+    userId,
+    event,
+    balance,
+    lifetimeCredits
+  );
   await notifyAchievements(userId, awardedAchievements);
   await notifyGoalCompleted(userId, goal, rewardPoints);
 }
@@ -271,7 +287,8 @@ async function getCourseInstructorId(courseId?: string | null) {
 async function awardAchievementsForCreditEvent(
   userId: string,
   event: CreditEventRecord,
-  balance: number
+  balance: number,
+  lifetimeCredits?: number
 ) {
   const { data: defs, error } = await supabase
     .from("achievements")
@@ -287,9 +304,11 @@ async function awardAchievementsForCreditEvent(
   );
 
   const totals: Record<string, number | null> = {
-    total_credits: balance,
-    credits_earned: balance,
-    credit_total: balance,
+    total_credits: lifetimeCredits ?? balance,
+    credits_earned: lifetimeCredits ?? balance,
+    credit_total: lifetimeCredits ?? balance,
+    current_credits: balance,
+    credit_balance: balance,
   };
 
   if (criteriaTypes.has("courses_completed") || criteriaTypes.has("course_completed")) {
@@ -358,9 +377,17 @@ async function awardAchievementsForCreditEvent(
       (criteriaType === "total_credits" ||
         criteriaType === "credits_earned" ||
         criteriaType === "credit_total") &&
-      (totals.total_credits ?? 0) >= threshold
+      (totals.credits_earned ?? 0) >= threshold
     ) {
-      toAward.push({ achievement_id: def.id, value: totals.total_credits ?? null });
+      toAward.push({ achievement_id: def.id, value: totals.credits_earned ?? null });
+      continue;
+    }
+
+    if (
+      (criteriaType === "current_credits" || criteriaType === "credit_balance") &&
+      (totals.current_credits ?? 0) >= threshold
+    ) {
+      toAward.push({ achievement_id: def.id, value: totals.current_credits ?? null });
       continue;
     }
 
@@ -497,8 +524,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return fail("Method not allowed", 405);
 
-  // Reject any call not carrying the service role key.
-  // User JWTs, missing headers, or wrong keys all get 403.
+  // This endpoint is intentionally server-only. Awarding credits from a user JWT
+  // would let clients mint arbitrary balance by choosing type/points/referenceKey.
+  // Client flows should call domain endpoints that validate the action, then call
+  // this function with the service role key.
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!serviceKey || authHeader !== `Bearer ${serviceKey}`) {
@@ -538,11 +567,13 @@ serve(async (req) => {
 
       if (existing) {
         const balanceBefore = await computeBalance(event.user_id);
+        const lifetimeCredits = await computePositiveCredits(event.user_id);
         await syncPointGoals(event.user_id, 0);
         const awardedAchievements = await awardAchievementsForCreditEvent(
           event.user_id,
           event,
-          balanceBefore
+          balanceBefore,
+          lifetimeCredits
         );
         const balance = await computeBalance(event.user_id);
         await notifyAchievements(event.user_id, awardedAchievements);
@@ -555,14 +586,33 @@ serve(async (req) => {
 
     // Insert event
     const { error: insertErr } = await supabase.from("credits_events").insert(event);
+    if (insertErr?.code === "23505" && event.reference_key) {
+      const balanceBefore = await computeBalance(event.user_id);
+      const lifetimeCredits = await computePositiveCredits(event.user_id);
+      await syncPointGoals(event.user_id, 0);
+      const awardedAchievements = await awardAchievementsForCreditEvent(
+        event.user_id,
+        event,
+        balanceBefore,
+        lifetimeCredits
+      );
+      const balance = await computeBalance(event.user_id);
+      await notifyAchievements(event.user_id, awardedAchievements);
+      return ok({
+        success: true,
+        data: { balance, event, duplicate: true, awardedAchievements },
+      });
+    }
     if (insertErr) throw insertErr;
 
     const balanceBefore = await computeBalance(event.user_id);
+    const lifetimeCredits = await computePositiveCredits(event.user_id);
     await syncPointGoals(event.user_id, pointsNum);
     const awardedAchievements = await awardAchievementsForCreditEvent(
       event.user_id,
       event,
-      balanceBefore
+      balanceBefore,
+      lifetimeCredits
     );
     const balance = await computeBalance(event.user_id);
     await notifyAchievements(event.user_id, awardedAchievements);

@@ -27,14 +27,59 @@ const PAGE_SIZE = 20;
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const isSameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
 
-const isToday = (d: Date) => isSameDay(d, new Date());
-const isYesterday = (d: Date) => {
-  const y = new Date();
-  y.setDate(y.getDate() - 1);
-  return isSameDay(d, y);
+const currentWeekFmt = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+});
+const monthFmt = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" });
+const UNKNOWN_DATE_LABEL = "Unknown date";
+
+const startOfWeek = (d: Date) => {
+  const day = startOfDay(d);
+  const dayOfWeek = day.getDay();
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  day.setDate(day.getDate() - daysSinceMonday);
+  return day;
 };
 
-const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+
+const isSameMonth = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+
+const parseValidDate = (value?: string | null) => {
+  if (!value) return null;
+  const dt = new Date(value);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+};
+
+const getPointHistorySectionTitle = (d: Date, now = new Date()) => {
+  if (isSameDay(d, now)) return "Today";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (isSameDay(d, yesterday)) return "Yesterday";
+
+  const currentWeekStart = startOfWeek(now);
+  const nextWeekStart = new Date(currentWeekStart);
+  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+  if (d >= currentWeekStart && d < nextWeekStart) {
+    return currentWeekFmt.format(d);
+  }
+
+  const lastWeekStart = new Date(currentWeekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  if (d >= lastWeekStart && d < currentWeekStart) return "Last week";
+
+  if (isSameMonth(d, now)) return "This month";
+
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  if (isSameMonth(d, lastMonth)) return "Last month";
+
+  return monthFmt.format(startOfMonth(d));
+};
+
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 
 const formatTime = (iso: string) => {
@@ -52,37 +97,35 @@ export default function PointsHistoryScreen({ navigation }: any) {
   const [hasMore, setHasMore] = useState(true);
   const [nextOffset, setNextOffset] = useState(0);
   const sections = useMemo(() => {
-    const today: AppPointHistory[] = [];
-    const yesterday: AppPointHistory[] = [];
-    const byDate: Record<string, AppPointHistory[]> = {};
+    const grouped: Record<string, AppPointHistory[]> = {};
+    const sectionTimes: Record<string, number> = {};
+    const ordered = [...history].sort((a, b) => {
+      const bTime = parseValidDate(b.createdAt)?.getTime() ?? 0;
+      const aTime = parseValidDate(a.createdAt)?.getTime() ?? 0;
+      return bTime - aTime;
+    });
 
-    for (const n of history) {
-      const dt = new Date(n.createdAt);
-
-      if (isToday(dt)) {
-        today.push(n);
-      } else if (isYesterday(dt)) {
-        yesterday.push(n);
-      } else {
-        const key = fmt.format(dt); // e.g., "Sep 2, 2025"
-        if (!byDate[key]) byDate[key] = [];
-        byDate[key].push(n);
+    for (const n of ordered) {
+      const dt = parseValidDate(n.createdAt);
+      if (!dt) {
+        if (!grouped[UNKNOWN_DATE_LABEL]) grouped[UNKNOWN_DATE_LABEL] = [];
+        grouped[UNKNOWN_DATE_LABEL].push(n);
+        continue;
       }
+
+      const key = getPointHistorySectionTitle(dt);
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(n);
+      sectionTimes[key] = Math.max(sectionTimes[key] ?? 0, dt.getTime());
     }
 
-    const result: Array<{ title: string; data: AppPointHistory[] }> = [];
-    if (today.length) result.push({ title: 'Today', data: today });
-    if (yesterday.length) result.push({ title: 'Yesterday', data: yesterday });
-
-    // Add older groups sorted by most-recent first
-    const olderDates = Object.keys(byDate)
-      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
-    for (const key of olderDates) {
-      result.push({ title: key, data: byDate[key] });
-    }
-
-    return result;
+    return Object.keys(grouped)
+      .sort((a, b) => {
+        if (a === UNKNOWN_DATE_LABEL) return 1;
+        if (b === UNKNOWN_DATE_LABEL) return -1;
+        return (sectionTimes[b] ?? 0) - (sectionTimes[a] ?? 0);
+      })
+      .map((title) => ({ title, data: grouped[title] }));
   }, [history]);
 
   const [refreshing, setRefreshing] = useState(false);

@@ -58,7 +58,6 @@ export default function HomeScreen({ navigation, route }: any) {
   const { user: profileUser } = useUser();
   const recommendationUserId = profileUser?.uuid;
   const [showInterestModal, setShowInterestModal] = useState(false);
-  const [dismissedRecoIds, setDismissedRecoIds] = useState<Set<string>>(new Set());
   const [creditBalance, setCreditBalance] = useState(0);
   const [equippedTitle, setEquippedTitle] = useState<Pick<ShopItem, 'icon' | 'name'> | null>(null);
   const [equippedFrameColor, setEquippedFrameColor] = useState<string | null>(null);
@@ -101,6 +100,8 @@ export default function HomeScreen({ navigation, route }: any) {
     recommendedLoading,
     recommendedError,
     refreshRecommended,
+    dismissedRecommendationIds,
+    dismissRecommendedCourse,
 
     wishlist,
     wishlistLoading,
@@ -436,8 +437,7 @@ export default function HomeScreen({ navigation, route }: any) {
   };
 
   const handleRecommendationDismiss = (course: Course) => {
-    setDismissedRecoIds((prev) => new Set(prev).add(course.id));
-    recordRecommendationEvent(course.id, 'dismiss', 'home_recommended')
+    dismissRecommendedCourse(course, 'home_recommended')
       .catch((err) => console.warn('Failed to record rec dismiss', err));
   };
 
@@ -449,14 +449,18 @@ export default function HomeScreen({ navigation, route }: any) {
 
   // Build recommended list: prefer API recs, fallback to non-enrolled, exclude dismissed
   const recommendedList = React.useMemo(() => {
-    const base = recommendedCourses?.length
-      ? recommendedCourses
-      : (() => {
-          const enrolledIds = new Set((myCoursesData ?? []).map((c) => c.id));
-          return (courses ?? []).filter((c) => !enrolledIds.has(c.id)).slice(0, 8);
-        })();
-    return base.filter((c) => !dismissedRecoIds.has(c.id));
-  }, [courses, myCoursesData, recommendedCourses, dismissedRecoIds]);
+    const enrolledIds = new Set((myCoursesData ?? []).map((c) => c.id));
+    const fallback = (courses ?? []).filter((c) => !enrolledIds.has(c.id));
+    const deduped = new Map<string, Course>();
+
+    [...(recommendedCourses ?? []), ...fallback].forEach((course) => {
+      if (course?.id) deduped.set(String(course.id), course);
+    });
+
+    return Array.from(deduped.values())
+      .filter((c) => !dismissedRecommendationIds.has(String(c.id)))
+      .slice(0, 5);
+  }, [courses, myCoursesData, recommendedCourses, dismissedRecommendationIds]);
 
   const recommendedListLoading = recommendedLoading || coursesLoading;
 

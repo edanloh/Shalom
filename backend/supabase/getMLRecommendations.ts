@@ -268,6 +268,12 @@ const applyMLDiversityConstraints = <
 // ── Hard-coded diversity caps (match defaults in getRecommendations.ts) ───────
 const ML_MAX_PER_CATEGORY = Number(Deno.env.get("RECO_MAX_PER_CATEGORY") ?? "2");
 const ML_MAX_PER_INSTRUCTOR = Number(Deno.env.get("RECO_MAX_PER_INSTRUCTOR") ?? "2");
+const MAX_RESULTS = 12;
+
+const clampInt = (value: number, min: number, max: number) => {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(Math.floor(value), min), max);
+};
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 serve(async (req) => {
@@ -276,6 +282,7 @@ serve(async (req) => {
   const url = new URL(req.url);
   const userId = url.searchParams.get("userId");
   const placement = url.searchParams.get("placement") ?? "home";
+  const resultLimit = clampInt(Number(url.searchParams.get("limit")) || MAX_RESULTS, 1, MAX_RESULTS);
 
   // Step 1: call the existing rule-based function to get scored candidates
   // We re-use all the candidate generation + feature computation by calling
@@ -345,7 +352,7 @@ serve(async (req) => {
     });
     reranked = applyMLDiversityConstraints(
       mlSorted,
-      6,
+      resultLimit,
       ML_MAX_PER_CATEGORY,
       ML_MAX_PER_INSTRUCTOR
     );
@@ -353,7 +360,7 @@ serve(async (req) => {
   }
 
   // Re-assign ranks after ML re-ranking
-  const results = reranked.slice(0, 6).map((item, i) => ({
+  const results = reranked.slice(0, resultLimit).map((item, i) => ({
     ...item,
     rank: i + 1,
     ml_score: mlOk && model ? Number(mlScore(item.score_breakdown, model).toFixed(4)) : null,

@@ -12,6 +12,42 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 );
 
+type AuthResult = {
+  userId?: string;
+  status?: number;
+  message?: string;
+};
+
+const getAuthenticatedPublicUserId = async (
+  req: Request,
+  adminClient: ReturnType<typeof createClient>
+): Promise<AuthResult> => {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader) return { status: 401, message: "Missing auth header" };
+
+  const authClient = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const {
+    data: { user },
+    error,
+  } = await authClient.auth.getUser();
+  if (error || !user?.email) return { status: 401, message: "Unauthorized" };
+
+  const { data: publicUser, error: userErr } = await adminClient
+    .from("users")
+    .select("id")
+    .eq("email", user.email)
+    .maybeSingle();
+  if (userErr) throw userErr;
+  if (!publicUser?.id) return { status: 403, message: "Public user profile not found" };
+
+  return { userId: publicUser.id };
+};
+
 const ok = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -35,156 +71,38 @@ serve(async (req) => {
       return fail("action must be 'purchase', 'equip', or 'unequip'", 400);
     }
 
-    // Fetch item
-    const { data: item, error: itemErr } = await supabase
-      .from("shop_items")
-      .select("id, name, cost, type, icon")
-      .eq("id", itemId)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (itemErr) throw itemErr;
-    if (!item) return fail("Item not found", 404);
-
-    // Check existing unlock
-    let { data: existing, error: existErr } = await supabase
-      .from("user_unlocked_items")
-      .select("id, is_equipped")
-      .eq("user_id", userId)
-      .eq("item_id", itemId)
-      .maybeSingle();
-    if (existErr) throw existErr;
-
-    if (action === "equip") {
-      if (!existing) {
-        const { data: purchaseEvent, error: purchaseLookupErr } = await supabase
-          .from("credits_events")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("type", "shop_purchase")
-          .eq("reference_key", `shop_purchase:${itemId}`)
-          .maybeSingle();
-        if (purchaseLookupErr) throw purchaseLookupErr;
-        if (!purchaseEvent) return fail("Item not unlocked", 403);
-
-        const { error: repairErr } = await supabase
-          .from("user_unlocked_items")
-          .upsert(
-            {
-              user_id: userId,
-              item_id: itemId,
-              is_equipped: false,
-            },
-            { onConflict: "user_id,item_id", ignoreDuplicates: true }
-          );
-        if (repairErr) throw repairErr;
-
-        const repaired = await supabase
-          .from("user_unlocked_items")
-          .select("id, is_equipped")
-          .eq("user_id", userId)
-          .eq("item_id", itemId)
-          .maybeSingle();
-        if (repaired.error) throw repaired.error;
-        existing = repaired.data;
-      }
-
-      // Unequip all other items of the same type, then equip this one
-      const { data: sameType, error: sameTypeErr } = await supabase
-        .from("shop_items")
-        .select("id")
-        .eq("type", item.type)
-        .eq("is_active", true);
-      if (sameTypeErr) throw sameTypeErr;
-
-      const sameTypeIds = (sameType ?? []).map((i) => i.id);
-
-      const { error: unequipErr } = await supabase
-        .from("user_unlocked_items")
-        .update({ is_equipped: false })
-        .eq("user_id", userId)
-        .in("item_id", sameTypeIds);
-      if (unequipErr) throw unequipErr;
-
-      const { error: equipErr } = await supabase
-        .from("user_unlocked_items")
-        .update({ is_equipped: true })
-        .eq("user_id", userId)
-        .eq("item_id", itemId);
-      if (equipErr) throw equipErr;
-
-      return ok({ success: true, data: { action: "equip", itemId, itemName: item.name } });
+    const auth = await getAuthenticatedPublicUserId(req, supabase);
+    if (!auth.userId) {
+      return fail(auth.message ?? "Unauthorized", auth.status ?? 401);
+    }
+    if (auth.userId !== userId) {
+      return fail("Forbidden", 403);
     }
 
-    if (action === "unequip") {
-      if (!existing) return fail("Item not unlocked", 403);
-
-      const { error: unequipErr } = await supabase
-        .from("user_unlocked_items")
-        .update({ is_equipped: false })
-        .eq("user_id", userId)
-        .eq("item_id", itemId);
-      if (unequipErr) throw unequipErr;
-
-      return ok({ success: true, data: { action: "unequip", itemId, itemName: item.name } });
-    }
-
-    // Verify balance
-    const { data: events, error: balErr } = await supabase
-      .from("credits_events")
-      .select("points")
-      .eq("user_id", userId);
-    if (balErr) throw balErr;
-    const balance = (events ?? []).reduce((sum, r) => sum + (Number(r.points) || 0), 0);
-
-    // action === "purchase"
-    if (existing) {
-      return ok({
-        success: true,
-        data: {
-          action: "purchase",
-          itemId,
-          itemName: item.name,
-          newBalance: balance,
-          alreadyUnlocked: true,
-        },
-      });
-    }
-
-    if (item.cost > 0 && balance < item.cost) {
-      return fail(`Not enough credits. Need ${item.cost}, have ${balance}.`, 402);
-    }
-
-    // Deduct credits via a negative credit event
-    const referenceKey = `shop_purchase:${itemId}`;
-    const { error: deductErr } = await supabase.from("credits_events").insert({
-      user_id: userId,
-      type: "shop_purchase",
-      title: `Unlocked "${item.name}"`,
-      points: -item.cost,
-      reference_key: referenceKey,
-      timestamp: new Date().toISOString(),
+    const { data, error } = await supabase.rpc("redeem_shop_item", {
+      p_user_id: userId,
+      p_item_id: itemId,
+      p_action: action,
     });
-    if (deductErr && deductErr.code !== "23505") throw deductErr;
+    if (error) {
+      const msg = error.message ?? "Failed to process redemption";
+      if (error.code === "P4020") return fail(msg, 402);
+      if (error.code === "P4030") return fail(msg, 403);
+      if (error.code === "P4040") return fail(msg, 404);
+      if (error.code === "P4000") return fail(msg, 400);
+      throw error;
+    }
 
-    // Ensure the unlock row exists whether this is the first successful purchase
-    // or a repair of a previously deducted item.
-    const { error: unlockErr } = await supabase
-      .from("user_unlocked_items")
-      .upsert(
-        {
-          user_id: userId,
-          item_id: itemId,
-          is_equipped: false,
-        },
-        { onConflict: "user_id,item_id", ignoreDuplicates: true }
-      );
-    if (unlockErr) throw unlockErr;
-
-    const alreadyUnlocked = deductErr?.code === "23505";
-    const newBalance = alreadyUnlocked ? balance : balance - item.cost;
+    const row = Array.isArray(data) ? data[0] : data;
     return ok({
       success: true,
-      data: { action: "purchase", itemId, itemName: item.name, newBalance, alreadyUnlocked },
+      data: {
+        action: row?.action ?? action,
+        itemId: row?.item_id ?? itemId,
+        itemName: row?.item_name ?? null,
+        newBalance: Number(row?.new_balance ?? 0),
+        alreadyUnlocked: !!row?.already_unlocked,
+      },
     });
   } catch (err: any) {
     console.error("redeemCredits error", err);

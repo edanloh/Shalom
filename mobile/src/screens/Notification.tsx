@@ -211,15 +211,52 @@ function resolveNotificationRoute(
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const isSameDay = (a: Date, b: Date) => startOfDay(a).getTime() === startOfDay(b).getTime();
 
-const isToday = (d: Date) => isSameDay(d, new Date());
-const isYesterday = (d: Date) => {
-  const y = new Date();
-  y.setDate(y.getDate() - 1);
-  return isSameDay(d, y);
+const currentWeekFmt = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+});
+const monthFmt = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" });
+const UNKNOWN_DATE_LABEL = "Unknown date";
+
+const startOfWeek = (d: Date) => {
+  const day = startOfDay(d);
+  const dayOfWeek = day.getDay();
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  day.setDate(day.getDate() - daysSinceMonday);
+  return day;
 };
 
-const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-const UNKNOWN_DATE_LABEL = "Unknown date";
+const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+
+const isSameMonth = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+
+const getNotificationSectionTitle = (d: Date, now = new Date()) => {
+  if (isSameDay(d, now)) return "Today";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (isSameDay(d, yesterday)) return "Yesterday";
+
+  const currentWeekStart = startOfWeek(now);
+  const nextWeekStart = new Date(currentWeekStart);
+  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+  if (d >= currentWeekStart && d < nextWeekStart) {
+    return currentWeekFmt.format(d);
+  }
+
+  const lastWeekStart = new Date(currentWeekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  if (d >= lastWeekStart && d < currentWeekStart) return "Last week";
+
+  if (isSameMonth(d, now)) return "This month";
+
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  if (isSameMonth(d, lastMonth)) return "Last month";
+
+  return monthFmt.format(startOfMonth(d));
+};
 
 const isIconUrl = (value?: string) =>
   !!value && (value.startsWith("http://") || value.startsWith("https://"));
@@ -472,9 +509,8 @@ export default function NotificationsScreen({ navigation }: any) {
   );
 
   const sections = useMemo(() => {
-    const today: InAppNotification[] = [];
-    const yesterday: InAppNotification[] = [];
-    const byDate: Record<string, InAppNotification[]> = {};
+    const grouped: Record<string, InAppNotification[]> = {};
+    const sectionTimes: Record<string, number> = {};
     const ordered = [...inAppNotifications].sort(
       (a, b) => {
         const bTime = parseValidDate(b.createdAt)?.getTime() ?? 0;
@@ -486,39 +522,24 @@ export default function NotificationsScreen({ navigation }: any) {
     for (const n of ordered) {
       const dt = parseValidDate(n.createdAt);
       if (!dt) {
-        if (!byDate[UNKNOWN_DATE_LABEL]) byDate[UNKNOWN_DATE_LABEL] = [];
-        byDate[UNKNOWN_DATE_LABEL].push(n);
+        if (!grouped[UNKNOWN_DATE_LABEL]) grouped[UNKNOWN_DATE_LABEL] = [];
+        grouped[UNKNOWN_DATE_LABEL].push(n);
         continue;
       }
 
-      if (isToday(dt)) {
-        today.push(n);
-      } else if (isYesterday(dt)) {
-        yesterday.push(n);
-      } else {
-        const key = fmt.format(dt); // e.g., "Sep 2, 2025"
-        if (!byDate[key]) byDate[key] = [];
-        byDate[key].push(n);
-      }
+      const key = getNotificationSectionTitle(dt);
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(n);
+      sectionTimes[key] = Math.max(sectionTimes[key] ?? 0, dt.getTime());
     }
 
-    const result: Array<{ title: string; data: InAppNotification[] }> = [];
-    if (today.length) result.push({ title: 'Today', data: today });
-    if (yesterday.length) result.push({ title: 'Yesterday', data: yesterday });
-
-    // Add older groups sorted by most-recent first
-    const olderDates = Object.keys(byDate)
+    return Object.keys(grouped)
       .sort((a, b) => {
         if (a === UNKNOWN_DATE_LABEL) return 1;
         if (b === UNKNOWN_DATE_LABEL) return -1;
-        return new Date(b).getTime() - new Date(a).getTime();
-      });
-
-    for (const key of olderDates) {
-      result.push({ title: key, data: byDate[key] });
-    }
-
-    return result;
+        return (sectionTimes[b] ?? 0) - (sectionTimes[a] ?? 0);
+      })
+      .map((title) => ({ title, data: grouped[title] }));
   }, [inAppNotifications]);
 
   const [refreshing, setRefreshing] = useState(false);
