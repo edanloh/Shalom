@@ -3,6 +3,7 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -12,11 +13,10 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, TextStyles, Shadows } from '../constants';
+import { Colors, Spacing, TextStyles } from '../constants';
 import { useUser } from '../contexts/UserContext';
 import { useMessages } from '@/contexts/MessageContext';
 import { supabase } from '@/lib/supabase';
-import { CustomTextInput } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ScreenHeader from '@/components/common/ScreenHeader';
 import { ImageWithFallback } from '../components/common';
@@ -299,32 +299,27 @@ export default function ConversationScreen({ navigation }: any) {
             <View style={{ height: 1 }} />
           </ScrollView>
           )}
-          <View
-            style={[
-              styles.messagesContainer,
-              {
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                margin: Spacing.lg,
-              },
-            ]}
-          >
-            <View style={{ flex: 1, marginRight: 8 }}>
-              <CustomTextInput
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', margin: Spacing.lg }}>
+            <View style={[styles.messagesContainer, { flex: 1, marginRight: 8 }]}>
+              <TextInput
+                style={styles.chatInput}
                 placeholder="Type your message..."
+                placeholderTextColor={Colors.textSecondary}
                 value={newMessage}
                 onChangeText={setNewMessage}
-                autoCapitalize={'none'}
-                keyboardType={'default'}
+                autoCapitalize="none"
+                keyboardType="default"
                 multiline
+                scrollEnabled
+                textAlignVertical="top"
               />
             </View>
             <TouchableOpacity
-              style={styles.sendButton}
+              style={[styles.sendButton, (!newMessage.trim() || sending) && { opacity: 0.4 }]}
               disabled={sending || !newMessage.trim()}
               onPress={handleSendMessage}
             >
-              <Ionicons name="send" size={20} color={Colors.white} />
+              <Ionicons name="send" size={18} color={Colors.white} />
             </TouchableOpacity>
           </View>
         </View>
@@ -334,22 +329,6 @@ export default function ConversationScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.purple200,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    borderWidth: 2,
-    borderColor: Colors.secondary,
-  },
-  avatarText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.secondary,
-  },
   messagesContainer: {
     backgroundColor: Colors.textInputBg,
     borderRadius: 12,
@@ -381,25 +360,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'right',
   },
-  inputRow: {
-    padding: Spacing.sm,
-    ...Shadows.small,
-  },
-  input: {
-    flex: 1,
+  chatInput: {
     minHeight: 40,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: Colors.gray200,
-    borderRadius: 10,
+    maxHeight: 120,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.white,
-    marginRight: 8,
+    paddingVertical: 10,
+    color: Colors.white,
     fontSize: 16,
   },
   sendButton: {
-    marginTop: 20,
-    marginRight: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },

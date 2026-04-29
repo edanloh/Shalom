@@ -414,11 +414,6 @@ export default function HomeScreen({ navigation, route }: any) {
     setActiveTab(tab);
   };
 
-  const handleNotificationPress = () => {
-    // Handle notification press - integrate with notification system
-    navigation.navigate('Notifications');
-  };
-
   const handleViewAllCourses = () => {
     // Navigate to my courses screen
     navigation.navigate('MyCourses');
@@ -454,7 +449,7 @@ export default function HomeScreen({ navigation, route }: any) {
     const deduped = new Map<string, Course>();
 
     [...(recommendedCourses ?? []), ...fallback].forEach((course) => {
-      if (course?.id) deduped.set(String(course.id), course);
+      if (course?.id && !deduped.has(String(course.id))) deduped.set(String(course.id), course);
     });
 
     return Array.from(deduped.values())
@@ -504,8 +499,6 @@ export default function HomeScreen({ navigation, route }: any) {
         equippedFrame={equippedFrame}
         equippedBanner={equippedBanner}
         onCreditsPress={() => navigation.navigate('PointsHistory')}
-        hasNotifications={true}
-        onNotificationPress={handleNotificationPress}
       />
 
           {/* Achievement Cards - Day Streak and Certificates */}

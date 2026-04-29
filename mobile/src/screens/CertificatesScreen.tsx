@@ -528,7 +528,7 @@ export default function CertificatesScreen({ navigation }: any) {
                     {formatDate(cert.completedAt).split(",")[0]}
                   </Text>
                 </View>
-                {cert.score && (
+                {cert.score != null && (
                   <View style={styles.compactScore}>
                     <Text
                       style={[
@@ -645,7 +645,7 @@ export default function CertificatesScreen({ navigation }: any) {
         </Text>
 
         {/* Score Badge */}
-        {selectedCert?.score && (
+        {selectedCert?.score != null && (
           <View
             style={[
               styles.scoreBadge,

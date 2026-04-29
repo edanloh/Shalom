@@ -341,7 +341,7 @@ export default function CoursesScreen({ navigation }: any) {
     if (query) return [];
     const deduped = new Map<string, Course>();
     [...recommendedCourses, ...catalogCourses].forEach((course) => {
-      if (course?.id) deduped.set(String(course.id), course);
+      if (course?.id && !deduped.has(String(course.id))) deduped.set(String(course.id), course);
     });
 
     return Array.from(deduped.values())
@@ -777,6 +777,8 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontWeight: "700",
     fontSize: 15,
+    lineHeight: 21,
+    minHeight: 42,
     marginTop: 10,
     paddingHorizontal: 2,
     fontFamily: TextStyles.body.fontFamily,

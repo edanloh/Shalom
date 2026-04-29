@@ -7,8 +7,6 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Image,
 } from "react-native";
 import styles from "@/styles/styles";
@@ -45,16 +43,16 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView
+    <ScrollView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      contentContainerStyle={[
+        styles.scrollContent,
+        { justifyContent: "center", padding: Spacing.lg },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { justifyContent: "center", padding: Spacing.lg },
-        ]}
-      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logo}>
@@ -175,7 +173,6 @@ export default function LoginScreen({ navigation }: any) {
             <Text style={styles.loginLink}>Sign Up</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </ScrollView>
   );
 }

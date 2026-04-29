@@ -21,8 +21,6 @@ interface CombinedHeaderProps {
   equippedFrame?: Partial<Pick<ShopItem, 'name' | 'color'>> | null;
   equippedBanner?: Partial<Pick<ShopItem, 'name' | 'color'>> | null;
   onCreditsPress?: () => void;
-  hasNotifications?: boolean;
-  onNotificationPress?: () => void;
 }
 
 export default function CombinedHeader({ 
@@ -31,8 +29,6 @@ export default function CombinedHeader({
   equippedFrame = null,
   equippedBanner = null,
   onCreditsPress,
-  hasNotifications = false,
-  onNotificationPress,
 }: CombinedHeaderProps) {
   const user = useUser().user;
   const formattedBalance = balance.toLocaleString();
@@ -81,17 +77,6 @@ export default function CombinedHeader({
             <Text style={styles.creditsText}>{formattedBalance}</Text>
           </TouchableOpacity>
 
-          {hasNotifications && onNotificationPress ? (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={onNotificationPress}
-              style={styles.notificationButton}
-              accessibilityRole="button"
-              accessibilityLabel="Open notifications"
-            >
-              <Ionicons name="notifications-outline" size={20} color={Colors.white} />
-            </TouchableOpacity>
-          ) : null}
         </View>
       </View>
     </LinearGradient>
@@ -101,12 +86,6 @@ export default function CombinedHeader({
 const styles = StyleSheet.create({
   container: {
     marginBottom: Spacing.sm,
-  },
-  topHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
   },
   welcomeSection: {
     flexDirection: 'row',
@@ -168,15 +147,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.white,
     marginLeft: 6,
-  },
-  notificationButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: Spacing.sm,
   },
   welcomeText: {
     fontFamily: Typography.fontFamily.regular,

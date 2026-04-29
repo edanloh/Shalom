@@ -215,17 +215,21 @@ function CourseCardItem({
         {/* Content Section */}
         <View style={styles.mainCardContent}>
           {/* Course Title */}
-          <Text style={TextStyles.h5} numberOfLines={2}>
-            {course.title}
-          </Text>
+          <View style={styles.titleWrap}>
+            <Text style={TextStyles.h5} numberOfLines={2}>
+              {course.title}
+            </Text>
+          </View>
 
           {/* Course Description */}
-          <Text style={TextStyles.caption} numberOfLines={2}>
-            {course.description}
-          </Text>
+          <View style={styles.descWrap}>
+            <Text style={TextStyles.caption} numberOfLines={2}>
+              {course.description}
+            </Text>
+          </View>
 
           {/* Progress Section */}
-          <View style={styles.progressRow}>
+          <View style={styles.progressSection}>
             <View style={styles.progressBarContainer}>
               <View
                 style={[
@@ -234,10 +238,7 @@ function CourseCardItem({
                 ]}
               />
             </View>
-
-            <Text style={styles.progressText}>
-              {progressPercent}% {"\n"} Complete
-            </Text>
+            <Text style={styles.progressText}>{progressPercent}% Complete</Text>
           </View>
 
           {/* Instructor Section */}
@@ -247,28 +248,25 @@ function CourseCardItem({
               fallback={Images.defaultAvatar}
               style={styles.instructorAvatar}
             />
-            <View>
-              <Text style={TextStyles.body}>
-                {course.instructor?.name || "Instructor"}
-              </Text>
-            </View>
+            <Text style={TextStyles.body} numberOfLines={1}>
+              {course.instructor?.name || "Instructor"}
+            </Text>
           </View>
 
           {/* Stats */}
           <View style={styles.statsSection}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{progressPercent}%</Text>
-              <Text style={styles.statLabel}>Complete</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{course.duration || "14h"}</Text>
+              <Text style={styles.statValue}>{course.duration || "—"}</Text>
               <Text style={styles.statLabel}>Duration</Text>
             </View>
 
+            <View style={styles.statDivider} />
+
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
-                {Number.isFinite(Number(course.rating)) ? course.rating : "0"}
+                {Number.isFinite(Number(course.rating)) && Number(course.rating) > 0
+                  ? Number(course.rating).toFixed(1)
+                  : "—"}
               </Text>
               <Text style={styles.statLabel}>Rating</Text>
             </View>
@@ -495,21 +493,20 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 18,
   },
-  progressRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.sm,
+  titleWrap: {
+    height: 54,
+    justifyContent: "flex-start",
+  },
+  descWrap: {
+    height: 42,
+    justifyContent: "flex-start",
+  },
+  progressSection: {
     marginTop: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   progressText: {
-    marginLeft: Spacing.sm,
-    fontFamily: Typography.fontFamily.medium,
-    fontSize: TextStyles.caption.fontSize,
-    color: Colors.textSecondary,
-    textAlign: "center",
-  },
-  progressLabel: {
+    marginTop: 4,
     fontFamily: Typography.fontFamily.medium,
     fontSize: TextStyles.caption.fontSize,
     color: Colors.textSecondary,
@@ -544,11 +541,17 @@ const styles = StyleSheet.create({
   statsSection: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
+    justifyContent: "center",
     marginVertical: Spacing.sm,
+    gap: Spacing.lg,
   },
   statItem: {
     alignItems: "center",
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: Colors.gray200,
   },
   statValue: {
     fontFamily: Typography.fontFamily.extraBold,
