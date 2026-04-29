@@ -469,10 +469,7 @@ const convertEnrollmentToAppCourse = (enrollment: EnrollmentCourse): Course => {
     ? Math.round((progressCompleted / progressTotal) * 100)
     : fallbackEnrollmentPercentage;
 
-  // If backend marks completion explicitly, enforce 100% to prevent mixed UI states.
-  const effectiveProgressPercentage = enrollment.is_completed
-    ? 100
-    : calculatedPercentage;
+  const effectiveProgressPercentage = calculatedPercentage;
   
   console.log(`[courseService] Converting enrollment for "${enrollment.title}":`, {
     hasSectionData,
