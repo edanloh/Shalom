@@ -288,6 +288,26 @@ serve(async (req) => {
     });
 
     const ratingBreakdown: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    const { data: ratingRows } = await supabaseClient
+      .from('course_ratings')
+      .select('rating')
+      .eq('course_id', courseId);
+    let actualTotalRatings = 0;
+    let ratingSum = 0;
+    if (ratingRows) {
+      for (const row of ratingRows) {
+        const val = Number(row.rating);
+        const star = Math.round(val);
+        if (star >= 1 && star <= 5) {
+          ratingBreakdown[star] = (ratingBreakdown[star] || 0) + 1;
+          ratingSum += val;
+          actualTotalRatings++;
+        }
+      }
+    }
+    const actualRating = actualTotalRatings > 0
+      ? Number((ratingSum / actualTotalRatings).toFixed(2))
+      : 0;
 
     // ========================================
     // 5. Construct structured response for instructor
@@ -300,8 +320,8 @@ serve(async (req) => {
         category_color: course.categories?.color,
         requirements: [],
         outcomes: (outcomes || []).map((o: any) => o.outcome),
-        rating: Number(course.rating || 0),
-        totalRatings: Number(course.total_ratings || 0),
+        rating: actualRating,
+        totalRatings: actualTotalRatings,
         ratingBreakdown: ratingBreakdown,
         // Reviews are served by getInstructorReviews for instructor workflows.
         reviews: []

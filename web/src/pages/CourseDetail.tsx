@@ -984,10 +984,7 @@ const CourseDetail = () => {
                     {/* Rating Breakdown */}
                     <div className="space-y-3">
                       {[5, 4, 3, 2, 1].map((rating) => {
-                        // Calculate actual rating distribution from reviews
-                        const count = reviews.filter(
-                          (review) => Math.round(review.rating) === rating,
-                        ).length;
+                        const count = course.ratingBreakdown?.[rating] ?? 0;
                         const percentage =
                           course.totalRatings > 0
                             ? Math.round((count / course.totalRatings) * 100)
@@ -1145,78 +1142,46 @@ const CourseDetail = () => {
                               <DropdownMenuContent align="end" className="w-44">
                                 {review.reviewStatus !== "hidden" ? (
                                   <DropdownMenuItem
-                                    onClick={(event) => {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      openReviewActionDialog(review, "hide");
-                                    }}
+                                    onClick={() => openReviewActionDialog(review, "hide")}
                                   >
                                     Hide
                                   </DropdownMenuItem>
                                 ) : (
                                   <DropdownMenuItem
-                                    onClick={(event) => {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      openReviewActionDialog(review, "unhide");
-                                    }}
+                                    onClick={() => openReviewActionDialog(review, "unhide")}
                                   >
                                     Unhide
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuItem
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    openReviewActionDialog(review, "flag");
-                                  }}
+                                  onClick={() => openReviewActionDialog(review, "flag")}
                                 >
                                   Flag
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    openReviewActionDialog(review, "resolve");
-                                  }}
+                                  onClick={() => openReviewActionDialog(review, "resolve")}
                                 >
                                   Resolve
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    openReviewActionDialog(review, "acknowledge");
-                                  }}
+                                  onClick={() => openReviewActionDialog(review, "acknowledge")}
                                 >
                                   Acknowledge
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    openReviewActionDialog(review, "reply");
-                                  }}
+                                  onClick={() => openReviewActionDialog(review, "reply")}
                                 >
                                   Reply
                                 </DropdownMenuItem>
                                 {review.isPinned ? (
                                   <DropdownMenuItem
-                                    onClick={(event) => {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      openReviewActionDialog(review, "unpin");
-                                    }}
+                                    onClick={() => openReviewActionDialog(review, "unpin")}
                                   >
                                     Unpin
                                   </DropdownMenuItem>
                                 ) : (
                                   <DropdownMenuItem
-                                    onClick={(event) => {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      openReviewActionDialog(review, "pin");
-                                    }}
+                                    onClick={() => openReviewActionDialog(review, "pin")}
                                   >
                                     Pin
                                   </DropdownMenuItem>

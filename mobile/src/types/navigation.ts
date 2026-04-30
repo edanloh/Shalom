@@ -1,4 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { Certificate } from '@/utils/certificate';
 
 export type CourseDetailSourceScreen = "Home" | "Courses" | "MyCourses";
 
@@ -32,6 +33,10 @@ export type MainStackParamList = {
   PointsHistory: undefined;
   AchievementsScreen: undefined;
   CertificatesScreen: undefined;
+  CertificateViewer: {
+    certificate: Certificate;
+    html: string;
+  };
   LearningGoalScreen: undefined;
   CreditsShop: undefined;
   ChangePassword: undefined;

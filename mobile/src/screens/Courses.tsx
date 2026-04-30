@@ -206,6 +206,7 @@ export default function CoursesScreen({ navigation }: any) {
     loading,
     recommendedLoading,
     refreshCourses,
+    refreshMyCourses,
     refreshRecommended,
     dismissedRecommendationIds,
     dismissRecommendedCourse,
@@ -406,6 +407,7 @@ export default function CoursesScreen({ navigation }: any) {
       setRefreshing(true);
       await Promise.all([
         refreshCourses?.(),
+        refreshMyCourses?.(),
         refreshRecommended?.(),
         fetchCategories(),
         loadCatalogPage({ reset: true }),
@@ -413,7 +415,7 @@ export default function CoursesScreen({ navigation }: any) {
     } finally {
       setRefreshing(false);
     }
-  }, [refreshCourses, refreshRecommended, fetchCategories, loadCatalogPage]);
+  }, [refreshCourses, refreshMyCourses, refreshRecommended, fetchCategories, loadCatalogPage]);
 
 
   const EmptyState = ({

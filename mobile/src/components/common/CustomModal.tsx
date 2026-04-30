@@ -7,12 +7,14 @@ import { ReactNode } from "react";
 type CustomModalProps = {
   visible: boolean;
   onClose: () => void;
+  onDismiss?: () => void;
   children: ReactNode;
 };
 
 export default function CustomModal({
   visible,
   onClose,
+  onDismiss,
   children,
 }: CustomModalProps) {
   return (
@@ -21,6 +23,7 @@ export default function CustomModal({
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
       <View style={styles.modalOverlay}>
         <TouchableOpacity

@@ -18,6 +18,7 @@ export { default as TestScreen } from "./TestScreen";
 export { default as UserProfile } from "./UserProfile";
 export { default as WishlistScreen } from "./WishlistScreen";
 export { default as CertificatesScreen } from "./CertificatesScreen";
+export { default as CertificateViewerScreen } from "./CertificateViewerScreen";
 export { default as DocumentView } from "./DocumentView";
 export { default as LearningGoalScreen } from "./LearningGoalScreen";
 export { default as CreditsShopScreen } from "./CreditsShopScreen";

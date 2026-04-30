@@ -300,6 +300,11 @@ export default function MainNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="CertificateViewer"
+        component={Screens.CertificateViewerScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="DocumentView"
         component={Screens.DocumentView}
         options={{ headerShown: false }}

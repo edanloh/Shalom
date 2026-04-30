@@ -470,7 +470,7 @@ const ModuleDetailScreen = () => {
 
           <View style={styles.itemFooter}>
             <View style={styles.itemMetaContainer}>
-              {item.type === "video" && item.duration_seconds && (
+              {item.type === "video" && !!item.duration_seconds && (
                 <View style={styles.itemMeta}>
                   <Ionicons
                     name="time-outline"

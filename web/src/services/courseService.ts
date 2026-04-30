@@ -50,6 +50,7 @@ export interface Course {
   completionRate: number;
   rating: number;
   totalRatings: number;
+  ratingBreakdown: Record<number, number>;
   duration: string;
   modules: number;
   lessons: number;
@@ -375,6 +376,7 @@ const convertAWSCourseToWebCourse = (awsCourse: any, statistics?: any): Course =
     completionRate: parseFloat(awsCourse.completion_rate || '0'),
     rating: parseFloat(awsCourse.rating || '4.0'),
     totalRatings: parseInt(awsCourse.total_ratings || '0'),
+    ratingBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
     duration: `${awsCourse.duration_hours || 0} weeks`,
     modules: Number(
       awsCourse.total_sections ??
@@ -492,6 +494,7 @@ class CourseService {
         completionRate: 0, // Will be calculated after fetching students
         rating: parseFloat(courseData.rating) || 0,
         totalRatings: parseInt(courseData.totalRatings) || 0,
+        ratingBreakdown: courseData.ratingBreakdown ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
         duration: `${courseData.duration_hours || 0}h`,
         modules: fullData.data.totalSections || 0,
         lessons: fullData.data.totalVideos || 0,
