@@ -99,9 +99,17 @@ FEATURE_COLS = [
     "thompson_bonus",          # UCB exploration signal
     "difficulty_progression",  # learning path next-step boost
     "session_cf_boost",        # similarity to courses clicked in current session
+    "user_embedding_similarity",  # cosine sim to recent-taste embedding centroid (last 30 d)
 ]
 
-POSITIVE_EVENTS = {"click", "start", "enroll", "complete", "wishlist", "save"}
+# Ordinal relevance grades matching the EVENT_RELEVANCE scale used in
+# getRecommendations.ts aggregateBehavior() weight table.
+# LightGBM lambdarank natively optimises nDCG with graded relevance (0-4);
+# the logistic regression path binarises these at training time.
+EVENT_RELEVANCE = {
+    "complete": 4, "enroll": 3, "wishlist": 2, "save": 2,
+    "start": 1,    "click":  1,
+}
 
 
 # ── Real data loader ──────────────────────────────────────────────────────────
@@ -123,7 +131,7 @@ def load_real_data() -> pd.DataFrame:
         breakdown = ctx.get("score_breakdown")
         if not breakdown:
             continue
-        label = 1 if (ev.get("event_type") or "").lower() in POSITIVE_EVENTS else 0
+        label = EVENT_RELEVANCE.get((ev.get("event_type") or "").lower(), 0)
         row = {"label": label, "course_id": ev.get("course_id")}
         for feat in FEATURE_COLS:
             row[feat] = float(breakdown.get(feat, 0.0))
@@ -150,6 +158,12 @@ def generate_synthetic_data(n_samples: int = 2000) -> pd.DataFrame:
     # session_cf_boost: 0 when no active session, peaks around 0.6 for courses
     # that match the session theme (most sessions are single-topic).
     data["session_cf_boost"] = rng.beta(1.5, 3, n_samples)  # right-skewed, mostly low
+    # user_embedding_similarity: 0 when embeddings disabled; when enabled it
+    # correlates with category_affinity/content_similarity_boost but captures
+    # recent drift. Simulate as a slightly noisy version of category_affinity.
+    data["user_embedding_similarity"] = np.clip(
+        data["category_affinity"] * 0.7 + rng.normal(0, 0.15, n_samples), 0, 1
+    )
 
     df = pd.DataFrame(data)
     logit = (
@@ -162,6 +176,7 @@ def generate_synthetic_data(n_samples: int = 2000) -> pd.DataFrame:
         + 0.5 * df["popularity"]
         + 0.4 * df["freshness"]
         + 0.5 * df["session_cf_boost"]   # strong signal: session intent matters
+        + 0.4 * df["user_embedding_similarity"]  # recent-taste centroid
         + 0.3 * df["thompson_bonus"]
         + 0.3 * df["session_intent_boost"]
         - 0.8 * df["ignored_penalty"]
@@ -170,32 +185,61 @@ def generate_synthetic_data(n_samples: int = 2000) -> pd.DataFrame:
         - 3.0
     )
     prob = 1 / (1 + np.exp(-logit))
-    df["label"] = (rng.uniform(0, 1, n_samples) < prob).astype(int)
+    # Map probability to ordinal relevance grades 0-4, mirroring EVENT_RELEVANCE:
+    #   0 = no action, 1 = click/start, 2 = save/wishlist, 3 = enroll, 4 = complete
+    grades = np.zeros(n_samples, dtype=int)
+    for grade, threshold in enumerate([0.25, 0.50, 0.68, 0.83], start=1):
+        grades[prob > threshold] = grade
+    df["label"] = grades
     return df
 
 
 # ── Position-bias correction ──────────────────────────────────────────────────
 def compute_position_weights(df: pd.DataFrame) -> np.ndarray:
     """
-    Inverse propensity scoring (IPS) to correct for position bias.
-    See original docstring for full explanation.
+    Inverse propensity scoring (IPS) to correct for position bias, combined
+    with exponential recency decay so that more recent events carry more weight.
+
+    IPS: items shown at rank 1 are clicked at higher rates than identical items
+    at rank 6. Without correction the model learns "rank 1 features → click"
+    rather than "quality features → click". We up-weight lower-ranked items
+    by 1/P(seen | rank) estimated from empirical position CTR.
+
+    Recency: a click from 85 days ago is weaker evidence of current taste than
+    one from yesterday. We apply exp(-age_days / 30) so 30-day-old events get
+    ~37% weight and 90-day-old events get ~5% weight.
     """
     if "rank" not in df.columns or (df["rank"] == 0).all():
-        return np.ones(len(df))
+        weights = np.ones(len(df))
+    else:
+        ranked = df[df["rank"] > 0]
+        if len(ranked) < 30:
+            weights = np.ones(len(df))
+        else:
+            # Binarise ordinal labels for CTR estimation (any engagement = positive)
+            global_ctr = (ranked["label"] > 0).mean()
+            position_ctr = ranked.groupby("rank").apply(lambda g: (g["label"] > 0).mean())
+            smoothed_ctr = position_ctr * 0.6 + global_ctr * 0.4
 
-    ranked = df[df["rank"] > 0]
-    if len(ranked) < 30:
-        return np.ones(len(df))
+            weights = df["rank"].map(
+                lambda r: 1.0 / max(float(smoothed_ctr.get(r, global_ctr)), 0.01)
+                if r > 0 else 1.0
+            ).astype(float)
+            weights = (weights / weights.mean()).values
 
-    global_ctr = ranked["label"].mean()
-    position_ctr = ranked.groupby("rank")["label"].mean()
-    smoothed_ctr = position_ctr * 0.6 + global_ctr * 0.4
+    # Recency decay: 30-day half-life (~21 days). Events without a timestamp
+    # are assigned 45-day age (moderate weight, not zero).
+    if "created_at" in df.columns and df["created_at"].notna().any():
+        ages = (
+            datetime.utcnow()
+            - pd.to_datetime(df["created_at"], errors="coerce")
+        ).dt.total_seconds().fillna(45 * 86400) / 86400  # days
+        recency_factor = np.exp(-ages.values / 30.0)
+        weights = weights * recency_factor
+        # Re-normalise and clip to prevent extreme weights from very old events
+        weights = np.clip(weights / weights.mean(), 0.1, 10.0)
 
-    weights = df["rank"].map(
-        lambda r: 1.0 / max(float(smoothed_ctr.get(r, global_ctr)), 0.01)
-        if r > 0 else 1.0
-    ).astype(float)
-    return (weights / weights.mean()).values
+    return weights
 
 
 # ── Pairwise preference data ───────────────────────────────────────────────────
@@ -217,8 +261,8 @@ def generate_pairwise_data(df: pd.DataFrame) -> pd.DataFrame:
     for req_id, group in deduped.groupby("request_id"):
         if pd.isna(req_id):
             continue
-        pos = group[group["label"] == 1]
-        neg = group[group["label"] == 0]
+        pos = group[group["label"] > 0]   # any positive grade (1-4)
+        neg = group[group["label"] == 0]  # no engagement
         if pos.empty or neg.empty:
             continue
         pos_s = pos.sample(min(len(pos), 3), random_state=42)
@@ -478,7 +522,9 @@ def train_logreg(df: pd.DataFrame) -> dict:
     Identical to the original train() logic.
     """
     X_raw = df[FEATURE_COLS].fillna(0).values
-    y_raw = df["label"].values
+    # Binarise ordinal labels — logistic regression can't use graded relevance.
+    # Any engagement (click=1 through complete=4) is treated as a positive.
+    y_raw = (df["label"].values > 0).astype(int)
 
     print(f"Training LR on {len(df)} samples  |  positive rate: {y_raw.mean():.2%}")
 
@@ -627,8 +673,10 @@ def evaluate_vs_baseline(df: pd.DataFrame, output: dict) -> str:
         g_ml = np.argsort(-ml_scores[s:e])[:6]
         g_rule = np.argsort(-rule_scores[s:e])[:6]
         labels = y[s:e]
-        precision_ml.append(labels[g_ml].mean())
-        precision_rule.append(labels[g_rule].mean())
+        # Precision@K requires binary labels; nDCG uses the full ordinal grades
+        binary_labels = (labels > 0).astype(int)
+        precision_ml.append(binary_labels[g_ml].mean())
+        precision_rule.append(binary_labels[g_rule].mean())
         if labels.sum() > 0:
             ndcg_ml.append(ndcg_score([labels], [ml_scores[s:e]], k=6))
             ndcg_rule.append(ndcg_score([labels], [rule_scores[s:e]], k=6))

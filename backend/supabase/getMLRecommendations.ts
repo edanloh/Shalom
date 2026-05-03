@@ -69,6 +69,7 @@ const FEATURE_COLS = [
   "thompson_bonus",          // UCB exploration signal
   "difficulty_progression",  // learning path next-step boost
   "session_cf_boost",        // similarity to courses clicked in current session
+  "user_embedding_similarity",  // cosine sim to recent-taste embedding centroid (last 30 d)
 ] as const;
 
 type FeatureCol = typeof FEATURE_COLS[number];

@@ -1566,6 +1566,44 @@ const courseSelect = `
       }
     }
 
+    // ── Recent-taste embedding similarity (pgvector) ─────────────────────────
+    // Distinct from content_similarity_boost (which uses ALL enrolled courses):
+    // this centroid is built from positively-interacted courses in the last 30
+    // days only, capturing taste drift. When the ML re-ranker has both features,
+    // it can learn to blend long-term and recent preferences automatically.
+    const recentTasteSimilarityMap = new Map<string, number>();
+    if (EMBEDDINGS_ENABLED && courseIds.length > 0) {
+      try {
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+        const recentPositiveTypes = new Set(["click", "start", "save", "complete", "enroll", "wishlist"]);
+        const recentCourseIds = Array.from(new Set(
+          userEvents
+            .filter((ev) => {
+              const ts = ev.timestamp ? new Date(ev.timestamp).getTime() : 0;
+              return (
+                nowTs - ts <= thirtyDaysMs &&
+                recentPositiveTypes.has((ev.event_type ?? "").toLowerCase())
+              );
+            })
+            .map((ev) => ev.course_id)
+            .filter((id): id is string => typeof id === "string" && id.length > 0)
+        ));
+        if (recentCourseIds.length > 0) {
+          const { data: recentSimRows, error: recentSimErr } = await (supabase as any).rpc(
+            "get_embedding_similarity",
+            { enrolled_ids: recentCourseIds, candidate_ids: courseIds }
+          );
+          if (!recentSimErr && Array.isArray(recentSimRows)) {
+            for (const row of recentSimRows) {
+              recentTasteSimilarityMap.set(row.course_id, clamp(row.similarity ?? 0, 0, 1));
+            }
+          }
+        }
+      } catch {
+        // Fall back silently — embeddings not yet configured
+      }
+    }
+
     const positiveEventTypes = new Set([
       "impression",
       "view",
@@ -1677,6 +1715,13 @@ const courseSelect = `
         return 0.1; // wrong direction (e.g. beginner when user is already intermediate)
       })();
 
+      // Recent-taste embedding similarity: cosine sim to centroid of the user's
+      // last-30-day positively-interacted courses. Captures taste drift that the
+      // all-time content_similarity_boost centroid may miss for returning users.
+      const userEmbeddingSimilarity = clamp(
+        recentTasteSimilarityMap.get(course.id) ?? 0, 0, 1
+      );
+
       // Thompson bonus: UCB-style exploration score. High for unseen courses,
       // moderate for courses with a good but uncertain global CTR.
       const thompsonBonus = thompsonBonusMap.get(course.id) ?? THOMPSON_DEFAULT;
@@ -1751,6 +1796,7 @@ const courseSelect = `
           freshness * 10 * scoring.freshness +
           popularity * 10 * scoring.globalPopularity * Math.max(0.1, contextFactors.popularity) +
           contentSimilarityBoost * 10 * scoring.contentSimilarityBoost +
+          userEmbeddingSimilarity * 10 * 0.08 +          // recent-taste centroid (ML learns exact weight)
           thompsonBonus * 10 * scoring.thompsonBonus +   // exploration bonus
           sessionCfBoost * 10 * 0.12 -                  // session sequence CF
           userBeh.ignoredPenalty * scoring.ignorePenalty -
@@ -1846,6 +1892,7 @@ const courseSelect = `
           thompson_bonus: Number((thompsonBonus * 10).toFixed(3)),          // UCB exploration signal
           difficulty_progression: Number((difficultyProgression * 10).toFixed(3)), // learning path
           session_cf_boost: Number((sessionCfBoost * 10).toFixed(3)),     // session sequence similarity
+          user_embedding_similarity: Number((userEmbeddingSimilarity * 10).toFixed(3)), // recent-taste centroid
         },
         course: {
           ...course,
