@@ -207,35 +207,51 @@ def make_synthetic_requests(n_requests=200, candidates_per_request=20, seed=0):
         n = candidates_per_request
         candidates = []
         for cid in range(n):
+            cat_affinity = float(rng.uniform(0, 1))
             breakdown = {
                 "rating":                    float(rng.uniform(0, 1)),
                 "user_ctr":                  float(rng.uniform(0, 1)),
                 "user_recency":              float(rng.uniform(0, 1)),
-                "category_affinity":         float(rng.uniform(0, 1)),
+                "category_affinity":         cat_affinity,
                 "instructor_affinity":       float(rng.uniform(0, 1)),
                 "tag_affinity":              float(rng.uniform(0, 1)),
                 "difficulty_match":          float(rng.uniform(0, 1)),
                 "freshness":                 float(rng.uniform(0, 1)),
                 "session_intent_boost":      float(rng.uniform(0, 0.5)),
                 "popularity":                float(rng.uniform(0, 1)),
-                "global_ctr":               float(rng.uniform(0, 1)),
+                "global_ctr":                float(rng.uniform(0, 1)),
                 "ignored_penalty":           float(rng.uniform(0, 1)),
                 "dismiss_penalty":           float(rng.uniform(0, 1)),
                 "suppression_penalty":       float(rng.uniform(0, 1)),
                 "overexposed_penalty":       float(rng.uniform(0, 0.5)),
                 "instructor_fatigue_penalty":float(rng.uniform(0, 0.5)),
                 "quality_penalty":           float(rng.uniform(0, 0.5)),
+                "content_similarity_boost":  float(rng.uniform(0, 1)),
+                "thompson_bonus":            float(rng.beta(2, 2)),
+                "difficulty_progression":    float(rng.choice([0.1, 0.4, 0.5, 0.6, 1.0])),
                 "session_cf_boost":          float(rng.beta(1.5, 3)),
+                "user_embedding_similarity": float(np.clip(cat_affinity * 0.7 + rng.normal(0, 0.15), 0, 1)),
             }
-            # Simulated "true" click probability (ground truth)
+            # Simulated "true" click probability (ground truth).
+            # Coefficients mirror generate_synthetic_data() in train_reranker.py
+            # so that training and evaluation share the same data-generating process.
             true_logit = (
                 1.2 * breakdown["rating"]
                 + 1.0 * breakdown["category_affinity"]
-                + 0.8 * breakdown["tag_affinity"]
-                + 0.6 * breakdown["user_ctr"]
-                - 0.9 * breakdown["ignored_penalty"]
-                - 1.1 * breakdown["dismiss_penalty"]
-                - 2.5
+                + 0.9 * breakdown["tag_affinity"]
+                + 0.8 * breakdown["content_similarity_boost"]
+                + 0.7 * breakdown["user_ctr"]
+                + 0.6 * breakdown["difficulty_progression"]
+                + 0.5 * breakdown["popularity"]
+                + 0.4 * breakdown["freshness"]
+                + 0.5 * breakdown["session_cf_boost"]
+                + 0.4 * breakdown["user_embedding_similarity"]
+                + 0.3 * breakdown["thompson_bonus"]
+                + 0.3 * breakdown["session_intent_boost"]
+                - 0.8 * breakdown["ignored_penalty"]
+                - 1.0 * breakdown["dismiss_penalty"]
+                - 0.6 * breakdown["suppression_penalty"]
+                - 3.0
             )
             true_prob = 1 / (1 + math.exp(-true_logit))
             label = int(rng.uniform(0, 1) < true_prob)

@@ -231,8 +231,8 @@ def compute_position_weights(df: pd.DataFrame) -> np.ndarray:
     # are assigned 45-day age (moderate weight, not zero).
     if "created_at" in df.columns and df["created_at"].notna().any():
         ages = (
-            datetime.utcnow()
-            - pd.to_datetime(df["created_at"], errors="coerce")
+            pd.Timestamp.now(tz="UTC")
+            - pd.to_datetime(df["created_at"], errors="coerce", utc=True)
         ).dt.total_seconds().fillna(45 * 86400) / 86400  # days
         recency_factor = np.exp(-ages.values / 30.0)
         weights = weights * recency_factor
@@ -437,7 +437,7 @@ def train_lgbm(df: pd.DataFrame) -> dict:
     ndcg_scores = []
     if has_timestamps:
         df_ts = df.copy()
-        df_ts["_ts"] = pd.to_datetime(df_ts["created_at"], errors="coerce")
+        df_ts["_ts"] = pd.to_datetime(df_ts["created_at"], errors="coerce", utc=True)
         df_ts = df_ts.sort_values("_ts").reset_index(drop=True)
         X_ts = df_ts[FEATURE_COLS].fillna(0).values.astype(np.float32)
         y_ts = df_ts["label"].values.astype(np.int32)
@@ -565,7 +565,7 @@ def train_logreg(df: pd.DataFrame) -> dict:
     aucs = []
     if has_timestamps:
         df_ts = df.copy()
-        df_ts["_ts"] = pd.to_datetime(df_ts["created_at"], errors="coerce")
+        df_ts["_ts"] = pd.to_datetime(df_ts["created_at"], errors="coerce", utc=True)
         df_ts = df_ts.sort_values("_ts").reset_index(drop=True)
         X_ts = scaler.transform(df_ts[FEATURE_COLS].fillna(0).values)
         y_ts = df_ts["label"].values
