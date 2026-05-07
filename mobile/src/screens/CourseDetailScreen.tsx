@@ -156,9 +156,13 @@ export default function CourseDetailScreen({
       ]);
       setCourseDetail(detail);
       setCourseContent(moduleData);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load course detail:", err);
-      setError("Failed to load course details");
+      if (err?.status === 403) {
+        setError(err.message);
+      } else {
+        setError("Failed to load course details");
+      }
     } finally {
       if (!isBackground) {
         setLoading(false);
@@ -514,13 +518,20 @@ export default function CourseDetailScreen({
   }
 
   if (error || !courseDetail) {
+    const isCourseUnavailable = error?.includes("currently unavailable");
     return (
       <Screen title="" noHeader customEdges={["top", "bottom"]}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error || "Course not found"}</Text>
-          <Pressable style={styles.retryButton} onPress={() => void loadCourseDetail()}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </Pressable>
+          {isCourseUnavailable ? (
+            <Pressable style={styles.retryButton} onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate("MyCourses" as any)}>
+              <Text style={styles.retryButtonText}>Go Back</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.retryButton} onPress={() => void loadCourseDetail()}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </Pressable>
+          )}
         </View>
       </Screen>
     );

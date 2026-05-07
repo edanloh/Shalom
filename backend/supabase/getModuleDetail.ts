@@ -91,6 +91,20 @@ serve(async (req) => {
       );
     }
 
+    if (!course.is_published) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "This course is currently unavailable. Your progress has been saved and will be restored when the course is republished.",
+          code: "COURSE_UNPUBLISHED"
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // ========================================
     // 2. Fetch sections, lessons, quizzes, PDFs, outcomes, reviews in parallel
     // ========================================
