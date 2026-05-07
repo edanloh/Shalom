@@ -361,6 +361,29 @@ serve(async (req) => {
           relatedEntityId: course.id,
         });
       }
+
+      // Notify learners who are mid-progress on this course
+      const { data: activeEnrollments } = await supabaseClient
+        .from('course_enrollments')
+        .select('user_id')
+        .eq('course_id', courseId)
+        .eq('is_completed', false);
+
+      if (activeEnrollments && activeEnrollments.length > 0) {
+        await Promise.all(
+          activeEnrollments.map((enrollment: { user_id: string }) =>
+            sendNotification(supabaseClient, {
+              userId: enrollment.user_id,
+              title: "Course temporarily unavailable",
+              message: `"${course.title}" has been taken down by the instructor and is no longer available. Your progress has been saved.`,
+              type: "course",
+              actionUrl: `/`,
+              relatedEntityType: "course",
+              relatedEntityId: course.id,
+            })
+          )
+        );
+      }
     }
 
     const normalizeResourceType = (lesson: any) => {
