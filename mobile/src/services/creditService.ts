@@ -1,5 +1,6 @@
 import { DeviceEventEmitter } from 'react-native';
 import apiService from './apiService';
+import { supabase } from '../lib/supabase';
 import { showToast } from '../components/common/Toast';
 import {
   AchievementItem,
@@ -183,6 +184,10 @@ export async function recordDailyLogin(userId?: string) {
   // the authoritative date from the user's stored timezone.
   const today = new Date().toLocaleDateString('en-CA');
   if (_dailyLoginFiredDate === today) return;
+  // Skip if there's no active session yet — the Supabase edge function requires
+  // a user JWT. This can happen on initial load before the session is ready.
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session) return;
   _dailyLoginFiredDate = today;
   try {
     const resp = await apiService.post<any>(ENDPOINTS.DAILY_ACTIVITY, { userId });
