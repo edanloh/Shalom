@@ -4,7 +4,6 @@ appId: com.jasmine02.shalom
     visible: 'Login to your Account'
     timeout: 30000
 
-# Authenticate with CI-provided credentials.
 - tapOn:
     text: 'Email'
 - inputText: ${MAESTRO_TEST_EMAIL}
@@ -21,12 +20,12 @@ appId: com.jasmine02.shalom
 - waitForAnimationToEnd
 
 - tapOn:
-    point: '50%, 88%' # Skip for now
+    point: '50%, 88%' # Skip for now (modal button)
 - waitForAnimationToEnd
 
-# App lands on Notifications after login
+# Wait for the nav bar — visible on any tab, avoids guessing landing screen
 - extendedWaitUntil:
-    visible: 'Notifications'
+    visible: 'Home'
     timeout: 30000
 
 # Smoke-check each main tab without relying on backend list data.

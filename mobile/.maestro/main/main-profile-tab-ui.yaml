@@ -4,7 +4,6 @@ appId: com.jasmine02.shalom
     visible: 'Login to your Account'
     timeout: 30000
 
-# Authenticate with CI-provided credentials.
 - tapOn:
     text: 'Email'
 - inputText: ${MAESTRO_TEST_EMAIL}
@@ -21,16 +20,17 @@ appId: com.jasmine02.shalom
 - waitForAnimationToEnd
 
 - tapOn:
-    point: '50%, 88%' # Skip for now
+    point: '50%, 88%' # Skip for now (modal button)
 - waitForAnimationToEnd
 
+# Wait for the nav bar — visible on any tab, avoids guessing landing screen
 - extendedWaitUntil:
-    visible: 'My Courses'
+    visible: 'Home'
     timeout: 30000
 
 # Open Profile tab and verify core Profile UI.
 - tapOn:
-    point: '88%, 88%' # Profile tab
+    point: '88%, 91%' # Profile tab
 - extendedWaitUntil:
     visible: 'Profile'
     timeout: 20000
