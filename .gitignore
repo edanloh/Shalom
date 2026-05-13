@@ -4,5 +4,4 @@ mobile/.expo/devices.json
 backend/ml/model_weights.json
 backend/ml/eval_report.txt
 **/__pycache__/
-backend/ml/supabase/.temp/
-backend/supabase/.temp/
+**/.temp/
