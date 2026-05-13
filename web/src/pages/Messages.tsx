@@ -31,7 +31,7 @@ import { useUser } from '@/contexts/useUser';
 import { getAvatarUri } from '@/utils/avatar';
 import { fetchUserProfile } from '@/services/userService';
 import { fetchAllUsers } from '@/services/userService';
-import { postNotification } from "@/services/notificationService";
+import { postNotification } from '@/services/notificationService';
 
 let CURRENT_USER_ID = '';
 
@@ -245,9 +245,9 @@ const Messages = () => {
     if (!error) {
       await postNotification({
         userIds: [selectedConversation.id],
-        title: user.name,
+        title: user?.name ?? 'New message',
         message: newMessage,
-        type: "message",
+        type: 'message',
       });
       setNewMessage('');
       await fetchConversations(); // Refresh conversations to update latest message in sidebar
@@ -257,12 +257,18 @@ const Messages = () => {
   };
 
   const handleComposeMessage = async () => {
-    if (!selectedUsers.length || !newMessage.trim()) return;
+    console.log(
+      'Composing message to users:',
+      selectedUsers,
+      'with content:',
+      composeMessage,
+    );
+    if (!selectedUsers.length || !composeMessage.trim()) return;
     // Send message to all selected users
-    const inserts = selectedUsers.map((user) => ({
+    const inserts = selectedUsers.map((recipient) => ({
       sender_id: CURRENT_USER_ID,
-      recipient_id: user.id,
-      content: newMessage,
+      recipient_id: recipient.id,
+      content: composeMessage,
     }));
     const { error } = await supabase.from('direct_messages').insert(inserts);
     if (!error) {
@@ -271,16 +277,16 @@ const Messages = () => {
         description: 'Your message has been sent to the selected recipients',
       });
       // Send notifications to all recipients
-      for (const user of selectedUsers) {
+      for (const recipient of selectedUsers) {
         await postNotification({
-          userIds: [user.id],
-          title: user.name,
-          message: newMessage,
-          type: "message",
+          userIds: [recipient.id],
+          title: user?.name ?? 'New message',
+          message: composeMessage,
+          type: 'message',
         });
       }
       setIsComposeOpen(false);
-      setNewMessage('');
+      setComposeMessage('');
       setSelectedUsers([]);
       // Refresh conversations after sending
       await fetchConversations();
@@ -456,45 +462,50 @@ const Messages = () => {
                 {conversations.map((conv) => (
                   <div
                     key={conv.id}
-                    onClick={() => {setSelectedConversation(conv); fetchConversations();}}
+                    onClick={() => {
+                      setSelectedConversation(conv);
+                      fetchConversations();
+                    }}
                     className={`p-3 rounded-lg cursor-pointer transition-colors ${
                       selectedConversation &&
                       selectedConversation.id === conv.id
                         ? 'bg-primary/20 border border-primary/30'
                         : 'bg-background/50 hover:bg-background/80'
                     } ${
-                      conv.unread_messages > 0 ? 'border-2 border-secondary' : ''
+                      conv.unread_messages > 0
+                        ? 'border-2 border-secondary'
+                        : ''
                     }
                     
                     `}
                   >
                     <div className="flex items-start gap-3">
                       <div className="relative flex items-start gap-3">
-                      <Avatar>
-                        {getConvoProfilePic(conv) ? (
-                          <img
-                            src={getConvoProfilePic(conv)}
-                            alt="Profile"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <AvatarFallback>
-                            {conv.name?.[0] || '?'}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="font-medium text-foreground text-sm truncate flex items-center gap-2">
-                            {conv.name}
-                          </p>
+                        <Avatar>
+                          {getConvoProfilePic(conv) ? (
+                            <img
+                              src={getConvoProfilePic(conv)}
+                              alt="Profile"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <AvatarFallback>
+                              {conv.name?.[0] || '?'}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="font-medium text-foreground text-sm truncate flex items-center gap-2">
+                              {conv.name}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-muted-foreground truncate max-w-[140px]">
+                              {conv.last_message || 'No messages yet'}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground truncate max-w-[140px]">
-                            {conv.last_message || 'No messages yet'}
-                          </p>
-                        </div>
-                      </div>
                       </div>
                       <div className="absolute right-3 top-3">
                         {conv.unread_messages > 0 && (
@@ -620,7 +631,6 @@ const Messages = () => {
                             autoFocusSearch={false}
                             width={350}
                             height={400}
-                            theme={'auto'}
                           />
                         </PopoverContent>
                       </Popover>

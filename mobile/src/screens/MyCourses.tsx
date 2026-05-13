@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     overflow: "hidden",
     minHeight: 110,
-    maxHeight: 160,
+    maxHeight: 200,
     ...Shadows.medium,
   },
   ipLeft: {

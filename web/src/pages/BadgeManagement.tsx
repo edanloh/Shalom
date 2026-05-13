@@ -60,6 +60,7 @@ const BadgeManagement = () => {
   const { toast } = useToast();
   const { user: profileUser } = useUser();
   const instructorDbId = profileUser?.uuid ?? "";
+  const instructorId = profileUser?.uuid ?? "";
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newBadgeName, setNewBadgeName] = useState("");
