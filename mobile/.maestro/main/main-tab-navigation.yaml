@@ -24,34 +24,35 @@ appId: com.jasmine02.shalom
     point: '50%, 88%' # Skip for now
 - waitForAnimationToEnd
 
+# App lands on Notifications after login
 - extendedWaitUntil:
-    visible: 'My Courses'
+    visible: 'Notifications'
     timeout: 30000
 
 # Smoke-check each main tab without relying on backend list data.
 - tapOn:
-    point: '31%, 88%' # Courses tab
+    point: '31%, 91%' # Courses tab
 - extendedWaitUntil:
     visible: 'Browse Courses'
     timeout: 20000
 - assertVisible: 'Browse Courses'
 
 - tapOn:
-    point: '50%, 88%' # Notifications tab
+    point: '50%, 91%' # Notifications tab
 - extendedWaitUntil:
     visible: 'Notifications'
     timeout: 20000
 - assertVisible: 'Notifications'
 
 - tapOn:
-    point: '69%, 88%' # Messages tab
+    point: '69%, 91%' # Messages tab
 - extendedWaitUntil:
     visible: 'Messages'
     timeout: 20000
 - assertVisible: 'Messages'
 
 - tapOn:
-    point: '88%, 88%' # Profile tab
+    point: '88%, 91%' # Profile tab
 - extendedWaitUntil:
     visible: 'Profile'
     timeout: 20000

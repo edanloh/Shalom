@@ -25,12 +25,12 @@ appId: com.jasmine02.shalom
 - waitForAnimationToEnd
 
 - extendedWaitUntil:
-    visible: 'My Courses'
+    visible: 'Notifications'
     timeout: 30000
 
 # Open Courses tab and verify core Courses UI.
 - tapOn:
-    point: '31%, 88%' # Courses tab
+    point: '31%, 91%'
 - extendedWaitUntil:
     visible: 'Browse Courses'
     timeout: 20000
