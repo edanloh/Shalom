@@ -20,6 +20,11 @@ appId: com.jasmine02.shalom
     retryTapIfNoChange: true
 - waitForAnimationToEnd
 
+- tapOn:
+    text: 'Skip for now'
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+
 - extendedWaitUntil:
     visible: 'My Courses'
     timeout: 30000

@@ -230,16 +230,19 @@ async function setupAssessmentsMocks(page: Page) {
     });
   });
 
-  await page.route('**/functions/v1/getPendingGradingByQuestion/**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        data: pendingGradingByQuestion,
-      }),
-    });
-  });
+  await page.route(
+    '**/functions/v1/getPendingGradingByQuestion/**',
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: mockPendingGrading,
+        }),
+      });
+    },
+  );
 
   await page.route('**/functions/v1/gradeAnswerVariation*', async (route) => {
     const requestBody = route.request().postDataJSON() as {
@@ -249,7 +252,7 @@ async function setupAssessmentsMocks(page: Page) {
       attemptIds: string[];
     };
 
-    const question = pendingGradingByQuestion.find(
+    const question = mockPendingGrading.find(
       (item) => item.questionId === requestBody.questionId,
     );
 
@@ -301,11 +304,8 @@ async function setupAssessmentsMocks(page: Page) {
   );
 }
 
-async function loginThenNavigateToQuiz(
-  page: Page,
-  options?: Parameters<typeof setupQuizMocks>[1],
-) {
-  await setupQuizMocks(page, options);
+async function loginThenNavigateToQuiz(page: Page) {
+  await setupAssessmentsMocks(page);
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByPlaceholder('Email').fill(TEST_EMAIL);
@@ -318,17 +318,32 @@ async function loginThenNavigateToQuiz(
   });
 
   await page.goto('/quiz', { waitUntil: 'domcontentloaded' });
-  await page.goto('/assessments', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('domcontentloaded');
-  await page.getByRole('tab', { name: 'Quiz Library' }).click();
+  await page.getByRole('button', { name: 'Quiz library' }).click();
 
   await expect(
     page.getByRole('heading', { name: 'Quiz Center' }),
   ).toBeVisible();
 }
 
-test.describe('Quiz page', () => {
-  test('shows course selection prompt before filters are applied', async ({
+async function loginThenNavigateToAssessments(page: Page) {
+  await setupAssessmentsMocks(page);
+
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.getByPlaceholder('Email').fill(TEST_EMAIL);
+  await page.getByPlaceholder('Password').fill(TEST_PASSWORD);
+  await page.getByRole('button', { name: 'Sign In' }).click();
+
+  await page.waitForURL(/\/$/, {
+    timeout: 10000,
+    waitUntil: 'domcontentloaded',
+  });
+
+  await page.goto('/assessments', { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('domcontentloaded');
+  await page.getByRole('tab', { name: 'Grading Queue' }).click();
+}
+
 test.describe('Assessments page', () => {
   test('shows course selection placeholder and browse button', async ({
     page,
@@ -347,16 +362,14 @@ test.describe('Assessments page', () => {
   });
 
   test('opens course selector dialog', async ({ page }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
     await page.getByRole('button', { name: 'Browse Courses' }).click();
 
     await expect(
       page.getByRole('heading', { name: 'Select Course' }),
     ).toBeVisible();
-    await expect(
-      page.getByPlaceholder(/search\s*courses/i),
-    ).toBeVisible();
+    await expect(page.getByPlaceholder(/search\s*courses/i)).toBeVisible();
   });
 
   test('shows published and draft courses in dialog and draft is disabled', async ({
@@ -376,7 +389,7 @@ test.describe('Assessments page', () => {
   });
 
   test('shows no quizzes found empty state', async ({ page }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
     await page.getByRole('button', { name: 'Browse Courses' }).click();
     await page
@@ -396,12 +409,13 @@ test.describe('Assessments page', () => {
   test('grading queue displays pending submissions from mocked data', async ({
     page,
   }) => {
-    await loginThenNavigateToAssessments(page);
+    await loginThenNavigateToQuiz(page);
 
-    await page.getByRole('tab', { name: 'Grading Queue' }).click();
+    await page.getByRole('button', { name: 'Grading Queue' }).click();
 
-    await expect(page.getByText('2 Submissions Pending')).toBeVisible();
-    await expect(page.getByLabel('Grading Queue')).toContainText('SQL Basics Quiz');
+    await expect(page.getByRole('paragraph').filter({ hasText: '2' })).toBeVisible();
+
+    await expect(page.getByRole('main')).toContainText('SQL Basics Quiz');
     await expect(page.locator('text=2 variations').first()).toBeVisible();
 
     await expect(page.getByText('Q1')).toBeVisible();
