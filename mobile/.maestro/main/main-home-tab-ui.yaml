@@ -21,16 +21,17 @@ appId: com.jasmine02.shalom
 - waitForAnimationToEnd
 
 - tapOn:
-    point: '50%, 88%' # Skip for now
+    point: '50%, 88%' # Skip for now (modal button)
 - waitForAnimationToEnd
 
+# Wait for nav bar — visible on any tab, avoids guessing landing screen
 - extendedWaitUntil:
-    visible: 'My Courses'
+    visible: 'Home'
     timeout: 30000
 
 # Open Home tab and verify core Home UI.
 - tapOn:
-    point: '12%, 88%' # Home tab
+    point: '12%, 91%' # Home tab
 - extendedWaitUntil:
     visible: 'My Courses'
     timeout: 20000
