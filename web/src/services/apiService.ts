@@ -34,8 +34,7 @@ export class TimeoutError extends ApiError {
 
 // API Configuration
 const API_CONFIG = {
-  // BASE_URL: API_BASE_URL || 'https://your-api-gateway-url.amazonaws.com',
-  BASE_URL: SUPABASE_URL + '/functions/v1' || 'https://your-supabase-url.supabase.co/rest/v1',
+  BASE_URL: SUPABASE_URL + '/functions/v1',
   TIMEOUT: 10000, // 10 seconds
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // 1 second
